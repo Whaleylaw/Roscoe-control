@@ -51,6 +51,7 @@ import { OpenClawDoctorBanner } from '@/components/layout/openclaw-doctor-banner
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
 import { Loader } from '@/components/ui/loader'
 import { ProjectManagerModal } from '@/components/modals/project-manager-modal'
+import { ProjectWorkspace } from '@/components/project/project-workspace'
 import { ExecApprovalOverlay } from '@/components/modals/exec-approval-overlay'
 import { useWebSocket } from '@/lib/websocket'
 import { useServerEvents } from '@/lib/use-server-events'
@@ -94,6 +95,7 @@ export default function Home() {
 
   // Sync URL → Zustand activeTab
   const pathname = usePathname()
+  const isProjectRoute = pathname.startsWith('/project/')
   const panelFromUrl = pathname === '/' ? 'overview' : pathname.slice(1)
   const normalizedPanel = panelFromUrl === 'sessions' ? 'chat' : panelFromUrl
 
@@ -428,8 +430,8 @@ export default function Home() {
           aria-hidden={showOnboarding}
         >
           <div aria-live="polite" className="flex flex-col min-h-full">
-            <ErrorBoundary key={activeTab}>
-              <ContentRouter tab={activeTab} />
+            <ErrorBoundary key={isProjectRoute ? pathname : activeTab}>
+              {isProjectRoute ? <ProjectWorkspace /> : <ContentRouter tab={activeTab} />}
             </ErrorBoundary>
           </div>
 {/* Footer removed — attribution moved to nav sidebar */}
