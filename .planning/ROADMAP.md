@@ -47,7 +47,10 @@ Plans:
   3. User can switch between Dashboard, Tasks, Sessions, Agents, and Settings tabs without a page reload
   4. The browser URL updates to reflect the active project and sub-view (e.g. /project/my-app/tasks)
   5. User can return to the main project list by clicking "Projects" in the breadcrumb or a back affordance
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 02-00-PLAN.md — Wave 0 test scaffolds for workspace, breadcrumb, tabs (NAV-01 through NAV-05)
+- [ ] 02-01-PLAN.md — Context provider with project data fetching, breadcrumb + tab bar components, workspace shell wiring, i18n nav keys
 **UI hint**: yes
 
 ### Phase 3: Project Dashboard
@@ -107,7 +110,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/3 | Planning complete | - |
-| 2. Navigation & Workspace Shell | 0/TBD | Not started | - |
+| 2. Navigation & Workspace Shell | 0/2 | Planning complete | - |
 | 3. Project Dashboard | 0/TBD | Not started | - |
 | 4. Project Tasks | 0/TBD | Not started | - |
 | 5. Sessions & Agents | 0/TBD | Not started | - |
