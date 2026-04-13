@@ -1416,6 +1416,27 @@ const migrations: Migration[] = [
     up(db: Database.Database) {
       db.exec(`ALTER TABLE agents ADD COLUMN runtime_type TEXT DEFAULT NULL`)
     }
+  },
+  {
+    id: '050_mcp_call_receipt_signing',
+    up(db: Database.Database) {
+      // Add Ed25519 receipt signing columns to the MCP audit log.
+      // payload_hash: SHA-256 of the canonical JSON payload at write time
+      // signature: Ed25519 signature (hex) over the canonical payload
+      // public_key: base64-encoded Ed25519 public key for offline verification
+      db.exec(`ALTER TABLE mcp_call_log ADD COLUMN payload_hash TEXT DEFAULT NULL`)
+      db.exec(`ALTER TABLE mcp_call_log ADD COLUMN signature TEXT DEFAULT NULL`)
+      db.exec(`ALTER TABLE mcp_call_log ADD COLUMN public_key TEXT DEFAULT NULL`)
+    }
+  },
+  {
+    id: '051_project_workspace_indexes',
+    up(db: Database.Database) {
+      // FOUN-02, D-09: Composite index for task count grouping by project + status
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_status ON tasks(project_id, status)`)
+      // FOUN-02, D-09: Composite index for active session filtering by project
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_project_active ON claude_sessions(project_slug, is_active)`)
+    }
   }
 ]
 
