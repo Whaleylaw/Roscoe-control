@@ -2198,10 +2198,14 @@
   "project": {
     "workspace": {
       "title": "Project Workspace",
-      "notFound": "Project not found",
-      "loading": "Loading project..."
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "Proyecto no encontrado",
+      "projectNotFoundDescription": "El proyecto que buscas no existe o ha sido eliminado.",
+      "backToProjects": "Volver a proyectos"
     },
     "nav": {
+      "projects": "Proyectos",
       "dashboard": "Dashboard",
       "tasks": "Tasks",
       "sessions": "Sessions",

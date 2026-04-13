@@ -2198,10 +2198,14 @@
   "project": {
     "workspace": {
       "title": "Project Workspace",
-      "notFound": "Project not found",
-      "loading": "Loading project..."
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "项目未找到",
+      "projectNotFoundDescription": "您查找的项目不存在或已被删除。",
+      "backToProjects": "返回项目列表"
     },
     "nav": {
+      "projects": "项目",
       "dashboard": "Dashboard",
       "tasks": "Tasks",
       "sessions": "Sessions",

@@ -2198,10 +2198,14 @@
   "project": {
     "workspace": {
       "title": "Project Workspace",
-      "notFound": "Project not found",
-      "loading": "Loading project..."
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "プロジェクトが見つかりません",
+      "projectNotFoundDescription": "お探しのプロジェクトは存在しないか、削除されました。",
+      "backToProjects": "プロジェクト一覧に戻る"
     },
     "nav": {
+      "projects": "プロジェクト",
       "dashboard": "Dashboard",
       "tasks": "Tasks",
       "sessions": "Sessions",
