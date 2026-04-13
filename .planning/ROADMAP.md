@@ -49,8 +49,8 @@ Plans:
   5. User can return to the main project list by clicking "Projects" in the breadcrumb or a back affordance
 **Plans:** 2 plans
 Plans:
-- [ ] 02-00-PLAN.md — Wave 0 test scaffolds for workspace, breadcrumb, tabs (NAV-01 through NAV-05)
-- [ ] 02-01-PLAN.md — Context provider with project data fetching, breadcrumb + tab bar components, workspace shell wiring, i18n nav keys
+- [x] 02-00-PLAN.md — Wave 0 test scaffolds for workspace, breadcrumb, tabs (NAV-01 through NAV-05)
+- [x] 02-01-PLAN.md — Context provider with project data fetching, breadcrumb + tab bar components, workspace shell wiring, i18n nav keys
 **UI hint**: yes
 
 ### Phase 3: Project Dashboard

@@ -9,11 +9,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Navigation
 
-- [ ] **NAV-01**: User can navigate into a project via full-takeover workspace view
-- [ ] **NAV-02**: Breadcrumb navigation shows Projects > Project Name > Sub-view with clickable trail
-- [ ] **NAV-03**: User can navigate between project sub-views (dashboard, tasks, sessions, agents, settings)
-- [ ] **NAV-04**: URL reflects current project and sub-view (e.g., /project/my-app/tasks)
-- [ ] **NAV-05**: User can return to main view via breadcrumb or back navigation
+- [x] **NAV-01**: User can navigate into a project via full-takeover workspace view
+- [x] **NAV-02**: Breadcrumb navigation shows Projects > Project Name > Sub-view with clickable trail
+- [x] **NAV-03**: User can navigate between project sub-views (dashboard, tasks, sessions, agents, settings)
+- [x] **NAV-04**: URL reflects current project and sub-view (e.g., /project/my-app/tasks)
+- [x] **NAV-05**: User can return to main view via breadcrumb or back navigation
 
 ### Dashboard
 
@@ -91,11 +91,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUN-02 | Phase 1 | Complete |
 | FOUN-03 | Phase 1 | Complete |
 | FOUN-04 | Phase 1 | Complete |
-| NAV-01 | Phase 2 | Pending |
-| NAV-02 | Phase 2 | Pending |
-| NAV-03 | Phase 2 | Pending |
-| NAV-04 | Phase 2 | Pending |
-| NAV-05 | Phase 2 | Pending |
+| NAV-01 | Phase 2 | Complete |
+| NAV-02 | Phase 2 | Complete |
+| NAV-03 | Phase 2 | Complete |
+| NAV-04 | Phase 2 | Complete |
+| NAV-05 | Phase 2 | Complete |
 | DASH-01 | Phase 3 | Pending |
 | DASH-02 | Phase 3 | Pending |
 | DASH-03 | Phase 3 | Pending |
