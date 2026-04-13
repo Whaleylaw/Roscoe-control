@@ -23,6 +23,10 @@ When I click into a project, I see everything about that project — what it is,
 
 ### Active
 
+- [x] URL-driven project workspace routing (no Zustand dependency) — Validated in Phase 1: Foundation
+- [x] Component architecture for project workspace (dedicated directory, multi-file) — Validated in Phase 1: Foundation
+- [x] Database composite indexes for project-scoped queries — Validated in Phase 1: Foundation
+- [x] i18n namespace for project workspace UI strings — Validated in Phase 1: Foundation
 - [ ] Full-takeover project workspace view when navigating into a project
 - [ ] Breadcrumb navigation (Projects > Project Name > Sub-view)
 - [ ] Project dashboard with status overview (active tasks, blocked items, progress)
@@ -86,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 after initialization*
+*Last updated: 2026-04-13 after Phase 1: Foundation completion*
