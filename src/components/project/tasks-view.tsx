@@ -1,16 +1,20 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
 import { useProjectWorkspace } from '@/components/project/project-context'
+import { TaskBoardPanel } from '@/components/panels/task-board-panel'
 
 export function TasksView() {
-  const t = useTranslations('project')
-  const { slug } = useProjectWorkspace()
-
+  const { project } = useProjectWorkspace()
+  // project-workspace.tsx already gates on loading/not-found before this view.
+  if (!project) return null
   return (
-    <div className="p-6">
-      <h2 className="text-lg font-semibold mb-4">{t('tasks.title')}</h2>
-      <p className="text-sm text-muted-foreground">{t('tasks.placeholder')}</p>
-    </div>
+    <TaskBoardPanel
+      scope={{
+        lockedProjectId: project.id,
+        hideProjectFilter: true,
+        hideProjectLabels: true,
+        defaultCreateProjectId: project.id,
+      }}
+    />
   )
 }
