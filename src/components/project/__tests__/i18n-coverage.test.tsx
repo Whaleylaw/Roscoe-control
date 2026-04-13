@@ -2,42 +2,46 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
-const STUB_VIEWS = [
-  'dashboard-view.tsx',
-  'tasks-view.tsx',
-  'sessions-view.tsx',
-  'agents-view.tsx',
-  'settings-view.tsx',
+const MESSAGES_DIR = path.resolve(__dirname, '..', '..', '..', '..', 'messages')
+
+const REQUIRED_SUB_KEYS = [
+  'workspace',
+  'nav',
+  'dashboard',
+  'tasks',
+  'sessions',
+  'agents',
+  'settings',
 ]
 
-const PROJECT_DIR = path.join(__dirname, '..')
+describe('Project i18n coverage (FOUN-04)', () => {
+  it('en.json has project namespace with all required sub-keys', () => {
+    const enPath = path.join(MESSAGES_DIR, 'en.json')
+    const data = JSON.parse(fs.readFileSync(enPath, 'utf-8'))
 
-describe('i18n coverage for stub views', () => {
-  for (const file of STUB_VIEWS) {
-    const filePath = path.join(PROJECT_DIR, file)
+    expect(data).toHaveProperty('project')
 
-    it(`${file} uses useTranslations('project')`, () => {
-      const source = fs.readFileSync(filePath, 'utf-8')
-      expect(source).toContain("useTranslations('project')")
-    })
+    for (const key of REQUIRED_SUB_KEYS) {
+      expect(data.project).toHaveProperty(key)
+    }
+  })
 
-    it(`${file} does not contain hardcoded English strings in JSX`, () => {
-      const source = fs.readFileSync(filePath, 'utf-8')
-      // Extract the return block (everything inside the return statement)
-      const returnMatch = source.match(/return\s*\(([\s\S]*)\)\s*\}/)
-      if (!returnMatch) return
+  it('all 10 locale files have project namespace', () => {
+    const files = fs.readdirSync(MESSAGES_DIR).filter((f) => f.endsWith('.json'))
+    expect(files.length).toBe(10)
 
-      const jsxBlock = returnMatch[1]
-      // Check that text content between > and < comes from t() calls, not string literals
-      // Match content between > and < that is not whitespace and not a JSX expression
-      const textContent = jsxBlock.match(/>([^<{]+)</g)
-      if (textContent) {
-        for (const match of textContent) {
-          const text = match.slice(1, -1).trim()
-          // Allow empty strings and whitespace
-          expect(text).toBe('')
-        }
+    for (const file of files) {
+      const filePath = path.join(MESSAGES_DIR, file)
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+      expect(data, `${file} missing project key`).toHaveProperty('project')
+
+      for (const key of REQUIRED_SUB_KEYS) {
+        expect(data.project, `${file} missing project.${key}`).toHaveProperty(key)
       }
-    })
-  }
+    }
+  })
+
+  // These will be filled in by Plan 02 after stub views are created
+  it.todo('all 5 stub view components use useTranslations(project)')
+  it.todo('no stub view contains hardcoded English strings in JSX')
 })
