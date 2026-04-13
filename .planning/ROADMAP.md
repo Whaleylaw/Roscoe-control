@@ -83,7 +83,7 @@ Plans:
   4. All existing task board actions (status change, edit, delete) work identically inside the project workspace
 **Plans:** 2 plans
 Plans:
-- [ ] 04-00-PLAN.md — Wave 0 test scaffolds (TASK-01 through TASK-04)
+- [x] 04-00-PLAN.md — Wave 0 test scaffolds (TASK-01 through TASK-04)
 - [ ] 04-01-PLAN.md — TaskBoardScope prop + tasks-view wrapper + test bodies
 **UI hint**: yes
 

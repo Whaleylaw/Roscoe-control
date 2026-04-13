@@ -27,10 +27,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Tasks
 
-- [ ] **TASK-01**: Project workspace shows task list filtered to only that project's tasks
-- [ ] **TASK-02**: User can create new tasks pre-scoped to the current project
-- [ ] **TASK-03**: User can reassign existing tasks into or out of the current project
-- [ ] **TASK-04**: Task list supports existing task board functionality (status changes, editing, etc.)
+- [x] **TASK-01**: Project workspace shows task list filtered to only that project's tasks
+- [x] **TASK-02**: User can create new tasks pre-scoped to the current project
+- [x] **TASK-03**: User can reassign existing tasks into or out of the current project
+- [x] **TASK-04**: Task list supports existing task board functionality (status changes, editing, etc.)
 
 ### Sessions
 
@@ -103,10 +103,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-05 | Phase 3 | Complete |
 | DASH-06 | Phase 3 | Complete |
 | DASH-07 | Phase 3 | Complete |
-| TASK-01 | Phase 4 | Pending |
-| TASK-02 | Phase 4 | Pending |
-| TASK-03 | Phase 4 | Pending |
-| TASK-04 | Phase 4 | Pending |
+| TASK-01 | Phase 4 | Complete |
+| TASK-02 | Phase 4 | Complete |
+| TASK-03 | Phase 4 | Complete |
+| TASK-04 | Phase 4 | Complete |
 | SESS-01 | Phase 5 | Pending |
 | SESS-02 | Phase 5 | Pending |
 | SESS-03 | Phase 5 | Pending |
