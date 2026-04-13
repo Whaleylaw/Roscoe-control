@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. All new UI strings render correctly via next-intl message lookups with no hardcoded text
 **Plans:** 3 plans
 Plans:
-- [ ] 01-00-PLAN.md — Wave 0 test scaffolds (FOUN-01, FOUN-02, FOUN-04)
+- [x] 01-00-PLAN.md — Wave 0 test scaffolds (FOUN-01, FOUN-02, FOUN-04)
 - [ ] 01-01-PLAN.md — DB composite indexes + i18n namespace for all 10 locales
 - [ ] 01-02-PLAN.md — URL-driven context provider, workspace shell, view router, stub views, page.tsx integration
 **UI hint**: yes

@@ -46,10 +46,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUN-01**: Workspace state derived from URL, not stored in global Zustand store
-- [ ] **FOUN-02**: Database indexes added for project_id composite queries (tasks, sessions)
+- [x] **FOUN-01**: Workspace state derived from URL, not stored in global Zustand store
+- [x] **FOUN-02**: Database indexes added for project_id composite queries (tasks, sessions)
 - [ ] **FOUN-03**: Component directory structure prevents monolithic panel anti-pattern
-- [ ] **FOUN-04**: All user-facing strings use next-intl message files
+- [x] **FOUN-04**: All user-facing strings use next-intl message files
 
 ## v2 Requirements
 
@@ -87,10 +87,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUN-01 | Phase 1 | Pending |
-| FOUN-02 | Phase 1 | Pending |
+| FOUN-01 | Phase 1 | Complete |
+| FOUN-02 | Phase 1 | Complete |
 | FOUN-03 | Phase 1 | Pending |
-| FOUN-04 | Phase 1 | Pending |
+| FOUN-04 | Phase 1 | Complete |
 | NAV-01 | Phase 2 | Pending |
 | NAV-02 | Phase 2 | Pending |
 | NAV-03 | Phase 2 | Pending |
