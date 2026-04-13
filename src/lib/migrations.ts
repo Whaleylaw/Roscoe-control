@@ -1428,6 +1428,15 @@ const migrations: Migration[] = [
       db.exec(`ALTER TABLE mcp_call_log ADD COLUMN signature TEXT DEFAULT NULL`)
       db.exec(`ALTER TABLE mcp_call_log ADD COLUMN public_key TEXT DEFAULT NULL`)
     }
+  },
+  {
+    id: '051_project_workspace_indexes',
+    up(db: Database.Database) {
+      // FOUN-02, D-09: Composite index for task count grouping by project + status
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_status ON tasks(project_id, status)`)
+      // FOUN-02, D-09: Composite index for active session filtering by project
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_project_active ON claude_sessions(project_slug, is_active)`)
+    }
   }
 ]
 
