@@ -68,3 +68,11 @@ describe('ProjectWorkspaceProvider', () => {
     }).toThrow('useProjectWorkspace must be used within ProjectWorkspaceProvider')
   })
 })
+
+describe('ProjectWorkspaceProvider - project data fetching (NAV-04)', () => {
+  it.todo('exposes fetched project object in context when slug matches store')
+  it.todo('sets loading=true while project is being resolved')
+  it.todo('sets error when project slug not found in store or API')
+  it.todo('calls setActiveProject on Zustand store when project is loaded')
+  it.todo('clears activeProject on unmount')
+})
