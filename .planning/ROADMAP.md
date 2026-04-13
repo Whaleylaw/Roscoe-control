@@ -84,7 +84,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 04-00-PLAN.md — Wave 0 test scaffolds (TASK-01 through TASK-04)
-- [ ] 04-01-PLAN.md — TaskBoardScope prop + tasks-view wrapper + test bodies
+- [x] 04-01-PLAN.md — TaskBoardScope prop + tasks-view wrapper + test bodies
 **UI hint**: yes
 
 ### Phase 5: Sessions & Agents
