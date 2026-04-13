@@ -65,7 +65,11 @@ Plans:
   5. Blocked or needs-attention tasks are visually prominent and distinct from normal tasks
   6. A health indicator (on track / at risk / off track) is visible without scrolling
   7. All dashboard data updates live when an SSE event fires for a task or session change
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 03-00-PLAN.md — Wave 0 test scaffolds for dashboard (DASH-01 through DASH-07)
+- [ ] 03-01-PLAN.md — i18n keys + dashboard sub-components (status cards, progress bar, health badge, project brief, activity feed)
+- [ ] 03-02-PLAN.md — Main dashboard-view.tsx wiring with data, layout, SSE reactivity, and visual verification
 **UI hint**: yes
 
 ### Phase 4: Project Tasks
@@ -111,7 +115,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/3 | Planning complete | - |
 | 2. Navigation & Workspace Shell | 0/2 | Planning complete | - |
-| 3. Project Dashboard | 0/TBD | Not started | - |
+| 3. Project Dashboard | 0/3 | Planning complete | - |
 | 4. Project Tasks | 0/TBD | Not started | - |
 | 5. Sessions & Agents | 0/TBD | Not started | - |
 | 6. Settings | 0/TBD | Not started | - |
