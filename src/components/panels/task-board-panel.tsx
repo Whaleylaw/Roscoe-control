@@ -388,7 +388,18 @@ interface SpawnFormData {
   timeoutSeconds: number
 }
 
-export function TaskBoardPanel() {
+export interface TaskBoardScope {
+  /** Lock the board to a single project_id; bypasses activeProject sync. */
+  lockedProjectId: number
+  /** Hide the top-bar project filter <select> dropdown. */
+  hideProjectFilter?: boolean
+  /** Hide the card-view ticket_ref span. Detail modal ticket_ref stays visible. */
+  hideProjectLabels?: boolean
+  /** Default project_id used in CreateTaskModal's useState initializer. */
+  defaultCreateProjectId?: number
+}
+
+export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
   const t = useTranslations('taskBoard')
   const statusColumns = STATUS_COLUMN_KEYS.map(col => ({ ...col, title: t(col.titleKey as any) }))
   const { tasks: storeTasks, setTasks: storeSetTasks, selectedTask, setSelectedTask, activeProject, availableModels, spawnRequests, addSpawnRequest, updateSpawnRequest, dashboardMode } = useMissionControl()
@@ -398,7 +409,11 @@ export function TaskBoardPanel() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(
-    activeProject ? String(activeProject.id) : 'all'
+    scope?.lockedProjectId
+      ? String(scope.lockedProjectId)
+      : activeProject
+        ? String(activeProject.id)
+        : 'all'
   )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -438,10 +453,14 @@ export function TaskBoardPanel() {
   }, [pathname, router, searchParams])
 
   // Augment store tasks with aegisApproved flag (computed, not stored)
-  const tasks: Task[] = storeTasks.map(t => ({
-    ...t,
-    aegisApproved: Boolean(aegisMap[t.id])
-  }))
+  // When scope is locked, filter client-side to defend against SSE keeping a
+  // reassigned-out task in storeTasks until the next re-fetch (pitfall #5).
+  const tasks: Task[] = storeTasks
+    .filter(t => !scope?.lockedProjectId || t.project_id === scope.lockedProjectId)
+    .map(t => ({
+      ...t,
+      aegisApproved: Boolean(aegisMap[t.id])
+    }))
 
   // Fetch tasks, agents, and projects
   const fetchData = useCallback(async () => {
@@ -527,10 +546,17 @@ export function TaskBoardPanel() {
   }, [])
 
   // Sync global activeProject into local projectFilter
+  // When scope is locked, this effect early-returns and re-asserts the locked
+  // project id so it can never fall back to 'all' (pitfall #2: activeProject
+  // unmount race in workspace mode).
   useEffect(() => {
+    if (scope?.lockedProjectId) {
+      setProjectFilter(String(scope.lockedProjectId))
+      return
+    }
     const newFilter = activeProject ? String(activeProject.id) : 'all'
     setProjectFilter(newFilter)
-  }, [activeProject])
+  }, [activeProject, scope?.lockedProjectId])
 
   useEffect(() => {
     if (!Number.isFinite(selectedTaskIdFromUrl)) {
@@ -798,23 +824,25 @@ export function TaskBoardPanel() {
               )}
             </button>
           )}
-          <div className="relative">
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="h-9 px-3 pr-8 bg-surface-1 text-foreground border border-border rounded-md text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
-            >
-              <option value="all">{t('allProjects')}</option>
-              {projects.map((project) => (
-                <option key={project.id} value={String(project.id)}>
-                  {project.name} ({project.ticket_prefix})
-                </option>
-              ))}
-            </select>
-            <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 6l4 4 4-4" />
-            </svg>
-          </div>
+          {!scope?.hideProjectFilter && (
+            <div className="relative">
+              <select
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="h-9 px-3 pr-8 bg-surface-1 text-foreground border border-border rounded-md text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="all">{t('allProjects')}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={String(project.id)}>
+                    {project.name} ({project.ticket_prefix})
+                  </option>
+                ))}
+              </select>
+              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowProjectManager(true)}>
@@ -1000,7 +1028,7 @@ export function TaskBoardPanel() {
                               {t('spawned')}
                             </span>
                           )}
-                          {task.ticket_ref && (
+                          {!scope?.hideProjectLabels && task.ticket_ref && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono">
                               {task.ticket_ref}
                             </span>
@@ -1170,6 +1198,7 @@ export function TaskBoardPanel() {
           projects={projects}
           onClose={() => setShowCreateModal(false)}
           onCreated={fetchData}
+          defaultProjectId={scope?.defaultCreateProjectId}
         />
       )}
 
@@ -2050,21 +2079,28 @@ function HermesCronSection() {
 
 // Create Task Modal Component (placeholder)
 function CreateTaskModal({
-  agents, 
+  agents,
   projects,
-  onClose, 
-  onCreated 
-}: { 
+  onClose,
+  onCreated,
+  defaultProjectId,
+}: {
   agents: Agent[]
   projects: Project[]
   onClose: () => void
   onCreated: () => void
+  defaultProjectId?: number
 }) {
+  // pitfall #3: read defaultProjectId inside the useState initializer (evaluates
+  // once). Do NOT add a useEffect to sync defaultProjectId — that would clobber
+  // user edits when the modal is open and props change.
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     priority: 'medium' as Task['priority'],
-    project_id: projects[0]?.id ? String(projects[0].id) : '',
+    project_id: defaultProjectId
+      ? String(defaultProjectId)
+      : (projects[0]?.id ? String(projects[0].id) : ''),
     assigned_to: '',
     tags: '',
     target_session: '',
