@@ -67,7 +67,7 @@ Plans:
   7. All dashboard data updates live when an SSE event fires for a task or session change
 **Plans:** 3 plans
 Plans:
-- [ ] 03-00-PLAN.md — Wave 0 test scaffolds for dashboard (DASH-01 through DASH-07)
+- [x] 03-00-PLAN.md — Wave 0 test scaffolds for dashboard (DASH-01 through DASH-07)
 - [ ] 03-01-PLAN.md — i18n keys + dashboard sub-components (status cards, progress bar, health badge, project brief, activity feed)
 - [ ] 03-02-PLAN.md — Main dashboard-view.tsx wiring with data, layout, SSE reactivity, and visual verification
 **UI hint**: yes

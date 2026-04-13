@@ -17,13 +17,13 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: Project dashboard shows status overview with task counts by status (active, blocked, completed)
-- [ ] **DASH-02**: Project dashboard shows progress indicator (completion percentage + progress bar)
-- [ ] **DASH-03**: Project dashboard shows project brief (description, goals, key info)
-- [ ] **DASH-04**: Project dashboard shows activity feed with recent task updates and agent activity
-- [ ] **DASH-05**: Project dashboard shows blocked/needs-attention tasks prominently
-- [ ] **DASH-06**: Project status indicator shows health (on track / at risk / off track)
-- [ ] **DASH-07**: Dashboard data updates in real-time via SSE when tasks or sessions change
+- [x] **DASH-01**: Project dashboard shows status overview with task counts by status (active, blocked, completed)
+- [x] **DASH-02**: Project dashboard shows progress indicator (completion percentage + progress bar)
+- [x] **DASH-03**: Project dashboard shows project brief (description, goals, key info)
+- [x] **DASH-04**: Project dashboard shows activity feed with recent task updates and agent activity
+- [x] **DASH-05**: Project dashboard shows blocked/needs-attention tasks prominently
+- [x] **DASH-06**: Project status indicator shows health (on track / at risk / off track)
+- [x] **DASH-07**: Dashboard data updates in real-time via SSE when tasks or sessions change
 
 ### Tasks
 
@@ -96,13 +96,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-03 | Phase 2 | Complete |
 | NAV-04 | Phase 2 | Complete |
 | NAV-05 | Phase 2 | Complete |
-| DASH-01 | Phase 3 | Pending |
-| DASH-02 | Phase 3 | Pending |
-| DASH-03 | Phase 3 | Pending |
-| DASH-04 | Phase 3 | Pending |
-| DASH-05 | Phase 3 | Pending |
-| DASH-06 | Phase 3 | Pending |
-| DASH-07 | Phase 3 | Pending |
+| DASH-01 | Phase 3 | Complete |
+| DASH-02 | Phase 3 | Complete |
+| DASH-03 | Phase 3 | Complete |
+| DASH-04 | Phase 3 | Complete |
+| DASH-05 | Phase 3 | Complete |
+| DASH-06 | Phase 3 | Complete |
+| DASH-07 | Phase 3 | Complete |
 | TASK-01 | Phase 4 | Pending |
 | TASK-02 | Phase 4 | Pending |
 | TASK-03 | Phase 4 | Pending |
