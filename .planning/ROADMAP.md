@@ -81,7 +81,10 @@ Plans:
   2. Creating a task from within the workspace automatically assigns it to the current project
   3. User can reassign any existing task to or from the current project via the task's edit UI
   4. All existing task board actions (status change, edit, delete) work identically inside the project workspace
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 04-00-PLAN.md — Wave 0 test scaffolds (TASK-01 through TASK-04)
+- [ ] 04-01-PLAN.md — TaskBoardScope prop + tasks-view wrapper + test bodies
 **UI hint**: yes
 
 ### Phase 5: Sessions & Agents
@@ -116,6 +119,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Foundation | 0/3 | Planning complete | - |
 | 2. Navigation & Workspace Shell | 0/2 | Planning complete | - |
 | 3. Project Dashboard | 3/3 | Complete   | 2026-04-13 |
-| 4. Project Tasks | 0/TBD | Not started | - |
+| 4. Project Tasks | 0/2 | Planning complete | - |
 | 5. Sessions & Agents | 0/TBD | Not started | - |
 | 6. Settings | 0/TBD | Not started | - |
