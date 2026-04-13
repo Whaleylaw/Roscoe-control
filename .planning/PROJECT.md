@@ -29,9 +29,9 @@ When I click into a project, I see everything about that project — what it is,
 - [x] i18n namespace for project workspace UI strings — Validated in Phase 1: Foundation
 - [x] Full-takeover project workspace view when navigating into a project — Validated in Phase 2: Navigation
 - [x] Breadcrumb navigation (Projects > Project Name > Sub-view) — Validated in Phase 2: Navigation
-- [ ] Project dashboard with status overview (active tasks, blocked items, progress)
-- [ ] Project dashboard with project brief (description, goals, key info)
-- [ ] Project dashboard with activity feed (recent task updates, agent activity)
+- [x] Project dashboard with status overview (active tasks, blocked items, progress) — Validated in Phase 3: Dashboard
+- [x] Project dashboard with project brief (description, goals, key info) — Validated in Phase 3: Dashboard
+- [x] Project dashboard with activity feed (recent task updates, agent activity) — Validated in Phase 3: Dashboard
 - [ ] Project-scoped task list showing only that project's tasks
 - [ ] Create new tasks pre-scoped to the current project
 - [ ] Reassign existing tasks into/out of the current project
@@ -90,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 after Phase 2: Navigation & Workspace Shell completion*
+*Last updated: 2026-04-13 after Phase 3: Project Dashboard completion*
