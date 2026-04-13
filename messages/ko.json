@@ -2194,5 +2194,39 @@
     "restarting": "Restarting...",
     "diagnosing": "Diagnosing...",
     "notInstalled": "Not installed"
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "Project not found",
+      "loading": "Loading project..."
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "Sessions",
+      "placeholder": "Project sessions coming soon"
+    },
+    "agents": {
+      "title": "Agents",
+      "placeholder": "Project agents coming soon"
+    },
+    "settings": {
+      "title": "Settings",
+      "placeholder": "Project settings coming soon"
+    }
   }
 }
