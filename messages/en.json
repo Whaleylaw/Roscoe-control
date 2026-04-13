@@ -2196,16 +2196,41 @@
     "notInstalled": "Not installed"
   },
   "project": {
-    "workspace.notFound": "View not found",
-    "dashboard.title": "Dashboard",
-    "dashboard.placeholder": "Project dashboard coming soon",
-    "tasks.title": "Tasks",
-    "tasks.placeholder": "Project tasks coming soon",
-    "sessions.title": "Sessions",
-    "sessions.placeholder": "Project sessions coming soon",
-    "agents.title": "Agents",
-    "agents.placeholder": "Project agents coming soon",
-    "settings.title": "Settings",
-    "settings.placeholder": "Project settings coming soon"
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "Project not found",
+      "projectNotFoundDescription": "The project you're looking for doesn't exist or has been removed.",
+      "backToProjects": "Back to projects"
+    },
+    "nav": {
+      "projects": "Projects",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "Sessions",
+      "placeholder": "Project sessions coming soon"
+    },
+    "agents": {
+      "title": "Agents",
+      "placeholder": "Project agents coming soon"
+    },
+    "settings": {
+      "title": "Settings",
+      "placeholder": "Project settings coming soon"
+    }
   }
 }
