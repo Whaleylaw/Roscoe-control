@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Database queries scoping tasks and sessions by project_id use indexes (query plans show index scans)
   3. Project workspace components live in a dedicated directory, not as a single monolithic file
   4. All new UI strings render correctly via next-intl message lookups with no hardcoded text
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — DB composite indexes + i18n namespace for all 10 locales
+- [ ] 01-02-PLAN.md — URL-driven context provider, workspace shell, view router, stub views, page.tsx integration
 **UI hint**: yes
 
 ### Phase 2: Navigation & Workspace Shell
@@ -102,7 +105,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/2 | Planning complete | - |
 | 2. Navigation & Workspace Shell | 0/TBD | Not started | - |
 | 3. Project Dashboard | 0/TBD | Not started | - |
 | 4. Project Tasks | 0/TBD | Not started | - |
