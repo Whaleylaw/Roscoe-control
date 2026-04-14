@@ -138,7 +138,7 @@ Plans:
 **Goal**: Users can discover and enter a project workspace from the main UI without typing a URL — NAV-01 is actually achievable end-to-end, not just direct-URL-load
 **Depends on**: Phase 2 (workspace shell), Phase 7 (clean baseline)
 **Requirements**: NAV-01 (reopened — was marked Complete in v1.0 audit but real-world entry path missing)
-**Gap Closure**: Closes the Phase 2 discovery gap surfaced during v1.0 human verification — workspace code existed but no main-UI call site ever navigated to `/project/{slug}`
+**Gap Closure**: Closes the Phase 2 discovery gap surfaced during v1.0 human verification — workspace code existed but no main-UI call site ever navigated to `/project/{slug}`. Plans 08-04 and 08-05 close the two UAT-diagnosed gaps (header CTA + upgraded create-project modal with GitHub linking at creation)
 **Success Criteria** (what must be TRUE):
   1. A "Projects" item is visible in the nav-rail OPERATE group (order: near Tasks); clicking it renders a Projects list panel, not the project workspace itself
   2. The Projects list panel shows one entry per active project with name, status badge, ticket prefix, and either a deadline or a last-activity hint; clicking an entry navigates to `/project/{slug}` (the workspace dashboard, per existing router)
@@ -146,12 +146,16 @@ Plans:
   4. Cold-start journey: from a fresh login at `/`, a user can reach a project's dashboard with clicks alone (no URL editing) and return to the main view via the existing breadcrumb "Projects" link (which should route to the new Projects panel, not to `/`)
   5. The Projects list panel uses i18n via `next-intl` across all 10 locales atomically (follow phase 6 precedent)
   6. Unit tests cover: nav-rail renders the new item; Projects list panel renders project cards from Zustand `projects[]` and navigates on click; breadcrumb "Projects" segment routes to the Projects panel (not `/`)
-**Plans:** 4 plans
+  7. Users can create a new project from the Projects panel header CTA (not only from the empty state) — UAT Gap 1 closure
+  8. Create-project modal supports github_repo, deadline, color, and one-click GitHub sync + label initialization at creation time — UAT Gap 2 closure
+**Plans:** 6 plans
 Plans:
 - [x] 08-00-PLAN.md — Backend + store: extend GET /api/projects with last_activity_at; extend Project interface; unit test
 - [x] 08-01-PLAN.md — i18n (10 locales) + nav-rail Projects item + ContentRouter + ProjectsPanel (row list + empty-state CTA) + unit tests
 - [x] 08-02-PLAN.md — Breadcrumb re-target to /projects + "↗ Open workspace" picker button on task-board filter + unit tests
 - [x] 08-03-PLAN.md — Playwright E2E covering the NAV-01 cold-start journey
+- [ ] 08-04-PLAN.md — Gap closure: header "New project" CTA on ProjectsPanel + atomic 10-locale i18n + test coverage (UAT Gap 1)
+- [ ] 08-05-PLAN.md — Gap closure: upgrade create-project modal with github_repo/deadline/color + init-labels chain + graceful failure + new test suite (UAT Gap 2)
 **UI hint**: yes
 
 ## Progress
@@ -168,4 +172,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Sessions & Agents | 0/4 | Planning complete | - |
 | 6. Settings | 0/2 | Planning complete | - |
 | 7. Post-Audit Gap Closure | 0/2 | Planning complete | - |
-| 8. Projects Entry Point | 0/4 | Planning complete | - |
+| 8. Projects Entry Point | 4/6 | Gap closure planning complete | - |
