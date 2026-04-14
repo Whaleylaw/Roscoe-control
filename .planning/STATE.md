@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-00-PLAN.md
-last_updated: "2026-04-14T00:56:57.197Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-04-14T01:06:16.243Z"
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 ## Current Position
 
 Phase: 05 (sessions-agents) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Plan: 2 of 4
 | Phase 04-project-tasks P00 | 2min | 3 tasks | 3 files |
 | Phase 04-project-tasks P01 | 12min | 5 tasks | 5 files |
 | Phase 05-sessions-agents P00 | 4min | 7 tasks | 18 files |
+| Phase 05-sessions-agents P02 | 4min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase 05-sessions-agents]: Translated all 10 locales atomically in Task 1 — eliminates messages/*.json conflicts across parallel Wave 1 plans
 - [Phase 05-sessions-agents]: Brand names (Claude/Codex/Hermes/Gateway) intentionally untranslated; ICU plural and {ticketRef} placeholders preserved verbatim across locales
 - [Phase 05-sessions-agents]: Settings namespace deferred — Phase 5 only owns sessions/agents/common; settings remains stubbed for a later phase
+- [Phase 05-sessions-agents]: Used useSmartPoll({ enabled: !isScoped }) — the hook's callback is non-nullable so the supported enabled option is the only typesafe disable path; paired with inner early-return for defense in depth (Pitfall 9)
+- [Phase 05-sessions-agents]: Conversation_id format project:<numeric-id>:agent:<name> — regex /^thread:(\\d+):(.+)$/ enforces numeric project id by construction (Pitfall 4 prevention)
+- [Phase 05-sessions-agents]: Created session-detail-view.tsx in Task 1 (not Task 2) so router import resolves immediately and typecheck stays green between commits
 
 ### Pending Todos
 
@@ -103,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T00:56:57.193Z
-Stopped at: Completed 05-00-PLAN.md
+Last session: 2026-04-14T01:06:04.914Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
