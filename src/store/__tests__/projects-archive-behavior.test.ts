@@ -1,4 +1,5 @@
-import { describe, it } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { useMissionControl } from '@/store'
 
 /**
  * FLOW-E (v1.0 Milestone Audit, .planning/v1.0-MILESTONE-AUDIT.md lines 19-29):
@@ -27,15 +28,67 @@ import { describe, it } from 'vitest'
  */
 
 describe('FLOW-E: store.fetchProjects archive-visibility contract (Phase 7 gap closure)', () => {
-  // Wave 1 will implement:
-  //   - Import useMissionControl from @/store
-  //   - Spy on global.fetch, assert the URL called equals '/api/projects' (no ?includeArchived)
-  //   - Seed projects[] with one active + one archived mock, call fetchProjects(),
-  //     assert the archived project is not in state.projects after the refresh.
-  //   - NO production-code change required in store/index.ts — these tests assert
-  //     the current (intentional) behavior. A clarifying code comment will be
-  //     added in Wave 1 alongside these test bodies.
-  it.todo('fetchProjects() calls GET /api/projects WITHOUT the includeArchived=1 query param (assert exact URL)')
-  it.todo('after a PATCH that archives a project, fetchProjects() refresh drops the archived project from state.projects (intentional per FLOW-E decision)')
-  it.todo('active projects remain present in state.projects after fetchProjects() refresh (regression guard)')
+  let fetchSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ projects: [] }),
+    })
+    global.fetch = fetchSpy as unknown as typeof fetch
+    useMissionControl.setState({ projects: [] })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('fetchProjects() calls GET /api/projects WITHOUT the includeArchived=1 query param (assert exact URL)', async () => {
+    await useMissionControl.getState().fetchProjects()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    const calledUrl = fetchSpy.mock.calls[0][0]
+    expect(calledUrl).toBe('/api/projects')
+    expect(String(calledUrl)).not.toContain('includeArchived')
+  })
+
+  it('after a PATCH that archives a project, fetchProjects() refresh drops the archived project from state.projects (intentional per FLOW-E decision)', async () => {
+    // Simulate the pre-archive state: two projects in the store.
+    useMissionControl.setState({
+      projects: [
+        { id: 1, slug: 'keep-me', name: 'Keep Me', status: 'active' } as never,
+        { id: 2, slug: 'archived-one', name: 'Archived One', status: 'archived' } as never,
+      ],
+    })
+
+    // Simulate the server's active-only response (archived row filtered out per
+    // src/app/api/projects/route.ts:47 when ?includeArchived=1 is absent).
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        projects: [{ id: 1, slug: 'keep-me', name: 'Keep Me', status: 'active' }],
+      }),
+    })
+
+    await useMissionControl.getState().fetchProjects()
+    const projects = useMissionControl.getState().projects
+    expect(projects).toHaveLength(1)
+    expect(projects[0].slug).toBe('keep-me')
+    expect(projects.find(p => p.slug === 'archived-one')).toBeUndefined()
+  })
+
+  it('active projects remain present in state.projects after fetchProjects() refresh (regression guard)', async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        projects: [
+          { id: 1, slug: 'alpha', name: 'Alpha', status: 'active' },
+          { id: 2, slug: 'beta', name: 'Beta', status: 'active' },
+        ],
+      }),
+    })
+    await useMissionControl.getState().fetchProjects()
+    const projects = useMissionControl.getState().projects
+    expect(projects).toHaveLength(2)
+    expect(projects.map(p => p.slug).sort()).toEqual(['alpha', 'beta'])
+  })
 })
