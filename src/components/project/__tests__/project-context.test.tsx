@@ -76,3 +76,12 @@ describe('ProjectWorkspaceProvider - project data fetching (NAV-04)', () => {
   it.todo('calls setActiveProject on Zustand store when project is loaded')
   it.todo('clears activeProject on unmount')
 })
+
+describe('SESS-03: detailId segment parsing', () => {
+  it.todo('parsed.detailId is null when pathname has fewer than 4 segments (e.g. /project/my-app/sessions)')
+  it.todo('parsed.detailId equals segments[3] when pathname is /project/my-app/sessions/abc123')
+  it.todo('parsed.detailId equals segments[3] for thread-prefixed ids like /project/my-app/sessions/thread:1:aegis')
+  it.todo('parsed.detailId is null when view is not "sessions" (other views do not expose detailId yet)')
+  it.todo('slug and view continue to parse correctly when detailId is present (regression guard)')
+  it.todo('useProjectWorkspace() return value includes detailId field (type contract)')
+})
