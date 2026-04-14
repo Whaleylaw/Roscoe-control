@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 08-04-PLAN.md (UAT Gap 1 closed — header CTA on ProjectsPanel)
-last_updated: "2026-04-14T18:21:50.944Z"
+status: Phase 08 complete — all 6 plans done, both UAT gaps closed
+stopped_at: Completed 08-05-PLAN.md (UAT Gap 2 closed — ProjectManagerModal create-form upgrade with GitHub sync chain)
+last_updated: "2026-04-14T19:35:00.000Z"
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 24
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 
 ## Current Position
 
-Phase: 08 (projects-entry-point) — EXECUTING
-Plan: 2 of 6
+Phase: 08 (projects-entry-point) — COMPLETE
+Plan: 6 of 6 (all plans committed; both UAT gaps closed)
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Plan: 2 of 6
 | Phase 08-projects-entry-point P01 | 8min | 3 tasks | 14 files |
 | Phase 08-projects-entry-point P03 | 10min | 1 tasks | 1 files |
 | Phase 08-projects-entry-point P04 | 8min | 1 tasks | 12 files |
+| Phase 08-projects-entry-point P05 | ~12min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,9 @@ Recent decisions affecting current work:
 - [Phase 08-projects-entry-point]: Plan 08-03 gates boot-complete on <nav aria-label='Main navigation'> visibility — earliest deterministic signal that all 9 STEP_KEYS marked done and NavRail mounted
 - [Phase 08-projects-entry-point]: Plan 08-04 header CTA reuses setShowManager(true) from the empty-state CTA — single ProjectManagerModal instance for both entry points (D-12 preserved); acceptance criterion grep -c 'setShowManager(true)' == 2
 - [Phase 08-projects-entry-point]: Plan 08-04 executed AFTER 08-05 in actual wave-1 ordering; ...rest spread locale script preserved all projects.create.* keys while adding projects.header.cta — race-safety mechanism exercised and verified
+- [Phase 08-projects-entry-point]: Plan 08-05 Task 2 chain uses nested try/catch — init-labels failure surfaces inline amber warning via setInitLabelsWarning(t('create.initLabelsFailedWarning')) and the outer createProject flow continues (setForm reset + load() + onChanged). Project is still created per plan graceful-failure contract
+- [Phase 08-projects-entry-point]: Plan 08-05 PATCH /api/projects/{id} with { github_sync_enabled: 1 } intentionally fire-and-forget — backend init-labels already set github_labels_initialized=1; user can toggle sync manually from inline edit UI if PATCH silently fails
+- [Phase 08-projects-entry-point]: Plan 08-05 established src/components/modals/__tests__/ as canonical modal test directory (first consumer: project-manager-modal.test.tsx, 10 tests)
 
 ### Pending Todos
 
@@ -152,6 +156,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T18:21:50.501Z
-Stopped at: Completed 08-04-PLAN.md (UAT Gap 1 closed — header CTA on ProjectsPanel)
+Last session: 2026-04-14T19:35:00.000Z
+Stopped at: Completed 08-05-PLAN.md (UAT Gap 2 closed — ProjectManagerModal create-form upgrade with GitHub sync chain). Phase 08 complete.
 Resume file: None
