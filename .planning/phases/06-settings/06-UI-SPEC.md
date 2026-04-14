@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: settings
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-13
+reviewed_at: 2026-04-13
 ---
 
 # Phase 6 — UI Design Contract
