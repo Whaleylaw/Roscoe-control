@@ -130,3 +130,18 @@ describe('SESS-03: detailId segment parsing', () => {
     expect(result.current).toHaveProperty('detailId')
   })
 })
+
+describe('ProjectWorkspaceProvider - loading timeout escape path (Phase 7 gap closure / AUDIT-PHASE-02-TECHDEBT)', () => {
+  // Wave 1 will implement:
+  //   - A setTimeout(10_000) inside the same useEffect that watches [slug, projects].
+  //   - When the timeout fires AND projects.length === 0 AND no project was found,
+  //     set error = 'load-timeout' and loading = false.
+  //   - Timer is cleared on cleanup AND when projects becomes non-empty.
+  //   - workspace shell (project-workspace.tsx) renders a timeout error UI with a Retry
+  //     button that calls useMissionControl().fetchProjects().
+  // These tests will use vi.useFakeTimers() to advance time past 10s.
+  it.todo('sets error to "load-timeout" and loading to false when projects stays empty for 10_000ms')
+  it.todo('does NOT fire the timeout when projects populates before 10s elapses (normal load path)')
+  it.todo('clears the pending timeout on unmount (no setState-after-unmount warning)')
+  it.todo('clears the pending timeout when projects becomes non-empty mid-wait (timeout does not fire)')
+})
