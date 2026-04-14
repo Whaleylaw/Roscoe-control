@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "概要",
+    "projects": "プロジェクト",
     "agents": "エージェント",
     "tasks": "タスク",
     "chat": "チャット",
@@ -2194,6 +2195,22 @@
     "tabStatus": "ステータス",
     "unhealthy": "異常",
     "unreachable": "到達不能"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "empty": {
+      "title": "アクティブなプロジェクトはまだありません",
+      "cta": "プロジェクトを作成"
+    },
+    "picker": {
+      "openWorkspace": "↗ ワークスペースを開く"
+    },
+    "row": {
+      "statusLabel": "ステータス",
+      "deadlineLabel": "期限",
+      "lastActivityLabel": "最終アクティビティ",
+      "noActivity": "まだアクティビティはありません"
+    }
   },
   "project": {
     "workspace": {

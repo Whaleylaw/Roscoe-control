@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "개요",
+    "projects": "프로젝트",
     "agents": "에이전트",
     "tasks": "작업",
     "chat": "채팅",
@@ -2194,6 +2195,22 @@
     "restarting": "Restarting...",
     "diagnosing": "Diagnosing...",
     "notInstalled": "Not installed"
+  },
+  "projects": {
+    "title": "프로젝트",
+    "empty": {
+      "title": "아직 활성 프로젝트가 없습니다",
+      "cta": "프로젝트 만들기"
+    },
+    "picker": {
+      "openWorkspace": "↗ 워크스페이스 열기"
+    },
+    "row": {
+      "statusLabel": "상태",
+      "deadlineLabel": "마감일",
+      "lastActivityLabel": "최근 활동",
+      "noActivity": "아직 활동이 없습니다"
+    }
   },
   "project": {
     "workspace": {

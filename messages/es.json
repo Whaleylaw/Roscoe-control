@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "Resumen",
+    "projects": "Proyectos",
     "agents": "Agentes",
     "tasks": "Tareas",
     "chat": "Chat",
@@ -2194,6 +2195,22 @@
     "tabStatus": "Estado",
     "unhealthy": "No saludable",
     "unreachable": "Inaccesible"
+  },
+  "projects": {
+    "title": "Proyectos",
+    "empty": {
+      "title": "Aún no hay proyectos activos",
+      "cta": "Crear proyecto"
+    },
+    "picker": {
+      "openWorkspace": "↗ Abrir espacio de trabajo"
+    },
+    "row": {
+      "statusLabel": "Estado",
+      "deadlineLabel": "Fecha límite",
+      "lastActivityLabel": "Última actividad",
+      "noActivity": "Aún no hay actividad"
+    }
   },
   "project": {
     "workspace": {

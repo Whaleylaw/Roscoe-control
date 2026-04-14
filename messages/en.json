@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "Overview",
+    "projects": "Projects",
     "agents": "Agents",
     "tasks": "Tasks",
     "chat": "Chat",
@@ -2196,6 +2197,22 @@
     "restarting": "Restarting...",
     "diagnosing": "Diagnosing...",
     "notInstalled": "Not installed"
+  },
+  "projects": {
+    "title": "Projects",
+    "empty": {
+      "title": "No active projects yet",
+      "cta": "Create project"
+    },
+    "picker": {
+      "openWorkspace": "↗ Open workspace"
+    },
+    "row": {
+      "statusLabel": "Status",
+      "deadlineLabel": "Deadline",
+      "lastActivityLabel": "Last activity",
+      "noActivity": "No activity yet"
+    }
   },
   "project": {
     "workspace": {

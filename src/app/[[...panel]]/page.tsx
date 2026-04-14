@@ -11,6 +11,7 @@ import { CronManagementPanel } from '@/components/panels/cron-management-panel'
 import { MemoryBrowserPanel } from '@/components/panels/memory-browser-panel'
 import { CostTrackerPanel } from '@/components/panels/cost-tracker-panel'
 import { TaskBoardPanel } from '@/components/panels/task-board-panel'
+import { ProjectsPanel } from '@/components/panels/projects-panel'
 import { ActivityFeedPanel } from '@/components/panels/activity-feed-panel'
 import { AgentSquadPanelPhase3 } from '@/components/panels/agent-squad-panel-phase3'
 import { AgentCommsPanel } from '@/components/panels/agent-comms-panel'
@@ -478,7 +479,7 @@ export default function Home() {
 }
 
 const ESSENTIAL_PANELS = new Set([
-  'overview', 'agents', 'tasks', 'chat', 'activity', 'logs', 'settings',
+  'overview', 'agents', 'projects', 'tasks', 'chat', 'activity', 'logs', 'settings',
 ])
 
 function ContentRouter({ tab }: { tab: string }) {
@@ -530,6 +531,8 @@ function ContentRouter({ tab }: { tab: string }) {
           )}
         </>
       )
+    case 'projects':
+      return <ProjectsPanel />
     case 'tasks':
       return <TaskBoardPanel />
     case 'agents':

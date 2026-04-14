@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "نظرة عامة",
+    "projects": "المشاريع",
     "agents": "الوكلاء",
     "tasks": "المهام",
     "chat": "الدردشة",
@@ -2194,6 +2195,22 @@
     "tabStatus": "الحالة",
     "unhealthy": "غير سليم",
     "unreachable": "لا يمكن الوصول إليه"
+  },
+  "projects": {
+    "title": "المشاريع",
+    "empty": {
+      "title": "لا توجد مشاريع نشطة بعد",
+      "cta": "إنشاء مشروع"
+    },
+    "picker": {
+      "openWorkspace": "↗ فتح مساحة العمل"
+    },
+    "row": {
+      "statusLabel": "الحالة",
+      "deadlineLabel": "الموعد النهائي",
+      "lastActivityLabel": "آخر نشاط",
+      "noActivity": "لا يوجد نشاط بعد"
+    }
   },
   "project": {
     "workspace": {

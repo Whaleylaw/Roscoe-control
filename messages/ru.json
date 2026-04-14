@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "Обзор",
+    "projects": "Проекты",
     "agents": "Агенты",
     "tasks": "Задачи",
     "chat": "Чат",
@@ -2194,6 +2195,22 @@
     "tabStatus": "Статус",
     "unhealthy": "Нездоров",
     "unreachable": "Недоступен"
+  },
+  "projects": {
+    "title": "Проекты",
+    "empty": {
+      "title": "Пока нет активных проектов",
+      "cta": "Создать проект"
+    },
+    "picker": {
+      "openWorkspace": "↗ Открыть рабочее пространство"
+    },
+    "row": {
+      "statusLabel": "Статус",
+      "deadlineLabel": "Срок",
+      "lastActivityLabel": "Последняя активность",
+      "noActivity": "Активности пока нет"
+    }
   },
   "project": {
     "workspace": {
