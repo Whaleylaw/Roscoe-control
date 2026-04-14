@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "세션",
+      "threadsHeader": "채팅 스레드",
+      "runtimeHeader": "외부 세션",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "실행 중",
+      "statusFinished": "완료됨",
+      "statusFailed": "실패",
+      "threadEmptyPreview": "아직 메시지가 없습니다 — 인사를 건네보세요",
+      "taskLabel": "작업 {ticketRef}",
+      "emptyHeading": "아직 세션이 없습니다",
+      "emptyBody": "이 프로젝트에 에이전트를 할당하면 채팅 스레드가 여기에 자동으로 표시됩니다.",
+      "emptyCta": "에이전트 탭 열기",
+      "errorHeading": "세션을 불러올 수 없습니다",
+      "errorBody": "연결 상태를 확인하고 다시 시도해 주세요. 문제가 지속되면 Live Feed에서 이벤트 버스 오류를 확인하세요.",
+      "detailBackLink": "세션으로 돌아가기",
+      "loading": "세션을 불러오는 중..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "에이전트",
+      "listHeader": "이 프로젝트의 에이전트",
+      "assignedChip": "할당됨",
+      "activeTaskCount": "{count, plural, =0 {활성 작업 없음} one {활성 작업 #개} other {활성 작업 #개}}",
+      "emptyHeading": "이 프로젝트에 에이전트가 없습니다",
+      "emptyBody": "메인 에이전트 뷰에서 에이전트를 할당하세요. 이 프로젝트의 작업을 수행 중인 에이전트도 여기에 표시됩니다.",
+      "emptyCta": "에이전트 뷰 열기",
+      "errorHeading": "에이전트를 불러올 수 없습니다",
+      "errorBody": "연결 상태를 확인하고 다시 시도해 주세요. 문제가 지속되면 Live Feed에서 이벤트 버스 오류를 확인하세요.",
+      "loading": "에이전트를 불러오는 중..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "다시 시도"
     }
   }
 }

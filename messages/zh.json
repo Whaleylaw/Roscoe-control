@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "会话",
+      "threadsHeader": "聊天会话",
+      "runtimeHeader": "外部会话",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "运行中",
+      "statusFinished": "已完成",
+      "statusFailed": "失败",
+      "threadEmptyPreview": "暂无消息 — 打个招呼吧",
+      "taskLabel": "任务 {ticketRef}",
+      "emptyHeading": "暂无会话",
+      "emptyBody": "为此项目分配一个代理,聊天会话将自动显示在此处。",
+      "emptyCta": "打开代理选项卡",
+      "errorHeading": "无法加载会话",
+      "errorBody": "请检查您的连接并重试。如果问题仍然存在,请在 Live Feed 中查看事件总线错误。",
+      "detailBackLink": "返回会话列表",
+      "loading": "正在加载会话..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "代理",
+      "listHeader": "此项目中的代理",
+      "assignedChip": "已分配",
+      "activeTaskCount": "{count, plural, =0 {无活动任务} one {# 个活动任务} other {# 个活动任务}}",
+      "emptyHeading": "此项目中没有代理",
+      "emptyBody": "从主代理视图分配代理。在此项目任务上工作的代理也将显示在此处。",
+      "emptyCta": "打开代理视图",
+      "errorHeading": "无法加载代理",
+      "errorBody": "请检查您的连接并重试。如果问题仍然存在,请在 Live Feed 中查看事件总线错误。",
+      "loading": "正在加载代理..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "重试"
     }
   }
 }

@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "الجلسات",
+      "threadsHeader": "محادثات الدردشة",
+      "runtimeHeader": "الجلسات الخارجية",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "قيد التشغيل",
+      "statusFinished": "منتهية",
+      "statusFailed": "فشلت",
+      "threadEmptyPreview": "لا توجد رسائل بعد — قل مرحبًا",
+      "taskLabel": "المهمة {ticketRef}",
+      "emptyHeading": "لا توجد جلسات بعد",
+      "emptyBody": "قم بتعيين وكيل لهذا المشروع وستظهر محادثة دردشة هنا تلقائيًا.",
+      "emptyCta": "افتح علامة تبويب الوكلاء",
+      "errorHeading": "تعذر تحميل الجلسات",
+      "errorBody": "تحقق من اتصالك وحاول مرة أخرى. إذا استمرت المشكلة، فتحقق من Live Feed لرؤية أخطاء ناقل الأحداث.",
+      "detailBackLink": "العودة إلى الجلسات",
+      "loading": "جارٍ تحميل الجلسات..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "الوكلاء",
+      "listHeader": "الوكلاء في هذا المشروع",
+      "assignedChip": "معيَّن",
+      "activeTaskCount": "{count, plural, =0 {لا توجد مهام نشطة} one {# مهمة نشطة} other {# مهام نشطة}}",
+      "emptyHeading": "لا يوجد وكلاء في هذا المشروع",
+      "emptyBody": "قم بتعيين وكيل من العرض الرئيسي للوكلاء. سيظهر هنا أيضًا الوكلاء الذين يعملون على مهام هذا المشروع.",
+      "emptyCta": "افتح عرض الوكلاء",
+      "errorHeading": "تعذر تحميل الوكلاء",
+      "errorBody": "تحقق من اتصالك وحاول مرة أخرى. إذا استمرت المشكلة، فتحقق من Live Feed لرؤية أخطاء ناقل الأحداث.",
+      "loading": "جارٍ تحميل الوكلاء..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "إعادة المحاولة"
     }
   }
 }

@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "Сессии",
+      "threadsHeader": "Чат-треды",
+      "runtimeHeader": "Внешние сессии",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "Выполняется",
+      "statusFinished": "Завершена",
+      "statusFailed": "Сбой",
+      "threadEmptyPreview": "Пока нет сообщений — поздоровайтесь",
+      "taskLabel": "Задача {ticketRef}",
+      "emptyHeading": "Сессий пока нет",
+      "emptyBody": "Назначьте агента этому проекту, и чат-тред появится здесь автоматически.",
+      "emptyCta": "Открыть вкладку Агенты",
+      "errorHeading": "Не удалось загрузить сессии",
+      "errorBody": "Проверьте подключение и попробуйте снова. Если проблема не исчезает, проверьте Live Feed на наличие ошибок шины событий.",
+      "detailBackLink": "Назад к сессиям",
+      "loading": "Загрузка сессий..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "Агенты",
+      "listHeader": "Агенты в этом проекте",
+      "assignedChip": "Назначен",
+      "activeTaskCount": "{count, plural, =0 {Нет активных задач} one {# активная задача} other {# активных задач}}",
+      "emptyHeading": "В этом проекте нет агентов",
+      "emptyBody": "Назначьте агента из основного представления Агенты. Агенты, работающие над задачами этого проекта, также появятся здесь.",
+      "emptyCta": "Открыть представление Агенты",
+      "errorHeading": "Не удалось загрузить агентов",
+      "errorBody": "Проверьте подключение и попробуйте снова. Если проблема не исчезает, проверьте Live Feed на наличие ошибок шины событий.",
+      "loading": "Загрузка агентов..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "Повторить"
     }
   }
 }

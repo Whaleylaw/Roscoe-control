@@ -2243,15 +2243,43 @@
     },
     "sessions": {
       "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "threadsHeader": "Chat threads",
+      "runtimeHeader": "External sessions",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "Running",
+      "statusFinished": "Finished",
+      "statusFailed": "Failed",
+      "threadEmptyPreview": "No messages yet — say hi",
+      "taskLabel": "Task {ticketRef}",
+      "emptyHeading": "No sessions yet",
+      "emptyBody": "Assign an agent to this project and a chat thread will appear here automatically.",
+      "emptyCta": "Open Agents tab",
+      "errorHeading": "Could not load sessions",
+      "errorBody": "Check your connection and try again. If the problem persists, check the Live Feed for event bus errors.",
+      "detailBackLink": "Back to sessions",
+      "loading": "Loading sessions..."
     },
     "agents": {
       "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "listHeader": "Agents on this project",
+      "assignedChip": "Assigned",
+      "activeTaskCount": "{count, plural, =0 {No active tasks} one {# active task} other {# active tasks}}",
+      "emptyHeading": "No agents on this project",
+      "emptyBody": "Assign an agent from the main Agents view. Agents working on this project's tasks will appear here too.",
+      "emptyCta": "Open Agents view",
+      "errorHeading": "Could not load agents",
+      "errorBody": "Check your connection and try again. If the problem persists, check the Live Feed for event bus errors.",
+      "loading": "Loading agents..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "Retry"
     }
   }
 }

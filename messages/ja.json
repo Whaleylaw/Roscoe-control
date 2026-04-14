@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "セッション",
+      "threadsHeader": "チャットスレッド",
+      "runtimeHeader": "外部セッション",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "実行中",
+      "statusFinished": "完了",
+      "statusFailed": "失敗",
+      "threadEmptyPreview": "まだメッセージがありません — 挨拶してみましょう",
+      "taskLabel": "タスク {ticketRef}",
+      "emptyHeading": "セッションがまだありません",
+      "emptyBody": "このプロジェクトにエージェントを割り当てると、チャットスレッドがここに自動的に表示されます。",
+      "emptyCta": "エージェントタブを開く",
+      "errorHeading": "セッションを読み込めませんでした",
+      "errorBody": "接続を確認して再試行してください。問題が解決しない場合は、Live Feed でイベントバスのエラーを確認してください。",
+      "detailBackLink": "セッションに戻る",
+      "loading": "セッションを読み込み中..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "エージェント",
+      "listHeader": "このプロジェクトのエージェント",
+      "assignedChip": "割り当て済み",
+      "activeTaskCount": "{count, plural, =0 {アクティブなタスクなし} one {# 件のアクティブなタスク} other {# 件のアクティブなタスク}}",
+      "emptyHeading": "このプロジェクトにエージェントがいません",
+      "emptyBody": "メインのエージェント画面からエージェントを割り当ててください。このプロジェクトのタスクで作業中のエージェントもここに表示されます。",
+      "emptyCta": "エージェント画面を開く",
+      "errorHeading": "エージェントを読み込めませんでした",
+      "errorBody": "接続を確認して再試行してください。問題が解決しない場合は、Live Feed でイベントバスのエラーを確認してください。",
+      "loading": "エージェントを読み込み中..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "再試行"
     }
   }
 }

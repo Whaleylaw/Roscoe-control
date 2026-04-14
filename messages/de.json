@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "Sitzungen",
+      "threadsHeader": "Chat-Threads",
+      "runtimeHeader": "Externe Sitzungen",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "Laeuft",
+      "statusFinished": "Abgeschlossen",
+      "statusFailed": "Fehlgeschlagen",
+      "threadEmptyPreview": "Noch keine Nachrichten — sag hallo",
+      "taskLabel": "Aufgabe {ticketRef}",
+      "emptyHeading": "Noch keine Sitzungen",
+      "emptyBody": "Weisen Sie diesem Projekt einen Agenten zu, und ein Chat-Thread erscheint hier automatisch.",
+      "emptyCta": "Tab Agenten oeffnen",
+      "errorHeading": "Sitzungen konnten nicht geladen werden",
+      "errorBody": "Pruefen Sie Ihre Verbindung und versuchen Sie es erneut. Bei anhaltenden Problemen pruefen Sie den Live-Feed auf Event-Bus-Fehler.",
+      "detailBackLink": "Zurueck zu Sitzungen",
+      "loading": "Sitzungen werden geladen..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "Agenten",
+      "listHeader": "Agenten in diesem Projekt",
+      "assignedChip": "Zugewiesen",
+      "activeTaskCount": "{count, plural, =0 {Keine aktiven Aufgaben} one {# aktive Aufgabe} other {# aktive Aufgaben}}",
+      "emptyHeading": "Keine Agenten in diesem Projekt",
+      "emptyBody": "Weisen Sie einen Agenten aus der Hauptansicht Agenten zu. Agenten, die an Aufgaben dieses Projekts arbeiten, erscheinen hier ebenfalls.",
+      "emptyCta": "Agenten-Ansicht oeffnen",
+      "errorHeading": "Agenten konnten nicht geladen werden",
+      "errorBody": "Pruefen Sie Ihre Verbindung und versuchen Sie es erneut. Bei anhaltenden Problemen pruefen Sie den Live-Feed auf Event-Bus-Fehler.",
+      "loading": "Agenten werden geladen..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "Wiederholen"
     }
   }
 }

@@ -2221,16 +2221,44 @@
       "placeholder": "Project tasks coming soon"
     },
     "sessions": {
-      "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "title": "Sesiones",
+      "threadsHeader": "Hilos de chat",
+      "runtimeHeader": "Sesiones externas",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "En ejecución",
+      "statusFinished": "Finalizada",
+      "statusFailed": "Fallida",
+      "threadEmptyPreview": "Aún no hay mensajes — saluda",
+      "taskLabel": "Tarea {ticketRef}",
+      "emptyHeading": "Aún no hay sesiones",
+      "emptyBody": "Asigna un agente a este proyecto y aparecerá un hilo de chat aquí automáticamente.",
+      "emptyCta": "Abrir pestaña Agentes",
+      "errorHeading": "No se pudieron cargar las sesiones",
+      "errorBody": "Verifica tu conexión e inténtalo de nuevo. Si el problema persiste, revisa el Live Feed para ver errores del bus de eventos.",
+      "detailBackLink": "Volver a sesiones",
+      "loading": "Cargando sesiones..."
     },
     "agents": {
-      "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "title": "Agentes",
+      "listHeader": "Agentes en este proyecto",
+      "assignedChip": "Asignado",
+      "activeTaskCount": "{count, plural, =0 {Sin tareas activas} one {# tarea activa} other {# tareas activas}}",
+      "emptyHeading": "No hay agentes en este proyecto",
+      "emptyBody": "Asigna un agente desde la vista principal de Agentes. Los agentes que trabajan en tareas de este proyecto también aparecerán aquí.",
+      "emptyCta": "Abrir vista Agentes",
+      "errorHeading": "No se pudieron cargar los agentes",
+      "errorBody": "Verifica tu conexión e inténtalo de nuevo. Si el problema persiste, revisa el Live Feed para ver errores del bus de eventos.",
+      "loading": "Cargando agentes..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "Reintentar"
     }
   }
 }

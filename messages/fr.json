@@ -2222,15 +2222,43 @@
     },
     "sessions": {
       "title": "Sessions",
-      "placeholder": "Project sessions coming soon"
+      "threadsHeader": "Fils de discussion",
+      "runtimeHeader": "Sessions externes",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "En cours",
+      "statusFinished": "Terminée",
+      "statusFailed": "Échouée",
+      "threadEmptyPreview": "Aucun message — dites bonjour",
+      "taskLabel": "Tâche {ticketRef}",
+      "emptyHeading": "Aucune session pour le moment",
+      "emptyBody": "Assignez un agent à ce projet et un fil de discussion apparaîtra ici automatiquement.",
+      "emptyCta": "Ouvrir l'onglet Agents",
+      "errorHeading": "Impossible de charger les sessions",
+      "errorBody": "Vérifiez votre connexion et réessayez. Si le problème persiste, consultez le Live Feed pour les erreurs du bus d'événements.",
+      "detailBackLink": "Retour aux sessions",
+      "loading": "Chargement des sessions..."
     },
     "agents": {
       "title": "Agents",
-      "placeholder": "Project agents coming soon"
+      "listHeader": "Agents sur ce projet",
+      "assignedChip": "Assigné",
+      "activeTaskCount": "{count, plural, =0 {Aucune tâche active} one {# tâche active} other {# tâches actives}}",
+      "emptyHeading": "Aucun agent sur ce projet",
+      "emptyBody": "Assignez un agent depuis la vue principale Agents. Les agents travaillant sur des tâches de ce projet apparaîtront également ici.",
+      "emptyCta": "Ouvrir la vue Agents",
+      "errorHeading": "Impossible de charger les agents",
+      "errorBody": "Vérifiez votre connexion et réessayez. Si le problème persiste, consultez le Live Feed pour les erreurs du bus d'événements.",
+      "loading": "Chargement des agents..."
     },
     "settings": {
       "title": "Settings",
       "placeholder": "Project settings coming soon"
+    },
+    "common": {
+      "retry": "Réessayer"
     }
   }
 }
