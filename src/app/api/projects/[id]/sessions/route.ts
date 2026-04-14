@@ -141,11 +141,13 @@ export async function GET(
   const projectAgentsLower = new Set(agentRows.map((r) => r.name.toLowerCase()))
   const runtimeSessions: RuntimeSession[] = []
 
+  const projectSlug = project.slug
+
   function pushIfMatching(
     s: any,
     kind: RuntimeSession['kind'],
   ) {
-    if (!isSessionInProject(s, project.slug, projectAgentsLower)) return
+    if (!isSessionInProject(s, projectSlug, projectAgentsLower)) return
     const active = Boolean(s?.active ?? s?.isActive ?? s?.is_active === 1)
     runtimeSessions.push({
       id: pickId(s),

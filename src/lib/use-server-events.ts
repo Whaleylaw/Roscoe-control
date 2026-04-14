@@ -147,6 +147,15 @@ export function useServerEvents() {
               created_at: event.data.created_at || Math.floor(Date.now() / 1000),
             })
           }
+          // D-20 relay — let scoped views (e.g. project sessions) re-fetch
+          // without needing direct store coupling.
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:chat-message', {
+                detail: { conversation_id: event.data?.conversation_id ?? null },
+              }),
+            )
+          }
           break
 
         // Notification events
