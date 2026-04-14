@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-04-14T13:53:09.780Z"
+status: Ready to execute
+stopped_at: Completed 07-00-PLAN.md
+last_updated: "2026-04-14T14:40:35.164Z"
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 18
+  completed_plans: 17
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place.
-**Current focus:** Phase 06 — settings
+**Current focus:** Phase 07 — post-audit-gap-closure
 
 ## Current Position
 
-Phase: 06
-Plan: Not started
+Phase: 07 (post-audit-gap-closure) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Plan: Not started
 | Phase 05-sessions-agents P03 | 9min | 3 tasks | 7 files |
 | Phase 06-settings P00 | 7min | 2 tasks tasks | 12 files files |
 | Phase 06-settings P01 | 10min | 2 tasks | 2 files |
+| Phase 07-post-audit-gap-closure P00 | 3min | 2 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,9 @@ Recent decisions affecting current work:
 - [Phase 06-settings]: useEffect-based banner focus (post-commit) replaces queueMicrotask — ref is null until React commits the bannerError state change
 - [Phase 06-settings]: Server-echo re-seed on 2xx — normalized values (especially ticket_prefix) land in the form without a false-dirty flash
 - [Phase 06-settings]: COLOR_PALETTE and normalizePrefixForCompare duplicated verbatim per D-11 (no cross-component import)
+- [Phase 07-post-audit-gap-closure]: FLOW-E adopted Option 2 (archived projects vanish from Zustand projects[]) as intentional — project-manager-modal owns archive-visible UX; decision quoted verbatim in projects-archive-behavior.test.ts block comment
+- [Phase 07-post-audit-gap-closure]: loadTimeout* i18n keys use English-fallback values in all 10 locales per project.workspace.title/notFound/loading precedent (additive, not translated)
+- [Phase 07-post-audit-gap-closure]: New src/store/__tests__/ directory established as canonical location for Zustand store contract tests (first consumer: projects-archive-behavior.test.ts)
 
 ### Pending Todos
 
@@ -126,6 +130,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T13:48:34.358Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-04-14T14:40:35.161Z
+Stopped at: Completed 07-00-PLAN.md
 Resume file: None

@@ -127,7 +127,10 @@ Plans:
   1. Archiving a project via Settings either (a) keeps the project visible in the Zustand `projects` array with `status: 'archived'` so the UI can show a badge, OR (b) the product decision to hide archived projects is documented explicitly in the plan — whichever the plan phase decides, the behavior is intentional and tested
   2. `project-context.tsx` has an escape path when the boot sequence stalls: if `projects.length === 0` after a reasonable timeout (e.g. 10s), the workspace shell surfaces an error state with a retry action instead of spinning indefinitely
   3. Unit tests cover both branches (timeout fires → error UI; timeout does not fire → normal load) and the archive visibility behavior matches the decision from criterion 1
-**Plans:** TBD — run `/gsd:plan-phase 7` to generate
+**Plans:** 2 plans
+Plans:
+- [x] 07-00-PLAN.md — Wave 0 scaffolds: it.todo stubs for loading-timeout + FLOW-E archive-behavior contract, atomic 10-locale loadTimeout i18n keys
+- [ ] 07-01-PLAN.md — Wave 1: 10s timeout escape path in project-context + workspace retry UI + FLOW-E Option-2 decision comment in store/index.ts + 7 real tests (replaces all 7 it.todo stubs)
 **UI hint**: no (no new UI surface; only error-state text inside existing workspace shell)
 
 ## Progress
@@ -143,4 +146,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Project Tasks | 0/2 | Planning complete | - |
 | 5. Sessions & Agents | 0/4 | Planning complete | - |
 | 6. Settings | 0/2 | Planning complete | - |
-| 7. Post-Audit Gap Closure | 0/0 | Needs planning | - |
+| 7. Post-Audit Gap Closure | 0/2 | Planning complete | - |
