@@ -2093,7 +2093,7 @@ function HermesCronSection() {
 }
 
 // Create Task Modal Component (placeholder)
-function CreateTaskModal({
+export function CreateTaskModal({
   agents,
   projects,
   onClose,
@@ -2121,6 +2121,8 @@ function CreateTaskModal({
     target_session: '',
   })
   const t = useTranslations('taskBoard')
+  const tProjects = useTranslations('projects')
+  const router = useRouter()
   const agentSessions = useAgentSessions(formData.assigned_to || undefined)
   const [isRecurring, setIsRecurring] = useState(false)
   const [scheduleInput, setScheduleInput] = useState('')
@@ -2245,18 +2247,33 @@ function CreateTaskModal({
 
               <div>
                 <label htmlFor="create-project" className="block text-sm text-muted-foreground mb-1">{t('fieldProject')}</label>
-                <select
-                  id="create-project"
-                  value={formData.project_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))}
-                  className="w-full bg-surface-1 text-foreground border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                >
-                  {projects.map(project => (
-                    <option key={project.id} value={String(project.id)}>
-                      {project.name} ({project.ticket_prefix})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2 items-stretch">
+                  <select
+                    id="create-project"
+                    value={formData.project_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, project_id: e.target.value }))}
+                    className="flex-1 bg-surface-1 text-foreground border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                  >
+                    {projects.map(project => (
+                      <option key={project.id} value={String(project.id)}>
+                        {project.name} ({project.ticket_prefix})
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!formData.project_id || !projects.find((p) => String(p.id) === formData.project_id)}
+                    onClick={() => {
+                      const selected = projects.find((p) => String(p.id) === formData.project_id)
+                      if (selected?.slug) router.push(`/project/${selected.slug}`, { scroll: false })
+                    }}
+                    aria-label={tProjects('picker.openWorkspace')}
+                  >
+                    {tProjects('picker.openWorkspace')}
+                  </Button>
+                </div>
               </div>
             </div>
 
