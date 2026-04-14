@@ -8,6 +8,7 @@ import type { Project } from '@/store'
 export interface ProjectWorkspaceState {
   slug: string
   view: string  // 'dashboard' | 'tasks' | 'sessions' | 'agents' | 'settings'
+  detailId: string | null  // SESS-03 — segments[3] when present (e.g. session id)
   project: Project | null
   loading: boolean
   error: string | null
@@ -23,16 +24,17 @@ export function ProjectWorkspaceProvider({ children }: { children: React.ReactNo
   const [project, setProject] = useState<Project | null>(null)
 
   const parsed = useMemo(() => {
-    // pathname: /project/:slug/:view?
+    // pathname: /project/:slug/:view?/:detailId?
     const segments = pathname.split('/').filter(Boolean)
-    // segments[0] = 'project', segments[1] = slug, segments[2] = view
+    // segments[0] = 'project', segments[1] = slug, segments[2] = view, segments[3] = detailId
     return {
       slug: segments[1] || '',
       view: segments[2] || 'dashboard',  // D-03: default to dashboard
+      detailId: segments[3] || null,     // SESS-03 — Pitfall 7: colons preserved verbatim by split('/')
     }
   }, [pathname])
 
-  const { slug, view } = parsed
+  const { slug, view, detailId } = parsed
 
   // Two-tier fetch: store lookup then API fallback (D-11)
   useEffect(() => {
@@ -86,10 +88,11 @@ export function ProjectWorkspaceProvider({ children }: { children: React.ReactNo
   const state = useMemo<ProjectWorkspaceState>(() => ({
     slug,
     view,
+    detailId,
     project,
     loading,
     error,
-  }), [slug, view, project, loading, error])
+  }), [slug, view, detailId, project, loading, error])
 
   return (
     <ProjectWorkspaceContext.Provider value={state}>

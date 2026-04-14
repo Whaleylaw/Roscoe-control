@@ -78,10 +78,55 @@ describe('ProjectWorkspaceProvider - project data fetching (NAV-04)', () => {
 })
 
 describe('SESS-03: detailId segment parsing', () => {
-  it.todo('parsed.detailId is null when pathname has fewer than 4 segments (e.g. /project/my-app/sessions)')
-  it.todo('parsed.detailId equals segments[3] when pathname is /project/my-app/sessions/abc123')
-  it.todo('parsed.detailId equals segments[3] for thread-prefixed ids like /project/my-app/sessions/thread:1:aegis')
-  it.todo('parsed.detailId is null when view is not "sessions" (other views do not expose detailId yet)')
-  it.todo('slug and view continue to parse correctly when detailId is present (regression guard)')
-  it.todo('useProjectWorkspace() return value includes detailId field (type contract)')
+  it('parsed.detailId is null when pathname has fewer than 4 segments (e.g. /project/my-app/sessions)', () => {
+    mockPathname = '/project/my-app/sessions'
+    const { result } = renderHook(() => useProjectWorkspace(), {
+      wrapper: ProjectWorkspaceProvider,
+    })
+    expect(result.current.detailId).toBeNull()
+  })
+
+  it('parsed.detailId equals segments[3] when pathname is /project/my-app/sessions/abc123', () => {
+    mockPathname = '/project/my-app/sessions/abc123'
+    const { result } = renderHook(() => useProjectWorkspace(), {
+      wrapper: ProjectWorkspaceProvider,
+    })
+    expect(result.current.detailId).toBe('abc123')
+  })
+
+  it('parsed.detailId equals segments[3] for thread-prefixed ids like /project/my-app/sessions/thread:1:aegis', () => {
+    mockPathname = '/project/my-app/sessions/thread:1:aegis'
+    const { result } = renderHook(() => useProjectWorkspace(), {
+      wrapper: ProjectWorkspaceProvider,
+    })
+    // Pitfall 7 — colons in segment must be preserved verbatim
+    expect(result.current.detailId).toBe('thread:1:aegis')
+  })
+
+  it('parsed.detailId is null when view is not "sessions" (other views do not expose detailId yet)', () => {
+    // segment parsing is uniform — when there is no fourth segment, detailId is null
+    mockPathname = '/project/my-app/dashboard'
+    const { result } = renderHook(() => useProjectWorkspace(), {
+      wrapper: ProjectWorkspaceProvider,
+    })
+    expect(result.current.detailId).toBeNull()
+  })
+
+  it('slug and view continue to parse correctly when detailId is present (regression guard)', () => {
+    mockPathname = '/project/my-app/sessions/thread:42:claude'
+    const { result } = renderHook(() => useProjectWorkspace(), {
+      wrapper: ProjectWorkspaceProvider,
+    })
+    expect(result.current.slug).toBe('my-app')
+    expect(result.current.view).toBe('sessions')
+    expect(result.current.detailId).toBe('thread:42:claude')
+  })
+
+  it('useProjectWorkspace() return value includes detailId field (type contract)', () => {
+    mockPathname = '/project/my-app/sessions/abc'
+    const { result } = renderHook(() => useProjectWorkspace(), {
+      wrapper: ProjectWorkspaceProvider,
+    })
+    expect(result.current).toHaveProperty('detailId')
+  })
 })
