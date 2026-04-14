@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import { useFocusTrap } from '@/lib/use-focus-trap'
 import { Button } from '@/components/ui/button'
 
@@ -45,11 +46,22 @@ export function ProjectManagerModal({
   onClose: () => void
   onChanged?: () => Promise<void>
 }) {
+  const t = useTranslations('projects')
   const [projects, setProjects] = useState<Project[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', ticket_prefix: '', description: '' })
+  const [form, setForm] = useState({
+    name: '',
+    ticket_prefix: '',
+    description: '',
+    github_repo: '',
+    deadline: '', // yyyy-mm-dd from <input type="date">
+    color: '',
+    github_sync_enabled: true, // default-checked; only matters when github_repo is non-empty
+  })
+  const [githubRepoError, setGithubRepoError] = useState<string | null>(null)
+  const [initLabelsWarning, setInitLabelsWarning] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<{
     description: string
@@ -91,6 +103,15 @@ export function ProjectManagerModal({
   const createProject = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) return
+
+    const repo = form.github_repo.trim()
+    if (repo && !/^[^/]+\/[^/]+$/.test(repo)) {
+      setGithubRepoError(t('create.githubRepoInvalid'))
+      return
+    }
+
+    setInitLabelsWarning(null)
+
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -98,12 +119,16 @@ export function ProjectManagerModal({
         body: JSON.stringify({
           name: form.name,
           ticket_prefix: form.ticket_prefix,
-          description: form.description
+          description: form.description,
+          github_repo: repo || undefined,
+          deadline: form.deadline ? Math.floor(new Date(form.deadline).getTime() / 1000) : undefined,
+          color: form.color || undefined,
         })
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to create project')
-      setForm({ name: '', ticket_prefix: '', description: '' })
+      setForm({ name: '', ticket_prefix: '', description: '', github_repo: '', deadline: '', color: '', github_sync_enabled: true })
+      setGithubRepoError(null)
       await load()
       await onChanged?.()
     } catch (err) {
@@ -252,6 +277,72 @@ export function ProjectManagerModal({
               rows={2}
               className="w-full bg-surface-1 text-foreground border border-border rounded-md px-3 py-2 text-sm resize-none"
             />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">{t('create.githubRepoLabel')}</label>
+                <input
+                  type="text"
+                  value={form.github_repo}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setForm((prev) => ({ ...prev, github_repo: v }))
+                    if (v && !/^[^/]+\/[^/]+$/.test(v.trim())) {
+                      setGithubRepoError(t('create.githubRepoInvalid'))
+                    } else {
+                      setGithubRepoError(null)
+                    }
+                  }}
+                  placeholder={t('create.githubRepoPlaceholder')}
+                  className="w-full bg-surface-1 text-foreground border border-border rounded-md px-3 py-2 text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground/70 mt-1">{t('create.githubRepoHelp')}</p>
+                {githubRepoError && <p className="text-[11px] text-red-400 mt-1">{githubRepoError}</p>}
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">{t('create.deadlineLabel')}</label>
+                <input
+                  type="date"
+                  value={form.deadline}
+                  onChange={(e) => setForm((prev) => ({ ...prev, deadline: e.target.value }))}
+                  className="w-full bg-surface-1 text-foreground border border-border rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">{t('create.colorLabel')}</label>
+              <div className="flex gap-1.5 items-center flex-wrap">
+                {COLOR_PALETTE.map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, color: prev.color === c ? '' : c }))}
+                    className={`w-6 h-6 rounded-full border-2 transition-smooth ${form.color === c ? 'border-foreground scale-110' : 'border-transparent hover:border-border'}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={c}
+                  />
+                ))}
+              </div>
+            </div>
+            {form.github_repo.trim() && !githubRepoError && (
+              <div className="flex items-start gap-2">
+                <input
+                  id="mc-create-sync"
+                  type="checkbox"
+                  checked={form.github_sync_enabled}
+                  onChange={(e) => setForm((prev) => ({ ...prev, github_sync_enabled: e.target.checked }))}
+                  className="mt-0.5"
+                />
+                <div className="text-xs">
+                  <label htmlFor="mc-create-sync" className="text-foreground cursor-pointer">{t('create.enableSyncLabel')}</label>
+                  <p className="text-muted-foreground/70">{t('create.enableSyncHelp')}</p>
+                </div>
+              </div>
+            )}
+            {initLabelsWarning && (
+              <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2">
+                {initLabelsWarning}
+              </div>
+            )}
           </form>
 
           {loading ? (

@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "المشاريع",
+    "header": {
+      "cta": "مشروع جديد"
+    },
+    "create": {
+      "githubRepoLabel": "مستودع GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "اختياري. اربط مستودع GitHub بهذا المشروع.",
+      "githubRepoInvalid": "استخدم تنسيق owner/repo",
+      "deadlineLabel": "الموعد النهائي",
+      "colorLabel": "اللون",
+      "enableSyncLabel": "تمكين مزامنة GitHub + تهيئة العلامات",
+      "enableSyncHelp": "ينشئ علامات Mission Control على المستودع ويُفعّل المزامنة الثنائية",
+      "initLabelsFailedWarning": "تم إنشاء المشروع، لكن فشل إعداد علامات GitHub. يمكنك المحاولة مجددًا من لوحة مزامنة GitHub."
+    },
     "empty": {
       "title": "لا توجد مشاريع نشطة بعد",
       "cta": "إنشاء مشروع"

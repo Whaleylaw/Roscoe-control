@@ -2200,6 +2200,20 @@
   },
   "projects": {
     "title": "Projects",
+    "header": {
+      "cta": "New project"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub repo",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Optional. Link a GitHub repository to this project.",
+      "githubRepoInvalid": "Use owner/repo format",
+      "deadlineLabel": "Deadline",
+      "colorLabel": "Color",
+      "enableSyncLabel": "Enable GitHub sync + initialize labels",
+      "enableSyncHelp": "Creates Mission Control labels on the repo and turns on two-way sync",
+      "initLabelsFailedWarning": "Project created, but GitHub label setup failed. You can retry from the GitHub Sync panel."
+    },
     "empty": {
       "title": "No active projects yet",
       "cta": "Create project"

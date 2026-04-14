@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "Projekte",
+    "header": {
+      "cta": "Neues Projekt"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub-Repo",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Optional. Verknüpfen Sie ein GitHub-Repository mit diesem Projekt.",
+      "githubRepoInvalid": "Format: owner/repo",
+      "deadlineLabel": "Frist",
+      "colorLabel": "Farbe",
+      "enableSyncLabel": "GitHub-Sync aktivieren und Labels initialisieren",
+      "enableSyncHelp": "Erstellt Mission-Control-Labels im Repo und aktiviert Zwei-Wege-Sync",
+      "initLabelsFailedWarning": "Projekt erstellt, aber GitHub-Label-Setup fehlgeschlagen. Sie können es im GitHub-Sync-Panel erneut versuchen."
+    },
     "empty": {
       "title": "Noch keine aktiven Projekte",
       "cta": "Projekt erstellen"

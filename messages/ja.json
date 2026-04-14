@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "プロジェクト",
+    "header": {
+      "cta": "新しいプロジェクト"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub リポジトリ",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "任意。GitHub リポジトリをこのプロジェクトにリンクします。",
+      "githubRepoInvalid": "owner/repo 形式で入力してください",
+      "deadlineLabel": "期限",
+      "colorLabel": "色",
+      "enableSyncLabel": "GitHub 同期を有効にしてラベルを初期化",
+      "enableSyncHelp": "リポジトリに Mission Control ラベルを作成し、双方向同期を有効にします",
+      "initLabelsFailedWarning": "プロジェクトは作成されましたが、GitHub ラベルの設定に失敗しました。GitHub Sync パネルから再試行できます。"
+    },
     "empty": {
       "title": "アクティブなプロジェクトはまだありません",
       "cta": "プロジェクトを作成"

@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "Proyectos",
+    "header": {
+      "cta": "Nuevo proyecto"
+    },
+    "create": {
+      "githubRepoLabel": "Repositorio GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Opcional. Vincula un repositorio GitHub a este proyecto.",
+      "githubRepoInvalid": "Usa el formato owner/repo",
+      "deadlineLabel": "Fecha límite",
+      "colorLabel": "Color",
+      "enableSyncLabel": "Activar sincronización GitHub + inicializar etiquetas",
+      "enableSyncHelp": "Crea etiquetas Mission Control en el repo y activa la sincronización bidireccional",
+      "initLabelsFailedWarning": "Proyecto creado, pero la configuración de etiquetas GitHub falló. Puedes reintentar desde el panel de GitHub Sync."
+    },
     "empty": {
       "title": "Aún no hay proyectos activos",
       "cta": "Crear proyecto"

@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "项目",
+    "header": {
+      "cta": "新建项目"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub 仓库",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "可选。将 GitHub 仓库关联到此项目。",
+      "githubRepoInvalid": "使用 owner/repo 格式",
+      "deadlineLabel": "截止日期",
+      "colorLabel": "颜色",
+      "enableSyncLabel": "启用 GitHub 同步并初始化标签",
+      "enableSyncHelp": "在仓库上创建 Mission Control 标签并启用双向同步",
+      "initLabelsFailedWarning": "项目已创建，但 GitHub 标签设置失败。您可以在 GitHub Sync 面板中重试。"
+    },
     "empty": {
       "title": "暂无活跃项目",
       "cta": "创建项目"

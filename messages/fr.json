@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "Projets",
+    "header": {
+      "cta": "Nouveau projet"
+    },
+    "create": {
+      "githubRepoLabel": "Dépôt GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Optionnel. Liez un dépôt GitHub à ce projet.",
+      "githubRepoInvalid": "Utilisez le format owner/repo",
+      "deadlineLabel": "Échéance",
+      "colorLabel": "Couleur",
+      "enableSyncLabel": "Activer la synchronisation GitHub + initialiser les libellés",
+      "enableSyncHelp": "Crée les libellés Mission Control sur le dépôt et active la synchronisation bidirectionnelle",
+      "initLabelsFailedWarning": "Projet créé, mais l'installation des libellés GitHub a échoué. Vous pouvez réessayer depuis le panneau GitHub Sync."
+    },
     "empty": {
       "title": "Aucun projet actif pour le moment",
       "cta": "Créer un projet"

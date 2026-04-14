@@ -2198,6 +2198,20 @@
   },
   "projects": {
     "title": "Проекты",
+    "header": {
+      "cta": "Новый проект"
+    },
+    "create": {
+      "githubRepoLabel": "Репозиторий GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Необязательно. Свяжите репозиторий GitHub с этим проектом.",
+      "githubRepoInvalid": "Используйте формат owner/repo",
+      "deadlineLabel": "Крайний срок",
+      "colorLabel": "Цвет",
+      "enableSyncLabel": "Включить синхронизацию GitHub и инициализировать метки",
+      "enableSyncHelp": "Создаёт метки Mission Control в репозитории и включает двустороннюю синхронизацию",
+      "initLabelsFailedWarning": "Проект создан, но настройка меток GitHub не удалась. Повторите попытку из панели GitHub Sync."
+    },
     "empty": {
       "title": "Пока нет активных проектов",
       "cta": "Создать проект"
