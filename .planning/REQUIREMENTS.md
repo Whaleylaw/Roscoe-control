@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Navigation
 
-- [ ] **NAV-01**: User can navigate into a project via full-takeover workspace view
+- [x] **NAV-01**: User can navigate into a project via full-takeover workspace view
 - [x] **NAV-02**: Breadcrumb navigation shows Projects > Project Name > Sub-view with clickable trail
 - [x] **NAV-03**: User can navigate between project sub-views (dashboard, tasks, sessions, agents, settings)
 - [x] **NAV-04**: URL reflects current project and sub-view (e.g., /project/my-app/tasks)

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Phase 8 context gathered
-last_updated: "2026-04-14T15:28:57.553Z"
+status: Ready to execute
+stopped_at: Completed 08-00-PLAN.md (last_activity_at backbone)
+last_updated: "2026-04-14T17:03:40.864Z"
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 22
+  completed_plans: 19
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place.
-**Current focus:** Phase 07 — post-audit-gap-closure
+**Current focus:** Phase 08 — projects-entry-point
 
 ## Current Position
 
-Phase: 07
-Plan: Not started
+Phase: 08 (projects-entry-point) — EXECUTING
+Plan: 2 of 4
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Plan: Not started
 | Phase 06-settings P01 | 10min | 2 tasks | 2 files |
 | Phase 07-post-audit-gap-closure P00 | 3min | 2 tasks | 12 files |
 | Phase 07-post-audit-gap-closure P01 | 7min | 2 tasks | 5 files |
+| Phase 08-projects-entry-point P00 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting current work:
 - [Phase 07-post-audit-gap-closure]: Timeout threshold 10_000ms (LOAD_TIMEOUT_MS) — matches industry-typical network-stall perception and >=2x the sub-5s boot observed across all 16 prior plans
 - [Phase 07-post-audit-gap-closure]: setTimeout lives inside the primary useEffect (not a separate effect) — cleanup-when-populated comes free via existing [slug, projects, setActiveProject] dependency re-run
 - [Phase 07-post-audit-gap-closure]: FLOW-E decision comment lives inside fetchProjects() adjacent to the fetch() call it guards, not as top-of-function JSDoc — intent is inseparable from the line it protects
+- [Phase 08-projects-entry-point]: Subquery alias rename t -> t2 to avoid shadowing outer LEFT JOIN alias in GET /api/projects
+- [Phase 08-projects-entry-point]: ms conversion done in SQL (MAX(updated_at) * 1000) not the map — single source of truth, tasks.updated_at is unix seconds
 
 ### Pending Todos
 
@@ -134,6 +137,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T15:28:57.544Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-projects-entry-point/08-CONTEXT.md
+Last session: 2026-04-14T17:03:40.862Z
+Stopped at: Completed 08-00-PLAN.md (last_activity_at backbone)
+Resume file: None
