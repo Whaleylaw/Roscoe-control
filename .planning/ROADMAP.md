@@ -150,7 +150,7 @@ Plans:
 Plans:
 - [x] 08-00-PLAN.md — Backend + store: extend GET /api/projects with last_activity_at; extend Project interface; unit test
 - [ ] 08-01-PLAN.md — i18n (10 locales) + nav-rail Projects item + ContentRouter + ProjectsPanel (row list + empty-state CTA) + unit tests
-- [ ] 08-02-PLAN.md — Breadcrumb re-target to /projects + "↗ Open workspace" picker button on task-board filter + unit tests
+- [x] 08-02-PLAN.md — Breadcrumb re-target to /projects + "↗ Open workspace" picker button on task-board filter + unit tests
 - [ ] 08-03-PLAN.md — Playwright E2E covering the NAV-01 cold-start journey
 **UI hint**: yes
 

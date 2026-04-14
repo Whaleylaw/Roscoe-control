@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 08-00-PLAN.md (last_activity_at backbone)
-last_updated: "2026-04-14T17:03:40.864Z"
+stopped_at: Completed 08-02-PLAN.md (breadcrumb + picker-button retrofits)
+last_updated: "2026-04-14T17:13:48.010Z"
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 22
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 ## Current Position
 
 Phase: 08 (projects-entry-point) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Plan: 2 of 4
 | Phase 07-post-audit-gap-closure P00 | 3min | 2 tasks | 12 files |
 | Phase 07-post-audit-gap-closure P01 | 7min | 2 tasks | 5 files |
 | Phase 08-projects-entry-point P00 | 2min | 2 tasks | 3 files |
+| Phase 08-projects-entry-point P02 | 6min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,9 @@ Recent decisions affecting current work:
 - [Phase 07-post-audit-gap-closure]: FLOW-E decision comment lives inside fetchProjects() adjacent to the fetch() call it guards, not as top-of-function JSDoc — intent is inseparable from the line it protects
 - [Phase 08-projects-entry-point]: Subquery alias rename t -> t2 to avoid shadowing outer LEFT JOIN alias in GET /api/projects
 - [Phase 08-projects-entry-point]: ms conversion done in SQL (MAX(updated_at) * 1000) not the map — single source of truth, tasks.updated_at is unix seconds
+- [Phase 08-projects-entry-point]: Exported CreateTaskModal as a named export (Strategy B) so isolated unit tests can render the modal without the full TaskBoardPanel pipeline — zero runtime cost
+- [Phase 08-projects-entry-point]: Picker audit: overview dashboard picker referenced by D-14 does not exist (verified 2026-04-14). D-14 fully honored by covering the two pickers that do exist: task-board filter + CreateTaskModal
+- [Phase 08-projects-entry-point]: CreateTaskModal's Open-workspace Button uses type='button' to prevent the surrounding <form onSubmit> from submitting on click — load-bearing detail flagged in plan
 
 ### Pending Todos
 
@@ -137,6 +141,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T17:03:40.862Z
-Stopped at: Completed 08-00-PLAN.md (last_activity_at backbone)
+Last session: 2026-04-14T17:13:48.007Z
+Stopped at: Completed 08-02-PLAN.md (breadcrumb + picker-button retrofits)
 Resume file: None
