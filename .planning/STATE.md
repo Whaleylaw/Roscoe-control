@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 06-00-PLAN.md
-last_updated: "2026-04-14T13:34:38.321Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-04-14T13:48:43.431Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -61,6 +61,7 @@ Plan: 2 of 2
 | Phase 05-sessions-agents P01 | 6min | 3 tasks | 6 files |
 | Phase 05-sessions-agents P03 | 9min | 3 tasks | 7 files |
 | Phase 06-settings P00 | 7min | 2 tasks tasks | 12 files files |
+| Phase 06-settings P01 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,10 @@ Recent decisions affecting current work:
 - [Phase 06-settings]: Atomic 10-locale commit for project.settings.* namespace — eliminates conflict surface for any future parallel work on settings copy
 - [Phase 06-settings]: Title updated 'Settings' → 'Project settings' per UI-SPEC; reused project.common.retry instead of adding loadErrorRetry
 - [Phase 06-settings]: Brand tokens (GitHub, PA, owner/repo, hex colors, Live Feed) untranslated across all 10 locales per Phase 5 precedent
+- [Phase 06-settings]: Per-field useState + useMemo-derived isDirty chosen over useReducer — seven scalar fields don't benefit from reducer indirection
+- [Phase 06-settings]: useEffect-based banner focus (post-commit) replaces queueMicrotask — ref is null until React commits the bannerError state change
+- [Phase 06-settings]: Server-echo re-seed on 2xx — normalized values (especially ticket_prefix) land in the form without a false-dirty flash
+- [Phase 06-settings]: COLOR_PALETTE and normalizePrefixForCompare duplicated verbatim per D-11 (no cross-component import)
 
 ### Pending Todos
 
@@ -121,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T13:34:28.494Z
-Stopped at: Completed 06-00-PLAN.md
+Last session: 2026-04-14T13:48:34.358Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None

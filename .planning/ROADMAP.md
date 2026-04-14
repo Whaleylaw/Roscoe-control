@@ -114,7 +114,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 06-00-PLAN.md — Wave 0 test scaffolds + atomic project.settings.* i18n keys across 10 locales (SETT-01, SETT-02, SETT-03)
-- [ ] 06-01-PLAN.md — SettingsView form implementation (structure + state + dirty/viewer readonly, then save PATCH + Zustand refresh + error routing + test bodies)
+- [x] 06-01-PLAN.md — SettingsView form implementation (structure + state + dirty/viewer readonly, then save PATCH + Zustand refresh + error routing + test bodies)
 **UI hint**: yes
 
 ## Progress
