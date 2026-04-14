@@ -401,6 +401,7 @@ export interface TaskBoardScope {
 
 export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
   const t = useTranslations('taskBoard')
+  const tProjects = useTranslations('projects')
   const statusColumns = STATUS_COLUMN_KEYS.map(col => ({ ...col, title: t(col.titleKey as any) }))
   const { tasks: storeTasks, setTasks: storeSetTasks, selectedTask, setSelectedTask, activeProject, availableModels, spawnRequests, addSpawnRequest, updateSpawnRequest, dashboardMode } = useMissionControl()
   const router = useRouter()
@@ -842,6 +843,20 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
                 <path d="M4 6l4 4 4-4" />
               </svg>
             </div>
+          )}
+          {!scope?.hideProjectFilter && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={projectFilter === 'all' || !projects.find((p) => String(p.id) === projectFilter)}
+              onClick={() => {
+                const selected = projects.find((p) => String(p.id) === projectFilter)
+                if (selected?.slug) router.push(`/project/${selected.slug}`, { scroll: false })
+              }}
+              aria-label={tProjects('picker.openWorkspace')}
+            >
+              {tProjects('picker.openWorkspace')}
+            </Button>
           )}
         </div>
         <div className="flex gap-2">
