@@ -154,7 +154,7 @@ Plans:
 - [x] 08-01-PLAN.md — i18n (10 locales) + nav-rail Projects item + ContentRouter + ProjectsPanel (row list + empty-state CTA) + unit tests
 - [x] 08-02-PLAN.md — Breadcrumb re-target to /projects + "↗ Open workspace" picker button on task-board filter + unit tests
 - [x] 08-03-PLAN.md — Playwright E2E covering the NAV-01 cold-start journey
-- [ ] 08-04-PLAN.md — Gap closure: header "New project" CTA on ProjectsPanel + atomic 10-locale i18n + test coverage (UAT Gap 1)
+- [x] 08-04-PLAN.md — Gap closure: header "New project" CTA on ProjectsPanel + atomic 10-locale i18n + test coverage (UAT Gap 1)
 - [ ] 08-05-PLAN.md — Gap closure: upgrade create-project modal with github_repo/deadline/color + init-labels chain + graceful failure + new test suite (UAT Gap 2)
 **UI hint**: yes
 

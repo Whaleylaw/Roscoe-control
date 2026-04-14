@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase complete — ready for verification
-stopped_at: Completed 08-03-PLAN.md (NAV-01 cold-start journey e2e)
-last_updated: "2026-04-14T17:30:20.525Z"
+status: Ready to execute
+stopped_at: Completed 08-04-PLAN.md (UAT Gap 1 closed — header CTA on ProjectsPanel)
+last_updated: "2026-04-14T18:21:50.944Z"
 progress:
   total_phases: 8
-  completed_phases: 8
-  total_plans: 22
-  completed_plans: 22
+  completed_phases: 7
+  total_plans: 24
+  completed_plans: 23
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 ## Current Position
 
 Phase: 08 (projects-entry-point) — EXECUTING
-Plan: 4 of 4
+Plan: 2 of 6
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Plan: 4 of 4
 | Phase 08-projects-entry-point P02 | 6min | 3 tasks | 5 files |
 | Phase 08-projects-entry-point P01 | 8min | 3 tasks | 14 files |
 | Phase 08-projects-entry-point P03 | 10min | 1 tasks | 1 files |
+| Phase 08-projects-entry-point P04 | 8min | 1 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,8 @@ Recent decisions affecting current work:
 - [Phase 08-projects-entry-point]: Plan 08-03 uses page.request.post for API-session login to avoid the login-form React-hydration race that caused native GET /login? submissions on click
 - [Phase 08-projects-entry-point]: Plan 08-03 suppresses onboarding wizard via sessionStorage['mc-onboarding-dismissed']=1 init script — reflects returning-admin state; nav-rail is hidden while wizard is up
 - [Phase 08-projects-entry-point]: Plan 08-03 gates boot-complete on <nav aria-label='Main navigation'> visibility — earliest deterministic signal that all 9 STEP_KEYS marked done and NavRail mounted
+- [Phase 08-projects-entry-point]: Plan 08-04 header CTA reuses setShowManager(true) from the empty-state CTA — single ProjectManagerModal instance for both entry points (D-12 preserved); acceptance criterion grep -c 'setShowManager(true)' == 2
+- [Phase 08-projects-entry-point]: Plan 08-04 executed AFTER 08-05 in actual wave-1 ordering; ...rest spread locale script preserved all projects.create.* keys while adding projects.header.cta — race-safety mechanism exercised and verified
 
 ### Pending Todos
 
@@ -149,6 +152,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T17:30:12.641Z
-Stopped at: Completed 08-03-PLAN.md (NAV-01 cold-start journey e2e)
+Last session: 2026-04-14T18:21:50.501Z
+Stopped at: Completed 08-04-PLAN.md (UAT Gap 1 closed — header CTA on ProjectsPanel)
 Resume file: None
