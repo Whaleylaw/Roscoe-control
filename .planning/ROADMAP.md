@@ -113,7 +113,7 @@ Plans:
   3. Saving changes calls the existing PATCH /api/projects/[id] endpoint and the workspace reflects updates immediately
 **Plans:** 2 plans
 Plans:
-- [ ] 06-00-PLAN.md — Wave 0 test scaffolds + atomic project.settings.* i18n keys across 10 locales (SETT-01, SETT-02, SETT-03)
+- [x] 06-00-PLAN.md — Wave 0 test scaffolds + atomic project.settings.* i18n keys across 10 locales (SETT-01, SETT-02, SETT-03)
 - [ ] 06-01-PLAN.md — SettingsView form implementation (structure + state + dirty/viewer readonly, then save PATCH + Zustand refresh + error routing + test bodies)
 **UI hint**: yes
 

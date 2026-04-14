@@ -40,9 +40,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Settings
 
-- [ ] **SETT-01**: User can edit project name, description, and status from project settings
-- [ ] **SETT-02**: User can edit project color, ticket prefix, deadline, and GitHub repo from settings
-- [ ] **SETT-03**: Project settings use existing PATCH /api/projects/[id] endpoint
+- [x] **SETT-01**: User can edit project name, description, and status from project settings
+- [x] **SETT-02**: User can edit project color, ticket prefix, deadline, and GitHub repo from settings
+- [x] **SETT-03**: Project settings use existing PATCH /api/projects/[id] endpoint
 
 ### Foundation
 
@@ -110,9 +110,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-01 | Phase 5 | Complete |
 | SESS-02 | Phase 5 | Complete |
 | SESS-03 | Phase 5 | Complete |
-| SETT-01 | Phase 6 | Pending |
-| SETT-02 | Phase 6 | Pending |
-| SETT-03 | Phase 6 | Pending |
+| SETT-01 | Phase 6 | Complete |
+| SETT-02 | Phase 6 | Complete |
+| SETT-03 | Phase 6 | Complete |
 
 **Coverage:**
 - v1 requirements: 26 total
