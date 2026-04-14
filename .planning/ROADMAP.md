@@ -146,7 +146,12 @@ Plans:
   4. Cold-start journey: from a fresh login at `/`, a user can reach a project's dashboard with clicks alone (no URL editing) and return to the main view via the existing breadcrumb "Projects" link (which should route to the new Projects panel, not to `/`)
   5. The Projects list panel uses i18n via `next-intl` across all 10 locales atomically (follow phase 6 precedent)
   6. Unit tests cover: nav-rail renders the new item; Projects list panel renders project cards from Zustand `projects[]` and navigates on click; breadcrumb "Projects" segment routes to the Projects panel (not `/`)
-**Plans:** TBD — run `/gsd:plan-phase 8` to generate
+**Plans:** 4 plans
+Plans:
+- [ ] 08-00-PLAN.md — Backend + store: extend GET /api/projects with last_activity_at; extend Project interface; unit test
+- [ ] 08-01-PLAN.md — i18n (10 locales) + nav-rail Projects item + ContentRouter + ProjectsPanel (row list + empty-state CTA) + unit tests
+- [ ] 08-02-PLAN.md — Breadcrumb re-target to /projects + "↗ Open workspace" picker button on task-board filter + unit tests
+- [ ] 08-03-PLAN.md — Playwright E2E covering the NAV-01 cold-start journey
 **UI hint**: yes
 
 ## Progress
@@ -163,4 +168,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Sessions & Agents | 0/4 | Planning complete | - |
 | 6. Settings | 0/2 | Planning complete | - |
 | 7. Post-Audit Gap Closure | 0/2 | Planning complete | - |
-| 8. Projects Entry Point | 0/0 | Needs planning | - |
+| 8. Projects Entry Point | 0/4 | Planning complete | - |
