@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 08-02-PLAN.md (breadcrumb + picker-button retrofits)
-last_updated: "2026-04-14T17:13:48.010Z"
+stopped_at: Completed 08-01-PLAN.md (Projects nav entry + list panel)
+last_updated: "2026-04-14T17:16:26.344Z"
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 ## Current Position
 
 Phase: 08 (projects-entry-point) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Plan: 3 of 4
 | Phase 07-post-audit-gap-closure P01 | 7min | 2 tasks | 5 files |
 | Phase 08-projects-entry-point P00 | 2min | 2 tasks | 3 files |
 | Phase 08-projects-entry-point P02 | 6min | 3 tasks | 5 files |
+| Phase 08-projects-entry-point P01 | 8min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,9 @@ Recent decisions affecting current work:
 - [Phase 08-projects-entry-point]: Exported CreateTaskModal as a named export (Strategy B) so isolated unit tests can render the modal without the full TaskBoardPanel pipeline — zero runtime cost
 - [Phase 08-projects-entry-point]: Picker audit: overview dashboard picker referenced by D-14 does not exist (verified 2026-04-14). D-14 fully honored by covering the two pickers that do exist: task-board filter + CreateTaskModal
 - [Phase 08-projects-entry-point]: CreateTaskModal's Open-workspace Button uses type='button' to prevent the surrounding <form onSubmit> from submitting on click — load-bearing detail flagged in plan
+- [Phase 08-projects-entry-point]: ProjectsPanel row uses div[role=button] + tabIndex + keyboard handler instead of native button to keep flex+ml-auto meta-slot layout clean; a11y equivalent via Enter/Space handlers
+- [Phase 08-projects-entry-point]: Atomic 10-locale i18n via one-shot Node script (JSON-parse + insertion-order preserve + write) — prevents drift and inserts keys at semantic positions (nav.projects after nav.overview; top-level projects before project)
+- [Phase 08-projects-entry-point]: Empty-state CTA reuses the existing ProjectManagerModal (task-board pattern) — single source of truth for project creation; onClose triggers fetchProjects so new projects appear without reload
 
 ### Pending Todos
 
@@ -141,6 +145,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T17:13:48.007Z
-Stopped at: Completed 08-02-PLAN.md (breadcrumb + picker-button retrofits)
+Last session: 2026-04-14T17:16:26.341Z
+Stopped at: Completed 08-01-PLAN.md (Projects nav entry + list panel)
 Resume file: None
