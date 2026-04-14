@@ -1,16 +1,20 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
 import { useProjectWorkspace } from '@/components/project/project-context'
+import { AgentSquadPanel } from '@/components/panels/agent-squad-panel'
 
 export function AgentsView() {
-  const t = useTranslations('project')
-  const { slug } = useProjectWorkspace()
-
+  const { project } = useProjectWorkspace()
+  // project-workspace.tsx already gates on loading/not-found before this view.
+  if (!project) return null
   return (
-    <div className="p-6">
-      <h2 className="text-lg font-semibold mb-4">{t('agents.title')}</h2>
-      <p className="text-sm text-muted-foreground">{t('agents.placeholder')}</p>
-    </div>
+    <AgentSquadPanel
+      scope={{
+        lockedProjectId: project.id,
+        taskScopeProjectId: project.id,
+        hideCreateAgent: true,
+        showAssignmentBadge: true,
+      }}
+    />
   )
 }
