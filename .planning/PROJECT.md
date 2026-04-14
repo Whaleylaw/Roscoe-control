@@ -37,7 +37,7 @@ When I click into a project, I see everything about that project — what it is,
 - [x] Reassign existing tasks into/out of the current project — Validated in Phase 4: Project Tasks
 - [x] Project-scoped agent sessions view — Validated in Phase 5: Sessions & Agents
 - [x] Project-scoped agents view — Validated in Phase 5: Sessions & Agents
-- [ ] Project settings (name, description, status, configuration)
+- [x] Project settings (name, description, status, configuration) — Validated in Phase 6: Settings
 - [ ] Project-level progress/completion indicators
 
 ### Out of Scope
@@ -90,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 after Phase 5: Sessions & Agents completion*
+*Last updated: 2026-04-14 after Phase 6: Settings completion*
