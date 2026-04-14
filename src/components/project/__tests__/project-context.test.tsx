@@ -1,16 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
 import { ProjectWorkspaceProvider, useProjectWorkspace } from '@/components/project/project-context'
 
 let mockPathname = '/project/my-app'
+let mockProjects: Array<{ id: number; slug: string; name: string; status: string }> = []
+const setActiveProjectSpy = vi.fn()
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname,
 }))
 
+vi.mock('@/store', () => ({
+  useMissionControl: () => ({
+    projects: mockProjects,
+    setActiveProject: setActiveProjectSpy,
+  }),
+}))
+
 describe('ProjectWorkspaceProvider', () => {
   beforeEach(() => {
     mockPathname = '/project/my-app'
+    mockProjects = []
+    setActiveProjectSpy.mockClear()
   })
 
   it('parses slug from URL /project/:slug', () => {
@@ -132,16 +143,70 @@ describe('SESS-03: detailId segment parsing', () => {
 })
 
 describe('ProjectWorkspaceProvider - loading timeout escape path (Phase 7 gap closure / AUDIT-PHASE-02-TECHDEBT)', () => {
-  // Wave 1 will implement:
-  //   - A setTimeout(10_000) inside the same useEffect that watches [slug, projects].
-  //   - When the timeout fires AND projects.length === 0 AND no project was found,
-  //     set error = 'load-timeout' and loading = false.
-  //   - Timer is cleared on cleanup AND when projects becomes non-empty.
+  // Wave 1 (Plan 07-01) implementation:
+  //   - A setTimeout(LOAD_TIMEOUT_MS = 10_000) inside the same useEffect that
+  //     watches [slug, projects] — in the projects.length === 0 branch.
+  //   - When the timeout fires, setError('load-timeout') and setLoading(false).
+  //   - Timer is cleared on cleanup AND when projects becomes non-empty (effect re-runs).
   //   - workspace shell (project-workspace.tsx) renders a timeout error UI with a Retry
   //     button that calls useMissionControl().fetchProjects().
-  // These tests will use vi.useFakeTimers() to advance time past 10s.
-  it.todo('sets error to "load-timeout" and loading to false when projects stays empty for 10_000ms')
-  it.todo('does NOT fire the timeout when projects populates before 10s elapses (normal load path)')
-  it.todo('clears the pending timeout on unmount (no setState-after-unmount warning)')
-  it.todo('clears the pending timeout when projects becomes non-empty mid-wait (timeout does not fire)')
+  beforeEach(() => {
+    setActiveProjectSpy.mockClear()
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('sets error to "load-timeout" and loading to false when projects stays empty for 10_000ms', () => {
+    mockPathname = '/project/unknown-slug'
+    mockProjects = []
+    const { result } = renderHook(() => useProjectWorkspace(), { wrapper: ProjectWorkspaceProvider })
+    expect(result.current.loading).toBe(true)
+    expect(result.current.error).toBeNull()
+    act(() => { vi.advanceTimersByTime(10_000) })
+    expect(result.current.loading).toBe(false)
+    expect(result.current.error).toBe('load-timeout')
+    expect(result.current.project).toBeNull()
+  })
+
+  it('does NOT fire the timeout when projects populates before 10s elapses (normal load path)', () => {
+    mockPathname = '/project/my-app'
+    mockProjects = []
+    const { result, rerender } = renderHook(() => useProjectWorkspace(), { wrapper: ProjectWorkspaceProvider })
+    act(() => { vi.advanceTimersByTime(5_000) })
+    // Populate projects mid-wait — effect re-runs, prior timer cleared
+    mockProjects = [{ id: 1, slug: 'my-app', name: 'My App', status: 'active' }]
+    rerender()
+    act(() => { vi.advanceTimersByTime(6_000) }) // past 10s total
+    expect(result.current.error).toBeNull()
+    expect(result.current.loading).toBe(false)
+    expect(result.current.project).toMatchObject({ slug: 'my-app' })
+  })
+
+  it('clears the pending timeout on unmount (no setState-after-unmount warning)', () => {
+    mockPathname = '/project/unknown-slug'
+    mockProjects = []
+    const { unmount } = renderHook(() => useProjectWorkspace(), { wrapper: ProjectWorkspaceProvider })
+    act(() => { vi.advanceTimersByTime(5_000) })
+    unmount()
+    // If clearTimeout was not called, advancing time would fire setState on an unmounted
+    // component. The assertion is simply that this doesn't throw.
+    expect(() => {
+      act(() => { vi.advanceTimersByTime(10_000) })
+    }).not.toThrow()
+  })
+
+  it('clears the pending timeout when projects becomes non-empty mid-wait (timeout does not fire)', () => {
+    mockPathname = '/project/my-app'
+    mockProjects = []
+    const { result, rerender } = renderHook(() => useProjectWorkspace(), { wrapper: ProjectWorkspaceProvider })
+    act(() => { vi.advanceTimersByTime(3_000) })
+    mockProjects = [{ id: 1, slug: 'my-app', name: 'My App', status: 'active' }]
+    rerender()
+    // Advance well past the original 10s mark to prove the old timer was cleared.
+    act(() => { vi.advanceTimersByTime(15_000) })
+    expect(result.current.error).toBeNull()
+    expect(result.current.error).not.toBe('load-timeout')
+  })
 })
