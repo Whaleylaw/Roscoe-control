@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-04-14T01:07:09.353Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-04-14T01:21:59.546Z"
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -59,6 +59,7 @@ Plan: 4 of 4
 | Phase 05-sessions-agents P00 | 4min | 7 tasks | 18 files |
 | Phase 05-sessions-agents P02 | 4min | 3 tasks | 8 files |
 | Phase 05-sessions-agents P01 | 6min | 3 tasks | 6 files |
+| Phase 05-sessions-agents P03 | 9min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,10 @@ Recent decisions affecting current work:
 - [Phase 05-sessions-agents]: Reused TaskBoardScope template — single optional scope prop on AgentSquadPanel preserves global behavior when undefined
 - [Phase 05-sessions-agents]: LEFT JOIN + CASE WHEN derives assignment_source in the same union query — no second round-trip
 - [Phase 05-sessions-agents]: Tightened project_id parsing rejects mixed-numeric-junk inputs (e.g. '12abc') with 400
+- [Phase 05-sessions-agents]: Reused Plan 05-01 agent-union SQL inline in /api/projects/[id]/sessions instead of cross-calling /api/agents — keeps the route self-contained, no HTTP round-trip
+- [Phase 05-sessions-agents]: SSE re-fetch wired via window CustomEvent (mc:chat-message) dispatched from use-server-events.ts — scoped views subscribe without store coupling
+- [Phase 05-sessions-agents]: Sections render conditionally — empty arrays print no header (avoids visual noise per UI-SPEC); empty-state branch only fires when both arrays are empty
+- [Phase 05-sessions-agents]: Added getLocalClaudeSessions() export to claude-sessions.ts — keeps the project-runtime-session data shape in one place rather than copying the global /api/sessions helper
 
 ### Pending Todos
 
@@ -111,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T01:07:09.351Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-04-14T01:21:59.544Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
