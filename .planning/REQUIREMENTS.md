@@ -34,9 +34,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Sessions
 
-- [ ] **SESS-01**: Project workspace shows agent sessions scoped to the project
-- [ ] **SESS-02**: Project workspace shows agents assigned to or working on the project
-- [ ] **SESS-03**: User can view session details from within the project context
+- [x] **SESS-01**: Project workspace shows agent sessions scoped to the project
+- [x] **SESS-02**: Project workspace shows agents assigned to or working on the project
+- [x] **SESS-03**: User can view session details from within the project context
 
 ### Settings
 
@@ -107,9 +107,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TASK-02 | Phase 4 | Complete |
 | TASK-03 | Phase 4 | Complete |
 | TASK-04 | Phase 4 | Complete |
-| SESS-01 | Phase 5 | Pending |
-| SESS-02 | Phase 5 | Pending |
-| SESS-03 | Phase 5 | Pending |
+| SESS-01 | Phase 5 | Complete |
+| SESS-02 | Phase 5 | Complete |
+| SESS-03 | Phase 5 | Complete |
 | SETT-01 | Phase 6 | Pending |
 | SETT-02 | Phase 6 | Pending |
 | SETT-03 | Phase 6 | Pending |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 5 context gathered
-last_updated: "2026-04-14T00:04:42.637Z"
+status: Ready to execute
+stopped_at: Completed 05-00-PLAN.md
+last_updated: "2026-04-14T00:56:57.197Z"
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 14
+  completed_plans: 11
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place.
-**Current focus:** Phase 04 — project-tasks
+**Current focus:** Phase 05 — sessions-agents
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 05 (sessions-agents) — EXECUTING
+Plan: 2 of 4
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Plan: Not started
 | Phase 03 P02 | 1min | 2 tasks | 1 files |
 | Phase 04-project-tasks P00 | 2min | 3 tasks | 3 files |
 | Phase 04-project-tasks P01 | 12min | 5 tasks | 5 files |
+| Phase 05-sessions-agents P00 | 4min | 7 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,11 @@ Recent decisions affecting current work:
 - [Phase 04-project-tasks]: CreateTaskModal reads defaultProjectId only inside useState initializer (pitfall #3) — no useEffect to sync prop changes
 - [Phase 04-project-tasks]: Client-side filter on storeTasks defends against SSE keeping a reassigned-out task visible (pitfall #5)
 - [Phase 04-project-tasks]: PATCH never appears as a method literal anywhere — all task updates use PUT to match the API contract (pitfall #1)
+- [Phase 05-sessions-agents]: Continued wave-0 it.todo()/test.fixme() pattern from Phases 1–4 — every Wave 1/2 task has a named test bucket pre-created
+- [Phase 05-sessions-agents]: Embedded mock setup as block comments at the top of each scaffold so Wave 1/2 plans don't re-derive harness
+- [Phase 05-sessions-agents]: Translated all 10 locales atomically in Task 1 — eliminates messages/*.json conflicts across parallel Wave 1 plans
+- [Phase 05-sessions-agents]: Brand names (Claude/Codex/Hermes/Gateway) intentionally untranslated; ICU plural and {ticketRef} placeholders preserved verbatim across locales
+- [Phase 05-sessions-agents]: Settings namespace deferred — Phase 5 only owns sessions/agents/common; settings remains stubbed for a later phase
 
 ### Pending Todos
 
@@ -97,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T00:04:42.631Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-sessions-agents/05-CONTEXT.md
+Last session: 2026-04-14T00:56:57.193Z
+Stopped at: Completed 05-00-PLAN.md
+Resume file: None

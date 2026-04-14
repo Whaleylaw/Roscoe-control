@@ -95,7 +95,12 @@ Plans:
   1. Sessions tab shows only sessions associated with the current project
   2. Agents tab shows only agents assigned to or currently working on the current project
   3. User can click a session to open its detail view without navigating away from the project workspace
-**Plans**: TBD
+**Plans:** 4 plans
+Plans:
+- [x] 05-00-PLAN.md — Wave 0 test scaffolds + i18n keys across 10 locales (SESS-01, SESS-02, SESS-03)
+- [ ] 05-01-PLAN.md — /api/agents?project_id= union filter + AgentSquadScope prop + agents-view wrapper (SESS-02)
+- [ ] 05-02-PLAN.md — detailId URL parser + SessionDetailView + SessionDetailScope prop + breadcrumb extension (SESS-03)
+- [ ] 05-03-PLAN.md — GET /api/projects/[id]/sessions endpoint + two-section sessions-view + Playwright E2E (SESS-01)
 **UI hint**: yes
 
 ### Phase 6: Settings
@@ -120,5 +125,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Navigation & Workspace Shell | 0/2 | Planning complete | - |
 | 3. Project Dashboard | 3/3 | Complete   | 2026-04-13 |
 | 4. Project Tasks | 0/2 | Planning complete | - |
-| 5. Sessions & Agents | 0/TBD | Not started | - |
+| 5. Sessions & Agents | 0/4 | Planning complete | - |
 | 6. Settings | 0/TBD | Not started | - |
