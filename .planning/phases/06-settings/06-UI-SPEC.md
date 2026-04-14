@@ -126,6 +126,8 @@ Accent is **not** used for:
 </div>
 ```
 
+**Focal point.** On initial (clean, non-dirty) load the `Project settings` view title (`text-lg font-semibold` at the top of the shell) is the visual anchor — it is the heaviest typographic element visible and sits at the top of the reading path, orienting the user before they scan the field grid. When the form enters the dirty state, the focal point shifts to the sticky footer: its top border, backdrop-blur surface, and primary Save CTA together form the strongest contrast cluster on screen and pull the eye to the commit action.
+
 Max-width constraint: `max-w-3xl` (768px). Keeps line-length readable for textarea and prevents inputs from stretching across ultra-wide viewports. At narrower viewports the form naturally shrinks; at narrower than `md` (768px) the two-column grid inside sections collapses to one column (see Responsive).
 
 ### Section structure
@@ -342,7 +344,7 @@ All strings go through `messages/{ar,de,en,es,fr,ja,ko,pt,ru,zh}.json` under `pr
 | Element | Copy (en) | i18n key |
 |---------|-----------|----------|
 | Primary CTA — save | `Save changes` | `project.settings.save` |
-| Secondary CTA — cancel | `Cancel` | `project.settings.cancel` |
+| Secondary CTA — cancel | `Discard changes` | `project.settings.cancel` |
 | Saving (in-flight) label | `Saving…` | `project.settings.saving` |
 | Dirty-state label | `Unsaved changes` | `project.settings.unsavedChanges` |
 
