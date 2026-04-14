@@ -2202,7 +2202,10 @@
       "loading": "Loading project...",
       "projectNotFound": "プロジェクトが見つかりません",
       "projectNotFoundDescription": "お探しのプロジェクトは存在しないか、削除されました。",
-      "backToProjects": "プロジェクト一覧に戻る"
+      "backToProjects": "プロジェクト一覧に戻る",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
     },
     "nav": {
       "projects": "プロジェクト",

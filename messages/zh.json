@@ -2202,7 +2202,10 @@
       "loading": "Loading project...",
       "projectNotFound": "项目未找到",
       "projectNotFoundDescription": "您查找的项目不存在或已被删除。",
-      "backToProjects": "返回项目列表"
+      "backToProjects": "返回项目列表",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
     },
     "nav": {
       "projects": "项目",

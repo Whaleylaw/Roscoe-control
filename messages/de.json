@@ -2202,7 +2202,10 @@
       "loading": "Loading project...",
       "projectNotFound": "Projekt nicht gefunden",
       "projectNotFoundDescription": "Das gesuchte Projekt existiert nicht oder wurde entfernt.",
-      "backToProjects": "Zurueck zu Projekten"
+      "backToProjects": "Zurueck zu Projekten",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
     },
     "nav": {
       "projects": "Projekte",

@@ -2202,7 +2202,10 @@
       "loading": "Loading project...",
       "projectNotFound": "프로젝트를 찾을 수 없습니다",
       "projectNotFoundDescription": "찾으시는 프로젝트가 존재하지 않거나 삭제되었습니다.",
-      "backToProjects": "프로젝트 목록으로 돌아가기"
+      "backToProjects": "프로젝트 목록으로 돌아가기",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
     },
     "nav": {
       "projects": "프로젝트",

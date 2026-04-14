@@ -84,6 +84,31 @@ describe('Project i18n coverage (FOUN-04)', () => {
     expect(enData.project.settings.title).toBe('Project settings')
   })
 
+  it('all 10 locale files have project.workspace.loadTimeout* keys (Phase 7 gap closure)', () => {
+    const LOADTIMEOUT_KEYS = ['loadTimeoutHeading', 'loadTimeoutBody', 'loadTimeoutRetry']
+    const files = fs.readdirSync(MESSAGES_DIR).filter((f) => f.endsWith('.json'))
+    expect(files.length).toBe(10)
+
+    for (const file of files) {
+      const filePath = path.join(MESSAGES_DIR, file)
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+      expect(data.project, `${file} missing project.workspace`).toHaveProperty('workspace')
+
+      for (const k of LOADTIMEOUT_KEYS) {
+        expect(
+          data.project.workspace,
+          `${file} missing project.workspace.${k}`,
+        ).toHaveProperty(k)
+      }
+    }
+
+    // English source of truth — values must match the canonical strings
+    const enPath = path.join(MESSAGES_DIR, 'en.json')
+    const enData = JSON.parse(fs.readFileSync(enPath, 'utf-8'))
+    expect(enData.project.workspace.loadTimeoutHeading).toBe('Taking longer than expected')
+    expect(enData.project.workspace.loadTimeoutRetry).toBe('Retry')
+  })
+
   // These will be filled in by Plan 02 after stub views are created
   it.todo('all 5 stub view components use useTranslations(project)')
   it.todo('no stub view contains hardcoded English strings in JSX')
