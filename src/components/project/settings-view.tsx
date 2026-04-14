@@ -156,7 +156,7 @@ export function SettingsView() {
 
     // Build PATCH body. Per SETT-03: name is always included; other fields
     // only when their normalized value differs from the loaded project.
-    // ticket_counter is never sent (pitfall).
+    // The ticket counter is never sent (pitfall).
     const body: Record<string, unknown> = { name: name.trim() }
 
     if (description.trim() !== (project.description ?? '').trim()) {
@@ -215,7 +215,7 @@ export function SettingsView() {
       // Success — server echoes normalized project row. Re-seed state from the
       // echo so the form immediately reflects the server's canonical values
       // (e.g. normalized ticket_prefix), then refresh Zustand so breadcrumb,
-      // dashboard and nav observe the update. No router.refresh, no SSE.
+      // dashboard and nav observe the update. No router refresh, no SSE.
       const echoed = (data as { project?: Project })?.project
       if (echoed) {
         setName(echoed.name ?? '')
