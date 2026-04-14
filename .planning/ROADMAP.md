@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Project Tasks** - Scoped task list with create, reassign, and full board functionality within the workspace
 - [ ] **Phase 5: Sessions & Agents** - Scoped session and agent views with detail access from within the project context
 - [ ] **Phase 6: Settings** - Project settings panel for name, description, status, color, prefix, deadline, and GitHub repo
+- [ ] **Phase 7: Post-Audit Gap Closure** - Resolve FLOW-E archive visibility decision + project-context loading-timeout escape hatch
 
 ## Phase Details
 
@@ -117,10 +118,22 @@ Plans:
 - [x] 06-01-PLAN.md — SettingsView form implementation (structure + state + dirty/viewer readonly, then save PATCH + Zustand refresh + error routing + test bodies)
 **UI hint**: yes
 
+### Phase 7: Post-Audit Gap Closure
+**Goal**: Resolve the one flow gap and one hardening item surfaced by the v1.0 milestone audit so the milestone ships without known UX ambiguity or boot-stall failure mode
+**Depends on**: Phase 6
+**Requirements**: (no new REQ-IDs — gap closure against existing SETT-01/SETT-02 and FOUN-01 behavior)
+**Gap Closure**: Closes FLOW-E (archive visibility) + Phase 2 tech-debt (project-context loading timeout) from `.planning/v1.0-MILESTONE-AUDIT.md`
+**Success Criteria** (what must be TRUE):
+  1. Archiving a project via Settings either (a) keeps the project visible in the Zustand `projects` array with `status: 'archived'` so the UI can show a badge, OR (b) the product decision to hide archived projects is documented explicitly in the plan — whichever the plan phase decides, the behavior is intentional and tested
+  2. `project-context.tsx` has an escape path when the boot sequence stalls: if `projects.length === 0` after a reasonable timeout (e.g. 10s), the workspace shell surfaces an error state with a retry action instead of spinning indefinitely
+  3. Unit tests cover both branches (timeout fires → error UI; timeout does not fire → normal load) and the archive visibility behavior matches the decision from criterion 1
+**Plans:** TBD — run `/gsd:plan-phase 7` to generate
+**UI hint**: no (no new UI surface; only error-state text inside existing workspace shell)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -130,3 +143,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 4. Project Tasks | 0/2 | Planning complete | - |
 | 5. Sessions & Agents | 0/4 | Planning complete | - |
 | 6. Settings | 0/2 | Planning complete | - |
+| 7. Post-Audit Gap Closure | 0/0 | Needs planning | - |
