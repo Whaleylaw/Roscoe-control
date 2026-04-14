@@ -98,6 +98,15 @@ export function SettingsView() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const bannerRef = useRef<HTMLDivElement>(null)
   const lastSeededProjectIdRef = useRef<number | null>(null)
+  const shouldFocusBannerRef = useRef(false)
+
+  // Focus the error banner once it mounts after a failed save.
+  useEffect(() => {
+    if (bannerError && shouldFocusBannerRef.current && bannerRef.current) {
+      bannerRef.current.focus()
+      shouldFocusBannerRef.current = false
+    }
+  }, [bannerError])
 
   // isDirty must be derived before the seeding effect so the effect can skip
   // re-seeding while the user has unsaved edits (Pitfall: in-progress edits
@@ -197,8 +206,8 @@ export function SettingsView() {
         } else if (errText === 'Default project cannot be archived') {
           setFieldErrors({ status: t('errorDefaultArchive') })
         } else {
+          shouldFocusBannerRef.current = true
           setBannerError(errText || t('errorBannerFallback'))
-          queueMicrotask(() => bannerRef.current?.focus())
         }
         return
       }
@@ -220,8 +229,8 @@ export function SettingsView() {
       }
       await fetchProjects()
     } catch {
+      shouldFocusBannerRef.current = true
       setBannerError(t('errorBannerFallback'))
-      queueMicrotask(() => bannerRef.current?.focus())
     } finally {
       setIsSaving(false)
     }
