@@ -339,3 +339,48 @@ export async function syncClaudeSessions(force = false): Promise<{ ok: boolean; 
     return lastSyncResult
   }
 }
+
+/**
+ * Read locally synced Claude sessions from the `claude_sessions` table.
+ *
+ * Used by `/api/projects/[id]/sessions` (Phase 5) to surface Claude sessions
+ * inside a project workspace. The route filters by project_slug or by an
+ * agent-membership union, so this returns the raw rows shaped to the
+ * common project-runtime-session contract (`id`, `project_slug`, `agent`,
+ * `startedAt`, `active`).
+ */
+export function getLocalClaudeSessions(): Array<{
+  id: string
+  project_slug: string | null
+  agent: string | null
+  startedAt: number
+  active: boolean
+}> {
+  try {
+    const db = getDatabase()
+    const rows = db
+      .prepare(
+        'SELECT session_id, project_slug, first_message_at, last_message_at, is_active FROM claude_sessions ORDER BY last_message_at DESC LIMIT 100',
+      )
+      .all() as Array<{
+        session_id: string
+        project_slug: string | null
+        first_message_at: string | null
+        last_message_at: string | null
+        is_active: number | null
+      }>
+
+    return rows.map((r) => ({
+      id: r.session_id,
+      project_slug: r.project_slug,
+      // Claude sessions don't carry an agent identity — fall back to project_slug
+      // so the caller's union-membership check still has something to match on.
+      agent: r.project_slug,
+      startedAt: r.first_message_at ? new Date(r.first_message_at).getTime() : 0,
+      active: r.is_active === 1,
+    }))
+  } catch (err) {
+    logger.warn({ err }, 'Failed to read local Claude sessions')
+    return []
+  }
+}
