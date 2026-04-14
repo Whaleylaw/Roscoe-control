@@ -127,6 +127,30 @@ export function ProjectManagerModal({
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to create project')
+
+      const createdProject = data.project as { id: number } | undefined
+
+      if (repo && form.github_sync_enabled && createdProject?.id) {
+        try {
+          const initRes = await fetch('/api/github', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'init-labels', repo })
+          })
+          if (!initRes.ok) {
+            const initData = await initRes.json().catch(() => ({}))
+            throw new Error(initData.error || 'Failed to initialize labels')
+          }
+          await fetch(`/api/projects/${createdProject.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ github_sync_enabled: 1 })
+          })
+        } catch {
+          setInitLabelsWarning(t('create.initLabelsFailedWarning'))
+        }
+      }
+
       setForm({ name: '', ticket_prefix: '', description: '', github_repo: '', deadline: '', color: '', github_sync_enabled: true })
       setGithubRepoError(null)
       await load()
