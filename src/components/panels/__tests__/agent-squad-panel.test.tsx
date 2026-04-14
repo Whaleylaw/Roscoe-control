@@ -24,8 +24,7 @@ const fetchSpy = vi.fn()
 beforeEach(() => {
   fetchSpy.mockReset()
   fetchSpy.mockResolvedValue({ ok: true, json: async () => ({ agents: [] }) })
-  // @ts-expect-error - global fetch shim for tests
-  global.fetch = fetchSpy
+  global.fetch = fetchSpy as unknown as typeof fetch
 })
 
 afterEach(() => {
