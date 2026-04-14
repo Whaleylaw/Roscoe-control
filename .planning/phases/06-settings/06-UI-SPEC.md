@@ -184,7 +184,7 @@ Helper and error are mutually exclusive in the visual stack when both present: e
 
 | Field | Control | Grid | Notes |
 |-------|---------|------|-------|
-| Color | 8-swatch palette row (`flex gap-1.5 flex-wrap`) + "None" pill at end | single column (`md:col-span-1`) | Matches `project-manager-modal.tsx:386-396` exactly — `w-6 h-6 rounded-full border-2`; selected swatch gets `border-foreground scale-110`; click-selected clears to null. "None" pill is a text button with `bg-transparent border border-border rounded-full px-3 py-1 text-xs` that selects the null-color state |
+| Color | 8-swatch palette row (`flex gap-2 flex-wrap`) + "None" pill at end | single column (`md:col-span-1`) | Matches `project-manager-modal.tsx:386-396` geometry — `w-6 h-6 rounded-full border-2`; selected swatch gets `border-foreground scale-110`; click-selected clears to null. Row gap uses the declared `sm` token (8px) instead of the modal's 6px to stay on our spacing scale. "None" pill is a text button with `bg-transparent border border-border rounded-full px-3 py-1 text-xs` that selects the null-color state |
 | Ticket prefix | `<input type="text" className="font-mono uppercase">` | `md:col-span-1` | Helper text: *"Changing the prefix affects only new tickets. Existing tickets keep their original prefix."* (i18n key `project.settings.prefixHelp`). `maxLength={12}` mirrors server cap. Visually uppercases the input via CSS `uppercase` (form value is sent raw; server normalizes) |
 | Deadline | `<input type="date">` | `md:col-span-2` on narrow / `md:col-span-1` on wide | Empty string → null on save. `h-9` to align with Button default height. Browser-native date picker; no custom calendar |
 
@@ -493,7 +493,7 @@ This phase introduces no new design tokens. All values above are either (a) alre
 Concrete reuse points:
 
 - **Form control styling** — inherits the modal's input pattern (`bg-surface-1 text-foreground border border-border rounded-md px-3 py-2`) verbatim; see `project-manager-modal.tsx:234, 328, 338, 351, 377`. Phase 6 adds focus-visible rings and aria-invalid states but keeps the base shell identical for visual consistency when the user jumps between the global modal and the scoped settings view.
-- **Color palette** — duplicate the 8-hex `COLOR_PALETTE` constant into `settings-view.tsx` (D-11). Swatch geometry (`w-6 h-6 rounded-full border-2`) and selected-state chrome (`border-foreground scale-110`) copied from the modal.
+- **Color palette** — duplicate the 8-hex `COLOR_PALETTE` constant into `settings-view.tsx` (D-11). Swatch geometry (`w-6 h-6 rounded-full border-2`) and selected-state chrome (`border-foreground scale-110`) copied from the modal. Swatch row gap uses `gap-2` (8px, `sm` token) — stays on our declared spacing scale. Reference implementations inform decisions but do not override phase tokens.
 - **Button primitive** — uses `variant="default"` for Save, `variant="secondary"` for Cancel. No new variants required.
 - **Loader primitive** — reuse `src/components/ui/loader.tsx` for initial-fetch state.
 - **Section heading typography** — matches the Phase 5 section-header treatment (`text-sm font-semibold` was used for sessions list section headers; Phase 6 uses `text-lg font-semibold` because these are page-level form sections, one tier higher in hierarchy than list-section breaks).
