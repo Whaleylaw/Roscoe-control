@@ -40,11 +40,14 @@ export async function GET(request: NextRequest) {
     const rows = db.prepare(`
       SELECT p.id, p.workspace_id, p.name, p.slug, p.description, p.ticket_prefix, p.ticket_counter, p.status,
              p.github_repo, p.deadline, p.color, p.github_sync_enabled, p.github_labels_initialized, p.github_default_branch, p.created_at, p.updated_at,
-             (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) as task_count,
-             (SELECT GROUP_CONCAT(paa.agent_name) FROM project_agent_assignments paa WHERE paa.project_id = p.id) as assigned_agents_csv
+             (SELECT COUNT(*) FROM tasks t2 WHERE t2.project_id = p.id) as task_count,
+             (SELECT GROUP_CONCAT(paa.agent_name) FROM project_agent_assignments paa WHERE paa.project_id = p.id) as assigned_agents_csv,
+             MAX(t.updated_at) * 1000 as last_activity_at
       FROM projects p
+      LEFT JOIN tasks t ON t.project_id = p.id
       WHERE p.workspace_id = ?
         ${includeArchived ? '' : "AND p.status = 'active'"}
+      GROUP BY p.id
       ORDER BY p.name COLLATE NOCASE ASC
     `).all(workspaceId) as Array<Record<string, unknown>>
 
@@ -52,6 +55,7 @@ export async function GET(request: NextRequest) {
       ...row,
       assigned_agents: row.assigned_agents_csv ? String(row.assigned_agents_csv).split(',') : [],
       assigned_agents_csv: undefined,
+      last_activity_at: row.last_activity_at == null ? null : Number(row.last_activity_at),
     }))
 
     return NextResponse.json({ projects })
