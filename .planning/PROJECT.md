@@ -35,8 +35,8 @@ When I click into a project, I see everything about that project — what it is,
 - [x] Project-scoped task list showing only that project's tasks — Validated in Phase 4: Project Tasks
 - [x] Create new tasks pre-scoped to the current project — Validated in Phase 4: Project Tasks
 - [x] Reassign existing tasks into/out of the current project — Validated in Phase 4: Project Tasks
-- [ ] Project-scoped agent sessions view
-- [ ] Project-scoped agents view
+- [x] Project-scoped agent sessions view — Validated in Phase 5: Sessions & Agents
+- [x] Project-scoped agents view — Validated in Phase 5: Sessions & Agents
 - [ ] Project settings (name, description, status, configuration)
 - [ ] Project-level progress/completion indicators
 
@@ -90,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 after Phase 4: Project Tasks completion*
+*Last updated: 2026-04-14 after Phase 5: Sessions & Agents completion*
