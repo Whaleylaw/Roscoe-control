@@ -7,11 +7,13 @@ import { ProjectWorkspaceProvider, useProjectWorkspace } from '@/components/proj
 import { ProjectBreadcrumb } from '@/components/project/project-breadcrumb'
 import { ProjectTabs } from '@/components/project/project-tabs'
 import { ProjectViewRouter } from '@/components/project/project-view-router'
+import { useMissionControl } from '@/store'
 
 function WorkspaceContent() {
   const t = useTranslations('project')
   const router = useRouter()
   const { loading, error } = useProjectWorkspace()
+  const { fetchProjects } = useMissionControl()
 
   if (loading) {
     return (
@@ -38,6 +40,28 @@ function WorkspaceContent() {
         >
           {t('workspace.backToProjects')}
         </button>
+      </div>
+    )
+  }
+
+  if (error === 'load-timeout') {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center gap-4 px-4">
+        <div className="bg-surface-1 border border-border rounded-md p-6 max-w-md space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">
+            {t('workspace.loadTimeoutHeading')}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {t('workspace.loadTimeoutBody')}
+          </p>
+          <button
+            type="button"
+            onClick={() => fetchProjects()}
+            className="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            {t('workspace.loadTimeoutRetry')}
+          </button>
+        </div>
       </div>
     )
   }

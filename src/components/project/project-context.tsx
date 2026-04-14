@@ -5,6 +5,12 @@ import { usePathname } from 'next/navigation'
 import { useMissionControl } from '@/store'
 import type { Project } from '@/store'
 
+// AUDIT-PHASE-02-TECHDEBT: escape hatch for the projects.length === 0 loading state.
+// Phase 7 gap closure per .planning/phases/07-post-audit-gap-closure/07-01-PLAN.md.
+// 10s is the industry-typical network-stall perception threshold and well above
+// the sub-5s boot sequence observed across all 16 completed plans in STATE.md.
+export const LOAD_TIMEOUT_MS = 10_000
+
 export interface ProjectWorkspaceState {
   slug: string
   view: string  // 'dashboard' | 'tasks' | 'sessions' | 'agents' | 'settings'
@@ -77,7 +83,14 @@ export function ProjectWorkspaceProvider({ children }: { children: React.ReactNo
       return () => { cancelled = true }
     }
 
-    // projects.length === 0 means store still booting -- keep loading=true
+    // projects.length === 0 — store still booting. Start escape-hatch timer.
+    // AUDIT-PHASE-02-TECHDEBT (Phase 7 gap closure).
+    const timer = setTimeout(() => {
+      setProject(null)
+      setLoading(false)
+      setError('load-timeout')
+    }, LOAD_TIMEOUT_MS)
+    return () => { clearTimeout(timer) }
   }, [slug, projects, setActiveProject])
 
   // Cleanup: clear activeProject on unmount (Pitfall 2: stale activeProject)
