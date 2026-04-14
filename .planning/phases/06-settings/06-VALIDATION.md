@@ -39,7 +39,7 @@ created: 2026-04-13
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 6-01-01 | 01 | 0 | SETT-01, SETT-02, SETT-03 | unit | `pnpm test -- src/components/project/__tests__/settings-view.test.tsx` | ❌ W0 | ⬜ pending |
-| 6-01-02 | 01 | 0 | SETT-01, SETT-02, SETT-03 | i18n | `pnpm test -- src/components/__tests__/i18n-coverage.test.tsx` | ✅ | ⬜ pending |
+| 6-01-02 | 01 | 0 | SETT-01, SETT-02, SETT-03 | i18n | `pnpm test -- src/components/project/__tests__/i18n-coverage.test.tsx` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
