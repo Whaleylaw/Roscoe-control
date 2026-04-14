@@ -66,10 +66,12 @@ const fixtureArchived: MockProject = {
 }
 
 function setStore(projects: MockProject[]) {
+  const fetchProjectsSpy = vi.fn()
   ;(useMissionControl as unknown as Mock).mockReturnValue({
     projects,
-    fetchProjects: vi.fn(),
+    fetchProjects: fetchProjectsSpy,
   })
+  return fetchProjectsSpy
 }
 
 beforeEach(() => {
@@ -142,5 +144,33 @@ describe('ProjectsPanel', () => {
     expect(screen.queryByRole('button', { name: /gamma/i })).toBeNull()
     expect(screen.getByRole('button', { name: /alpha/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /beta/i })).toBeTruthy()
+  })
+
+  it("renders a 'New project' button in the header", () => {
+    setStore([fixtureA])
+    render(<ProjectsPanel />)
+    // Header CTA is keyed by header.cta — the mock returns the key verbatim,
+    // so disambiguating via name regex cleanly separates it from row buttons.
+    const headerCta = screen.getByRole('button', { name: /header\.cta/i })
+    expect(headerCta).toBeTruthy()
+    const rowButton = screen.getByRole('button', { name: /alpha/i })
+    // The header CTA must NOT be the same DOM node as the row button.
+    expect(headerCta).not.toBe(rowButton)
+  })
+
+  it("header 'New project' button opens ProjectManagerModal", () => {
+    setStore([fixtureA])
+    render(<ProjectsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /header\.cta/i }))
+    expect(screen.getByTestId('project-manager-modal')).toBeTruthy()
+  })
+
+  it('header CTA onClose triggers fetchProjects', () => {
+    const fetchSpy = setStore([fixtureA])
+    render(<ProjectsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /header\.cta/i }))
+    // The mocked modal invokes onClose when clicked.
+    fireEvent.click(screen.getByTestId('project-manager-modal'))
+    expect(fetchSpy).toHaveBeenCalled()
   })
 })

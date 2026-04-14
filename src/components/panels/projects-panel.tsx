@@ -55,6 +55,7 @@ export function ProjectsPanel() {
       {/* Header */}
       <div className="flex justify-between items-center p-4 border-b border-border flex-shrink-0">
         <h2 className="text-xl font-bold text-foreground">{t('title')}</h2>
+        <Button onClick={() => setShowManager(true)}>{t('header.cta')}</Button>
       </div>
 
       {/* Body */}
