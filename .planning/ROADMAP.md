@@ -111,7 +111,10 @@ Plans:
   1. Settings tab shows editable fields for project name, description, and status
   2. Settings tab shows editable fields for color, ticket prefix, deadline, and GitHub repo
   3. Saving changes calls the existing PATCH /api/projects/[id] endpoint and the workspace reflects updates immediately
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 06-00-PLAN.md — Wave 0 test scaffolds + atomic project.settings.* i18n keys across 10 locales (SETT-01, SETT-02, SETT-03)
+- [ ] 06-01-PLAN.md — SettingsView form implementation (structure + state + dirty/viewer readonly, then save PATCH + Zustand refresh + error routing + test bodies)
 **UI hint**: yes
 
 ## Progress
@@ -126,4 +129,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Project Dashboard | 3/3 | Complete   | 2026-04-13 |
 | 4. Project Tasks | 0/2 | Planning complete | - |
 | 5. Sessions & Agents | 0/4 | Planning complete | - |
-| 6. Settings | 0/TBD | Not started | - |
+| 6. Settings | 0/2 | Planning complete | - |
