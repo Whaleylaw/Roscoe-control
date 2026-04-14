@@ -130,7 +130,7 @@ Plans:
 **Plans:** 2 plans
 Plans:
 - [x] 07-00-PLAN.md — Wave 0 scaffolds: it.todo stubs for loading-timeout + FLOW-E archive-behavior contract, atomic 10-locale loadTimeout i18n keys
-- [ ] 07-01-PLAN.md — Wave 1: 10s timeout escape path in project-context + workspace retry UI + FLOW-E Option-2 decision comment in store/index.ts + 7 real tests (replaces all 7 it.todo stubs)
+- [x] 07-01-PLAN.md — Wave 1: 10s timeout escape path in project-context + workspace retry UI + FLOW-E Option-2 decision comment in store/index.ts + 7 real tests (replaces all 7 it.todo stubs)
 **UI hint**: no (no new UI surface; only error-state text inside existing workspace shell)
 
 ## Progress

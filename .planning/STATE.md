@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 07-00-PLAN.md
-last_updated: "2026-04-14T14:40:35.164Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-04-14T14:50:56.624Z"
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -63,6 +63,7 @@ Plan: 2 of 2
 | Phase 06-settings P00 | 7min | 2 tasks tasks | 12 files files |
 | Phase 06-settings P01 | 10min | 2 tasks | 2 files |
 | Phase 07-post-audit-gap-closure P00 | 3min | 2 tasks | 12 files |
+| Phase 07-post-audit-gap-closure P01 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,9 @@ Recent decisions affecting current work:
 - [Phase 07-post-audit-gap-closure]: FLOW-E adopted Option 2 (archived projects vanish from Zustand projects[]) as intentional — project-manager-modal owns archive-visible UX; decision quoted verbatim in projects-archive-behavior.test.ts block comment
 - [Phase 07-post-audit-gap-closure]: loadTimeout* i18n keys use English-fallback values in all 10 locales per project.workspace.title/notFound/loading precedent (additive, not translated)
 - [Phase 07-post-audit-gap-closure]: New src/store/__tests__/ directory established as canonical location for Zustand store contract tests (first consumer: projects-archive-behavior.test.ts)
+- [Phase 07-post-audit-gap-closure]: Timeout threshold 10_000ms (LOAD_TIMEOUT_MS) — matches industry-typical network-stall perception and >=2x the sub-5s boot observed across all 16 prior plans
+- [Phase 07-post-audit-gap-closure]: setTimeout lives inside the primary useEffect (not a separate effect) — cleanup-when-populated comes free via existing [slug, projects, setActiveProject] dependency re-run
+- [Phase 07-post-audit-gap-closure]: FLOW-E decision comment lives inside fetchProjects() adjacent to the fetch() call it guards, not as top-of-function JSDoc — intent is inseparable from the line it protects
 
 ### Pending Todos
 
@@ -130,6 +134,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T14:40:35.161Z
-Stopped at: Completed 07-00-PLAN.md
+Last session: 2026-04-14T14:50:56.622Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
