@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 5: Sessions & Agents** - Scoped session and agent views with detail access from within the project context
 - [ ] **Phase 6: Settings** - Project settings panel for name, description, status, color, prefix, deadline, and GitHub repo
 - [ ] **Phase 7: Post-Audit Gap Closure** - Resolve FLOW-E archive visibility decision + project-context loading-timeout escape hatch
+- [ ] **Phase 8: Projects Entry Point** - Wire the main-UI path INTO the project workspace (nav-rail item, projects list panel, deep-link from existing project pickers) — closes real-world NAV-01 gap
 
 ## Phase Details
 
@@ -133,10 +134,25 @@ Plans:
 - [x] 07-01-PLAN.md — Wave 1: 10s timeout escape path in project-context + workspace retry UI + FLOW-E Option-2 decision comment in store/index.ts + 7 real tests (replaces all 7 it.todo stubs)
 **UI hint**: no (no new UI surface; only error-state text inside existing workspace shell)
 
+### Phase 8: Projects Entry Point
+**Goal**: Users can discover and enter a project workspace from the main UI without typing a URL — NAV-01 is actually achievable end-to-end, not just direct-URL-load
+**Depends on**: Phase 2 (workspace shell), Phase 7 (clean baseline)
+**Requirements**: NAV-01 (reopened — was marked Complete in v1.0 audit but real-world entry path missing)
+**Gap Closure**: Closes the Phase 2 discovery gap surfaced during v1.0 human verification — workspace code existed but no main-UI call site ever navigated to `/project/{slug}`
+**Success Criteria** (what must be TRUE):
+  1. A "Projects" item is visible in the nav-rail OPERATE group (order: near Tasks); clicking it renders a Projects list panel, not the project workspace itself
+  2. The Projects list panel shows one entry per active project with name, status badge, ticket prefix, and either a deadline or a last-activity hint; clicking an entry navigates to `/project/{slug}` (the workspace dashboard, per existing router)
+  3. All pre-existing project-name pickers and dropdowns in the main UI (task board filter, overview, create-task modal) expose a clear path into the workspace — either a "Open workspace" action on the selected project, or clicking the picker's resolved project name routes to its workspace
+  4. Cold-start journey: from a fresh login at `/`, a user can reach a project's dashboard with clicks alone (no URL editing) and return to the main view via the existing breadcrumb "Projects" link (which should route to the new Projects panel, not to `/`)
+  5. The Projects list panel uses i18n via `next-intl` across all 10 locales atomically (follow phase 6 precedent)
+  6. Unit tests cover: nav-rail renders the new item; Projects list panel renders project cards from Zustand `projects[]` and navigates on click; breadcrumb "Projects" segment routes to the Projects panel (not `/`)
+**Plans:** TBD — run `/gsd:plan-phase 8` to generate
+**UI hint**: yes
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -147,3 +163,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. Sessions & Agents | 0/4 | Planning complete | - |
 | 6. Settings | 0/2 | Planning complete | - |
 | 7. Post-Audit Gap Closure | 0/2 | Planning complete | - |
+| 8. Projects Entry Point | 0/0 | Needs planning | - |

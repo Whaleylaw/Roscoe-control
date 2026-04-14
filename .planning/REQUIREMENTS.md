@@ -9,7 +9,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Navigation
 
-- [x] **NAV-01**: User can navigate into a project via full-takeover workspace view
+- [ ] **NAV-01**: User can navigate into a project via full-takeover workspace view
 - [x] **NAV-02**: Breadcrumb navigation shows Projects > Project Name > Sub-view with clickable trail
 - [x] **NAV-03**: User can navigate between project sub-views (dashboard, tasks, sessions, agents, settings)
 - [x] **NAV-04**: URL reflects current project and sub-view (e.g., /project/my-app/tasks)
@@ -91,7 +91,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUN-02 | Phase 1 | Complete |
 | FOUN-03 | Phase 1 | Complete |
 | FOUN-04 | Phase 1 | Complete |
-| NAV-01 | Phase 2 | Complete |
+| NAV-01 | Phase 8 | Pending (reopened — Phase 2 shipped workspace code but no main-UI entry point; discovered during v1.0 human verification) |
 | NAV-02 | Phase 2 | Complete |
 | NAV-03 | Phase 2 | Complete |
 | NAV-04 | Phase 2 | Complete |
