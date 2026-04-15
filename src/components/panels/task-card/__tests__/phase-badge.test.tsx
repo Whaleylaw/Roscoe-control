@@ -9,27 +9,26 @@
  */
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import React from 'react'
 import { PhaseBadge } from '../phase-badge'
 
 describe('PhaseBadge (GSD-24)', () => {
   it('renders upper-cased phase value when task.gsd_phase="plan" → "PLAN"', () => {
-    render(React.createElement(PhaseBadge, { task: { gsd_phase: 'plan' } }))
+    render(<PhaseBadge task={{ gsd_phase: 'plan' }} />)
     expect(screen.getByText('PLAN')).toBeInTheDocument()
   })
 
   it('renders nothing when task.gsd_phase is null (D-22)', () => {
-    const { container } = render(React.createElement(PhaseBadge, { task: { gsd_phase: null } }))
+    const { container } = render(<PhaseBadge task={{ gsd_phase: null }} />)
     expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when task.gsd_phase is undefined (D-22)', () => {
-    const { container } = render(React.createElement(PhaseBadge, { task: {} }))
+    const { container } = render(<PhaseBadge task={{}} />)
     expect(container).toBeEmptyDOMElement()
   })
 
   it('carries classes text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono (UI-SPEC)', () => {
-    render(React.createElement(PhaseBadge, { task: { gsd_phase: 'execute' } }))
+    render(<PhaseBadge task={{ gsd_phase: 'execute' }} />)
     const el = screen.getByText('EXECUTE')
     // Verbatim class list from UI-SPEC — visual parity with ticket_ref badge.
     expect(el).toHaveClass('text-[10px]', 'px-1.5', 'py-0.5', 'rounded', 'bg-primary/15', 'text-primary', 'font-mono')
