@@ -1,30 +1,41 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Phase 08 complete — all 6 plans done, both UAT gaps closed
-stopped_at: Completed 08-05-PLAN.md (UAT Gap 2 closed — ProjectManagerModal create-form upgrade with GitHub sync chain)
-last_updated: "2026-04-14T19:35:00.000Z"
+milestone: v1.1
+milestone_name: native-gsd-integration
+status: Defining requirements (v1.1 opened after v1.0 closed)
+stopped_at: Milestone v1.1 opened — Phase 09 context captured, requirements + roadmap next
+last_updated: "2026-04-14T21:25:00.000Z"
 progress:
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+previous_milestone:
+  version: v1.0
+  name: Project Workspace & Dashboard
   total_phases: 8
   completed_phases: 8
   total_plans: 24
   completed_plans: 24
+  closed_at: "2026-04-14T19:35:00.000Z"
+  note: v1.0 not formally archived via /gsd:complete-milestone; can be archived retroactively
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-13)
+See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 
-**Core value:** When I click into a project, I see everything about that project and can manage all its work from one place.
-**Current focus:** Phase 08 — projects-entry-point
+**Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle.
+**Current focus:** Phase 09 — gsd-native-integration (v1.1)
 
 ## Current Position
 
-Phase: 08 (projects-entry-point) — COMPLETE
-Plan: 6 of 6 (all plans committed; both UAT gaps closed)
+Phase: 09 (gsd-native-integration) — Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.1
+Last activity: 2026-04-14 — Milestone v1.1 started
 
 ## Performance Metrics
 

@@ -4,9 +4,25 @@
 
 A full-takeover project workspace for Mission Control that elevates projects from a task-grouping label into a first-class destination. Users navigate into a project and get a dedicated dashboard with status overview, activity feed, and project brief — plus scoped views for tasks, agent sessions, agents, and settings. Breadcrumb navigation moves between projects and back to the main view.
 
+v1.1 extends this workspace with native GSD lifecycle support: projects can be flagged `gsd_enabled`, move through Discuss → Plan → Execute → Verify → Done phases, and gate critical tasks behind operator/admin approval — eliminating the need to reach for the CLI to track phase state.
+
 ## Core Value
 
-When I click into a project, I see everything about that project — what it is, what's happening, what's next — and I can manage all its work from one place.
+When I click into a project, I see everything about that project — what it is, what's happening, what's next — and I can manage all its work from one place, including driving it through its GSD lifecycle.
+
+## Current Milestone: v1.1 Native GSD Integration
+
+**Goal:** Build first-class GSD lifecycle support (Discuss → Plan → Execute → Verify → Done) directly into Mission Control so every project can be created, tracked, and executed through phases in one system.
+
+**Target features:**
+- GSD-aware project schema (`gsd_enabled`, `gsd_phase`, `gsd_track`, `gsd_gate_mode`) with lifecycle transitions
+- Gate-required tasks that block in_progress/done without operator/admin approval
+- Dedicated "Lifecycle" tab in the project workspace + phase badges on tasks in the task board
+- External JSON template system for bootstrap task packs (`<DATA_DIR>/gsd-templates/*.json` with bundled default fallback)
+- Three new API endpoints: bootstrap, transition, gate approval
+- i18n coverage across all 10 locales for new UI strings
+
+**Starting point:** Phase 09-CONTEXT.md already captures 38 locked implementation decisions (D-01..38) from `/gsd:discuss-phase 09`.
 
 ## Requirements
 
@@ -39,6 +55,14 @@ When I click into a project, I see everything about that project — what it is,
 - [x] Project-scoped agents view — Validated in Phase 5: Sessions & Agents
 - [x] Project settings (name, description, status, configuration) — Validated in Phase 6: Settings
 - [ ] Project-level progress/completion indicators
+- [ ] Projects can be flagged for GSD-native tracking (`gsd_enabled`) — v1.1
+- [ ] Projects advance through Discuss → Plan → Execute → Verify → Done phases via in-app controls — v1.1
+- [ ] Tasks can be marked gate-required, blocking in_progress/done without operator approval — v1.1
+- [ ] Operators and admins can approve or reject gates from the UI and API — v1.1
+- [ ] Bootstrap endpoint creates default phase task packs idempotently — v1.1
+- [ ] Phase state is visible on the task board as per-task badges — v1.1
+- [ ] Project workspace exposes a dedicated Lifecycle tab — v1.1
+- [ ] Bootstrap templates loadable from external JSON files with bundled fallback — v1.1
 
 ### Out of Scope
 
@@ -71,6 +95,10 @@ When I click into a project, I see everything about that project — what it is,
 | Full takeover view (not drawer/sidebar) | User wants project to feel like its own workspace, not a detail panel | — Pending |
 | Breadcrumb navigation | Natural way to move between project context and main view | — Pending |
 | All sub-views in v1 (tasks, sessions, agents, settings) | User wants the complete workspace experience, not incremental | — Pending |
+| v1.1: GSD state stored in-DB only (no `.planning/` sync) | Avoids filesystem sync bugs; CLI stays the authoring surface, MC tracks approvals | — Pending |
+| v1.1: Operator+admin required for all GSD endpoints | Reuses existing MC role model; no new per-project approver table | — Pending |
+| v1.1: External JSON templates with bundled default fallback | Flexibility for users without forcing code changes | — Pending |
+| v1.1: Dedicated Lifecycle tab (not just settings) + task badges | Discoverable where work happens; matches existing workspace tab pattern | — Pending |
 
 ## Evolution
 
@@ -90,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 after Phase 7: Post-Audit Gap Closure completion*
+*Last updated: 2026-04-14 — Milestone v1.1 (Native GSD Integration) opened*
