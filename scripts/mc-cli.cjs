@@ -51,8 +51,9 @@ Groups:
   auth         login/logout/whoami
   agents       list/get/create/update/delete/wake/diagnostics/heartbeat
                memory get|set|clear / soul get|set|templates / attribution
+  projects     create/list/get/bootstrap/transition
   tasks        list/get/create/update/delete/queue
-               comments list|add / broadcast
+               comments list|add / broadcast / gate
   sessions     list/control/continue/transcript
   connect      register/list/disconnect
   tokens       list/stats/by-agent/agent-costs/task-costs/export/rotate
@@ -75,9 +76,14 @@ Examples:
   mc agents list --json
   mc agents memory get --id 5
   mc agents soul set --id 5 --template operator
+  mc projects create --name "Q2 Pricing" --gsd --track product --json
+  mc projects bootstrap --id 42 --json
+  mc projects transition --id 42 --to plan --json
   mc tasks queue --agent Aegis --max-capacity 2
   mc tasks comments list --id 42
   mc tasks comments add --id 42 --content "Looks good"
+  mc tasks gate --id 105 --approve --note "Plan reviewed"
+  mc tasks list --project 42 --phase execute --gate-required --json
   mc sessions transcript --kind claude-code --id abc123
   mc tokens agent-costs --timeframe week
   mc tokens export --format csv
@@ -384,8 +390,70 @@ const commands = {
     },
   },
 
+  // Compound: projects create|list|get|bootstrap|transition
+  projects: (flags) => {
+    const sub = flags._sub;
+    if (sub === 'create') {
+      if (flags.body) {
+        return { method: 'POST', route: '/api/projects', body: bodyFromFlags(flags) };
+      }
+      const body = { name: required(flags, 'name') };
+      if (flags.prefix) body.ticket_prefix = String(flags.prefix);
+      if (flags.slug) body.slug = String(flags.slug);
+      if (flags.description) body.description = String(flags.description);
+      if (flags.gsd) body.gsd_enabled = true;
+      if (flags.track) body.gsd_track = String(flags.track);
+      if (flags['gate-mode']) body.gsd_gate_mode = String(flags['gate-mode']);
+      if (flags['gsd-project-id']) body.gsd_project_id = String(flags['gsd-project-id']);
+      return { method: 'POST', route: '/api/projects', body };
+    }
+    if (sub === 'list') {
+      const qs = flags['include-archived'] ? '?includeArchived=1' : '';
+      return { method: 'GET', route: `/api/projects${qs}` };
+    }
+    if (sub === 'get') {
+      return { method: 'GET', route: `/api/projects/${required(flags, 'id')}` };
+    }
+    if (sub === 'bootstrap') {
+      return {
+        method: 'POST',
+        route: `/api/projects/${required(flags, 'id')}/gsd/bootstrap`,
+        body: {},
+      };
+    }
+    if (sub === 'transition') {
+      const body = { to_phase: required(flags, 'to') };
+      if (flags.waive) body.waive_remaining = true;
+      if (flags.reason) body.reason = String(flags.reason);
+      return {
+        method: 'POST',
+        route: `/api/projects/${required(flags, 'id')}/gsd/transition`,
+        body,
+      };
+    }
+    throw new Error(`Unknown projects subcommand: ${sub}. Use create|list|get|bootstrap|transition`);
+  },
+
   tasks: {
-    list: () => ({ method: 'GET', route: '/api/tasks' }),
+    list: async (flags, ctx) => {
+      let qs = '';
+      if (flags.project) qs = `?project_id=${encodeURIComponent(String(flags.project))}`;
+      const result = await httpRequest({
+        baseUrl: ctx.baseUrl,
+        apiKey: ctx.apiKey,
+        cookie: ctx.profile.cookie,
+        method: 'GET',
+        route: `/api/tasks${qs}`,
+        timeoutMs: ctx.timeoutMs,
+      });
+      if (result.ok && Array.isArray(result.data?.tasks)) {
+        let tasks = result.data.tasks;
+        if (flags.phase) tasks = tasks.filter((t) => t.gsd_phase === String(flags.phase));
+        if (flags['gate-required']) tasks = tasks.filter((t) => Number(t.gate_required) === 1);
+        result.data = { ...result.data, tasks };
+      }
+      return result;
+    },
     get: (flags) => ({ method: 'GET', route: `/api/tasks/${required(flags, 'id')}` }),
     create: (flags) => ({
       method: 'POST',
@@ -409,6 +477,17 @@ const commands = {
       route: `/api/tasks/${required(flags, 'id')}/broadcast`,
       body: { message: required(flags, 'message') },
     }),
+    gate: (flags) => {
+      const id = required(flags, 'id');
+      const approve = Boolean(flags.approve);
+      const reject = Boolean(flags.reject);
+      if (approve === reject) {
+        throw new Error('tasks gate requires exactly one of --approve or --reject');
+      }
+      const body = { gate_status: approve ? 'approved' : 'rejected' };
+      if (flags.note) body.note = String(flags.note);
+      return { method: 'PATCH', route: `/api/tasks/${id}/gate`, body };
+    },
     // Subcommand: tasks comments list|add --id <id>
     comments: (flags) => {
       const id = required(flags, 'id');
@@ -682,16 +761,23 @@ async function run() {
       process.exit(EXIT.USAGE);
     }
 
-    let handler = groupMap[action];
-    if (!handler) {
-      console.error(`Unknown action: ${group} ${action}`);
-      usage();
-      process.exit(EXIT.USAGE);
-    }
-
-    // Inject sub-command into flags for compound commands (memory, soul, comments)
-    if (sub && typeof handler === 'function') {
-      parsed.flags._sub = sub;
+    let handler;
+    if (typeof groupMap === 'function') {
+      // Group itself is a single dispatcher (e.g., projects).
+      // The 2nd positional (action) is the subcommand.
+      handler = groupMap;
+      parsed.flags._sub = action;
+    } else {
+      handler = groupMap[action];
+      if (!handler) {
+        console.error(`Unknown action: ${group} ${action}`);
+        usage();
+        process.exit(EXIT.USAGE);
+      }
+      // Inject sub-command into flags for compound commands (memory, soul, comments)
+      if (sub && typeof handler === 'function') {
+        parsed.flags._sub = sub;
+      }
     }
 
     // Execute handler
