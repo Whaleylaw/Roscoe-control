@@ -2246,7 +2246,8 @@
       "tasks": "Tasks",
       "sessions": "Sessions",
       "agents": "Agents",
-      "settings": "Settings"
+      "settings": "Settings",
+      "lifecycle": "Lifecycle"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -2344,6 +2345,60 @@
     },
     "common": {
       "retry": "Retry"
+    },
+    "lifecycle": {
+      "title": "Lifecycle",
+      "currentPhase": "Current phase",
+      "phaseTimeline": "Phase timeline",
+      "gateTasks": "Tasks awaiting approval",
+      "gateTasksNone": "No tasks awaiting approval",
+      "gateTasksEmptyBody": "Nothing needs approval right now. Gate-required tasks appear here when they are created or promoted to pending approval.",
+      "cta": {
+        "enable": "Enable GSD for this project",
+        "bootstrap": "Bootstrap phase tasks",
+        "bootstrapRerun": "Re-run bootstrap",
+        "bootstrapHelper": "Safe to re-run — creates only missing tasks",
+        "advance": "Advance to {next} phase",
+        "waive": "Waive remaining and continue",
+        "waiveConfirmBody": "Waive the remaining Execute tasks and move to Verify? The reason is recorded in the activity log.",
+        "waiveConfirmSubmit": "Confirm waiver",
+        "cancel": "Cancel"
+      },
+      "gate": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "statusPending": "Pending approval",
+        "statusRequired": "🔒 Approval required",
+        "statusApproved": "✓ Approved",
+        "statusRejected": "Rejected",
+        "rejectConfirmBody": "Reject this gate? The task will stay blocked until an operator re-approves.",
+        "rejectConfirmSubmit": "Confirm reject",
+        "rejectNotePlaceholder": "Note (optional) — why is this rejected?"
+      },
+      "settings": {
+        "heading": "GSD lifecycle",
+        "enableLabel": "GSD enabled",
+        "enableHelper": "Turn on to track this project through Discuss → Plan → Execute → Verify → Done phases",
+        "trackLabel": "Track",
+        "trackHelperDisabled": "Enable GSD to choose a track",
+        "gateModeLabel": "Gate approval mode",
+        "gateModeHelper": "Manual approval requires an operator to approve each gate. Auto internal skips approval for internal-only work."
+      },
+      "empty": {
+        "heading": "GSD is not enabled on this project",
+        "body": "Turn on GSD to track this project through its Discuss, Plan, Execute, Verify, and Done phases, bootstrap default phase tasks, and enforce approval gates on high-impact work.",
+        "notBootstrapped": {
+          "heading": "No phase tasks yet",
+          "body": "Bootstrap to create the default Discuss → Plan → Execute → Verify task pack for this project. You can customize any task after bootstrap."
+        }
+      },
+      "error": {
+        "illegalTransition": "Can't advance to {toPhase} yet: {reason}. {remedy}",
+        "gateBlocked": "This task needs approval before it can move forward. Approve the gate below or ask an operator to approve it.",
+        "bootstrapFailed": "Couldn't reach the server. Retry bootstrap in a moment.",
+        "enableFailed": "Couldn't enable GSD. {serverError} Try again.",
+        "transitionFailed": "Couldn't advance the phase. Check your connection and try again."
+      }
     }
   }
 }
