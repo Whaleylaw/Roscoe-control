@@ -23,10 +23,27 @@ async function ensureUser(request: APIRequestContext, username: string) {
   expect([201, 409]).toContain(res.status())
 }
 
+// Each test in this spec calls loginAndAttachCookie once, and the spec
+// has >5 tests. The loginLimiter is keyed by client IP (5/min window), so
+// using a single x-real-ip for all tests exhausts the bucket partway
+// through the run. Bump a counter per call so each test gets its own
+// bucket.
+let _loginIpCounter = 0
 async function loginAndAttachCookie(page: Page, request: APIRequestContext, username: string) {
+  _loginIpCounter += 1
+  // Suppress the onboarding wizard — it covers the workspace UI for
+  // first-time admins and is not under test here. Same pattern as
+  // tests/projects-entry-point.spec.ts.
+  await page.context().addInitScript(() => {
+    try {
+      window.sessionStorage.setItem('mc-onboarding-dismissed', '1')
+    } catch {
+      /* ignore */
+    }
+  })
   const res = await request.post('/api/auth/login', {
     data: { username, password: TEST_PASS },
-    headers: { 'x-forwarded-for': '10.99.99.1' },
+    headers: { 'x-real-ip': `10.99.98.${_loginIpCounter}` },
   })
   expect(res.status()).toBe(200)
   const setCookie = res.headers()['set-cookie'] || ''

@@ -97,6 +97,32 @@ if (mode === 'gateway') {
 }
 
 const standaloneServerPath = path.join(repoRoot, '.next', 'standalone', 'server.js')
+
+// Next.js `output: 'standalone'` produces server.js but does NOT copy
+// `.next/static` or `/public` into the standalone dir — the build system
+// expects the deploy tool (or scripts/start-standalone.sh) to do that
+// copy. When `pnpm test:all` runs `pnpm build && pnpm test:e2e`, the
+// standalone server boots with missing chunks/public assets, which
+// manifests as "Refused to apply style ... MIME type ('text/html')"
+// console errors and a boot sequence that never completes because the
+// React bundle fails to hydrate. Copy the assets here so the e2e harness
+// is self-contained.
+if (fs.existsSync(standaloneServerPath)) {
+  const standaloneDir = path.join(repoRoot, '.next', 'standalone')
+  const staticSrc = path.join(repoRoot, '.next', 'static')
+  const staticDst = path.join(standaloneDir, '.next', 'static')
+  const publicSrc = path.join(repoRoot, 'public')
+  const publicDst = path.join(standaloneDir, 'public')
+  if (fs.existsSync(staticSrc)) {
+    fs.rmSync(staticDst, { recursive: true, force: true })
+    fs.cpSync(staticSrc, staticDst, { recursive: true })
+  }
+  if (fs.existsSync(publicSrc)) {
+    fs.rmSync(publicDst, { recursive: true, force: true })
+    fs.cpSync(publicSrc, publicDst, { recursive: true })
+  }
+}
+
 app = fs.existsSync(standaloneServerPath)
   ? spawn('node', [standaloneServerPath], {
       cwd: repoRoot,

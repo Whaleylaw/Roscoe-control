@@ -31,9 +31,14 @@ const TEST_PASS = process.env.AUTH_PASS || 'testpass1234!'
  * same session-cookie contract here.
  */
 async function login(page: Page) {
+  // Pass x-real-ip so this spec's login attempts live in their own
+  // loginLimiter bucket (5/min per IP, critical=true). When
+  // MC_TRUSTED_PROXIES is unset (the e2e default), XFF is ignored and all
+  // tests without x-real-ip share the 'unknown' bucket and exhaust it
+  // quickly when many UI specs run back-to-back (Phase 9 discovery).
   const res = await page.request.post('/api/auth/login', {
     data: { username: TEST_USER, password: TEST_PASS },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-real-ip': '10.90.8.1' },
   })
   if (!res.ok()) {
     throw new Error(`Login failed: ${res.status()} ${await res.text()}`)

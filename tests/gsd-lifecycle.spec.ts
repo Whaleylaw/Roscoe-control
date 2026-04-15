@@ -33,9 +33,15 @@ const TEST_USER = process.env.AUTH_USER || 'testadmin'
 const TEST_PASS = process.env.AUTH_PASS || 'testpass1234!'
 
 async function login(page: Page) {
+  // Pass a unique x-real-ip so this spec's login attempts live in their
+  // own loginLimiter bucket (5/min per IP, critical=true so it cannot be
+  // disabled). When MC_TRUSTED_PROXIES is unset (the e2e default), the
+  // XFF header is ignored and x-real-ip is the only way to distinguish
+  // this spec's bucket from 127.0.0.1 — same pattern as
+  // tests/rate-limiting.spec.ts.
   const res = await page.request.post('/api/auth/login', {
     data: { username: TEST_USER, password: TEST_PASS },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-real-ip': '10.90.9.10' },
   })
   if (!res.ok()) {
     throw new Error(`Login failed: ${res.status()} ${await res.text()}`)
