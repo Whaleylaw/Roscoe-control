@@ -170,6 +170,23 @@ export async function PUT(
       updateParams.push(description);
     }
     if (normalizedStatus !== undefined) {
+      // Phase 09 — GSD-15, D-30, D-31, D-32: gate enforcement on forward motion
+      //   D-31: only 'in_progress' and 'done' are gated; backward/sideways motion
+      //         (backlog, review, awaiting_owner, inbox, assigned, etc.) bypasses.
+      //   D-32: 'rejected' blocks identically to 'pending' / 'not_required' — only
+      //         'approved' unblocks. Ordering: runs BEFORE the Aegis check because
+      //         gate failure is cheaper + semantically prior (Pitfall ordering).
+      if ((normalizedStatus === 'in_progress' || normalizedStatus === 'done')
+          && currentTask.gate_required === 1
+          && currentTask.gate_status !== 'approved') {
+        return NextResponse.json({
+          error: 'This task requires gate approval before it can move forward.',
+          code: 'GATE_BLOCKED',
+          gate_status: currentTask.gate_status,
+          gate_required: 1,
+        }, { status: 403 })
+      }
+
       if (normalizedStatus === 'done' && !hasAegisApproval(db, taskId, workspaceId)) {
         return NextResponse.json(
           { error: 'Aegis approval is required to move task to done.' },
