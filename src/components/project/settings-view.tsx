@@ -82,6 +82,7 @@ function FieldBlock({
 export function SettingsView() {
   const t = useTranslations('project.settings')
   const tCommon = useTranslations('project.common')
+  const tLc = useTranslations('project.lifecycle')
   const { project, loading, error } = useProjectWorkspace()
   const { currentUser, fetchProjects } = useMissionControl()
   const isViewer = currentUser?.role === 'viewer'
@@ -93,6 +94,10 @@ export function SettingsView() {
   const [ticketPrefix, setTicketPrefix] = useState('')
   const [deadline, setDeadline] = useState('') // YYYY-MM-DD
   const [githubRepo, setGithubRepo] = useState('')
+  // GSD lifecycle fields (Plan 09-09, GSD-26, GSD-27)
+  const [gsdEnabled, setGsdEnabled] = useState<boolean>(false)
+  const [gsdTrack, setGsdTrack] = useState<string>('')
+  const [gsdGateMode, setGsdGateMode] = useState<string>('manual_approval')
   const [isSaving, setIsSaving] = useState(false)
   const [bannerError, setBannerError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
@@ -126,8 +131,24 @@ export function SettingsView() {
     const loadedDeadline = deadlineToYyyyMmDd(project.deadline)
     if (deadline !== loadedDeadline) return true
     if (githubRepo.trim() !== (project.github_repo ?? '').trim()) return true
+    // GSD lifecycle dirty checks (Plan 09-09)
+    if (!!project.gsd_enabled !== gsdEnabled) return true
+    if ((project.gsd_track ?? '') !== gsdTrack) return true
+    if ((project.gsd_gate_mode ?? 'manual_approval') !== gsdGateMode) return true
     return false
-  }, [project, name, description, status, color, ticketPrefix, deadline, githubRepo])
+  }, [
+    project,
+    name,
+    description,
+    status,
+    color,
+    ticketPrefix,
+    deadline,
+    githubRepo,
+    gsdEnabled,
+    gsdTrack,
+    gsdGateMode,
+  ])
 
   // Seed state when project id changes, or on first load. Skip re-seeding when
   // the form is dirty so an in-flight edit isn't clobbered by a projects[]
@@ -143,6 +164,9 @@ export function SettingsView() {
     setTicketPrefix(project.ticket_prefix ?? '')
     setDeadline(deadlineToYyyyMmDd(project.deadline))
     setGithubRepo(project.github_repo ?? '')
+    setGsdEnabled(!!project.gsd_enabled)
+    setGsdTrack(project.gsd_track ?? '')
+    setGsdGateMode(project.gsd_gate_mode ?? 'manual_approval')
     lastSeededProjectIdRef.current = project.id
   }, [project, isDirty])
 
@@ -182,6 +206,17 @@ export function SettingsView() {
     }
     if (githubRepo.trim() !== (project.github_repo ?? '').trim()) {
       body.github_repo = githubRepo // '' allowed; server coerces to null
+    }
+    // GSD lifecycle fields (Plan 09-09) — include only when dirty, matching the
+    // existing selective-inclusion pattern. gsd_track empty string → null (D-23).
+    if (!!project.gsd_enabled !== gsdEnabled) {
+      body.gsd_enabled = gsdEnabled ? 1 : 0
+    }
+    if ((project.gsd_track ?? '') !== gsdTrack) {
+      body.gsd_track = gsdTrack || null
+    }
+    if ((project.gsd_gate_mode ?? 'manual_approval') !== gsdGateMode) {
+      body.gsd_gate_mode = gsdGateMode
     }
 
     try {
@@ -225,6 +260,9 @@ export function SettingsView() {
         setTicketPrefix(echoed.ticket_prefix ?? '')
         setDeadline(deadlineToYyyyMmDd(echoed.deadline))
         setGithubRepo(echoed.github_repo ?? '')
+        setGsdEnabled(!!echoed.gsd_enabled)
+        setGsdTrack(echoed.gsd_track ?? '')
+        setGsdGateMode(echoed.gsd_gate_mode ?? 'manual_approval')
         lastSeededProjectIdRef.current = echoed.id ?? lastSeededProjectIdRef.current
       }
       await fetchProjects()
@@ -245,6 +283,9 @@ export function SettingsView() {
     setTicketPrefix(project.ticket_prefix ?? '')
     setDeadline(deadlineToYyyyMmDd(project.deadline))
     setGithubRepo(project.github_repo ?? '')
+    setGsdEnabled(!!project.gsd_enabled)
+    setGsdTrack(project.gsd_track ?? '')
+    setGsdGateMode(project.gsd_gate_mode ?? 'manual_approval')
     setFieldErrors({})
     setBannerError(null)
   }
@@ -472,6 +513,79 @@ export function SettingsView() {
                 aria-describedby="github-help"
                 disabled={isViewer || isSaving}
               />
+            </FieldBlock>
+          </div>
+        </section>
+
+        {/* Section 4 — GSD lifecycle (Plan 09-09, GSD-26, GSD-27).
+            Always visible per D-23; track + gate-mode disabled until enabled.
+            Option values are literal strings per D-37 — NOT translated. */}
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold">{tLc('settings.heading')}</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FieldBlock
+              id="gsd-enabled"
+              label={tLc('settings.enableLabel')}
+              helperId="gsd-enabled-help"
+              helperText={tLc('settings.enableHelper')}
+              colSpanClass="md:col-span-2"
+            >
+              <input
+                id="gsd-enabled"
+                type="checkbox"
+                checked={gsdEnabled}
+                onChange={(e) => setGsdEnabled(e.target.checked)}
+                aria-describedby="gsd-enabled-help"
+                disabled={isViewer || isSaving}
+                className="h-4 w-4 rounded border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </FieldBlock>
+
+            <FieldBlock
+              id="gsd-track"
+              label={tLc('settings.trackLabel')}
+              helperId="gsd-track-help"
+              helperText={!gsdEnabled ? tLc('settings.trackHelperDisabled') : undefined}
+              colSpanClass="md:col-span-1"
+            >
+              <select
+                id="gsd-track"
+                value={gsdTrack}
+                onChange={(e) => setGsdTrack(e.target.value)}
+                aria-describedby="gsd-track-help"
+                disabled={!gsdEnabled || isViewer || isSaving}
+                className={`${inputClass} h-9`}
+              >
+                <option value="">—</option>
+                <option value="ops">ops</option>
+                <option value="product">product</option>
+                <option value="marketing">marketing</option>
+                <option value="legal">legal</option>
+                <option value="firmvault">firmvault</option>
+                <option value="custom">custom</option>
+              </select>
+            </FieldBlock>
+
+            <FieldBlock
+              id="gsd-gate-mode"
+              label={tLc('settings.gateModeLabel')}
+              helperId="gsd-gate-mode-help"
+              helperText={tLc('settings.gateModeHelper')}
+              colSpanClass="md:col-span-1"
+            >
+              <select
+                id="gsd-gate-mode"
+                value={gsdGateMode}
+                onChange={(e) => setGsdGateMode(e.target.value)}
+                aria-describedby="gsd-gate-mode-help"
+                disabled={!gsdEnabled || isViewer || isSaving}
+                className={`${inputClass} h-9`}
+              >
+                <option value="manual_approval">manual_approval</option>
+                <option value="auto_internal">auto_internal</option>
+              </select>
             </FieldBlock>
           </div>
         </section>
