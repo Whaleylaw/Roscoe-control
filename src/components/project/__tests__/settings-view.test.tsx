@@ -591,4 +591,166 @@ describe('SettingsView', () => {
     expect(screen.queryByText('Basics')).toBeNull()
     expect(screen.queryByText('Unsaved changes')).toBeNull()
   })
+
+  // ─── GSD lifecycle section (Plan 09-09, GSD-26, GSD-27) ───────────
+  describe('GSD lifecycle section', () => {
+    it('GSD-26: renders "GSD lifecycle" section heading', () => {
+      render(<SettingsView />)
+      expect(screen.getByText('project.lifecycle.settings.heading')).toBeTruthy()
+    })
+
+    it('GSD-26: renders 3 controls — gsd_enabled checkbox, gsd_track select, gsd_gate_mode select', () => {
+      render(<SettingsView />)
+      const enabled = screen.getByLabelText('project.lifecycle.settings.enableLabel') as HTMLInputElement
+      expect(enabled.type).toBe('checkbox')
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      expect(track.tagName.toLowerCase()).toBe('select')
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      expect(gateMode.tagName.toLowerCase()).toBe('select')
+    })
+
+    it('GSD-26: gsd_track has 7 options (empty + 6 literal tracks) — literal values per D-37', () => {
+      render(<SettingsView />)
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      const options = Array.from(track.querySelectorAll('option')).map((o) => o.value)
+      expect(options).toEqual(['', 'ops', 'product', 'marketing', 'legal', 'firmvault', 'custom'])
+    })
+
+    it('GSD-26: gsd_gate_mode has 2 literal options — manual_approval / auto_internal (D-37)', () => {
+      render(<SettingsView />)
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      const options = Array.from(gateMode.querySelectorAll('option')).map((o) => o.value)
+      expect(options).toEqual(['manual_approval', 'auto_internal'])
+    })
+
+    it('GSD-27: when gsd_enabled=0, gsd_track and gsd_gate_mode are disabled', () => {
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject, gsd_enabled: 0 as any, gsd_track: null, gsd_gate_mode: 'manual_approval' as any },
+      }
+      render(<SettingsView />)
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      expect(track.disabled).toBe(true)
+      expect(gateMode.disabled).toBe(true)
+    })
+
+    it('GSD-27: when user toggles gsd_enabled=1, track and gate-mode become enabled without reload', () => {
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject, gsd_enabled: 0 as any, gsd_track: null, gsd_gate_mode: 'manual_approval' as any },
+      }
+      render(<SettingsView />)
+      const enabled = screen.getByLabelText('project.lifecycle.settings.enableLabel') as HTMLInputElement
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      expect(track.disabled).toBe(true)
+      fireEvent.click(enabled)
+      expect(enabled.checked).toBe(true)
+      expect(track.disabled).toBe(false)
+      expect(gateMode.disabled).toBe(false)
+    })
+
+    it('GSD-26: changing gsd_track from ops to product marks form dirty', () => {
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject, gsd_enabled: 1 as any, gsd_track: 'ops' as any, gsd_gate_mode: 'manual_approval' as any },
+      }
+      render(<SettingsView />)
+      expect(screen.queryByText('project.settings.unsavedChanges')).toBeNull()
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      fireEvent.change(track, { target: { value: 'product' } })
+      expect(screen.getByText('project.settings.unsavedChanges')).toBeTruthy()
+    })
+
+    it('GSD-26: on Save, PATCH body includes gsd_enabled, gsd_track, gsd_gate_mode (only when dirty, matching existing save pattern)', async () => {
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject, gsd_enabled: 0 as any, gsd_track: null, gsd_gate_mode: 'manual_approval' as any },
+      }
+      mockFetchOnce({ ok: true, json: { project: baseProject } })
+      render(<SettingsView />)
+      const enabled = screen.getByLabelText('project.lifecycle.settings.enableLabel') as HTMLInputElement
+      fireEvent.click(enabled)
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      fireEvent.change(track, { target: { value: 'ops' } })
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      fireEvent.change(gateMode, { target: { value: 'auto_internal' } })
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('project.settings.save'))
+      })
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.gsd_enabled).toBe(1)
+      expect(body.gsd_track).toBe('ops')
+      expect(body.gsd_gate_mode).toBe('auto_internal')
+    })
+
+    it('GSD-26: on Save with empty track string, PATCH body sends gsd_track: null (clear-the-track signal)', async () => {
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject, gsd_enabled: 1 as any, gsd_track: 'ops' as any, gsd_gate_mode: 'manual_approval' as any },
+      }
+      mockFetchOnce({ ok: true, json: { project: baseProject } })
+      render(<SettingsView />)
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      fireEvent.change(track, { target: { value: '' } })
+      await act(async () => {
+        fireEvent.click(screen.getByText('project.settings.save'))
+      })
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body)
+      expect(body.gsd_track).toBeNull()
+    })
+
+    it('D-23: GSD section renders even when project has no gsd fields (always visible)', () => {
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject }, // no gsd_* fields at all
+      }
+      render(<SettingsView />)
+      expect(screen.getByText('project.lifecycle.settings.heading')).toBeTruthy()
+      const enabled = screen.getByLabelText('project.lifecycle.settings.enableLabel') as HTMLInputElement
+      expect(enabled.checked).toBe(false) // defaults to unchecked
+    })
+
+    it('D-09: viewer sees GSD fields as disabled', () => {
+      missionControlState.current = {
+        currentUser: { role: 'viewer' },
+        fetchProjects: vi.fn().mockResolvedValue(undefined),
+      }
+      projectWorkspaceState.current = {
+        ...projectWorkspaceState.current,
+        project: { ...baseProject, gsd_enabled: 1 as any, gsd_track: 'ops' as any, gsd_gate_mode: 'manual_approval' as any },
+      }
+      render(<SettingsView />)
+      const enabled = screen.getByLabelText('project.lifecycle.settings.enableLabel') as HTMLInputElement
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      expect(enabled.disabled).toBe(true)
+      expect(track.disabled).toBe(true)
+      expect(gateMode.disabled).toBe(true)
+    })
+
+    it('D-37: track option values are literal English strings — not translation keys', () => {
+      render(<SettingsView />)
+      const track = screen.getByLabelText('project.lifecycle.settings.trackLabel') as HTMLSelectElement
+      const options = Array.from(track.querySelectorAll('option'))
+      // Values are literal; also visible text must NOT go through t() — it's the literal value
+      const opsOption = options.find((o) => o.value === 'ops')!
+      expect(opsOption.textContent).toBe('ops')
+      const customOption = options.find((o) => o.value === 'custom')!
+      expect(customOption.textContent).toBe('custom')
+    })
+
+    it('D-37: gate-mode option values are literal strings — not translation keys', () => {
+      render(<SettingsView />)
+      const gateMode = screen.getByLabelText('project.lifecycle.settings.gateModeLabel') as HTMLSelectElement
+      const options = Array.from(gateMode.querySelectorAll('option'))
+      const manual = options.find((o) => o.value === 'manual_approval')!
+      expect(manual.textContent).toBe('manual_approval')
+      const auto = options.find((o) => o.value === 'auto_internal')!
+      expect(auto.textContent).toBe('auto_internal')
+    })
+  })
 })
