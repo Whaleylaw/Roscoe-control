@@ -100,8 +100,8 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### UI — Settings
 
-- [ ] **GSD-26**: Project settings view includes a GSD section with `gsd_enabled` toggle, `gsd_track` dropdown, and `gsd_gate_mode` selector
-- [ ] **GSD-27**: GSD section is always visible; track and gate-mode controls are disabled/grayed until `gsd_enabled=1`
+- [x] **GSD-26**: Project settings view includes a GSD section with `gsd_enabled` toggle, `gsd_track` dropdown, and `gsd_gate_mode` selector
+- [x] **GSD-27**: GSD section is always visible; track and gate-mode controls are disabled/grayed until `gsd_enabled=1`
 
 ### Events & i18n
 
@@ -195,8 +195,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-23 | Phase 9 | Pending |
 | GSD-24 | Phase 9 | Pending |
 | GSD-25 | Phase 9 | Pending |
-| GSD-26 | Phase 9 | Pending |
-| GSD-27 | Phase 9 | Pending |
+| GSD-26 | Phase 9 | Complete |
+| GSD-27 | Phase 9 | Complete |
 | GSD-28 | Phase 9 | Complete |
 | GSD-29 | Phase 9 | Complete |
 
