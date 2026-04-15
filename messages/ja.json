@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "概要",
+    "projects": "プロジェクト",
     "agents": "エージェント",
     "tasks": "タスク",
     "chat": "チャット",
@@ -2194,5 +2195,134 @@
     "tabStatus": "ステータス",
     "unhealthy": "異常",
     "unreachable": "到達不能"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "header": {
+      "cta": "新しいプロジェクト"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub リポジトリ",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "任意。GitHub リポジトリをこのプロジェクトにリンクします。",
+      "githubRepoInvalid": "owner/repo 形式で入力してください",
+      "deadlineLabel": "期限",
+      "colorLabel": "色",
+      "enableSyncLabel": "GitHub 同期を有効にしてラベルを初期化",
+      "enableSyncHelp": "リポジトリに Mission Control ラベルを作成し、双方向同期を有効にします",
+      "initLabelsFailedWarning": "プロジェクトは作成されましたが、GitHub ラベルの設定に失敗しました。GitHub Sync パネルから再試行できます。"
+    },
+    "empty": {
+      "title": "アクティブなプロジェクトはまだありません",
+      "cta": "プロジェクトを作成"
+    },
+    "picker": {
+      "openWorkspace": "↗ ワークスペースを開く"
+    },
+    "row": {
+      "statusLabel": "ステータス",
+      "deadlineLabel": "期限",
+      "lastActivityLabel": "最終アクティビティ",
+      "noActivity": "まだアクティビティはありません"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "プロジェクトが見つかりません",
+      "projectNotFoundDescription": "お探しのプロジェクトは存在しないか、削除されました。",
+      "backToProjects": "プロジェクト一覧に戻る",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "プロジェクト",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "セッション",
+      "threadsHeader": "チャットスレッド",
+      "runtimeHeader": "外部セッション",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "実行中",
+      "statusFinished": "完了",
+      "statusFailed": "失敗",
+      "threadEmptyPreview": "まだメッセージがありません — 挨拶してみましょう",
+      "taskLabel": "タスク {ticketRef}",
+      "emptyHeading": "セッションがまだありません",
+      "emptyBody": "このプロジェクトにエージェントを割り当てると、チャットスレッドがここに自動的に表示されます。",
+      "emptyCta": "エージェントタブを開く",
+      "errorHeading": "セッションを読み込めませんでした",
+      "errorBody": "接続を確認して再試行してください。問題が解決しない場合は、Live Feed でイベントバスのエラーを確認してください。",
+      "detailBackLink": "セッションに戻る",
+      "loading": "セッションを読み込み中..."
+    },
+    "agents": {
+      "title": "エージェント",
+      "listHeader": "このプロジェクトのエージェント",
+      "assignedChip": "割り当て済み",
+      "activeTaskCount": "{count, plural, =0 {アクティブなタスクなし} one {# 件のアクティブなタスク} other {# 件のアクティブなタスク}}",
+      "emptyHeading": "このプロジェクトにエージェントがいません",
+      "emptyBody": "メインのエージェント画面からエージェントを割り当ててください。このプロジェクトのタスクで作業中のエージェントもここに表示されます。",
+      "emptyCta": "エージェント画面を開く",
+      "errorHeading": "エージェントを読み込めませんでした",
+      "errorBody": "接続を確認して再試行してください。問題が解決しない場合は、Live Feed でイベントバスのエラーを確認してください。",
+      "loading": "エージェントを読み込み中..."
+    },
+    "settings": {
+      "title": "プロジェクト設定",
+      "sectionBasics": "基本",
+      "sectionAppearance": "外観とトラッキング",
+      "sectionIntegrations": "連携",
+      "readOnlyNote": "プロジェクト設定を編集するにはオペレーター権限が必要です。",
+      "nameLabel": "名前",
+      "namePlaceholder": "マイプロジェクト",
+      "descriptionLabel": "説明",
+      "descriptionPlaceholder": "このプロジェクトは何についてですか?",
+      "statusLabel": "ステータス",
+      "statusActive": "アクティブ",
+      "statusArchived": "アーカイブ済み",
+      "colorLabel": "カラー",
+      "colorNone": "なし",
+      "prefixLabel": "チケット接頭辞",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "接頭辞の変更は新しいチケットにのみ影響します。既存のチケットは元の接頭辞を保持します。",
+      "deadlineLabel": "期限",
+      "githubRepoLabel": "GitHub リポジトリ",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "形式: owner/repo。チケットのリンクと同期に使用されます。",
+      "save": "変更を保存",
+      "cancel": "変更を破棄",
+      "saving": "保存中…",
+      "unsavedChanges": "未保存の変更",
+      "errorNameRequired": "プロジェクト名は空にできません",
+      "errorPrefixConflict": "このチケット接頭辞は既に使用されています。別の接頭辞を試してください。",
+      "errorPrefixInvalid": "無効なチケット接頭辞 — 英数字のみ、最大 12 文字。",
+      "errorDefaultArchive": "既定のプロジェクトはアーカイブできません。",
+      "errorBannerHeading": "変更を保存できませんでした",
+      "errorBannerFallback": "プロジェクトを更新できませんでした。もう一度試すか、Live Feed で詳細を確認してください。",
+      "loadErrorHeading": "プロジェクト設定を読み込めませんでした"
+    },
+    "common": {
+      "retry": "再試行"
+    }
   }
 }

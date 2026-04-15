@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "Visão geral",
+    "projects": "Projetos",
     "agents": "Agentes",
     "tasks": "Tarefas",
     "chat": "Chat",
@@ -2194,5 +2195,134 @@
     "tabStatus": "Status",
     "unhealthy": "Não saudável",
     "unreachable": "Inacessível"
+  },
+  "projects": {
+    "title": "Projetos",
+    "header": {
+      "cta": "Novo projeto"
+    },
+    "create": {
+      "githubRepoLabel": "Repositório GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Opcional. Vincule um repositório GitHub a este projeto.",
+      "githubRepoInvalid": "Use o formato owner/repo",
+      "deadlineLabel": "Prazo",
+      "colorLabel": "Cor",
+      "enableSyncLabel": "Ativar sincronização GitHub + inicializar etiquetas",
+      "enableSyncHelp": "Cria etiquetas do Mission Control no repositório e ativa a sincronização bidirecional",
+      "initLabelsFailedWarning": "Projeto criado, mas a configuração de etiquetas do GitHub falhou. Você pode tentar novamente no painel GitHub Sync."
+    },
+    "empty": {
+      "title": "Nenhum projeto ativo ainda",
+      "cta": "Criar projeto"
+    },
+    "picker": {
+      "openWorkspace": "↗ Abrir área de trabalho"
+    },
+    "row": {
+      "statusLabel": "Status",
+      "deadlineLabel": "Prazo",
+      "lastActivityLabel": "Última atividade",
+      "noActivity": "Nenhuma atividade ainda"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "Projeto nao encontrado",
+      "projectNotFoundDescription": "O projeto que voce procura nao existe ou foi removido.",
+      "backToProjects": "Voltar aos projetos",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "Projetos",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "Sessões",
+      "threadsHeader": "Threads de chat",
+      "runtimeHeader": "Sessões externas",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "Em execução",
+      "statusFinished": "Concluída",
+      "statusFailed": "Falhou",
+      "threadEmptyPreview": "Sem mensagens ainda — diga olá",
+      "taskLabel": "Tarefa {ticketRef}",
+      "emptyHeading": "Nenhuma sessão ainda",
+      "emptyBody": "Atribua um agente a este projeto e um thread de chat aparecerá aqui automaticamente.",
+      "emptyCta": "Abrir aba Agentes",
+      "errorHeading": "Não foi possível carregar as sessões",
+      "errorBody": "Verifique sua conexão e tente novamente. Se o problema persistir, verifique o Live Feed para ver erros do barramento de eventos.",
+      "detailBackLink": "Voltar para sessões",
+      "loading": "Carregando sessões..."
+    },
+    "agents": {
+      "title": "Agentes",
+      "listHeader": "Agentes neste projeto",
+      "assignedChip": "Atribuído",
+      "activeTaskCount": "{count, plural, =0 {Nenhuma tarefa ativa} one {# tarefa ativa} other {# tarefas ativas}}",
+      "emptyHeading": "Nenhum agente neste projeto",
+      "emptyBody": "Atribua um agente a partir da visualização principal de Agentes. Agentes que trabalham nas tarefas deste projeto também aparecerão aqui.",
+      "emptyCta": "Abrir visualização Agentes",
+      "errorHeading": "Não foi possível carregar os agentes",
+      "errorBody": "Verifique sua conexão e tente novamente. Se o problema persistir, verifique o Live Feed para ver erros do barramento de eventos.",
+      "loading": "Carregando agentes..."
+    },
+    "settings": {
+      "title": "Configurações do projeto",
+      "sectionBasics": "Básico",
+      "sectionAppearance": "Aparência e rastreamento",
+      "sectionIntegrations": "Integrações",
+      "readOnlyNote": "Você precisa de permissões de operador para editar as configurações do projeto.",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Meu projeto",
+      "descriptionLabel": "Descrição",
+      "descriptionPlaceholder": "Sobre o que é este projeto?",
+      "statusLabel": "Status",
+      "statusActive": "Ativo",
+      "statusArchived": "Arquivado",
+      "colorLabel": "Cor",
+      "colorNone": "Nenhuma",
+      "prefixLabel": "Prefixo de ticket",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "A alteração do prefixo afeta apenas novos tickets. Tickets existentes mantêm seu prefixo original.",
+      "deadlineLabel": "Prazo",
+      "githubRepoLabel": "Repositório GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Formato: owner/repo. Usado para vincular tickets e sincronizar.",
+      "save": "Salvar alterações",
+      "cancel": "Descartar alterações",
+      "saving": "Salvando…",
+      "unsavedChanges": "Alterações não salvas",
+      "errorNameRequired": "O nome do projeto não pode ficar vazio",
+      "errorPrefixConflict": "Prefixo de ticket já em uso. Tente outro.",
+      "errorPrefixInvalid": "Prefixo de ticket inválido — apenas letras e números, até 12 caracteres.",
+      "errorDefaultArchive": "O projeto padrão não pode ser arquivado.",
+      "errorBannerHeading": "Não foi possível salvar as alterações",
+      "errorBannerFallback": "Falha ao atualizar o projeto. Tente novamente ou verifique o Live Feed para detalhes.",
+      "loadErrorHeading": "Não foi possível carregar as configurações do projeto"
+    },
+    "common": {
+      "retry": "Tentar novamente"
+    }
   }
 }

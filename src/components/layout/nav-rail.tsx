@@ -30,6 +30,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'overview', label: 'Overview', icon: <OverviewIcon />, priority: true, essential: true },
       { id: 'agents', label: 'Agents', icon: <AgentsIcon />, priority: true, essential: true },
+      { id: 'projects', label: 'Projects', icon: <ProjectsIcon />, priority: true, essential: true },
       { id: 'tasks', label: 'Tasks', icon: <TasksIcon />, priority: true, essential: true },
       { id: 'chat', label: 'Chat', icon: <ChatIcon />, priority: false, essential: true },
       { id: 'channels', label: 'Channels', icon: <ChannelsIcon />, priority: false },
@@ -85,6 +86,7 @@ const navGroups: NavGroup[] = [
 const navItemTranslationKeys: Record<string, string> = {
   overview: 'overview',
   agents: 'agents',
+  projects: 'projects',
   tasks: 'tasks',
   chat: 'chat',
   channels: 'channels',
@@ -942,7 +944,7 @@ function ContextSwitcher({ currentUser, isAdmin, isLocal, isConnected, tenants, 
                   onClick={async () => {
                     if (interfaceMode === 'essential') return
                     setInterfaceMode('essential')
-                    const essentialIds = new Set(['overview', 'agents', 'tasks', 'chat', 'activity', 'logs', 'settings'])
+                    const essentialIds = new Set(['overview', 'agents', 'projects', 'tasks', 'chat', 'activity', 'logs', 'settings'])
                     if (!essentialIds.has(activeTab)) navigateToPanel('overview')
                     try { await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: { 'general.interface_mode': 'essential' } }) }) } catch {}
                   }}
@@ -1243,6 +1245,14 @@ function TasksIcon() {
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="1" width="12" height="14" rx="1.5" />
       <path d="M5 5h6M5 8h6M5 11h3" />
+    </svg>
+  )
+}
+
+function ProjectsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1.5 4.5a1 1 0 0 1 1-1h4l1.5 1.5h5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-10.5a1 1 0 0 1-1-1z" />
     </svg>
   )
 }

@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "개요",
+    "projects": "프로젝트",
     "agents": "에이전트",
     "tasks": "작업",
     "chat": "채팅",
@@ -2194,5 +2195,134 @@
     "restarting": "Restarting...",
     "diagnosing": "Diagnosing...",
     "notInstalled": "Not installed"
+  },
+  "projects": {
+    "title": "프로젝트",
+    "header": {
+      "cta": "새 프로젝트"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub 저장소",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "선택 사항입니다. GitHub 저장소를 이 프로젝트에 연결합니다.",
+      "githubRepoInvalid": "owner/repo 형식을 사용하세요",
+      "deadlineLabel": "마감일",
+      "colorLabel": "색상",
+      "enableSyncLabel": "GitHub 동기화 활성화 및 레이블 초기화",
+      "enableSyncHelp": "저장소에 Mission Control 레이블을 생성하고 양방향 동기화를 활성화합니다",
+      "initLabelsFailedWarning": "프로젝트는 생성되었지만 GitHub 레이블 설정에 실패했습니다. GitHub Sync 패널에서 다시 시도할 수 있습니다."
+    },
+    "empty": {
+      "title": "아직 활성 프로젝트가 없습니다",
+      "cta": "프로젝트 만들기"
+    },
+    "picker": {
+      "openWorkspace": "↗ 워크스페이스 열기"
+    },
+    "row": {
+      "statusLabel": "상태",
+      "deadlineLabel": "마감일",
+      "lastActivityLabel": "최근 활동",
+      "noActivity": "아직 활동이 없습니다"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "프로젝트를 찾을 수 없습니다",
+      "projectNotFoundDescription": "찾으시는 프로젝트가 존재하지 않거나 삭제되었습니다.",
+      "backToProjects": "프로젝트 목록으로 돌아가기",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "프로젝트",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "세션",
+      "threadsHeader": "채팅 스레드",
+      "runtimeHeader": "외부 세션",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "실행 중",
+      "statusFinished": "완료됨",
+      "statusFailed": "실패",
+      "threadEmptyPreview": "아직 메시지가 없습니다 — 인사를 건네보세요",
+      "taskLabel": "작업 {ticketRef}",
+      "emptyHeading": "아직 세션이 없습니다",
+      "emptyBody": "이 프로젝트에 에이전트를 할당하면 채팅 스레드가 여기에 자동으로 표시됩니다.",
+      "emptyCta": "에이전트 탭 열기",
+      "errorHeading": "세션을 불러올 수 없습니다",
+      "errorBody": "연결 상태를 확인하고 다시 시도해 주세요. 문제가 지속되면 Live Feed에서 이벤트 버스 오류를 확인하세요.",
+      "detailBackLink": "세션으로 돌아가기",
+      "loading": "세션을 불러오는 중..."
+    },
+    "agents": {
+      "title": "에이전트",
+      "listHeader": "이 프로젝트의 에이전트",
+      "assignedChip": "할당됨",
+      "activeTaskCount": "{count, plural, =0 {활성 작업 없음} one {활성 작업 #개} other {활성 작업 #개}}",
+      "emptyHeading": "이 프로젝트에 에이전트가 없습니다",
+      "emptyBody": "메인 에이전트 뷰에서 에이전트를 할당하세요. 이 프로젝트의 작업을 수행 중인 에이전트도 여기에 표시됩니다.",
+      "emptyCta": "에이전트 뷰 열기",
+      "errorHeading": "에이전트를 불러올 수 없습니다",
+      "errorBody": "연결 상태를 확인하고 다시 시도해 주세요. 문제가 지속되면 Live Feed에서 이벤트 버스 오류를 확인하세요.",
+      "loading": "에이전트를 불러오는 중..."
+    },
+    "settings": {
+      "title": "프로젝트 설정",
+      "sectionBasics": "기본",
+      "sectionAppearance": "모양 및 추적",
+      "sectionIntegrations": "통합",
+      "readOnlyNote": "프로젝트 설정을 편집하려면 오퍼레이터 권한이 필요합니다.",
+      "nameLabel": "이름",
+      "namePlaceholder": "내 프로젝트",
+      "descriptionLabel": "설명",
+      "descriptionPlaceholder": "이 프로젝트는 무엇에 관한 것입니까?",
+      "statusLabel": "상태",
+      "statusActive": "활성",
+      "statusArchived": "보관됨",
+      "colorLabel": "색상",
+      "colorNone": "없음",
+      "prefixLabel": "티켓 접두사",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "접두사 변경은 새 티켓에만 적용됩니다. 기존 티켓은 원래 접두사를 유지합니다.",
+      "deadlineLabel": "마감일",
+      "githubRepoLabel": "GitHub 저장소",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "형식: owner/repo. 티켓 링크 및 동기화에 사용됩니다.",
+      "save": "변경 사항 저장",
+      "cancel": "변경 사항 취소",
+      "saving": "저장 중…",
+      "unsavedChanges": "저장되지 않은 변경 사항",
+      "errorNameRequired": "프로젝트 이름은 비워둘 수 없습니다",
+      "errorPrefixConflict": "이미 사용 중인 티켓 접두사입니다. 다른 접두사를 시도하세요.",
+      "errorPrefixInvalid": "잘못된 티켓 접두사입니다 — 영문자와 숫자만, 최대 12자까지 가능합니다.",
+      "errorDefaultArchive": "기본 프로젝트는 보관할 수 없습니다.",
+      "errorBannerHeading": "변경 사항을 저장할 수 없습니다",
+      "errorBannerFallback": "프로젝트를 업데이트하지 못했습니다. 다시 시도하거나 자세한 내용은 Live Feed를 확인하세요.",
+      "loadErrorHeading": "프로젝트 설정을 불러올 수 없습니다"
+    },
+    "common": {
+      "retry": "다시 시도"
+    }
   }
 }

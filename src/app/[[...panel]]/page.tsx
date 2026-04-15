@@ -11,6 +11,7 @@ import { CronManagementPanel } from '@/components/panels/cron-management-panel'
 import { MemoryBrowserPanel } from '@/components/panels/memory-browser-panel'
 import { CostTrackerPanel } from '@/components/panels/cost-tracker-panel'
 import { TaskBoardPanel } from '@/components/panels/task-board-panel'
+import { ProjectsPanel } from '@/components/panels/projects-panel'
 import { ActivityFeedPanel } from '@/components/panels/activity-feed-panel'
 import { AgentSquadPanelPhase3 } from '@/components/panels/agent-squad-panel-phase3'
 import { AgentCommsPanel } from '@/components/panels/agent-comms-panel'
@@ -51,6 +52,7 @@ import { OpenClawDoctorBanner } from '@/components/layout/openclaw-doctor-banner
 import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
 import { Loader } from '@/components/ui/loader'
 import { ProjectManagerModal } from '@/components/modals/project-manager-modal'
+import { ProjectWorkspace } from '@/components/project/project-workspace'
 import { ExecApprovalOverlay } from '@/components/modals/exec-approval-overlay'
 import { useWebSocket } from '@/lib/websocket'
 import { useServerEvents } from '@/lib/use-server-events'
@@ -94,6 +96,7 @@ export default function Home() {
 
   // Sync URL → Zustand activeTab
   const pathname = usePathname()
+  const isProjectRoute = pathname.startsWith('/project/')
   const panelFromUrl = pathname === '/' ? 'overview' : pathname.slice(1)
   const normalizedPanel = panelFromUrl === 'sessions' ? 'chat' : panelFromUrl
 
@@ -428,8 +431,8 @@ export default function Home() {
           aria-hidden={showOnboarding}
         >
           <div aria-live="polite" className="flex flex-col min-h-full">
-            <ErrorBoundary key={activeTab}>
-              <ContentRouter tab={activeTab} />
+            <ErrorBoundary key={isProjectRoute ? pathname : activeTab}>
+              {isProjectRoute ? <ProjectWorkspace /> : <ContentRouter tab={activeTab} />}
             </ErrorBoundary>
           </div>
 {/* Footer removed — attribution moved to nav sidebar */}
@@ -476,7 +479,7 @@ export default function Home() {
 }
 
 const ESSENTIAL_PANELS = new Set([
-  'overview', 'agents', 'tasks', 'chat', 'activity', 'logs', 'settings',
+  'overview', 'agents', 'projects', 'tasks', 'chat', 'activity', 'logs', 'settings',
 ])
 
 function ContentRouter({ tab }: { tab: string }) {
@@ -528,6 +531,8 @@ function ContentRouter({ tab }: { tab: string }) {
           )}
         </>
       )
+    case 'projects':
+      return <ProjectsPanel />
     case 'tasks':
       return <TaskBoardPanel />
     case 'agents':

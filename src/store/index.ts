@@ -341,6 +341,7 @@ export interface Project {
   github_sync_enabled?: boolean
   github_labels_initialized?: boolean
   github_default_branch?: string
+  last_activity_at?: number
 }
 
 export interface ConnectionStatus {
@@ -876,6 +877,19 @@ export const useMissionControl = create<MissionControlStore>()(
     setProjects: (projects) => set({ projects }),
     fetchProjects: async () => {
       try {
+        // FLOW-E (v1.0 Milestone Audit): archived projects intentionally drop out of
+        // state.projects on refresh. Do NOT add ?includeArchived=1 here.
+        //
+        // Decision (.planning/phases/07-post-audit-gap-closure/07-01-PLAN.md):
+        // Option 2 — Archived projects vanish from the active store list.
+        //   1. project-manager-modal.tsx:68 already fetches ?includeArchived=1 independently
+        //      with an Activate toggle — admin archive/unarchive UX is authoritative there.
+        //   2. state.projects drives nav-rail quick-switcher and task-board project pickers,
+        //      where archived noise would clutter nav and allow task creation against
+        //      archived projects.
+        //   3. Server default at src/app/api/projects/route.ts:47 filters status='active';
+        //      store matches server default = least-surprise behavior.
+        // Contract tested in src/store/__tests__/projects-archive-behavior.test.ts.
         const res = await fetch('/api/projects', { cache: 'no-store' })
         if (!res.ok) return
         const data = await res.json()

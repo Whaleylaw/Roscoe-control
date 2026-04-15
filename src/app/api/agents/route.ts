@@ -33,29 +33,87 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // Build dynamic query
-    let query = 'SELECT * FROM agents WHERE workspace_id = ?';
-    const params: any[] = [workspaceId];
+    // Parse project_id — SESS-02 union filter (D-01, D-03, Pitfall 6)
+    const projectIdRaw = searchParams.get('project_id');
+    let projectIdFilter: number | null = null;
+    if (projectIdRaw !== null) {
+      const parsed = Number.parseInt(projectIdRaw, 10);
+      if (!Number.isFinite(parsed) || String(parsed) !== projectIdRaw.trim()) {
+        return NextResponse.json({ error: 'Invalid project_id' }, { status: 400 });
+      }
+      projectIdFilter = parsed;
+    }
 
-    if (!showHidden) {
-      query += ' AND hidden = 0';
+    let agents: (Agent & { assignment_source?: 'assigned' | 'task' })[];
+
+    if (projectIdFilter !== null) {
+      // SESS-02: union of (project_agent_assignments) ∪ (tasks.assigned_to LOWER-deduped),
+      // returning canonical casing from agents.name and an assignment_source field.
+      let scopedQuery = `
+        SELECT a.*,
+          CASE WHEN paa.agent_name IS NOT NULL THEN 'assigned' ELSE 'task' END AS assignment_source
+        FROM agents a
+        LEFT JOIN project_agent_assignments paa
+          ON LOWER(paa.agent_name) = LOWER(a.name)
+         AND paa.project_id = ?
+        WHERE a.workspace_id = ?
+      `;
+      const scopedParams: any[] = [projectIdFilter, workspaceId];
+
+      if (!showHidden) {
+        scopedQuery += ' AND a.hidden = 0';
+      }
+      if (status) {
+        scopedQuery += ' AND a.status = ?';
+        scopedParams.push(status);
+      }
+      if (role) {
+        scopedQuery += ' AND a.role = ?';
+        scopedParams.push(role);
+      }
+
+      scopedQuery += `
+        AND (
+          paa.agent_name IS NOT NULL
+          OR LOWER(a.name) IN (
+            SELECT DISTINCT LOWER(assigned_to)
+            FROM tasks
+            WHERE project_id = ? AND assigned_to IS NOT NULL AND workspace_id = ?
+          )
+        )
+        ORDER BY a.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      scopedParams.push(projectIdFilter, workspaceId, limit, offset);
+
+      agents = db.prepare(scopedQuery).all(...scopedParams) as (Agent & {
+        assignment_source: 'assigned' | 'task'
+      })[];
+    } else {
+      // Build dynamic query (unscoped — preserves regression behavior)
+      let query = 'SELECT * FROM agents WHERE workspace_id = ?';
+      const params: any[] = [workspaceId];
+
+      if (!showHidden) {
+        query += ' AND hidden = 0';
+      }
+
+      if (status) {
+        query += ' AND status = ?';
+        params.push(status);
+      }
+
+      if (role) {
+        query += ' AND role = ?';
+        params.push(role);
+      }
+
+      query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+      params.push(limit, offset);
+
+      const stmt = db.prepare(query);
+      agents = stmt.all(...params) as Agent[];
     }
-    
-    if (status) {
-      query += ' AND status = ?';
-      params.push(status);
-    }
-    
-    if (role) {
-      query += ' AND role = ?';
-      params.push(role);
-    }
-    
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-    
-    const stmt = db.prepare(query);
-    const agents = stmt.all(...params) as Agent[];
     
     // Parse JSON config field
     const agentsWithParsedData = agents.map(agent => ({
@@ -79,8 +137,13 @@ export async function GET(request: NextRequest) {
           SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done
         FROM tasks
         WHERE workspace_id = ? AND assigned_to IN (${placeholders})
+          ${projectIdFilter !== null ? 'AND project_id = ?' : ''}
         GROUP BY assigned_to
-      `).all(workspaceId, ...agentNames) as Array<{
+      `).all(
+        workspaceId,
+        ...agentNames,
+        ...(projectIdFilter !== null ? [projectIdFilter] : []),
+      ) as Array<{
         assigned_to: string
         total: number | null
         assigned: number | null

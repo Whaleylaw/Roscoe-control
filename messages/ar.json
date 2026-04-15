@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "نظرة عامة",
+    "projects": "المشاريع",
     "agents": "الوكلاء",
     "tasks": "المهام",
     "chat": "الدردشة",
@@ -2194,5 +2195,134 @@
     "tabStatus": "الحالة",
     "unhealthy": "غير سليم",
     "unreachable": "لا يمكن الوصول إليه"
+  },
+  "projects": {
+    "title": "المشاريع",
+    "header": {
+      "cta": "مشروع جديد"
+    },
+    "create": {
+      "githubRepoLabel": "مستودع GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "اختياري. اربط مستودع GitHub بهذا المشروع.",
+      "githubRepoInvalid": "استخدم تنسيق owner/repo",
+      "deadlineLabel": "الموعد النهائي",
+      "colorLabel": "اللون",
+      "enableSyncLabel": "تمكين مزامنة GitHub + تهيئة العلامات",
+      "enableSyncHelp": "ينشئ علامات Mission Control على المستودع ويُفعّل المزامنة الثنائية",
+      "initLabelsFailedWarning": "تم إنشاء المشروع، لكن فشل إعداد علامات GitHub. يمكنك المحاولة مجددًا من لوحة مزامنة GitHub."
+    },
+    "empty": {
+      "title": "لا توجد مشاريع نشطة بعد",
+      "cta": "إنشاء مشروع"
+    },
+    "picker": {
+      "openWorkspace": "↗ فتح مساحة العمل"
+    },
+    "row": {
+      "statusLabel": "الحالة",
+      "deadlineLabel": "الموعد النهائي",
+      "lastActivityLabel": "آخر نشاط",
+      "noActivity": "لا يوجد نشاط بعد"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "المشروع غير موجود",
+      "projectNotFoundDescription": "المشروع الذي تبحث عنه غير موجود أو تمت إزالته.",
+      "backToProjects": "العودة إلى المشاريع",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "المشاريع",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "الجلسات",
+      "threadsHeader": "محادثات الدردشة",
+      "runtimeHeader": "الجلسات الخارجية",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "قيد التشغيل",
+      "statusFinished": "منتهية",
+      "statusFailed": "فشلت",
+      "threadEmptyPreview": "لا توجد رسائل بعد — قل مرحبًا",
+      "taskLabel": "المهمة {ticketRef}",
+      "emptyHeading": "لا توجد جلسات بعد",
+      "emptyBody": "قم بتعيين وكيل لهذا المشروع وستظهر محادثة دردشة هنا تلقائيًا.",
+      "emptyCta": "افتح علامة تبويب الوكلاء",
+      "errorHeading": "تعذر تحميل الجلسات",
+      "errorBody": "تحقق من اتصالك وحاول مرة أخرى. إذا استمرت المشكلة، فتحقق من Live Feed لرؤية أخطاء ناقل الأحداث.",
+      "detailBackLink": "العودة إلى الجلسات",
+      "loading": "جارٍ تحميل الجلسات..."
+    },
+    "agents": {
+      "title": "الوكلاء",
+      "listHeader": "الوكلاء في هذا المشروع",
+      "assignedChip": "معيَّن",
+      "activeTaskCount": "{count, plural, =0 {لا توجد مهام نشطة} one {# مهمة نشطة} other {# مهام نشطة}}",
+      "emptyHeading": "لا يوجد وكلاء في هذا المشروع",
+      "emptyBody": "قم بتعيين وكيل من العرض الرئيسي للوكلاء. سيظهر هنا أيضًا الوكلاء الذين يعملون على مهام هذا المشروع.",
+      "emptyCta": "افتح عرض الوكلاء",
+      "errorHeading": "تعذر تحميل الوكلاء",
+      "errorBody": "تحقق من اتصالك وحاول مرة أخرى. إذا استمرت المشكلة، فتحقق من Live Feed لرؤية أخطاء ناقل الأحداث.",
+      "loading": "جارٍ تحميل الوكلاء..."
+    },
+    "settings": {
+      "title": "إعدادات المشروع",
+      "sectionBasics": "الأساسيات",
+      "sectionAppearance": "المظهر والتتبع",
+      "sectionIntegrations": "التكاملات",
+      "readOnlyNote": "تحتاج إلى صلاحيات المشغِّل لتعديل إعدادات المشروع.",
+      "nameLabel": "الاسم",
+      "namePlaceholder": "مشروعي",
+      "descriptionLabel": "الوصف",
+      "descriptionPlaceholder": "ما الغرض من هذا المشروع؟",
+      "statusLabel": "الحالة",
+      "statusActive": "نشط",
+      "statusArchived": "مؤرشف",
+      "colorLabel": "اللون",
+      "colorNone": "بدون",
+      "prefixLabel": "بادئة التذكرة",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "تغيير البادئة يؤثر فقط على التذاكر الجديدة. تحتفظ التذاكر الحالية ببادئتها الأصلية.",
+      "deadlineLabel": "الموعد النهائي",
+      "githubRepoLabel": "مستودع GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "التنسيق: owner/repo. يُستخدم لربط التذاكر والمزامنة.",
+      "save": "حفظ التغييرات",
+      "cancel": "تجاهل التغييرات",
+      "saving": "جارٍ الحفظ…",
+      "unsavedChanges": "تغييرات غير محفوظة",
+      "errorNameRequired": "لا يمكن أن يكون اسم المشروع فارغًا",
+      "errorPrefixConflict": "بادئة التذكرة مستخدمة بالفعل. جرّب بادئة أخرى.",
+      "errorPrefixInvalid": "بادئة تذكرة غير صالحة — أحرف وأرقام فقط، بحد أقصى 12 حرفًا.",
+      "errorDefaultArchive": "لا يمكن أرشفة المشروع الافتراضي.",
+      "errorBannerHeading": "تعذر حفظ التغييرات",
+      "errorBannerFallback": "تعذر تحديث المشروع. حاول مرة أخرى، أو تحقق من Live Feed لمزيد من التفاصيل.",
+      "loadErrorHeading": "تعذر تحميل إعدادات المشروع"
+    },
+    "common": {
+      "retry": "إعادة المحاولة"
+    }
   }
 }
