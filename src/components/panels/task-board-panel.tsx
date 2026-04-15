@@ -15,6 +15,8 @@ import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { Button } from '@/components/ui/button'
 import { ProjectManagerModal } from '@/components/modals/project-manager-modal'
 import { SessionMessage, shouldShowTimestamp, type SessionTranscriptMessage } from '@/components/chat/session-message'
+import { PhaseBadge } from '@/components/panels/task-card/phase-badge'
+import { GateBadge } from '@/components/panels/task-card/gate-badge'
 
 const log = createClientLogger('TaskBoard')
 
@@ -47,6 +49,12 @@ interface Task {
   comment_count?: number
   error_message?: string
   dispatch_attempts?: number
+  // Phase 09 GSD fields — extended in Wave 2a (migration 052 + store Task type)
+  gsd_phase?: 'discuss' | 'plan' | 'execute' | 'verify' | 'done' | null
+  gate_required?: 0 | 1
+  gate_status?: 'not_required' | 'pending' | 'approved' | 'rejected'
+  gate_approved_by?: string | null
+  gate_approved_at?: number | null
 }
 
 interface Agent {
@@ -1048,6 +1056,10 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
                               {task.ticket_ref}
                             </span>
                           )}
+                          {/* Phase 09 GSD-24: phase badge — renders only when task.gsd_phase is set (D-22) */}
+                          <PhaseBadge task={task} />
+                          {/* Phase 09 GSD-25: gate badge — renders only when task.gate_required === 1 */}
+                          <GateBadge task={task} />
                           {task.github_issue_number && task.github_repo && (
                             <a
                               href={`https://github.com/${task.github_repo}/issues/${task.github_issue_number}`}
@@ -1483,6 +1495,10 @@ function TaskDetailModal({
                 {task.ticket_ref && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono shrink-0">{task.ticket_ref}</span>
                 )}
+                {/* Phase 09 GSD-24: phase badge — renders only when task.gsd_phase is set (D-22) */}
+                <PhaseBadge task={task} />
+                {/* Phase 09 GSD-25: gate badge — renders only when task.gate_required === 1 */}
+                <GateBadge task={task} />
                 <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusColors[task.status] || statusColors.inbox}`}>
                   {task.status.replace(/_/g, ' ')}
                 </span>
