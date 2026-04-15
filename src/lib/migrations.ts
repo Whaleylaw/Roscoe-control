@@ -1437,6 +1437,36 @@ const migrations: Migration[] = [
       // FOUN-02, D-09: Composite index for active session filtering by project
       db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_project_active ON claude_sessions(project_slug, is_active)`)
     }
+  },
+  {
+    id: '052_gsd_native_integration',
+    up(db: Database.Database) {
+      // GSD-01, GSD-02, GSD-03: project-level GSD columns
+      const projCols = db.prepare(`PRAGMA table_info(projects)`).all() as Array<{ name: string }>
+      const hasProjCol = (n: string) => projCols.some((c) => c.name === n)
+      if (!hasProjCol('gsd_enabled'))     db.exec(`ALTER TABLE projects ADD COLUMN gsd_enabled INTEGER NOT NULL DEFAULT 0`)
+      if (!hasProjCol('gsd_track'))       db.exec(`ALTER TABLE projects ADD COLUMN gsd_track TEXT`)
+      if (!hasProjCol('gsd_phase'))       db.exec(`ALTER TABLE projects ADD COLUMN gsd_phase TEXT NOT NULL DEFAULT 'discuss'`)
+      if (!hasProjCol('gsd_gate_mode'))   db.exec(`ALTER TABLE projects ADD COLUMN gsd_gate_mode TEXT NOT NULL DEFAULT 'manual_approval'`)
+      if (!hasProjCol('gsd_project_id'))  db.exec(`ALTER TABLE projects ADD COLUMN gsd_project_id TEXT`)
+      if (!hasProjCol('gsd_updated_at'))  db.exec(`ALTER TABLE projects ADD COLUMN gsd_updated_at INTEGER`)
+
+      // GSD-04, GSD-05: task-level GSD columns
+      const taskCols = db.prepare(`PRAGMA table_info(tasks)`).all() as Array<{ name: string }>
+      const hasTaskCol = (n: string) => taskCols.some((c) => c.name === n)
+      if (!hasTaskCol('gsd_phase'))           db.exec(`ALTER TABLE tasks ADD COLUMN gsd_phase TEXT`)
+      if (!hasTaskCol('gate_required'))       db.exec(`ALTER TABLE tasks ADD COLUMN gate_required INTEGER NOT NULL DEFAULT 0`)
+      if (!hasTaskCol('gate_status'))         db.exec(`ALTER TABLE tasks ADD COLUMN gate_status TEXT NOT NULL DEFAULT 'not_required'`)
+      if (!hasTaskCol('gate_approved_by'))    db.exec(`ALTER TABLE tasks ADD COLUMN gate_approved_by TEXT`)
+      if (!hasTaskCol('gate_approved_at'))    db.exec(`ALTER TABLE tasks ADD COLUMN gate_approved_at INTEGER`)
+      if (!hasTaskCol('depends_on_task_ids')) db.exec(`ALTER TABLE tasks ADD COLUMN depends_on_task_ids TEXT`)
+
+      // Indexes for lookup hot-paths
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_gsd_phase ON projects(gsd_phase)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_phase ON tasks(gsd_phase)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gate_status ON tasks(gate_status)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_gsd_phase ON tasks(project_id, gsd_phase)`)
+    }
   }
 ]
 
