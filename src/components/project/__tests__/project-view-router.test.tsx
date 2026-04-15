@@ -11,6 +11,10 @@ vi.mock('@/components/project/dashboard-view', () => ({
   DashboardView: () => <div data-testid="dashboard-view-mock" />,
 }))
 
+vi.mock('@/components/project/lifecycle/lifecycle-view', () => ({
+  LifecycleView: () => <div data-testid="lifecycle-view-mock" />,
+}))
+
 vi.mock('@/components/project/tasks-view', () => ({
   TasksView: () => <div data-testid="tasks-view-mock" />,
 }))
@@ -77,6 +81,12 @@ describe('ProjectViewRouter', () => {
       mockedUseProjectWorkspace.mockReturnValue({ view: 'tasks', detailId: null, slug: 'alpha' })
       render(<ProjectViewRouter />)
       expect(screen.getByTestId('tasks-view-mock')).toBeInTheDocument()
+    })
+
+    it('renders <LifecycleView/> when view === "lifecycle" (GSD-20)', () => {
+      mockedUseProjectWorkspace.mockReturnValue({ view: 'lifecycle', detailId: null, slug: 'alpha' })
+      render(<ProjectViewRouter />)
+      expect(screen.getByTestId('lifecycle-view-mock')).toBeInTheDocument()
     })
 
     it('renders <AgentsView/> when view === "agents" (even when detailId is present — detail ignored for agents in Phase 5)', () => {

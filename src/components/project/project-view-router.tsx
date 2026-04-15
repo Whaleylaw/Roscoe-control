@@ -2,6 +2,7 @@
 
 import { useProjectWorkspace } from '@/components/project/project-context'
 import { DashboardView } from '@/components/project/dashboard-view'
+import { LifecycleView } from '@/components/project/lifecycle/lifecycle-view'
 import { TasksView } from '@/components/project/tasks-view'
 import { SessionsView } from '@/components/project/sessions-view'
 import { SessionDetailView } from '@/components/project/session-detail-view'
@@ -16,6 +17,8 @@ export function ProjectViewRouter() {
   switch (view) {
     case 'dashboard':
       return <DashboardView />
+    case 'lifecycle':
+      return <LifecycleView />
     case 'tasks':
       return <TasksView />
     case 'sessions':

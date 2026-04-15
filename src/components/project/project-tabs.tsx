@@ -5,7 +5,7 @@ import { startTransition } from 'react'
 import { useTranslations } from 'next-intl'
 import { useProjectWorkspace } from '@/components/project/project-context'
 
-const VIEWS = ['dashboard', 'tasks', 'sessions', 'agents', 'settings'] as const
+const VIEWS = ['dashboard', 'lifecycle', 'tasks', 'sessions', 'agents', 'settings'] as const
 
 export function ProjectTabs() {
   const router = useRouter()
