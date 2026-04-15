@@ -192,7 +192,7 @@ Plans:
 Plans:
 - [x] 09-00-PLAN.md — Wave 0: 17 test scaffolds + atomic 10-locale i18n seed (project.lifecycle.*)
 - [x] 09-01-PLAN.md — Wave 1: Migration 052 + Zod schemas + EventType union
-- [ ] 09-02-PLAN.md — Wave 2: Projects API GET/POST/PATCH extensions + Project/Task type plumbing
+- [x] 09-02-PLAN.md — Wave 2: Projects API GET/POST/PATCH extensions + Project/Task type plumbing
 - [ ] 09-03-PLAN.md — Wave 2: Bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate
 - [x] 09-04-PLAN.md — Wave 2: Transition endpoint with 4 rules + waiver + illegal-jump
 - [x] 09-05-PLAN.md — Wave 2: Gate PATCH endpoint + task GET field audit

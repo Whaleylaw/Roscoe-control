@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-05-PLAN.md (Wave 2d: gate PATCH + task GET GSD fields)"
-last_updated: "2026-04-15T02:54:12.197Z"
+stopped_at: "Completed 09-02-PLAN.md (Wave 2: Project API GSD CRUD + type plumbing)"
+last_updated: "2026-04-15T02:54:42.137Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 28
+  completed_plans: 29
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 4 of 11
+Plan: 5 of 11
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Plan: 4 of 11
 | Phase 09-gsd-native-integration P01 | 5min | 2 tasks | 6 files |
 | Phase 09-gsd-native-integration P04 | 7min | 1 tasks | 2 files |
 | Phase 09-gsd-native-integration P05 | 6min | 2 tasks | 3 files |
+| Phase 09-gsd-native-integration P02 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -165,6 +166,10 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-05 Pitfall 6 double-broadcast implemented — eventBus.broadcast('task.gate.changed') followed by eventBus.broadcast('task.updated') so existing task-board SSE listeners refresh without client changes
 - [Phase 09-gsd-native-integration]: Plan 09-05 read-path audit: all three task GET handlers (list, detail, project-scoped) already use SELECT t.* — migration 052 columns flow through automatically, zero SQL edits required. Added SELECT t.* lock assertions to guard against future refactors
 - [Phase 09-gsd-native-integration]: Plan 09-05 gate PATCH returns typed error codes: NO_GATE (400) when gate_required=0, TASK_NOT_FOUND (404) when missing — both include 'code' field in JSON body for client-side error switching
+- [Phase 09-gsd-native-integration]: Plan 09-02 created Project interface in src/lib/db.ts from scratch (did not exist prior) rather than merely extending — structural addition captured full column set + 6 gsd_* fields
+- [Phase 09-gsd-native-integration]: Plan 09-02 PATCH silently drops gsd_phase (no 400) — tested explicitly: body {gsd_phase:'execute', gsd_enabled:true} applies gsd_enabled while leaving phase unchanged; matches D-24..28 'transitions flow through dedicated endpoint' contract
+- [Phase 09-gsd-native-integration]: Plan 09-02 PATCH accepts null on gsd_track as valid clear-the-track signal; enum validation only runs when value is non-null — test covers both paths
+- [Phase 09-gsd-native-integration]: Plan 09-02 test harness uses mutable Map<id, Row> + SQL-string capture + role-switchable requireRole mock — established as reference pattern for Wave 2+ CRUD tests on projects/tasks routes
 
 ### Pending Todos
 
@@ -176,6 +181,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:54:06.479Z
-Stopped at: Completed 09-05-PLAN.md (Wave 2d: gate PATCH + task GET GSD fields)
+Last session: 2026-04-15T02:54:30.230Z
+Stopped at: Completed 09-02-PLAN.md (Wave 2: Project API GSD CRUD + type plumbing)
 Resume file: None

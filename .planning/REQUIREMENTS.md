@@ -57,7 +57,7 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### Schema & Data Model
 
-- [ ] **GSD-01**: Projects can be flagged `gsd_enabled` and assigned a `gsd_track` (ops / product / marketing / legal / firmvault / custom) at create or update time
+- [x] **GSD-01**: Projects can be flagged `gsd_enabled` and assigned a `gsd_track` (ops / product / marketing / legal / firmvault / custom) at create or update time
 - [x] **GSD-02**: Projects track current phase via `gsd_phase` (discuss / plan / execute / verify / done) with backward-compatible default
 - [x] **GSD-03**: Projects track approval policy via `gsd_gate_mode` (manual_approval / auto_internal)
 - [x] **GSD-04**: Tasks track `gsd_phase` and `gate_required` flag to participate in the lifecycle
@@ -73,7 +73,7 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 - [x] **GSD-11**: User can approve or reject a task gate via `PATCH /api/tasks/:id/gate`, recording approver identity and timestamp
 - [x] **GSD-12**: All three new endpoints require operator or admin role; viewers can read gate state but not mutate it
 - [x] **GSD-13**: Project and task read endpoints include the new GSD fields in their responses
-- [ ] **GSD-14**: Project create/update endpoints accept the new GSD fields with validation
+- [x] **GSD-14**: Project create/update endpoints accept the new GSD fields with validation
 
 ### Gate Enforcement
 
@@ -170,7 +170,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETT-01 | Phase 6 | Complete |
 | SETT-02 | Phase 6 | Complete |
 | SETT-03 | Phase 6 | Complete |
-| GSD-01 | Phase 9 | Pending |
+| GSD-01 | Phase 9 | Complete |
 | GSD-02 | Phase 9 | Complete |
 | GSD-03 | Phase 9 | Complete |
 | GSD-04 | Phase 9 | Complete |
@@ -183,7 +183,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-11 | Phase 9 | Complete |
 | GSD-12 | Phase 9 | Complete |
 | GSD-13 | Phase 9 | Complete |
-| GSD-14 | Phase 9 | Pending |
+| GSD-14 | Phase 9 | Complete |
 | GSD-15 | Phase 9 | Pending |
 | GSD-16 | Phase 9 | Pending |
 | GSD-17 | Phase 9 | Pending |
