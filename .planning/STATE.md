@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-07-PLAN.md (Wave 3b: Lifecycle tab UI + 6 components + tab wiring)"
-last_updated: "2026-04-15T03:05:33.546Z"
+stopped_at: "Completed 09-10-PLAN.md (Wave 4: verification sweep — E2E, /api/index docs, infra fixes)"
+last_updated: "2026-04-15T04:09:59.579Z"
 progress:
   total_phases: 9
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 29
-  completed_plans: 34
+  completed_plans: 35
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 10 of 11
+Plan: 11 of 11
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Plan: 10 of 11
 | Phase 09-gsd-native-integration P09 | 7min | 1 tasks | 3 files |
 | Phase 09-gsd-native-integration P08 | 5min | 2 tasks | 6 files |
 | Phase 09-gsd-native-integration P07 | 10min | 2 tasks tasks | 14 files files |
+| Phase 09-gsd-native-integration P10 | 59min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,10 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-07: hasBeenBootstrapped is a client-side heuristic: projectTasks.some(t => t.gsd_phase != null). No server-side is_bootstrapped flag needed — Wave 2's bootstrap seeds gsd_phase on every created task
 - [Phase 09-gsd-native-integration]: Plan 09-07: NEXT_PHASE map duplicated inline in lifecycle-view.tsx (per plan guidance) — avoids creating a new shared export; if Wave 4+ sees duplication across multiple surfaces, a refactor to a shared constant is welcome
 - [Phase 09-gsd-native-integration]: Plan 09-07: GateTaskRow rejection flow: note is OPTIONAL per UI-SPEC rejectNotePlaceholder copy; Enter submits whether note is empty or filled (trimmed); Escape always cancels back to idle
+- [Phase 09-gsd-native-integration]: Plan 09-10 E2E uses API primarily with a single UI click (bootstrap CTA) — deterministic, avoids Zustand-lag races on Advance buttons
+- [Phase 09-gsd-native-integration]: Plan 09-10 uses POST /api/quality-review with reviewer=aegis,status=approved as the Aegis-bypass path — exercises the auto-advance side effect in quality-review/route.ts:108
+- [Phase 09-gsd-native-integration]: Plan 09-10 identified two pre-existing test-infra bugs: Next.js standalone missing-static-copy and loginLimiter sharing the unknown IP bucket — both fixed in scripts/e2e-openclaw/start-e2e-server.mjs + the 5 affected specs
+- [Phase 09-gsd-native-integration]: Plan 09-10 x-real-ip is the correct login-bucket isolator in e2e mode (XFF is ignored when MC_TRUSTED_PROXIES is unset); monotonic counter pattern when a spec calls login >5 times
 
 ### Pending Todos
 
@@ -206,6 +211,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T03:05:20.788Z
-Stopped at: Completed 09-07-PLAN.md (Wave 3b: Lifecycle tab UI + 6 components + tab wiring)
+Last session: 2026-04-15T04:09:48.067Z
+Stopped at: Completed 09-10-PLAN.md (Wave 4: verification sweep — E2E, /api/index docs, infra fixes)
 Resume file: None

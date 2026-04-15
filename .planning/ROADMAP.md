@@ -200,7 +200,7 @@ Plans:
 - [x] 09-07-PLAN.md — Wave 3: Lifecycle tab (6 components) + project-tabs + project-view-router
 - [x] 09-08-PLAN.md — Wave 3: PhaseBadge + GateBadge + task-board-panel injection
 - [x] 09-09-PLAN.md — Wave 3: Settings view GSD section
-- [ ] 09-10-PLAN.md — Wave 4: Playwright E2E + /api/index docs + test:all green
+- [x] 09-10-PLAN.md — Wave 4: Playwright E2E + /api/index docs + test:all green
 **UI hint**: yes
 
 ## Progress
