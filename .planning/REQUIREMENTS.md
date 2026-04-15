@@ -88,10 +88,10 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### UI — Lifecycle Tab
 
-- [ ] **GSD-20**: Project workspace exposes a dedicated "Lifecycle" tab at `/[slug]/lifecycle` alongside Dashboard / Tasks / Sessions / Agents / Settings
-- [ ] **GSD-21**: Lifecycle tab shows current phase, phase timeline, bootstrap button, and transition controls for GSD-enabled projects
-- [ ] **GSD-22**: Lifecycle tab shows gate-required tasks with inline approve/reject actions (operator+ only)
-- [ ] **GSD-23**: For non-GSD projects, Lifecycle tab renders an empty state with an "Enable GSD for this project" CTA
+- [x] **GSD-20**: Project workspace exposes a dedicated "Lifecycle" tab at `/[slug]/lifecycle` alongside Dashboard / Tasks / Sessions / Agents / Settings
+- [x] **GSD-21**: Lifecycle tab shows current phase, phase timeline, bootstrap button, and transition controls for GSD-enabled projects
+- [x] **GSD-22**: Lifecycle tab shows gate-required tasks with inline approve/reject actions (operator+ only)
+- [x] **GSD-23**: For non-GSD projects, Lifecycle tab renders an empty state with an "Enable GSD for this project" CTA
 
 ### UI — Task Board Integration
 
@@ -189,10 +189,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-17 | Phase 9 | Complete |
 | GSD-18 | Phase 9 | Complete |
 | GSD-19 | Phase 9 | Complete |
-| GSD-20 | Phase 9 | Pending |
-| GSD-21 | Phase 9 | Pending |
-| GSD-22 | Phase 9 | Pending |
-| GSD-23 | Phase 9 | Pending |
+| GSD-20 | Phase 9 | Complete |
+| GSD-21 | Phase 9 | Complete |
+| GSD-22 | Phase 9 | Complete |
+| GSD-23 | Phase 9 | Complete |
 | GSD-24 | Phase 9 | Complete |
 | GSD-25 | Phase 9 | Complete |
 | GSD-26 | Phase 9 | Complete |

@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
 stopped_at: "Completed 09-07-PLAN.md (Wave 3b: Lifecycle tab UI + 6 components + tab wiring)"
-last_updated: "2026-04-15T03:05:20.791Z"
+last_updated: "2026-04-15T03:05:33.546Z"
 progress:
   total_phases: 9
   completed_phases: 6
@@ -190,6 +190,11 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-08 extended in-file task-board Task interface with 5 GSD fields (gsd_phase, gate_required, gate_status, gate_approved_by, gate_approved_at) mirroring Wave 2a store type — in-file interface shadowed store, had to re-declare for badge props typecheck
 - [Phase 09-gsd-native-integration]: Plan 09-08 GateBadge two-branch render (approved→green, else→amber) — pending/rejected/not_required all render the same 'Approval required' visual because gate_required=1 + non-approved always means 'blocked on approval' semantically; only approved earns affirmative green
 - [Phase 09-gsd-native-integration]: Plan 09-08 GateBadge tests use real NextIntlClientProvider + imported messages/en.json (no next-intl mock) — exercises translation resolution end-to-end; future copy drift in en.json flips tests red. First use of this pattern in the repo
+- [Phase 09-gsd-native-integration]: Plan 09-07: Renamed 4 wave-0 lifecycle .test.ts scaffolds to .test.tsx — JSX in .test.ts fails esbuild parse; confirmed via probe. Wave 0 pattern for future UI plans should default to .test.tsx when components render.
+- [Phase 09-gsd-native-integration]: Plan 09-07: LifecycleEmptyState CTAs invoke onEnable/onBootstrap callbacks rather than fetch directly — parent LifecycleView owns all fetch state (banner error + loader flags) so retry semantics live in one place
+- [Phase 09-gsd-native-integration]: Plan 09-07: hasBeenBootstrapped is a client-side heuristic: projectTasks.some(t => t.gsd_phase != null). No server-side is_bootstrapped flag needed — Wave 2's bootstrap seeds gsd_phase on every created task
+- [Phase 09-gsd-native-integration]: Plan 09-07: NEXT_PHASE map duplicated inline in lifecycle-view.tsx (per plan guidance) — avoids creating a new shared export; if Wave 4+ sees duplication across multiple surfaces, a refactor to a shared constant is welcome
+- [Phase 09-gsd-native-integration]: Plan 09-07: GateTaskRow rejection flow: note is OPTIONAL per UI-SPEC rejectNotePlaceholder copy; Enter submits whether note is empty or filled (trimmed); Escape always cancels back to idle
 
 ### Pending Todos
 
