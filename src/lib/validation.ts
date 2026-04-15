@@ -198,3 +198,51 @@ export const githubSyncSchema = z.object({
   comment: z.string().optional(),
   project_id: z.number().optional(),
 })
+
+// Phase 09 — GSD Native Integration (GSD-03, GSD-14, D-17, D-24..29)
+export const GSD_PHASES = ['discuss', 'plan', 'execute', 'verify', 'done'] as const
+export const GSD_TRACKS = ['ops', 'product', 'marketing', 'legal', 'firmvault', 'custom'] as const
+export const GSD_GATE_MODES = ['manual_approval', 'auto_internal'] as const
+export const GSD_GATE_STATUSES = ['not_required', 'pending', 'approved', 'rejected'] as const
+
+export const gsdPhaseSchema = z.enum(GSD_PHASES)
+export const gsdTrackSchema = z.enum(GSD_TRACKS)
+export const gsdGateModeSchema = z.enum(GSD_GATE_MODES)
+export const gsdGateStatusSchema = z.enum(GSD_GATE_STATUSES)
+
+// POST /api/projects/:id/gsd/transition body (D-24..29)
+export const transitionSchema = z.object({
+  to_phase: gsdPhaseSchema,
+  reason: z.string().max(1000).optional(),
+  waive_remaining: z.boolean().optional(),
+}).refine(
+  (v) => !v.waive_remaining || (v.reason != null && v.reason.trim().length > 0),
+  { message: 'reason is required when waive_remaining is true', path: ['reason'] }
+)
+
+// POST /api/projects/:id/gsd/bootstrap body (empty body allowed)
+export const bootstrapSchema = z.object({}).passthrough()
+
+// PATCH /api/tasks/:id/gate body (D-09, GSD-11)
+export const taskGatePatchSchema = z.object({
+  gate_status: z.enum(['approved', 'rejected']),
+  note: z.string().max(1000).optional(),
+})
+
+// Template-file JSON shape (D-17)
+export const gsdTemplatePhaseEntrySchema = z.object({
+  ticket_ref: z.string().regex(/^[A-Z]+-\d+$/, 'ticket_ref must match PREFIX-NN'),
+  title: z.string().min(1).max(500),
+  description: z.string().max(5000).optional(),
+  gate_required: z.union([z.literal(0), z.literal(1)]).default(0),
+  depends_on: z.array(z.string()).optional(),
+})
+export const gsdTemplateSchema = z.object({
+  name: z.string().min(1),
+  phases: z.object({
+    discuss: z.array(gsdTemplatePhaseEntrySchema),
+    plan: z.array(gsdTemplatePhaseEntrySchema),
+    execute: z.array(gsdTemplatePhaseEntrySchema),
+    verify: z.array(gsdTemplatePhaseEntrySchema),
+  }),
+})

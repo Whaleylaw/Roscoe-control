@@ -38,6 +38,8 @@ export type EventType =
   | 'run.eval_attached'
   | 'task.escalated'
   | 'session.updated'
+  | 'project.gsd.transition'   // Phase 09 GSD-28, D-34
+  | 'task.gate.changed'         // Phase 09 GSD-28, D-34
 
 class ServerEventBus extends EventEmitter {
   private static instance: ServerEventBus | null = null
