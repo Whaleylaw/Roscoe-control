@@ -1,10 +1,11 @@
 ---
 phase: 9
 slug: gsd-native-integration
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-14
+reviewed_at: 2026-04-14
 ---
 
 # Phase 9 — UI Design Contract
