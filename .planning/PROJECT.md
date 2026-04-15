@@ -55,14 +55,14 @@ When I click into a project, I see everything about that project — what it is,
 - [x] Project-scoped agents view — Validated in Phase 5: Sessions & Agents
 - [x] Project settings (name, description, status, configuration) — Validated in Phase 6: Settings
 - [ ] Project-level progress/completion indicators
-- [ ] Projects can be flagged for GSD-native tracking (`gsd_enabled`) — v1.1
-- [ ] Projects advance through Discuss → Plan → Execute → Verify → Done phases via in-app controls — v1.1
-- [ ] Tasks can be marked gate-required, blocking in_progress/done without operator approval — v1.1
-- [ ] Operators and admins can approve or reject gates from the UI and API — v1.1
-- [ ] Bootstrap endpoint creates default phase task packs idempotently — v1.1
-- [ ] Phase state is visible on the task board as per-task badges — v1.1
-- [ ] Project workspace exposes a dedicated Lifecycle tab — v1.1
-- [ ] Bootstrap templates loadable from external JSON files with bundled fallback — v1.1
+- [x] Projects can be flagged for GSD-native tracking (`gsd_enabled`) — Validated in Phase 9: GSD Native Integration
+- [x] Projects advance through Discuss → Plan → Execute → Verify → Done phases via in-app controls — Validated in Phase 9: GSD Native Integration
+- [x] Tasks can be marked gate-required, blocking in_progress/done without operator approval — Validated in Phase 9: GSD Native Integration
+- [x] Operators and admins can approve or reject gates from the UI and API — Validated in Phase 9: GSD Native Integration
+- [x] Bootstrap endpoint creates default phase task packs idempotently — Validated in Phase 9: GSD Native Integration
+- [x] Phase state is visible on the task board as per-task badges — Validated in Phase 9: GSD Native Integration
+- [x] Project workspace exposes a dedicated Lifecycle tab — Validated in Phase 9: GSD Native Integration
+- [x] Bootstrap templates loadable from external JSON files with bundled fallback — Validated in Phase 9: GSD Native Integration
 
 ### Out of Scope
 
@@ -95,10 +95,10 @@ When I click into a project, I see everything about that project — what it is,
 | Full takeover view (not drawer/sidebar) | User wants project to feel like its own workspace, not a detail panel | — Pending |
 | Breadcrumb navigation | Natural way to move between project context and main view | — Pending |
 | All sub-views in v1 (tasks, sessions, agents, settings) | User wants the complete workspace experience, not incremental | — Pending |
-| v1.1: GSD state stored in-DB only (no `.planning/` sync) | Avoids filesystem sync bugs; CLI stays the authoring surface, MC tracks approvals | — Pending |
-| v1.1: Operator+admin required for all GSD endpoints | Reuses existing MC role model; no new per-project approver table | — Pending |
-| v1.1: External JSON templates with bundled default fallback | Flexibility for users without forcing code changes | — Pending |
-| v1.1: Dedicated Lifecycle tab (not just settings) + task badges | Discoverable where work happens; matches existing workspace tab pattern | — Pending |
+| v1.1: GSD state stored in-DB only (no `.planning/` sync) | Avoids filesystem sync bugs; CLI stays the authoring surface, MC tracks approvals | Landed in Phase 9 (migration 052 adds `gsd_*` columns on projects/tasks; no FS sync) |
+| v1.1: Operator+admin required for all GSD endpoints | Reuses existing MC role model; no new per-project approver table | Landed in Phase 9 (`requireRole(request, 'operator')` on bootstrap/transition/gate routes) |
+| v1.1: External JSON templates with bundled default fallback | Flexibility for users without forcing code changes | Landed in Phase 9 (`loadGsdTemplate` resolves `<DATA_DIR>/gsd-templates/*.json` → `DEFAULT_TEMPLATE`) |
+| v1.1: Dedicated Lifecycle tab (not just settings) + task badges | Discoverable where work happens; matches existing workspace tab pattern | Landed in Phase 9 (lifecycle-view + phase/gate badges on task cards) |
 
 ## Evolution
 
