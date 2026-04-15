@@ -195,7 +195,7 @@ Plans:
 - [ ] 09-02-PLAN.md — Wave 2: Projects API GET/POST/PATCH extensions + Project/Task type plumbing
 - [ ] 09-03-PLAN.md — Wave 2: Bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate
 - [x] 09-04-PLAN.md — Wave 2: Transition endpoint with 4 rules + waiver + illegal-jump
-- [ ] 09-05-PLAN.md — Wave 2: Gate PATCH endpoint + task GET field audit
+- [x] 09-05-PLAN.md — Wave 2: Gate PATCH endpoint + task GET field audit
 - [ ] 09-06-PLAN.md — Wave 3: Gate enforcement hook in task PUT at line 172
 - [ ] 09-07-PLAN.md — Wave 3: Lifecycle tab (6 components) + project-tabs + project-view-router
 - [ ] 09-08-PLAN.md — Wave 3: PhaseBadge + GateBadge + task-board-panel injection

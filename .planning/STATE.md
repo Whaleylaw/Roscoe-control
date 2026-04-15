@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-04-PLAN.md (Wave 2c: /gsd/transition endpoint)"
-last_updated: "2026-04-15T02:52:29.991Z"
+stopped_at: "Completed 09-05-PLAN.md (Wave 2d: gate PATCH + task GET GSD fields)"
+last_updated: "2026-04-15T02:54:12.197Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 27
+  completed_plans: 28
 ---
 
 # Project State
@@ -73,6 +73,7 @@ Plan: 4 of 11
 | Phase 09-gsd-native-integration P00 | 6min | 2 tasks | 27 files |
 | Phase 09-gsd-native-integration P01 | 5min | 2 tasks | 6 files |
 | Phase 09-gsd-native-integration P04 | 7min | 1 tasks | 2 files |
+| Phase 09-gsd-native-integration P05 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,9 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-04: waiver is two-layer (Zod refine 400 for missing reason; route SQL 409 only gates execute→verify) — clients get fast ingress feedback and the D-29 rule stays scoped
 - [Phase 09-gsd-native-integration]: Plan 09-04: invalid project ID roundtrip check uses String(projectId) !== id.trim() (rejects '12abc') — same pattern established by Plan 05-01
 - [Phase 09-gsd-native-integration]: Plan 09-04: two pre-existing TS errors (gate.test.ts:146, gsd-templates.ts:64) logged to deferred-items.md — owned by parallel plans 09-05/09-03, out of scope for 09-04
+- [Phase 09-gsd-native-integration]: Plan 09-05 Pitfall 6 double-broadcast implemented — eventBus.broadcast('task.gate.changed') followed by eventBus.broadcast('task.updated') so existing task-board SSE listeners refresh without client changes
+- [Phase 09-gsd-native-integration]: Plan 09-05 read-path audit: all three task GET handlers (list, detail, project-scoped) already use SELECT t.* — migration 052 columns flow through automatically, zero SQL edits required. Added SELECT t.* lock assertions to guard against future refactors
+- [Phase 09-gsd-native-integration]: Plan 09-05 gate PATCH returns typed error codes: NO_GATE (400) when gate_required=0, TASK_NOT_FOUND (404) when missing — both include 'code' field in JSON body for client-side error switching
 
 ### Pending Todos
 
@@ -172,6 +176,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:52:19.360Z
-Stopped at: Completed 09-04-PLAN.md (Wave 2c: /gsd/transition endpoint)
+Last session: 2026-04-15T02:54:06.479Z
+Stopped at: Completed 09-05-PLAN.md (Wave 2d: gate PATCH + task GET GSD fields)
 Resume file: None
