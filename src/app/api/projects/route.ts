@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
+import { GSD_TRACKS, GSD_GATE_MODES } from '@/lib/validation'
 
 function slugify(input: string): string {
   return input
@@ -39,7 +40,9 @@ export async function GET(request: NextRequest) {
 
     const rows = db.prepare(`
       SELECT p.id, p.workspace_id, p.name, p.slug, p.description, p.ticket_prefix, p.ticket_counter, p.status,
-             p.github_repo, p.deadline, p.color, p.github_sync_enabled, p.github_labels_initialized, p.github_default_branch, p.created_at, p.updated_at,
+             p.github_repo, p.deadline, p.color,
+             p.gsd_enabled, p.gsd_track, p.gsd_phase, p.gsd_gate_mode, p.gsd_project_id, p.gsd_updated_at,
+             p.github_sync_enabled, p.github_labels_initialized, p.github_default_branch, p.created_at, p.updated_at,
              (SELECT COUNT(*) FROM tasks t2 WHERE t2.project_id = p.id) as task_count,
              (SELECT GROUP_CONCAT(paa.agent_name) FROM project_agent_assignments paa WHERE paa.project_id = p.id) as assigned_agents_csv,
              MAX(t.updated_at) * 1000 as last_activity_at
@@ -97,6 +100,21 @@ export async function POST(request: NextRequest) {
     const deadline = typeof body?.deadline === 'number' ? body.deadline : null
     const color = typeof body?.color === 'string' ? body.color.trim() || null : null
 
+    // Phase 09 GSD fields (GSD-01, GSD-13, GSD-14)
+    const gsdEnabled = body?.gsd_enabled ? 1 : 0
+    const gsdTrackRaw = typeof body?.gsd_track === 'string' ? body.gsd_track.trim() : null
+    const gsdTrack =
+      gsdTrackRaw && (GSD_TRACKS as readonly string[]).includes(gsdTrackRaw) ? gsdTrackRaw : null
+    if (gsdTrackRaw && !gsdTrack) {
+      return NextResponse.json({ error: 'Invalid gsd_track' }, { status: 400 })
+    }
+    const gsdGateModeRaw = typeof body?.gsd_gate_mode === 'string' ? body.gsd_gate_mode.trim() : 'manual_approval'
+    if (!(GSD_GATE_MODES as readonly string[]).includes(gsdGateModeRaw)) {
+      return NextResponse.json({ error: 'Invalid gsd_gate_mode' }, { status: 400 })
+    }
+    const gsdGateMode = gsdGateModeRaw
+    const gsdProjectId = typeof body?.gsd_project_id === 'string' ? (body.gsd_project_id.trim() || null) : null
+
     if (!name) return NextResponse.json({ error: 'Project name is required' }, { status: 400 })
 
     const slug = slugInput ? slugify(slugInput) : slugify(name)
@@ -114,13 +132,18 @@ export async function POST(request: NextRequest) {
     }
 
     const result = db.prepare(`
-      INSERT INTO projects (workspace_id, name, slug, description, ticket_prefix, github_repo, deadline, color, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', unixepoch(), unixepoch())
-    `).run(workspaceId, name, slug, description || null, ticketPrefix, githubRepo, deadline, color)
+      INSERT INTO projects (workspace_id, name, slug, description, ticket_prefix, github_repo, deadline, color,
+        gsd_enabled, gsd_track, gsd_gate_mode, gsd_project_id,
+        status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', unixepoch(), unixepoch())
+    `).run(workspaceId, name, slug, description || null, ticketPrefix, githubRepo, deadline, color,
+           gsdEnabled, gsdTrack, gsdGateMode, gsdProjectId)
 
     const project = db.prepare(`
       SELECT id, workspace_id, name, slug, description, ticket_prefix, ticket_counter, status,
-             github_repo, deadline, color, github_sync_enabled, github_labels_initialized, github_default_branch, created_at, updated_at
+             github_repo, deadline, color,
+             gsd_enabled, gsd_track, gsd_phase, gsd_gate_mode, gsd_project_id, gsd_updated_at,
+             github_sync_enabled, github_labels_initialized, github_default_branch, created_at, updated_at
       FROM projects
       WHERE id = ?
     `).get(Number(result.lastInsertRowid))

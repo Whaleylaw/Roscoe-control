@@ -7,6 +7,7 @@ import {
   ensureTenantWorkspaceAccess,
   ForbiddenError
 } from '@/lib/workspaces'
+import { GSD_TRACKS, GSD_GATE_MODES } from '@/lib/validation'
 
 function normalizePrefix(input: string): string {
   const normalized = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -51,7 +52,9 @@ export async function GET(
 
     const row = db.prepare(`
       SELECT p.id, p.workspace_id, p.name, p.slug, p.description, p.ticket_prefix, p.ticket_counter, p.status,
-             p.github_repo, p.deadline, p.color, p.github_sync_enabled, p.github_labels_initialized, p.github_default_branch, p.created_at, p.updated_at,
+             p.github_repo, p.deadline, p.color,
+             p.gsd_enabled, p.gsd_track, p.gsd_phase, p.gsd_gate_mode, p.gsd_project_id, p.gsd_updated_at,
+             p.github_sync_enabled, p.github_labels_initialized, p.github_default_branch, p.created_at, p.updated_at,
              (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) as task_count,
              (SELECT GROUP_CONCAT(paa.agent_name) FROM project_agent_assignments paa WHERE paa.project_id = p.id) as assigned_agents_csv
       FROM projects p
@@ -174,6 +177,34 @@ export async function PATCH(
       paramsList.push(body.github_labels_initialized ? 1 : 0)
     }
 
+    // Phase 09 GSD lifecycle (GSD-01, GSD-13, GSD-14)
+    if (body?.gsd_enabled !== undefined) {
+      updates.push('gsd_enabled = ?')
+      paramsList.push(body.gsd_enabled ? 1 : 0)
+    }
+    if (body?.gsd_track !== undefined) {
+      const v = body.gsd_track
+      if (v !== null && !(GSD_TRACKS as readonly string[]).includes(v)) {
+        return NextResponse.json({ error: 'Invalid gsd_track' }, { status: 400 })
+      }
+      updates.push('gsd_track = ?')
+      paramsList.push(v ?? null)
+    }
+    if (body?.gsd_gate_mode !== undefined) {
+      if (!(GSD_GATE_MODES as readonly string[]).includes(body.gsd_gate_mode)) {
+        return NextResponse.json({ error: 'Invalid gsd_gate_mode' }, { status: 400 })
+      }
+      updates.push('gsd_gate_mode = ?')
+      paramsList.push(body.gsd_gate_mode)
+    }
+    if (body?.gsd_project_id !== undefined) {
+      updates.push('gsd_project_id = ?')
+      paramsList.push(typeof body.gsd_project_id === 'string' ? (body.gsd_project_id.trim() || null) : null)
+    }
+    // NOTE: gsd_phase is intentionally NOT user-settable via PATCH.
+    // Phase transitions MUST flow through POST /api/projects/:id/gsd/transition so rules are enforced (D-24..28).
+    // gsd_updated_at is server-managed and only set by the transition endpoint.
+
     if (updates.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
     updates.push('updated_at = unixepoch()')
@@ -185,7 +216,9 @@ export async function PATCH(
 
     const project = db.prepare(`
       SELECT id, workspace_id, name, slug, description, ticket_prefix, ticket_counter, status,
-             github_repo, deadline, color, github_sync_enabled, github_labels_initialized, github_default_branch, created_at, updated_at
+             github_repo, deadline, color,
+             gsd_enabled, gsd_track, gsd_phase, gsd_gate_mode, gsd_project_id, gsd_updated_at,
+             github_sync_enabled, github_labels_initialized, github_default_branch, created_at, updated_at
       FROM projects
       WHERE id = ? AND workspace_id = ?
     `).get(projectId, workspaceId)
