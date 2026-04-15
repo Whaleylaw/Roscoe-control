@@ -67,11 +67,11 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 ### Lifecycle API
 
 - [ ] **GSD-07**: User can bootstrap default phase tasks via `POST /api/projects/:id/gsd/bootstrap` idempotently (re-run safe)
-- [ ] **GSD-08**: User can advance a project through phases via `POST /api/projects/:id/gsd/transition` with enforced ordering
-- [ ] **GSD-09**: Transition endpoint rejects illegal phase jumps with a machine-readable error code and actionable message
-- [ ] **GSD-10**: Transition endpoint supports a waiver flag on execute→verify (with required reason) for tasks that won't ship this cycle
+- [x] **GSD-08**: User can advance a project through phases via `POST /api/projects/:id/gsd/transition` with enforced ordering
+- [x] **GSD-09**: Transition endpoint rejects illegal phase jumps with a machine-readable error code and actionable message
+- [x] **GSD-10**: Transition endpoint supports a waiver flag on execute→verify (with required reason) for tasks that won't ship this cycle
 - [ ] **GSD-11**: User can approve or reject a task gate via `PATCH /api/tasks/:id/gate`, recording approver identity and timestamp
-- [ ] **GSD-12**: All three new endpoints require operator or admin role; viewers can read gate state but not mutate it
+- [x] **GSD-12**: All three new endpoints require operator or admin role; viewers can read gate state but not mutate it
 - [ ] **GSD-13**: Project and task read endpoints include the new GSD fields in their responses
 - [ ] **GSD-14**: Project create/update endpoints accept the new GSD fields with validation
 
@@ -177,11 +177,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-05 | Phase 9 | Complete |
 | GSD-06 | Phase 9 | Complete |
 | GSD-07 | Phase 9 | Pending |
-| GSD-08 | Phase 9 | Pending |
-| GSD-09 | Phase 9 | Pending |
-| GSD-10 | Phase 9 | Pending |
+| GSD-08 | Phase 9 | Complete |
+| GSD-09 | Phase 9 | Complete |
+| GSD-10 | Phase 9 | Complete |
 | GSD-11 | Phase 9 | Pending |
-| GSD-12 | Phase 9 | Pending |
+| GSD-12 | Phase 9 | Complete |
 | GSD-13 | Phase 9 | Pending |
 | GSD-14 | Phase 9 | Pending |
 | GSD-15 | Phase 9 | Pending |

@@ -212,6 +212,39 @@ export interface Task {
   completed_at?: number;
   tags?: string; // JSON string
   metadata?: string; // JSON string
+  // Phase 09 — GSD gate lifecycle (GSD-04, GSD-05)
+  gsd_phase?: 'discuss' | 'plan' | 'execute' | 'verify' | 'done' | null;
+  gate_required?: 0 | 1;
+  gate_status?: 'not_required' | 'pending' | 'approved' | 'rejected';
+  gate_approved_by?: string | null;
+  gate_approved_at?: number | null;
+  depends_on_task_ids?: string | null; // JSON string
+}
+
+export interface Project {
+  id: number;
+  workspace_id?: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  ticket_prefix: string;
+  ticket_counter?: number;
+  status: string;
+  github_repo?: string | null;
+  deadline?: number | null;
+  color?: string | null;
+  github_sync_enabled?: 0 | 1 | boolean;
+  github_labels_initialized?: 0 | 1 | boolean;
+  github_default_branch?: string | null;
+  created_at?: number;
+  updated_at?: number;
+  // Phase 09 — GSD lifecycle (GSD-01, GSD-02, GSD-03, GSD-13)
+  gsd_enabled?: 0 | 1;
+  gsd_track?: 'ops' | 'product' | 'marketing' | 'legal' | 'firmvault' | 'custom' | null;
+  gsd_phase?: 'discuss' | 'plan' | 'execute' | 'verify' | 'done';
+  gsd_gate_mode?: 'manual_approval' | 'auto_internal';
+  gsd_project_id?: string | null;
+  gsd_updated_at?: number | null;
 }
 
 export interface Agent {

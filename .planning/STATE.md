@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-01-PLAN.md (Wave 1: migration 052 + validation schemas + EventType union)"
-last_updated: "2026-04-15T02:45:39.868Z"
+stopped_at: "Completed 09-04-PLAN.md (Wave 2c: /gsd/transition endpoint)"
+last_updated: "2026-04-15T02:52:29.991Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 26
+  completed_plans: 27
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 3 of 11
+Plan: 4 of 11
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Plan: 3 of 11
 | Phase 08-projects-entry-point P05 | ~12min | 2 tasks | 12 files |
 | Phase 09-gsd-native-integration P00 | 6min | 2 tasks | 27 files |
 | Phase 09-gsd-native-integration P01 | 5min | 2 tasks | 6 files |
+| Phase 09-gsd-native-integration P04 | 7min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,10 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: GSD enum constants exported as 'as const' arrays so Zod schemas + downstream iteration share one source of truth (GSD_PHASES, GSD_TRACKS, GSD_GATE_MODES, GSD_GATE_STATUSES)
 - [Phase 09-gsd-native-integration]: transitionSchema uses .refine() with explicit path:['reason'] — 400 responses surface the violating field by name (matches existing validation contract)
 - [Phase 09-gsd-native-integration]: Locale parity test walks full en.json key tree against all 9 other locales (241 assertions) — fails loudly if any plan adds a project.lifecycle.* key without atomic 10-locale seed
+- [Phase 09-gsd-native-integration]: Plan 09-04: TDD flow used vi.mock dispatch by SQL regex (UPDATE vs COUNT vs SELECT) so a single prepare spy serves every branch — no per-test statement builder stubs needed
+- [Phase 09-gsd-native-integration]: Plan 09-04: waiver is two-layer (Zod refine 400 for missing reason; route SQL 409 only gates execute→verify) — clients get fast ingress feedback and the D-29 rule stays scoped
+- [Phase 09-gsd-native-integration]: Plan 09-04: invalid project ID roundtrip check uses String(projectId) !== id.trim() (rejects '12abc') — same pattern established by Plan 05-01
+- [Phase 09-gsd-native-integration]: Plan 09-04: two pre-existing TS errors (gate.test.ts:146, gsd-templates.ts:64) logged to deferred-items.md — owned by parallel plans 09-05/09-03, out of scope for 09-04
 
 ### Pending Todos
 
@@ -167,6 +172,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:45:30.102Z
-Stopped at: Completed 09-01-PLAN.md (Wave 1: migration 052 + validation schemas + EventType union)
+Last session: 2026-04-15T02:52:19.360Z
+Stopped at: Completed 09-04-PLAN.md (Wave 2c: /gsd/transition endpoint)
 Resume file: None
