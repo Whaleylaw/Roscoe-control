@@ -77,8 +77,8 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### Gate Enforcement
 
-- [ ] **GSD-15**: Tasks with `gate_required=1` and `gate_status!=approved` cannot move to `in_progress` or `done`; the API returns 403 with actionable error text
-- [ ] **GSD-16**: Gate enforcement applies only to forward motion (in_progress / done), not to backward motion or status changes to backlog/blocked/in_review
+- [x] **GSD-15**: Tasks with `gate_required=1` and `gate_status!=approved` cannot move to `in_progress` or `done`; the API returns 403 with actionable error text
+- [x] **GSD-16**: Gate enforcement applies only to forward motion (in_progress / done), not to backward motion or status changes to backlog/blocked/in_review
 
 ### Bootstrap Templates
 
@@ -184,8 +184,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-12 | Phase 9 | Complete |
 | GSD-13 | Phase 9 | Complete |
 | GSD-14 | Phase 9 | Complete |
-| GSD-15 | Phase 9 | Pending |
-| GSD-16 | Phase 9 | Pending |
+| GSD-15 | Phase 9 | Complete |
+| GSD-16 | Phase 9 | Complete |
 | GSD-17 | Phase 9 | Complete |
 | GSD-18 | Phase 9 | Complete |
 | GSD-19 | Phase 9 | Complete |

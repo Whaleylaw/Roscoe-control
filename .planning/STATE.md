@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-03-PLAN.md (Wave 2: bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate)"
-last_updated: "2026-04-15T02:55:28.762Z"
+stopped_at: "Completed 09-06-PLAN.md (Wave 3a: gate enforcement hook in PUT /api/tasks/:id)"
+last_updated: "2026-04-15T03:01:00.617Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 30
+  completed_plans: 31
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 6 of 11
+Plan: 7 of 11
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Plan: 6 of 11
 | Phase 09-gsd-native-integration P05 | 6min | 2 tasks | 3 files |
 | Phase 09-gsd-native-integration P02 | 7min | 2 tasks | 5 files |
 | Phase 09-gsd-native-integration P03 | 8min | 2 tasks | 4 files |
+| Phase 09-gsd-native-integration P06 | 6min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,9 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-03: GsdTemplate type = z.infer<typeof gsdTemplateSchema> (structural, mutable) — DEFAULT_TEMPLATE keeps 'as const' but is cast via 'as unknown as GsdTemplate' at return sites; avoids readonly-tuple leaking into the consumer contract
 - [Phase 09-gsd-native-integration]: Plan 09-03: eventBus.broadcast('task.created') called in post-TX loop, never inside db.transaction() — guarantees SSE listeners observe persisted rows; same pattern used for logActivity
 - [Phase 09-gsd-native-integration]: Plan 09-03: loadGsdTemplate NEVER throws — unknown track / missing file / malformed JSON / Zod-invalid shape all return DEFAULT_TEMPLATE with logger.warn (Pitfall 8); bootstrap is universally safe per D-16
+- [Phase 09-gsd-native-integration]: Plan 09-06: Gate-enforcement block placed as FIRST statement inside if(normalizedStatus!==undefined) — GATE_BLOCKED at line 184, Aegis at line 192 (gate precedes Aegis per Pitfall ordering intent)
+- [Phase 09-gsd-native-integration]: Plan 09-06: 403 body exposes {error, code:'GATE_BLOCKED', gate_status, gate_required} — single client-side switch on code handles both pending and rejected gate blocks (D-32 unified surface)
+- [Phase 09-gsd-native-integration]: Plan 09-06: D-31 backward-motion test trio uses ACTUAL schema statuses (backlog, review, awaiting_owner) — plan's 'blocked'/'in_review' don't exist in createTaskSchema enum; same semantic coverage
 
 ### Pending Todos
 
@@ -186,6 +190,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:55:14.859Z
-Stopped at: Completed 09-03-PLAN.md (Wave 2: bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate)
+Last session: 2026-04-15T03:00:53.985Z
+Stopped at: Completed 09-06-PLAN.md (Wave 3a: gate enforcement hook in PUT /api/tasks/:id)
 Resume file: None
