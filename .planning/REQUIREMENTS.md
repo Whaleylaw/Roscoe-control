@@ -58,11 +58,11 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 ### Schema & Data Model
 
 - [ ] **GSD-01**: Projects can be flagged `gsd_enabled` and assigned a `gsd_track` (ops / product / marketing / legal / firmvault / custom) at create or update time
-- [ ] **GSD-02**: Projects track current phase via `gsd_phase` (discuss / plan / execute / verify / done) with backward-compatible default
-- [ ] **GSD-03**: Projects track approval policy via `gsd_gate_mode` (manual_approval / auto_internal)
-- [ ] **GSD-04**: Tasks track `gsd_phase` and `gate_required` flag to participate in the lifecycle
-- [ ] **GSD-05**: Tasks track gate state via `gate_status` (not_required / pending / approved / rejected) with `gate_approved_by` and `gate_approved_at` audit fields
-- [ ] **GSD-06**: Database migrations are additive and safe to run on existing production DBs
+- [x] **GSD-02**: Projects track current phase via `gsd_phase` (discuss / plan / execute / verify / done) with backward-compatible default
+- [x] **GSD-03**: Projects track approval policy via `gsd_gate_mode` (manual_approval / auto_internal)
+- [x] **GSD-04**: Tasks track `gsd_phase` and `gate_required` flag to participate in the lifecycle
+- [x] **GSD-05**: Tasks track gate state via `gate_status` (not_required / pending / approved / rejected) with `gate_approved_by` and `gate_approved_at` audit fields
+- [x] **GSD-06**: Database migrations are additive and safe to run on existing production DBs
 
 ### Lifecycle API
 
@@ -105,7 +105,7 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### Events & i18n
 
-- [ ] **GSD-28**: Transitions and gate-status changes emit events via the existing `eventBus` (`project.gsd.transition`, `task.gate.changed`); existing `/api/activities` stream surfaces them automatically
+- [x] **GSD-28**: Transitions and gate-status changes emit events via the existing `eventBus` (`project.gsd.transition`, `task.gate.changed`); existing `/api/activities` stream surfaces them automatically
 - [x] **GSD-29**: All new user-facing strings go through next-intl under a `project.lifecycle.*` namespace with atomic coverage across all 10 locales
 
 ## v2 Requirements
@@ -171,11 +171,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETT-02 | Phase 6 | Complete |
 | SETT-03 | Phase 6 | Complete |
 | GSD-01 | Phase 9 | Pending |
-| GSD-02 | Phase 9 | Pending |
-| GSD-03 | Phase 9 | Pending |
-| GSD-04 | Phase 9 | Pending |
-| GSD-05 | Phase 9 | Pending |
-| GSD-06 | Phase 9 | Pending |
+| GSD-02 | Phase 9 | Complete |
+| GSD-03 | Phase 9 | Complete |
+| GSD-04 | Phase 9 | Complete |
+| GSD-05 | Phase 9 | Complete |
+| GSD-06 | Phase 9 | Complete |
 | GSD-07 | Phase 9 | Pending |
 | GSD-08 | Phase 9 | Pending |
 | GSD-09 | Phase 9 | Pending |
@@ -197,7 +197,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-25 | Phase 9 | Pending |
 | GSD-26 | Phase 9 | Pending |
 | GSD-27 | Phase 9 | Pending |
-| GSD-28 | Phase 9 | Pending |
+| GSD-28 | Phase 9 | Complete |
 | GSD-29 | Phase 9 | Complete |
 
 **Coverage:**

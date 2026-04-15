@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: Completed 09-00-PLAN.md (Wave 0 scaffolds + atomic 10-locale i18n seed)
-last_updated: "2026-04-15T02:38:19.166Z"
+stopped_at: "Completed 09-01-PLAN.md (Wave 1: migration 052 + validation schemas + EventType union)"
+last_updated: "2026-04-15T02:45:39.868Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 25
+  completed_plans: 26
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Plan: 2 of 11
 | Phase 08-projects-entry-point P04 | 8min | 1 tasks | 12 files |
 | Phase 08-projects-entry-point P05 | ~12min | 2 tasks | 12 files |
 | Phase 09-gsd-native-integration P00 | 6min | 2 tasks | 27 files |
+| Phase 09-gsd-native-integration P01 | 5min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,10 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: English-fallback policy for all 10 locales per D-37/D-38 — phase/track/gate-mode names remain literal English; ICU placeholders ({next},{toPhase},{reason},{remedy},{serverError}) preserved verbatim
 - [Phase 09-gsd-native-integration]: Top-of-file block comment in every scaffold enumerates covered GSD-IDs — downstream plans can locate test homes by requirement number
 - [Phase 09-gsd-native-integration]: Established src/components/project/lifecycle/__tests__/ and src/components/panels/task-card/__tests__/ as canonical unit-test directories for Wave 3 UI components
+- [Phase 09-gsd-native-integration]: Migration 052 inserted at line 1441 with PRAGMA-guarded ALTER TABLE statements — pre-existing DBs upgrade safely; re-run is no-op (matches 028_github_sync_v2 idempotency pattern)
+- [Phase 09-gsd-native-integration]: GSD enum constants exported as 'as const' arrays so Zod schemas + downstream iteration share one source of truth (GSD_PHASES, GSD_TRACKS, GSD_GATE_MODES, GSD_GATE_STATUSES)
+- [Phase 09-gsd-native-integration]: transitionSchema uses .refine() with explicit path:['reason'] — 400 responses surface the violating field by name (matches existing validation contract)
+- [Phase 09-gsd-native-integration]: Locale parity test walks full en.json key tree against all 9 other locales (241 assertions) — fails loudly if any plan adds a project.lifecycle.* key without atomic 10-locale seed
 
 ### Pending Todos
 
@@ -162,6 +167,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:38:19.164Z
-Stopped at: Completed 09-00-PLAN.md (Wave 0 scaffolds + atomic 10-locale i18n seed)
+Last session: 2026-04-15T02:45:30.102Z
+Stopped at: Completed 09-01-PLAN.md (Wave 1: migration 052 + validation schemas + EventType union)
 Resume file: None
