@@ -51,6 +51,63 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **FOUN-03**: Component directory structure prevents monolithic panel anti-pattern
 - [x] **FOUN-04**: All user-facing strings use next-intl message files
 
+## v1.1 Requirements — Native GSD Integration
+
+Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
+
+### Schema & Data Model
+
+- [ ] **GSD-01**: Projects can be flagged `gsd_enabled` and assigned a `gsd_track` (ops / product / marketing / legal / firmvault / custom) at create or update time
+- [ ] **GSD-02**: Projects track current phase via `gsd_phase` (discuss / plan / execute / verify / done) with backward-compatible default
+- [ ] **GSD-03**: Projects track approval policy via `gsd_gate_mode` (manual_approval / auto_internal)
+- [ ] **GSD-04**: Tasks track `gsd_phase` and `gate_required` flag to participate in the lifecycle
+- [ ] **GSD-05**: Tasks track gate state via `gate_status` (not_required / pending / approved / rejected) with `gate_approved_by` and `gate_approved_at` audit fields
+- [ ] **GSD-06**: Database migrations are additive and safe to run on existing production DBs
+
+### Lifecycle API
+
+- [ ] **GSD-07**: User can bootstrap default phase tasks via `POST /api/projects/:id/gsd/bootstrap` idempotently (re-run safe)
+- [ ] **GSD-08**: User can advance a project through phases via `POST /api/projects/:id/gsd/transition` with enforced ordering
+- [ ] **GSD-09**: Transition endpoint rejects illegal phase jumps with a machine-readable error code and actionable message
+- [ ] **GSD-10**: Transition endpoint supports a waiver flag on execute→verify (with required reason) for tasks that won't ship this cycle
+- [ ] **GSD-11**: User can approve or reject a task gate via `PATCH /api/tasks/:id/gate`, recording approver identity and timestamp
+- [ ] **GSD-12**: All three new endpoints require operator or admin role; viewers can read gate state but not mutate it
+- [ ] **GSD-13**: Project and task read endpoints include the new GSD fields in their responses
+- [ ] **GSD-14**: Project create/update endpoints accept the new GSD fields with validation
+
+### Gate Enforcement
+
+- [ ] **GSD-15**: Tasks with `gate_required=1` and `gate_status!=approved` cannot move to `in_progress` or `done`; the API returns 403 with actionable error text
+- [ ] **GSD-16**: Gate enforcement applies only to forward motion (in_progress / done), not to backward motion or status changes to backlog/blocked/in_review
+
+### Bootstrap Templates
+
+- [ ] **GSD-17**: Bootstrap loads phase task templates from external JSON files at `<MISSION_CONTROL_DATA_DIR>/gsd-templates/<track>.json` (or `default.json`)
+- [ ] **GSD-18**: Bootstrap falls back to a bundled hard-coded default if no template file exists on disk — bootstrap always succeeds
+- [ ] **GSD-19**: Bootstrap is idempotent per phase: re-runs skip tasks whose `ticket_ref` + `gsd_phase` combination already exists on the project
+
+### UI — Lifecycle Tab
+
+- [ ] **GSD-20**: Project workspace exposes a dedicated "Lifecycle" tab at `/[slug]/lifecycle` alongside Dashboard / Tasks / Sessions / Agents / Settings
+- [ ] **GSD-21**: Lifecycle tab shows current phase, phase timeline, bootstrap button, and transition controls for GSD-enabled projects
+- [ ] **GSD-22**: Lifecycle tab shows gate-required tasks with inline approve/reject actions (operator+ only)
+- [ ] **GSD-23**: For non-GSD projects, Lifecycle tab renders an empty state with an "Enable GSD for this project" CTA
+
+### UI — Task Board Integration
+
+- [ ] **GSD-24**: Task board (global and project-scoped) displays phase badges on tasks with non-null `gsd_phase`
+- [ ] **GSD-25**: Gate-required tasks display a distinct "Approval required" badge; approved gates show "Approved"
+
+### UI — Settings
+
+- [ ] **GSD-26**: Project settings view includes a GSD section with `gsd_enabled` toggle, `gsd_track` dropdown, and `gsd_gate_mode` selector
+- [ ] **GSD-27**: GSD section is always visible; track and gate-mode controls are disabled/grayed until `gsd_enabled=1`
+
+### Events & i18n
+
+- [ ] **GSD-28**: Transitions and gate-status changes emit events via the existing `eventBus` (`project.gsd.transition`, `task.gate.changed`); existing `/api/activities` stream surfaces them automatically
+- [ ] **GSD-29**: All new user-facing strings go through next-intl under a `project.lifecycle.*` namespace with atomic coverage across all 10 locales
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -113,12 +170,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETT-01 | Phase 6 | Complete |
 | SETT-02 | Phase 6 | Complete |
 | SETT-03 | Phase 6 | Complete |
+| GSD-01 | Phase 9 | Pending |
+| GSD-02 | Phase 9 | Pending |
+| GSD-03 | Phase 9 | Pending |
+| GSD-04 | Phase 9 | Pending |
+| GSD-05 | Phase 9 | Pending |
+| GSD-06 | Phase 9 | Pending |
+| GSD-07 | Phase 9 | Pending |
+| GSD-08 | Phase 9 | Pending |
+| GSD-09 | Phase 9 | Pending |
+| GSD-10 | Phase 9 | Pending |
+| GSD-11 | Phase 9 | Pending |
+| GSD-12 | Phase 9 | Pending |
+| GSD-13 | Phase 9 | Pending |
+| GSD-14 | Phase 9 | Pending |
+| GSD-15 | Phase 9 | Pending |
+| GSD-16 | Phase 9 | Pending |
+| GSD-17 | Phase 9 | Pending |
+| GSD-18 | Phase 9 | Pending |
+| GSD-19 | Phase 9 | Pending |
+| GSD-20 | Phase 9 | Pending |
+| GSD-21 | Phase 9 | Pending |
+| GSD-22 | Phase 9 | Pending |
+| GSD-23 | Phase 9 | Pending |
+| GSD-24 | Phase 9 | Pending |
+| GSD-25 | Phase 9 | Pending |
+| GSD-26 | Phase 9 | Pending |
+| GSD-27 | Phase 9 | Pending |
+| GSD-28 | Phase 9 | Pending |
+| GSD-29 | Phase 9 | Pending |
 
 **Coverage:**
-- v1 requirements: 26 total
-- Mapped to phases: 26
-- Unmapped: 0 ✓
+- v1 requirements: 26 total, mapped 26 / unmapped 0 ✓
+- v1.1 requirements: 29 total, mapped 29 / unmapped 0 ✓
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-13 after roadmap creation*
+*Last updated: 2026-04-14 — v1.1 Native GSD Integration requirements added (29 new REQ-IDs: GSD-01..29)*

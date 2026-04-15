@@ -2,7 +2,12 @@
 
 ## Overview
 
-Transform projects from a task-grouping label into a first-class destination. The build starts with technical foundations (URL routing, DB indexes, component structure), then constructs the navigation shell that lets users enter a project workspace, followed by the dashboard that makes the core value real. The final phases layer in scoped task management, session and agent views, and project settings — completing the full workspace experience.
+Transform projects from a task-grouping label into a first-class destination. v1.0 built the workspace itself — foundations, navigation shell, dashboard, scoped tasks/sessions/agents, settings, and entry points. v1.1 layers native GSD lifecycle support onto that workspace so every project can be tracked through Discuss → Plan → Execute → Verify → Done phases directly inside Mission Control.
+
+## Milestones
+
+**v1.0 — Project Workspace & Dashboard** (Phases 1–8): ✓ Complete
+**v1.1 — Native GSD Integration** (Phase 9): In progress — context captured, plan next
 
 ## Phases
 
@@ -12,14 +17,18 @@ Transform projects from a task-grouping label into a first-class destination. Th
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Technical underpinnings: URL-driven state, DB indexes, component structure, i18n
-- [ ] **Phase 2: Navigation & Workspace Shell** - Full-takeover workspace entry point with breadcrumb navigation and sub-view routing
+### v1.0 — Project Workspace & Dashboard
+- [x] **Phase 1: Foundation** - Technical underpinnings: URL-driven state, DB indexes, component structure, i18n
+- [x] **Phase 2: Navigation & Workspace Shell** - Full-takeover workspace entry point with breadcrumb navigation and sub-view routing
 - [x] **Phase 3: Project Dashboard** - Dashboard with status overview, progress, project brief, activity feed, and real-time updates (completed 2026-04-13)
-- [ ] **Phase 4: Project Tasks** - Scoped task list with create, reassign, and full board functionality within the workspace
-- [ ] **Phase 5: Sessions & Agents** - Scoped session and agent views with detail access from within the project context
-- [ ] **Phase 6: Settings** - Project settings panel for name, description, status, color, prefix, deadline, and GitHub repo
-- [ ] **Phase 7: Post-Audit Gap Closure** - Resolve FLOW-E archive visibility decision + project-context loading-timeout escape hatch
-- [ ] **Phase 8: Projects Entry Point** - Wire the main-UI path INTO the project workspace (nav-rail item, projects list panel, deep-link from existing project pickers) — closes real-world NAV-01 gap
+- [x] **Phase 4: Project Tasks** - Scoped task list with create, reassign, and full board functionality within the workspace
+- [x] **Phase 5: Sessions & Agents** - Scoped session and agent views with detail access from within the project context
+- [x] **Phase 6: Settings** - Project settings panel for name, description, status, color, prefix, deadline, and GitHub repo
+- [x] **Phase 7: Post-Audit Gap Closure** - Resolve FLOW-E archive visibility decision + project-context loading-timeout escape hatch
+- [x] **Phase 8: Projects Entry Point** - Wire the main-UI path INTO the project workspace (nav-rail item, projects list panel, deep-link from existing project pickers) — closes real-world NAV-01 gap
+
+### v1.1 — Native GSD Integration
+- [ ] **Phase 9: GSD Native Integration** - First-class lifecycle tracking inside MC: schema extensions, three new APIs (bootstrap / transition / gate), gate-required task enforcement, dedicated Lifecycle tab + task-board phase badges, external JSON template system
 
 ## Phase Details
 
@@ -155,21 +164,46 @@ Plans:
 - [x] 08-02-PLAN.md — Breadcrumb re-target to /projects + "↗ Open workspace" picker button on task-board filter + unit tests
 - [x] 08-03-PLAN.md — Playwright E2E covering the NAV-01 cold-start journey
 - [x] 08-04-PLAN.md — Gap closure: header "New project" CTA on ProjectsPanel + atomic 10-locale i18n + test coverage (UAT Gap 1)
-- [ ] 08-05-PLAN.md — Gap closure: upgrade create-project modal with github_repo/deadline/color + init-labels chain + graceful failure + new test suite (UAT Gap 2)
+- [x] 08-05-PLAN.md — Gap closure: upgrade create-project modal with github_repo/deadline/color + init-labels chain + graceful failure + new test suite (UAT Gap 2)
+**UI hint**: yes
+
+### Phase 9: GSD Native Integration  *(v1.1)*
+**Goal**: Build first-class GSD lifecycle (Discuss → Plan → Execute → Verify → Done) into Mission Control so projects can be tracked through phases, bootstrap default task packs, and enforce gate approval on critical tasks — all without reaching for the CLI
+**Depends on**: Phase 8 (project workspace shell, settings view, task board — all v1.0 foundations used by the Lifecycle tab and phase badges)
+**Requirements**: GSD-01..29 (29 requirements — schema, API, gate enforcement, templates, Lifecycle tab, task-board badges, settings section, events, i18n)
+**Canonical refs**:
+  - `.planning/phases/09-gsd-native-integration/09-CONTEXT.md` — 38 locked decisions (D-01..38)
+  - `.planning/phases/09-gsd-native-integration/09-00-PLAN.md` — narrative spec (schema, endpoints, transition rules, templates)
+  - `.planning/phases/09-gsd-native-integration/09-02-COMMIT-SEQUENCE.md` — proposed commit ordering (informational)
+**Success Criteria** (what must be TRUE):
+  1. A new GSD-enabled project can be created with `gsd_enabled=1`, `gsd_track` set, and appear on GET with all GSD fields populated
+  2. `POST /api/projects/:id/gsd/bootstrap` creates the default phase tasks exactly once (idempotent) and is sourced from external JSON templates at `$DATA_DIR/gsd-templates/` with a bundled fallback if no file exists
+  3. `POST /api/projects/:id/gsd/transition` enforces lifecycle ordering (discuss → plan → execute → verify → done) and rejects illegal jumps with HTTP 409 and machine-readable error code
+  4. `PATCH /api/tasks/:id/gate` flips gate_status to approved or rejected and records approver + timestamp; gate-required tasks with status != approved cannot move to in_progress/done (403)
+  5. All three endpoints enforce operator+admin role via existing `requireRole`; viewers can read but not mutate gate state
+  6. Project workspace renders a dedicated "Lifecycle" tab at `/[slug]/lifecycle` with current-phase callout, phase timeline, bootstrap button, transition controls, and gate approval list; non-GSD projects see an empty state with "Enable GSD" CTA
+  7. Task board (global and project-scoped) renders per-task phase badges when `gsd_phase` is set; gate-required tasks show an "Approval required" badge
+  8. Project settings view includes a GSD section with `gsd_enabled` toggle, `gsd_track` dropdown, and `gsd_gate_mode` selector; track and gate-mode controls disabled until GSD enabled
+  9. Transitions and gate changes emit events via existing `eventBus`; `/api/activities` stream surfaces them automatically
+  10. All new user-facing strings live under `project.lifecycle.*` with atomic coverage across all 10 locales
+  11. Migration is additive and runs cleanly on existing production DBs; non-GSD projects behave identically to v1.0
+  12. Test suite covers: project CRUD with GSD fields, bootstrap idempotency, illegal transition rejection, gate-block on task status, gate-approval unblocks, role enforcement on new endpoints
+**Plans:** TBD (created via `/gsd:plan-phase 09`)
 **UI hint**: yes
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/3 | Planning complete | - |
-| 2. Navigation & Workspace Shell | 0/2 | Planning complete | - |
-| 3. Project Dashboard | 3/3 | Complete   | 2026-04-13 |
-| 4. Project Tasks | 0/2 | Planning complete | - |
-| 5. Sessions & Agents | 0/4 | Planning complete | - |
-| 6. Settings | 0/2 | Planning complete | - |
-| 7. Post-Audit Gap Closure | 0/2 | Planning complete | - |
-| 8. Projects Entry Point | 4/6 | Gap closure planning complete | - |
+| 1. Foundation | 3/3 | Complete | 2026-04-13 |
+| 2. Navigation & Workspace Shell | 2/2 | Complete | 2026-04-13 |
+| 3. Project Dashboard | 3/3 | Complete | 2026-04-13 |
+| 4. Project Tasks | 2/2 | Complete | 2026-04-13 |
+| 5. Sessions & Agents | 4/4 | Complete | 2026-04-13 |
+| 6. Settings | 2/2 | Complete | 2026-04-14 |
+| 7. Post-Audit Gap Closure | 2/2 | Complete | 2026-04-14 |
+| 8. Projects Entry Point | 6/6 | Complete | 2026-04-14 |
+| 9. GSD Native Integration *(v1.1)* | — | Context captured, plans next | - |
