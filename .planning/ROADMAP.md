@@ -173,8 +173,8 @@ Plans:
 **Requirements**: GSD-01..29 (29 requirements — schema, API, gate enforcement, templates, Lifecycle tab, task-board badges, settings section, events, i18n)
 **Canonical refs**:
   - `.planning/phases/09-gsd-native-integration/09-CONTEXT.md` — 38 locked decisions (D-01..38)
-  - `.planning/phases/09-gsd-native-integration/09-00-PLAN.md` — narrative spec (schema, endpoints, transition rules, templates)
-  - `.planning/phases/09-gsd-native-integration/09-02-COMMIT-SEQUENCE.md` — proposed commit ordering (informational)
+  - `.planning/phases/09-gsd-native-integration/09-00-SPEC.md` — narrative spec (schema, endpoints, transition rules, templates)
+  - `.planning/phases/09-gsd-native-integration/09-02-COMMIT-SEQUENCE-SPEC.md` — proposed commit ordering (informational)
 **Success Criteria** (what must be TRUE):
   1. A new GSD-enabled project can be created with `gsd_enabled=1`, `gsd_track` set, and appear on GET with all GSD fields populated
   2. `POST /api/projects/:id/gsd/bootstrap` creates the default phase tasks exactly once (idempotent) and is sourced from external JSON templates at `$DATA_DIR/gsd-templates/` with a bundled fallback if no file exists

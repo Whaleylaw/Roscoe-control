@@ -100,9 +100,9 @@ Build first-class GSD lifecycle support directly into Mission Control so every p
 ## Canonical References
 
 ### Phase-local specs (authoritative for scope)
-- `.planning/phases/09-gsd-native-integration/09-00-PLAN.md` — hand-authored narrative plan covering schema, endpoints, transition rules, default templates, UI goals, and acceptance criteria
-- `.planning/phases/09-gsd-native-integration/09-01-CLAUDE-CODE-PROMPT.md` — execution constraints (backward compat, test coverage, auth preservation)
-- `.planning/phases/09-gsd-native-integration/09-02-COMMIT-SEQUENCE.md` — proposed 10-commit sequence (informational, not binding on task decomposition)
+- `.planning/phases/09-gsd-native-integration/09-00-SPEC.md` — hand-authored narrative spec covering schema, endpoints, transition rules, default templates, UI goals, and acceptance criteria
+- `.planning/phases/09-gsd-native-integration/09-01-EXEC-PROMPT-SPEC.md` — execution constraints (backward compat, test coverage, auth preservation)
+- `.planning/phases/09-gsd-native-integration/09-02-COMMIT-SEQUENCE-SPEC.md` — proposed 10-commit sequence (informational, not binding on task decomposition)
 
 ### Project-level context
 - `.planning/PROJECT.md` — Mission Control vision, core value, stack constraints (Next.js 16, React 19, SQLite, no ORM, no icon libraries, pnpm only)
