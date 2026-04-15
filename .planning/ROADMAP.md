@@ -188,7 +188,19 @@ Plans:
   10. All new user-facing strings live under `project.lifecycle.*` with atomic coverage across all 10 locales
   11. Migration is additive and runs cleanly on existing production DBs; non-GSD projects behave identically to v1.0
   12. Test suite covers: project CRUD with GSD fields, bootstrap idempotency, illegal transition rejection, gate-block on task status, gate-approval unblocks, role enforcement on new endpoints
-**Plans:** TBD (created via `/gsd:plan-phase 09`)
+**Plans:** 11 plans
+Plans:
+- [ ] 09-00-PLAN.md — Wave 0: 17 test scaffolds + atomic 10-locale i18n seed (project.lifecycle.*)
+- [ ] 09-01-PLAN.md — Wave 1: Migration 052 + Zod schemas + EventType union
+- [ ] 09-02-PLAN.md — Wave 2: Projects API GET/POST/PATCH extensions + Project/Task type plumbing
+- [ ] 09-03-PLAN.md — Wave 2: Bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate
+- [ ] 09-04-PLAN.md — Wave 2: Transition endpoint with 4 rules + waiver + illegal-jump
+- [ ] 09-05-PLAN.md — Wave 2: Gate PATCH endpoint + task GET field audit
+- [ ] 09-06-PLAN.md — Wave 3: Gate enforcement hook in task PUT at line 172
+- [ ] 09-07-PLAN.md — Wave 3: Lifecycle tab (6 components) + project-tabs + project-view-router
+- [ ] 09-08-PLAN.md — Wave 3: PhaseBadge + GateBadge + task-board-panel injection
+- [ ] 09-09-PLAN.md — Wave 3: Settings view GSD section
+- [ ] 09-10-PLAN.md — Wave 4: Playwright E2E + /api/index docs + test:all green
 **UI hint**: yes
 
 ## Progress
