@@ -6,12 +6,12 @@ import { NextRequest } from 'next/server'
 // operator users, stamps approver + timestamp, broadcasts events.
 
 // --- auth mock (role-aware) --------------------------------------------------
-const requireRoleMock = vi.fn((_req: unknown, requiredRole: string) => {
-  // Default returns operator; individual tests override for the viewer 403 case.
-  return {
-    user: { id: 10, username: 'opuser', role: 'operator', workspace_id: 1, tenant_id: 1 },
-  }
-})
+type AuthResult =
+  | { user: { id: number; username: string; role: string; workspace_id: number; tenant_id: number } }
+  | { error: string; status: number }
+const requireRoleMock = vi.fn<(req: unknown, role: string) => AuthResult>(() => ({
+  user: { id: 10, username: 'opuser', role: 'operator', workspace_id: 1, tenant_id: 1 },
+}))
 
 // --- validation mock ---------------------------------------------------------
 const validateBodyMock = vi.fn(async (req: Request) => {
@@ -137,13 +137,13 @@ describe('PATCH /api/tasks/:id/gate (GSD-05, GSD-11, GSD-12, GSD-28)', () => {
     vi.clearAllMocks()
     for (const k of Object.keys(taskFixtures)) delete taskFixtures[Number(k)]
     // Default role: operator. Tests override for viewer case.
-    requireRoleMock.mockImplementation(() => ({
+    requireRoleMock.mockImplementation((): AuthResult => ({
       user: { id: 10, username: 'opuser', role: 'operator', workspace_id: 1, tenant_id: 1 },
     }))
   })
 
   it('viewer role gets 403', async () => {
-    requireRoleMock.mockImplementationOnce(() => ({
+    requireRoleMock.mockImplementationOnce((): AuthResult => ({
       error: 'Forbidden',
       status: 403,
     }))
