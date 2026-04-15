@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-02-PLAN.md (Wave 2: Project API GSD CRUD + type plumbing)"
-last_updated: "2026-04-15T02:54:42.137Z"
+stopped_at: "Completed 09-03-PLAN.md (Wave 2: bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate)"
+last_updated: "2026-04-15T02:55:28.762Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 29
+  completed_plans: 30
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 5 of 11
+Plan: 6 of 11
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Plan: 5 of 11
 | Phase 09-gsd-native-integration P04 | 7min | 1 tasks | 2 files |
 | Phase 09-gsd-native-integration P05 | 6min | 2 tasks | 3 files |
 | Phase 09-gsd-native-integration P02 | 7min | 2 tasks | 5 files |
+| Phase 09-gsd-native-integration P03 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,10 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-02 PATCH silently drops gsd_phase (no 400) — tested explicitly: body {gsd_phase:'execute', gsd_enabled:true} applies gsd_enabled while leaving phase unchanged; matches D-24..28 'transitions flow through dedicated endpoint' contract
 - [Phase 09-gsd-native-integration]: Plan 09-02 PATCH accepts null on gsd_track as valid clear-the-track signal; enum validation only runs when value is non-null — test covers both paths
 - [Phase 09-gsd-native-integration]: Plan 09-02 test harness uses mutable Map<id, Row> + SQL-string capture + role-switchable requireRole mock — established as reference pattern for Wave 2+ CRUD tests on projects/tasks routes
+- [Phase 09-gsd-native-integration]: Plan 09-03: Idempotency key is (project_id, workspace_id, gsd_phase, json_extract metadata $.gsd_ticket_ref) — re-bootstrap on same project is a no-op
+- [Phase 09-gsd-native-integration]: Plan 09-03: GsdTemplate type = z.infer<typeof gsdTemplateSchema> (structural, mutable) — DEFAULT_TEMPLATE keeps 'as const' but is cast via 'as unknown as GsdTemplate' at return sites; avoids readonly-tuple leaking into the consumer contract
+- [Phase 09-gsd-native-integration]: Plan 09-03: eventBus.broadcast('task.created') called in post-TX loop, never inside db.transaction() — guarantees SSE listeners observe persisted rows; same pattern used for logActivity
+- [Phase 09-gsd-native-integration]: Plan 09-03: loadGsdTemplate NEVER throws — unknown track / missing file / malformed JSON / Zod-invalid shape all return DEFAULT_TEMPLATE with logger.warn (Pitfall 8); bootstrap is universally safe per D-16
 
 ### Pending Todos
 
@@ -181,6 +186,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:54:30.230Z
-Stopped at: Completed 09-02-PLAN.md (Wave 2: Project API GSD CRUD + type plumbing)
+Last session: 2026-04-15T02:55:14.859Z
+Stopped at: Completed 09-03-PLAN.md (Wave 2: bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate)
 Resume file: None

@@ -66,7 +66,7 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### Lifecycle API
 
-- [ ] **GSD-07**: User can bootstrap default phase tasks via `POST /api/projects/:id/gsd/bootstrap` idempotently (re-run safe)
+- [x] **GSD-07**: User can bootstrap default phase tasks via `POST /api/projects/:id/gsd/bootstrap` idempotently (re-run safe)
 - [x] **GSD-08**: User can advance a project through phases via `POST /api/projects/:id/gsd/transition` with enforced ordering
 - [x] **GSD-09**: Transition endpoint rejects illegal phase jumps with a machine-readable error code and actionable message
 - [x] **GSD-10**: Transition endpoint supports a waiver flag on execute→verify (with required reason) for tasks that won't ship this cycle
@@ -82,9 +82,9 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### Bootstrap Templates
 
-- [ ] **GSD-17**: Bootstrap loads phase task templates from external JSON files at `<MISSION_CONTROL_DATA_DIR>/gsd-templates/<track>.json` (or `default.json`)
-- [ ] **GSD-18**: Bootstrap falls back to a bundled hard-coded default if no template file exists on disk — bootstrap always succeeds
-- [ ] **GSD-19**: Bootstrap is idempotent per phase: re-runs skip tasks whose `ticket_ref` + `gsd_phase` combination already exists on the project
+- [x] **GSD-17**: Bootstrap loads phase task templates from external JSON files at `<MISSION_CONTROL_DATA_DIR>/gsd-templates/<track>.json` (or `default.json`)
+- [x] **GSD-18**: Bootstrap falls back to a bundled hard-coded default if no template file exists on disk — bootstrap always succeeds
+- [x] **GSD-19**: Bootstrap is idempotent per phase: re-runs skip tasks whose `ticket_ref` + `gsd_phase` combination already exists on the project
 
 ### UI — Lifecycle Tab
 
@@ -176,7 +176,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-04 | Phase 9 | Complete |
 | GSD-05 | Phase 9 | Complete |
 | GSD-06 | Phase 9 | Complete |
-| GSD-07 | Phase 9 | Pending |
+| GSD-07 | Phase 9 | Complete |
 | GSD-08 | Phase 9 | Complete |
 | GSD-09 | Phase 9 | Complete |
 | GSD-10 | Phase 9 | Complete |
@@ -186,9 +186,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-14 | Phase 9 | Complete |
 | GSD-15 | Phase 9 | Pending |
 | GSD-16 | Phase 9 | Pending |
-| GSD-17 | Phase 9 | Pending |
-| GSD-18 | Phase 9 | Pending |
-| GSD-19 | Phase 9 | Pending |
+| GSD-17 | Phase 9 | Complete |
+| GSD-18 | Phase 9 | Complete |
+| GSD-19 | Phase 9 | Complete |
 | GSD-20 | Phase 9 | Pending |
 | GSD-21 | Phase 9 | Pending |
 | GSD-22 | Phase 9 | Pending |
