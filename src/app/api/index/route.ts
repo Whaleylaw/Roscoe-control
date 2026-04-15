@@ -17,6 +17,7 @@ const endpoints: Endpoint[] = [
   { path: '/api/tasks/:id', methods: ['GET', 'PATCH', 'DELETE'], description: 'Task detail — read, update, delete', tag: 'Tasks', auth: 'viewer/operator/admin' },
   { path: '/api/tasks/:id/comments', methods: ['GET', 'POST'], description: 'Task comments — list, add', tag: 'Tasks', auth: 'viewer/operator' },
   { path: '/api/tasks/:id/broadcast', methods: ['POST'], description: 'Broadcast task update via SSE', tag: 'Tasks', auth: 'operator' },
+  { path: '/api/tasks/:id/gate', methods: ['PATCH'], description: 'Phase 09 — Approve or reject a gate-required task. Body: { gate_status: approved|rejected, note? }. Records approver identity + timestamp. Emits task.gate.changed + task.updated events.', tag: 'Tasks', auth: 'operator' },
   { path: '/api/tasks/queue', methods: ['GET'], description: 'Task queue — next assignable tasks', tag: 'Tasks', auth: 'viewer' },
   { path: '/api/tasks/outcomes', methods: ['GET'], description: 'Task outcome analytics', tag: 'Tasks', auth: 'viewer' },
   { path: '/api/tasks/regression', methods: ['GET'], description: 'Task regression detection', tag: 'Tasks', auth: 'viewer' },
@@ -27,6 +28,8 @@ const endpoints: Endpoint[] = [
   { path: '/api/projects/:id', methods: ['GET', 'PATCH', 'DELETE'], description: 'Project detail — read, update, archive/delete', tag: 'Projects', auth: 'viewer/operator/admin' },
   { path: '/api/projects/:id/tasks', methods: ['GET'], description: 'Tasks scoped to project', tag: 'Projects', auth: 'viewer' },
   { path: '/api/projects/:id/agents', methods: ['GET', 'POST', 'DELETE'], description: 'Project agent assignments — list, assign, unassign', tag: 'Projects', auth: 'viewer/operator' },
+  { path: '/api/projects/:id/gsd/bootstrap', methods: ['POST'], description: 'Phase 09 — Seed default phase tasks for a GSD-enabled project. Idempotent: re-runs skip tasks with matching (gsd_phase, ticket_ref). Loads external template from <dataDir>/gsd-templates/<track>.json with bundled fallback.', tag: 'Projects', auth: 'operator' },
+  { path: '/api/projects/:id/gsd/transition', methods: ['POST'], description: 'Phase 09 — Advance a project through lifecycle phases (discuss → plan → execute → verify → done). Body: { to_phase, reason?, waive_remaining? }. Returns 409 with machine-readable code on illegal jumps or unmet preconditions.', tag: 'Projects', auth: 'operator' },
 
   // ── Agents ────────────────────────────────────────
   { path: '/api/agents', methods: ['GET', 'POST'], description: 'Agent CRUD — list, register', tag: 'Agents', auth: 'viewer/operator' },
