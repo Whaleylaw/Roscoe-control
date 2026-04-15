@@ -55,8 +55,15 @@ node scripts/mc-cli.cjs sessions control --id <session-id> --action terminate
 - soul set --id --template operator
 - soul templates --id [--template name]
 
+### projects
+- create --name <name> [--prefix <ticket_prefix>] [--slug <slug>] [--description <text>] [--gsd] [--track <ops|product|marketing|legal|firmvault|custom>] [--gate-mode <manual_approval|auto_internal>] [--gsd-project-id <id>] [--body '{}']
+- list [--include-archived]
+- get --id
+- bootstrap --id
+- transition --id --to <discuss|plan|execute|verify|done> [--waive --reason "..."]
+
 ### tasks
-- list
+- list [--project <id>] [--phase <discuss|plan|execute|verify>] [--gate-required]
 - get --id
 - create --title [--body '{}']
 - update --id [--body '{}']
@@ -65,6 +72,8 @@ node scripts/mc-cli.cjs sessions control --id <session-id> --action terminate
 - broadcast --id --message "..."
 - comments list --id
 - comments add --id --content "..." [--parent-id 5]
+- gate --id --approve [--note "..."]
+- gate --id --reject [--note "..."]
 
 ### sessions
 - list
