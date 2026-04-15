@@ -197,8 +197,8 @@ Plans:
 - [x] 09-04-PLAN.md — Wave 2: Transition endpoint with 4 rules + waiver + illegal-jump
 - [x] 09-05-PLAN.md — Wave 2: Gate PATCH endpoint + task GET field audit
 - [x] 09-06-PLAN.md — Wave 3: Gate enforcement hook in task PUT at line 172
-- [ ] 09-07-PLAN.md — Wave 3: Lifecycle tab (6 components) + project-tabs + project-view-router
-- [ ] 09-08-PLAN.md — Wave 3: PhaseBadge + GateBadge + task-board-panel injection
+- [x] 09-07-PLAN.md — Wave 3: Lifecycle tab (6 components) + project-tabs + project-view-router
+- [x] 09-08-PLAN.md — Wave 3: PhaseBadge + GateBadge + task-board-panel injection
 - [x] 09-09-PLAN.md — Wave 3: Settings view GSD section
 - [ ] 09-10-PLAN.md — Wave 4: Playwright E2E + /api/index docs + test:all green
 **UI hint**: yes

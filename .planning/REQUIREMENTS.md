@@ -95,8 +95,8 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 
 ### UI — Task Board Integration
 
-- [ ] **GSD-24**: Task board (global and project-scoped) displays phase badges on tasks with non-null `gsd_phase`
-- [ ] **GSD-25**: Gate-required tasks display a distinct "Approval required" badge; approved gates show "Approved"
+- [x] **GSD-24**: Task board (global and project-scoped) displays phase badges on tasks with non-null `gsd_phase`
+- [x] **GSD-25**: Gate-required tasks display a distinct "Approval required" badge; approved gates show "Approved"
 
 ### UI — Settings
 
@@ -193,8 +193,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-21 | Phase 9 | Pending |
 | GSD-22 | Phase 9 | Pending |
 | GSD-23 | Phase 9 | Pending |
-| GSD-24 | Phase 9 | Pending |
-| GSD-25 | Phase 9 | Pending |
+| GSD-24 | Phase 9 | Complete |
+| GSD-25 | Phase 9 | Complete |
 | GSD-26 | Phase 9 | Complete |
 | GSD-27 | Phase 9 | Complete |
 | GSD-28 | Phase 9 | Complete |

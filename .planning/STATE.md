@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: Ready to execute
-stopped_at: "Completed 09-09-PLAN.md (Wave 3d: GSD lifecycle section in settings-view)"
-last_updated: "2026-04-15T03:02:46.515Z"
+stopped_at: "Completed 09-07-PLAN.md (Wave 3b: Lifecycle tab UI + 6 components + tab wiring)"
+last_updated: "2026-04-15T03:05:20.791Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 32
+  completed_plans: 34
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 ## Current Position
 
 Phase: 09 (gsd-native-integration) — EXECUTING
-Plan: 8 of 11
+Plan: 10 of 11
 
 ## Performance Metrics
 
@@ -78,6 +78,8 @@ Plan: 8 of 11
 | Phase 09-gsd-native-integration P03 | 8min | 2 tasks | 4 files |
 | Phase 09-gsd-native-integration P06 | 6min | 1 tasks | 3 files |
 | Phase 09-gsd-native-integration P09 | 7min | 1 tasks | 3 files |
+| Phase 09-gsd-native-integration P08 | 5min | 2 tasks | 6 files |
+| Phase 09-gsd-native-integration P07 | 10min | 2 tasks tasks | 14 files files |
 
 ## Accumulated Context
 
@@ -183,6 +185,11 @@ Recent decisions affecting current work:
 - [Phase 09-gsd-native-integration]: Plan 09-09: Added second useTranslations('project.lifecycle') hook as tLc alongside existing t and tCommon — avoids renaming ~40 call sites and matches existing multi-namespace pattern
 - [Phase 09-gsd-native-integration]: Plan 09-09: GSD PATCH payload uses selective-inclusion (field added only when dirty) matching existing save() pattern; gsd_track empty-string serializes to null as clear-the-track signal per Plan 09-02 contract
 - [Phase 09-gsd-native-integration]: Plan 09-09: GSD section heading uses text-lg (not UI-SPEC's text-sm) to match sibling sections Basics/Appearance/Integrations — visual hierarchy consistency
+- [Phase 09-gsd-native-integration]: Plan 09-08 Task-card badge test files renamed .test.ts→.test.tsx (Rule 3 blocking) — NextIntlClientProvider JSX-children type requires JSX syntax; vitest include globs already accept both extensions
+- [Phase 09-gsd-native-integration]: Plan 09-08 injected PhaseBadge + GateBadge in TWO locations of task-board-panel.tsx (regular card + detail modal header) per keep-read-paths-in-sync pitfall; grep -c returns exactly 2 for each component
+- [Phase 09-gsd-native-integration]: Plan 09-08 extended in-file task-board Task interface with 5 GSD fields (gsd_phase, gate_required, gate_status, gate_approved_by, gate_approved_at) mirroring Wave 2a store type — in-file interface shadowed store, had to re-declare for badge props typecheck
+- [Phase 09-gsd-native-integration]: Plan 09-08 GateBadge two-branch render (approved→green, else→amber) — pending/rejected/not_required all render the same 'Approval required' visual because gate_required=1 + non-approved always means 'blocked on approval' semantically; only approved earns affirmative green
+- [Phase 09-gsd-native-integration]: Plan 09-08 GateBadge tests use real NextIntlClientProvider + imported messages/en.json (no next-intl mock) — exercises translation resolution end-to-end; future copy drift in en.json flips tests red. First use of this pattern in the repo
 
 ### Pending Todos
 
@@ -194,6 +201,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T03:02:46.513Z
-Stopped at: Completed 09-09-PLAN.md (Wave 3d: GSD lifecycle section in settings-view)
+Last session: 2026-04-15T03:05:20.788Z
+Stopped at: Completed 09-07-PLAN.md (Wave 3b: Lifecycle tab UI + 6 components + tab wiring)
 Resume file: None
