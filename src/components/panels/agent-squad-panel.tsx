@@ -27,6 +27,23 @@ interface Agent {
     completed: number
   }
   runtime_type?: string
+  /** Present only when the GET response was scoped via /api/agents?project_id=<id>. */
+  assignment_source?: 'assigned' | 'task'
+}
+
+/**
+ * Optional scope for embedding the panel inside a project workspace.
+ * When omitted, the panel behaves identically to the global Agents view (regression preserved).
+ */
+export interface AgentSquadScope {
+  /** Filter agents to those in project_agent_assignments OR tasks.assigned_to for this project. */
+  lockedProjectId: number
+  /** When true, hide the "Add Agent" button (workspace is not for creating agents). */
+  hideCreateAgent?: boolean
+  /** Use this project_id to scope each card's active-task count. Typically equals lockedProjectId. */
+  taskScopeProjectId?: number
+  /** When true, render an "Assigned" chip on cards whose assignment_source is "assigned". */
+  showAssignmentBadge?: boolean
 }
 
 const statusColors: Record<string, string> = {
@@ -43,8 +60,9 @@ const statusIcons: Record<string, string> = {
   error: '🔴',
 }
 
-export function AgentSquadPanel() {
+export function AgentSquadPanel({ scope }: { scope?: AgentSquadScope } = {}) {
   const t = useTranslations('agentSquad')
+  const tProject = useTranslations('project.agents')
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -52,13 +70,16 @@ export function AgentSquadPanel() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
 
-  // Fetch agents
+  // Fetch agents — scope.lockedProjectId triggers project-scoped endpoint (SESS-02)
   const fetchAgents = useCallback(async () => {
     try {
       setError(null)
       if (agents.length === 0) setLoading(true)
 
-      const response = await fetch('/api/agents')
+      const url = scope?.lockedProjectId
+        ? `/api/agents?project_id=${scope.lockedProjectId}`
+        : '/api/agents'
+      const response = await fetch(url)
       if (!response.ok) throw new Error(t('failedToFetch'))
 
       const data = await response.json()
@@ -68,7 +89,7 @@ export function AgentSquadPanel() {
     } finally {
       setLoading(false)
     }
-  }, [agents.length])
+  }, [agents.length, scope?.lockedProjectId])
 
   // Initial load
   useEffect(() => {
@@ -170,11 +191,13 @@ export function AgentSquadPanel() {
           >
             {autoRefresh ? t('live') : t('manual')}
           </Button>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-          >
-            {t('addAgent')}
-          </Button>
+          {!scope?.hideCreateAgent && (
+            <Button
+              onClick={() => setShowCreateModal(true)}
+            >
+              {t('addAgent')}
+            </Button>
+          )}
           <Button
             onClick={fetchAgents}
             variant="secondary"
@@ -223,6 +246,11 @@ export function AgentSquadPanel() {
                       {agent.runtime_type && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-1 text-muted-foreground border border-border/30">
                           {agent.runtime_type}
+                        </span>
+                      )}
+                      {scope?.showAssignmentBadge && agent.assignment_source === 'assigned' && (
+                        <span className="bg-primary/10 text-primary border border-primary/30 px-2 py-0.5 rounded text-xs font-medium">
+                          {tProject('assignedChip')}
                         </span>
                       )}
                     </div>

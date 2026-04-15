@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "Обзор",
+    "projects": "Проекты",
     "agents": "Агенты",
     "tasks": "Задачи",
     "chat": "Чат",
@@ -2194,5 +2195,134 @@
     "tabStatus": "Статус",
     "unhealthy": "Нездоров",
     "unreachable": "Недоступен"
+  },
+  "projects": {
+    "title": "Проекты",
+    "header": {
+      "cta": "Новый проект"
+    },
+    "create": {
+      "githubRepoLabel": "Репозиторий GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Необязательно. Свяжите репозиторий GitHub с этим проектом.",
+      "githubRepoInvalid": "Используйте формат owner/repo",
+      "deadlineLabel": "Крайний срок",
+      "colorLabel": "Цвет",
+      "enableSyncLabel": "Включить синхронизацию GitHub и инициализировать метки",
+      "enableSyncHelp": "Создаёт метки Mission Control в репозитории и включает двустороннюю синхронизацию",
+      "initLabelsFailedWarning": "Проект создан, но настройка меток GitHub не удалась. Повторите попытку из панели GitHub Sync."
+    },
+    "empty": {
+      "title": "Пока нет активных проектов",
+      "cta": "Создать проект"
+    },
+    "picker": {
+      "openWorkspace": "↗ Открыть рабочее пространство"
+    },
+    "row": {
+      "statusLabel": "Статус",
+      "deadlineLabel": "Срок",
+      "lastActivityLabel": "Последняя активность",
+      "noActivity": "Активности пока нет"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "Проект не найден",
+      "projectNotFoundDescription": "Проект, который вы ищете, не существует или был удален.",
+      "backToProjects": "Вернуться к проектам",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "Проекты",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "Сессии",
+      "threadsHeader": "Чат-треды",
+      "runtimeHeader": "Внешние сессии",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "Выполняется",
+      "statusFinished": "Завершена",
+      "statusFailed": "Сбой",
+      "threadEmptyPreview": "Пока нет сообщений — поздоровайтесь",
+      "taskLabel": "Задача {ticketRef}",
+      "emptyHeading": "Сессий пока нет",
+      "emptyBody": "Назначьте агента этому проекту, и чат-тред появится здесь автоматически.",
+      "emptyCta": "Открыть вкладку Агенты",
+      "errorHeading": "Не удалось загрузить сессии",
+      "errorBody": "Проверьте подключение и попробуйте снова. Если проблема не исчезает, проверьте Live Feed на наличие ошибок шины событий.",
+      "detailBackLink": "Назад к сессиям",
+      "loading": "Загрузка сессий..."
+    },
+    "agents": {
+      "title": "Агенты",
+      "listHeader": "Агенты в этом проекте",
+      "assignedChip": "Назначен",
+      "activeTaskCount": "{count, plural, =0 {Нет активных задач} one {# активная задача} other {# активных задач}}",
+      "emptyHeading": "В этом проекте нет агентов",
+      "emptyBody": "Назначьте агента из основного представления Агенты. Агенты, работающие над задачами этого проекта, также появятся здесь.",
+      "emptyCta": "Открыть представление Агенты",
+      "errorHeading": "Не удалось загрузить агентов",
+      "errorBody": "Проверьте подключение и попробуйте снова. Если проблема не исчезает, проверьте Live Feed на наличие ошибок шины событий.",
+      "loading": "Загрузка агентов..."
+    },
+    "settings": {
+      "title": "Настройки проекта",
+      "sectionBasics": "Основные",
+      "sectionAppearance": "Внешний вид и отслеживание",
+      "sectionIntegrations": "Интеграции",
+      "readOnlyNote": "Для редактирования настроек проекта нужны права оператора.",
+      "nameLabel": "Название",
+      "namePlaceholder": "Мой проект",
+      "descriptionLabel": "Описание",
+      "descriptionPlaceholder": "О чём этот проект?",
+      "statusLabel": "Статус",
+      "statusActive": "Активный",
+      "statusArchived": "В архиве",
+      "colorLabel": "Цвет",
+      "colorNone": "Нет",
+      "prefixLabel": "Префикс тикета",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "Изменение префикса влияет только на новые тикеты. Существующие тикеты сохраняют исходный префикс.",
+      "deadlineLabel": "Срок",
+      "githubRepoLabel": "Репозиторий GitHub",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Формат: owner/repo. Используется для связывания тикетов и синхронизации.",
+      "save": "Сохранить изменения",
+      "cancel": "Отменить изменения",
+      "saving": "Сохранение…",
+      "unsavedChanges": "Несохранённые изменения",
+      "errorNameRequired": "Название проекта не может быть пустым",
+      "errorPrefixConflict": "Префикс тикета уже используется. Попробуйте другой.",
+      "errorPrefixInvalid": "Недопустимый префикс тикета — только буквы и цифры, до 12 символов.",
+      "errorDefaultArchive": "Проект по умолчанию нельзя архивировать.",
+      "errorBannerHeading": "Не удалось сохранить изменения",
+      "errorBannerFallback": "Не удалось обновить проект. Попробуйте снова или проверьте Live Feed для подробностей.",
+      "loadErrorHeading": "Не удалось загрузить настройки проекта"
+    },
+    "common": {
+      "retry": "Повторить"
+    }
   }
 }

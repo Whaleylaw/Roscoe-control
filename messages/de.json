@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "Übersicht",
+    "projects": "Projekte",
     "agents": "Agenten",
     "tasks": "Aufgaben",
     "chat": "Chat",
@@ -2194,5 +2195,134 @@
     "tabStatus": "Status",
     "unhealthy": "Ungesund",
     "unreachable": "Nicht erreichbar"
+  },
+  "projects": {
+    "title": "Projekte",
+    "header": {
+      "cta": "Neues Projekt"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub-Repo",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Optional. Verknüpfen Sie ein GitHub-Repository mit diesem Projekt.",
+      "githubRepoInvalid": "Format: owner/repo",
+      "deadlineLabel": "Frist",
+      "colorLabel": "Farbe",
+      "enableSyncLabel": "GitHub-Sync aktivieren und Labels initialisieren",
+      "enableSyncHelp": "Erstellt Mission-Control-Labels im Repo und aktiviert Zwei-Wege-Sync",
+      "initLabelsFailedWarning": "Projekt erstellt, aber GitHub-Label-Setup fehlgeschlagen. Sie können es im GitHub-Sync-Panel erneut versuchen."
+    },
+    "empty": {
+      "title": "Noch keine aktiven Projekte",
+      "cta": "Projekt erstellen"
+    },
+    "picker": {
+      "openWorkspace": "↗ Arbeitsbereich öffnen"
+    },
+    "row": {
+      "statusLabel": "Status",
+      "deadlineLabel": "Frist",
+      "lastActivityLabel": "Letzte Aktivität",
+      "noActivity": "Noch keine Aktivität"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "Projekt nicht gefunden",
+      "projectNotFoundDescription": "Das gesuchte Projekt existiert nicht oder wurde entfernt.",
+      "backToProjects": "Zurueck zu Projekten",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "Projekte",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "Sitzungen",
+      "threadsHeader": "Chat-Threads",
+      "runtimeHeader": "Externe Sitzungen",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "Laeuft",
+      "statusFinished": "Abgeschlossen",
+      "statusFailed": "Fehlgeschlagen",
+      "threadEmptyPreview": "Noch keine Nachrichten — sag hallo",
+      "taskLabel": "Aufgabe {ticketRef}",
+      "emptyHeading": "Noch keine Sitzungen",
+      "emptyBody": "Weisen Sie diesem Projekt einen Agenten zu, und ein Chat-Thread erscheint hier automatisch.",
+      "emptyCta": "Tab Agenten oeffnen",
+      "errorHeading": "Sitzungen konnten nicht geladen werden",
+      "errorBody": "Pruefen Sie Ihre Verbindung und versuchen Sie es erneut. Bei anhaltenden Problemen pruefen Sie den Live-Feed auf Event-Bus-Fehler.",
+      "detailBackLink": "Zurueck zu Sitzungen",
+      "loading": "Sitzungen werden geladen..."
+    },
+    "agents": {
+      "title": "Agenten",
+      "listHeader": "Agenten in diesem Projekt",
+      "assignedChip": "Zugewiesen",
+      "activeTaskCount": "{count, plural, =0 {Keine aktiven Aufgaben} one {# aktive Aufgabe} other {# aktive Aufgaben}}",
+      "emptyHeading": "Keine Agenten in diesem Projekt",
+      "emptyBody": "Weisen Sie einen Agenten aus der Hauptansicht Agenten zu. Agenten, die an Aufgaben dieses Projekts arbeiten, erscheinen hier ebenfalls.",
+      "emptyCta": "Agenten-Ansicht oeffnen",
+      "errorHeading": "Agenten konnten nicht geladen werden",
+      "errorBody": "Pruefen Sie Ihre Verbindung und versuchen Sie es erneut. Bei anhaltenden Problemen pruefen Sie den Live-Feed auf Event-Bus-Fehler.",
+      "loading": "Agenten werden geladen..."
+    },
+    "settings": {
+      "title": "Projekteinstellungen",
+      "sectionBasics": "Grundlagen",
+      "sectionAppearance": "Darstellung und Verfolgung",
+      "sectionIntegrations": "Integrationen",
+      "readOnlyNote": "Sie benoetigen Operator-Berechtigungen, um Projekteinstellungen zu bearbeiten.",
+      "nameLabel": "Name",
+      "namePlaceholder": "Mein Projekt",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Worum geht es in diesem Projekt?",
+      "statusLabel": "Status",
+      "statusActive": "Aktiv",
+      "statusArchived": "Archiviert",
+      "colorLabel": "Farbe",
+      "colorNone": "Keine",
+      "prefixLabel": "Ticket-Praefix",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "Die Aenderung des Praefix wirkt sich nur auf neue Tickets aus. Bestehende Tickets behalten ihr urspruengliches Praefix.",
+      "deadlineLabel": "Frist",
+      "githubRepoLabel": "GitHub-Repository",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "Format: owner/repo. Wird zum Verknuepfen von Tickets und zur Synchronisation verwendet.",
+      "save": "Aenderungen speichern",
+      "cancel": "Aenderungen verwerfen",
+      "saving": "Wird gespeichert…",
+      "unsavedChanges": "Nicht gespeicherte Aenderungen",
+      "errorNameRequired": "Der Projektname darf nicht leer sein",
+      "errorPrefixConflict": "Ticket-Praefix bereits in Verwendung. Versuchen Sie ein anderes.",
+      "errorPrefixInvalid": "Ungueltiges Ticket-Praefix — nur Buchstaben und Zahlen, bis zu 12 Zeichen.",
+      "errorDefaultArchive": "Das Standardprojekt kann nicht archiviert werden.",
+      "errorBannerHeading": "Aenderungen konnten nicht gespeichert werden",
+      "errorBannerFallback": "Projekt konnte nicht aktualisiert werden. Versuchen Sie es erneut oder pruefen Sie den Live-Feed fuer Details.",
+      "loadErrorHeading": "Projekteinstellungen konnten nicht geladen werden"
+    },
+    "common": {
+      "retry": "Wiederholen"
+    }
   }
 }

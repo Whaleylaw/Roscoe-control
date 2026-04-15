@@ -79,6 +79,7 @@
   },
   "nav": {
     "overview": "概览",
+    "projects": "项目",
     "agents": "智能体",
     "tasks": "任务",
     "chat": "聊天",
@@ -2194,5 +2195,134 @@
     "tabStatus": "状态",
     "unhealthy": "不健康",
     "unreachable": "不可达"
+  },
+  "projects": {
+    "title": "项目",
+    "header": {
+      "cta": "新建项目"
+    },
+    "create": {
+      "githubRepoLabel": "GitHub 仓库",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "可选。将 GitHub 仓库关联到此项目。",
+      "githubRepoInvalid": "使用 owner/repo 格式",
+      "deadlineLabel": "截止日期",
+      "colorLabel": "颜色",
+      "enableSyncLabel": "启用 GitHub 同步并初始化标签",
+      "enableSyncHelp": "在仓库上创建 Mission Control 标签并启用双向同步",
+      "initLabelsFailedWarning": "项目已创建，但 GitHub 标签设置失败。您可以在 GitHub Sync 面板中重试。"
+    },
+    "empty": {
+      "title": "暂无活跃项目",
+      "cta": "创建项目"
+    },
+    "picker": {
+      "openWorkspace": "↗ 打开工作区"
+    },
+    "row": {
+      "statusLabel": "状态",
+      "deadlineLabel": "截止日期",
+      "lastActivityLabel": "最近活动",
+      "noActivity": "暂无活动"
+    }
+  },
+  "project": {
+    "workspace": {
+      "title": "Project Workspace",
+      "notFound": "View not found",
+      "loading": "Loading project...",
+      "projectNotFound": "项目未找到",
+      "projectNotFoundDescription": "您查找的项目不存在或已被删除。",
+      "backToProjects": "返回项目列表",
+      "loadTimeoutHeading": "Taking longer than expected",
+      "loadTimeoutBody": "We couldn't load your projects in time. Check your connection and try again.",
+      "loadTimeoutRetry": "Retry"
+    },
+    "nav": {
+      "projects": "项目",
+      "dashboard": "Dashboard",
+      "tasks": "Tasks",
+      "sessions": "Sessions",
+      "agents": "Agents",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "placeholder": "Project dashboard coming soon"
+    },
+    "tasks": {
+      "title": "Tasks",
+      "placeholder": "Project tasks coming soon"
+    },
+    "sessions": {
+      "title": "会话",
+      "threadsHeader": "聊天会话",
+      "runtimeHeader": "外部会话",
+      "runtimeClaude": "Claude",
+      "runtimeCodex": "Codex",
+      "runtimeHermes": "Hermes",
+      "runtimeGateway": "Gateway",
+      "statusRunning": "运行中",
+      "statusFinished": "已完成",
+      "statusFailed": "失败",
+      "threadEmptyPreview": "暂无消息 — 打个招呼吧",
+      "taskLabel": "任务 {ticketRef}",
+      "emptyHeading": "暂无会话",
+      "emptyBody": "为此项目分配一个代理,聊天会话将自动显示在此处。",
+      "emptyCta": "打开代理选项卡",
+      "errorHeading": "无法加载会话",
+      "errorBody": "请检查您的连接并重试。如果问题仍然存在,请在 Live Feed 中查看事件总线错误。",
+      "detailBackLink": "返回会话列表",
+      "loading": "正在加载会话..."
+    },
+    "agents": {
+      "title": "代理",
+      "listHeader": "此项目中的代理",
+      "assignedChip": "已分配",
+      "activeTaskCount": "{count, plural, =0 {无活动任务} one {# 个活动任务} other {# 个活动任务}}",
+      "emptyHeading": "此项目中没有代理",
+      "emptyBody": "从主代理视图分配代理。在此项目任务上工作的代理也将显示在此处。",
+      "emptyCta": "打开代理视图",
+      "errorHeading": "无法加载代理",
+      "errorBody": "请检查您的连接并重试。如果问题仍然存在,请在 Live Feed 中查看事件总线错误。",
+      "loading": "正在加载代理..."
+    },
+    "settings": {
+      "title": "项目设置",
+      "sectionBasics": "基本信息",
+      "sectionAppearance": "外观与跟踪",
+      "sectionIntegrations": "集成",
+      "readOnlyNote": "编辑项目设置需要操作员权限。",
+      "nameLabel": "名称",
+      "namePlaceholder": "我的项目",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "这个项目是关于什么的?",
+      "statusLabel": "状态",
+      "statusActive": "活跃",
+      "statusArchived": "已归档",
+      "colorLabel": "颜色",
+      "colorNone": "无",
+      "prefixLabel": "工单前缀",
+      "prefixPlaceholder": "PA",
+      "prefixHelp": "更改前缀仅影响新工单。现有工单保留其原始前缀。",
+      "deadlineLabel": "截止日期",
+      "githubRepoLabel": "GitHub 仓库",
+      "githubRepoPlaceholder": "owner/repo",
+      "githubRepoHelp": "格式:owner/repo。用于链接工单和同步。",
+      "save": "保存更改",
+      "cancel": "放弃更改",
+      "saving": "保存中…",
+      "unsavedChanges": "未保存的更改",
+      "errorNameRequired": "项目名称不能为空",
+      "errorPrefixConflict": "工单前缀已被使用。请尝试其他前缀。",
+      "errorPrefixInvalid": "无效的工单前缀 — 仅限字母和数字,最多 12 个字符。",
+      "errorDefaultArchive": "默认项目无法归档。",
+      "errorBannerHeading": "无法保存更改",
+      "errorBannerFallback": "无法更新项目。请重试,或查看 Live Feed 了解详情。",
+      "loadErrorHeading": "无法加载项目设置"
+    },
+    "common": {
+      "retry": "重试"
+    }
   }
 }

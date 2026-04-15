@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { useMissionControl } from '@/store'
@@ -14,11 +15,48 @@ type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
 type VerboseLevel = 'off' | 'on' | 'full'
 type ReasoningLevel = 'off' | 'on' | 'stream'
 
+/**
+ * SessionDetailScope — Phase 5 SESS-03 / D-10 / D-11.
+ *
+ * Optional prop that adapts the panel for an embedded scoped detail view inside
+ * the project workspace. When undefined, behavior is identical to today.
+ */
+export interface SessionDetailScope {
+  /** When set, panel renders only this session's detail (no list of others, no global polling). */
+  sessionId: string
+  /** Hide filter/sort/time-window controls. */
+  hideFilters?: boolean
+  /** Hide the top page header/title. */
+  hideHeader?: boolean
+  /** Render as a chat thread (messages from /api/chat/messages) instead of runtime transcript. */
+  threadMode?: boolean
+  /** Back link target URL — if provided, a "Back to sessions" link is rendered. */
+  backHref?: string
+}
+
 const selectClass =
   'px-2 py-1 border border-border rounded bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/50'
 
-export function SessionDetailsPanel() {
+/**
+ * Pitfall 4 — conversation_id MUST use the numeric project.id, never the slug.
+ * sessionId format: "thread:<projectId>:<agentNameLower>"
+ * conversation_id : "project:<projectId>:agent:<agentNameLower>"
+ */
+function sessionIdToConversationId(id: string): string | null {
+  const m = id.match(/^thread:(\d+):(.+)$/)
+  return m ? `project:${m[1]}:agent:${m[2]}` : null
+}
+
+interface ThreadMessage {
+  id: number | string
+  from_agent?: string
+  content: string
+  created_at?: number | string
+}
+
+export function SessionDetailsPanel({ scope }: { scope?: SessionDetailScope } = {}) {
   const t = useTranslations('sessionDetails')
+  const tProject = useTranslations('project.sessions')
   const {
     sessions,
     selectedSession,
@@ -27,8 +65,13 @@ export function SessionDetailsPanel() {
     availableModels
   } = useMissionControl()
 
-  // Smart polling for sessions (60s, visibility-aware)
+  // Pitfall 9 — when rendering a single-session detail, do NOT poll /api/sessions
+  // and do NOT call setSessions (would clobber the global Zustand list).
+  const isScoped = Boolean(scope?.sessionId)
+
+  // Smart polling for sessions (60s, visibility-aware) — guarded by scope.
   const loadSessions = useCallback(async () => {
+    if (isScoped) return  // Pitfall 9: never call setSessions in scope mode
     try {
       const response = await fetch('/api/sessions')
       const data = await response.json()
@@ -36,9 +79,26 @@ export function SessionDetailsPanel() {
     } catch (error) {
       log.error('Failed to load sessions:', error)
     }
-  }, [setSessions])
+  }, [setSessions, isScoped])
 
-  useSmartPoll(loadSessions, 60000, { pauseWhenConnected: true })
+  // Disable polling entirely in scope mode — useSmartPoll's `enabled: false`
+  // prevents both the initial fetch and the interval from invoking the callback.
+  useSmartPoll(loadSessions, 60000, { pauseWhenConnected: true, enabled: !isScoped })
+
+  // Thread-mode: fetch chat messages for the derived conversation_id (Pitfall 4 — numeric project id).
+  const conversationId = scope?.threadMode && scope.sessionId
+    ? sessionIdToConversationId(scope.sessionId)
+    : null
+  const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([])
+  useEffect(() => {
+    if (!conversationId) return
+    const ctrl = new AbortController()
+    fetch(`/api/chat/messages?conversation_id=${encodeURIComponent(conversationId)}`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
+      .then((data) => setThreadMessages(data.messages || []))
+      .catch(() => { /* leave empty */ })
+    return () => ctrl.abort()
+  }, [conversationId])
 
   const [controllingSession, setControllingSession] = useState<string | null>(null)
   const [sessionFilter, setSessionFilter] = useState<'all' | 'active' | 'idle'>('all')
@@ -162,6 +222,17 @@ export function SessionDetailsPanel() {
     }
   })
 
+  // SESS-03: when scope.sessionId is set, narrow the rendered list to just the
+  // matching session (compare against id, session_key, and key for robustness).
+  const visibleSessions = scope?.sessionId
+    ? sortedSessions.filter(
+        (s: any) =>
+          s.session_key === scope.sessionId ||
+          s.id === scope.sessionId ||
+          s.key === scope.sessionId,
+      )
+    : sortedSessions
+
   const handleSessionSelect = (session: any) => {
     setSelectedSession(session.id)
     setExpandedSession(expandedSession === session.id ? null : session.id)
@@ -214,14 +285,26 @@ export function SessionDetailsPanel() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="border-b border-border pb-4">
-        <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
-        <p className="text-muted-foreground mt-2">
-          {t('subtitle')}
-        </p>
-      </div>
+      {!scope?.hideHeader && (
+        <div className="border-b border-border pb-4">
+          <h1 className="text-3xl font-bold text-foreground">{t('title')}</h1>
+          <p className="text-muted-foreground mt-2">
+            {t('subtitle')}
+          </p>
+        </div>
+      )}
+
+      {scope?.backHref && (
+        <Link
+          href={scope.backHref}
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {tProject('detailBackLink')}
+        </Link>
+      )}
 
       {/* Filters and Controls */}
+      {!scope?.hideFilters && (
       <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex flex-wrap items-end gap-4">
           {/* Filter by Status */}
@@ -301,18 +384,35 @@ export function SessionDetailsPanel() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* SESS-01 thread-mode branch — render chat thread when scope.threadMode is true */}
+      {scope?.threadMode ? (
+        <div className="flex flex-col gap-3 p-4 bg-card border border-border rounded-lg">
+          {threadMessages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{tProject('threadEmptyPreview')}</p>
+          ) : (
+            threadMessages.map((m) => (
+              <div key={m.id} className="rounded border border-border bg-background p-3">
+                <div className="text-xs text-muted-foreground mb-1">{m.from_agent || 'user'}</div>
+                <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Sessions List */}
         <div className="lg:col-span-2 space-y-4">
-          {sortedSessions.length === 0 ? (
+          {visibleSessions.length === 0 ? (
             <div className="bg-card border border-border rounded-lg p-12 text-center">
               <div className="text-muted-foreground">
                 {t('noSessionsMatch')}
               </div>
             </div>
           ) : (
-            sortedSessions.map((session) => {
+            visibleSessions.map((session) => {
               const modelInfo = getModelInfo(session.model)
               const tokenUsage = parseTokenUsage(session.tokens)
               const status = getSessionStatus(session)
@@ -736,6 +836,7 @@ export function SessionDetailsPanel() {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }
