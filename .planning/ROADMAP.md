@@ -190,7 +190,7 @@ Plans:
   12. Test suite covers: project CRUD with GSD fields, bootstrap idempotency, illegal transition rejection, gate-block on task status, gate-approval unblocks, role enforcement on new endpoints
 **Plans:** 11 plans
 Plans:
-- [ ] 09-00-PLAN.md — Wave 0: 17 test scaffolds + atomic 10-locale i18n seed (project.lifecycle.*)
+- [x] 09-00-PLAN.md — Wave 0: 17 test scaffolds + atomic 10-locale i18n seed (project.lifecycle.*)
 - [ ] 09-01-PLAN.md — Wave 1: Migration 052 + Zod schemas + EventType union
 - [ ] 09-02-PLAN.md — Wave 2: Projects API GET/POST/PATCH extensions + Project/Task type plumbing
 - [ ] 09-03-PLAN.md — Wave 2: Bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate

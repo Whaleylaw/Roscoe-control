@@ -1,24 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: native-gsd-integration
-status: Defining requirements (v1.1 opened after v1.0 closed)
-stopped_at: Milestone v1.1 opened — Phase 09 context captured, requirements + roadmap next
-last_updated: "2026-04-14T21:25:00.000Z"
+milestone: v1.0
+milestone_name: — Project Workspace & Dashboard
+status: Ready to execute
+stopped_at: Completed 09-00-PLAN.md (Wave 0 scaffolds + atomic 10-locale i18n seed)
+last_updated: "2026-04-15T02:38:19.166Z"
 progress:
-  total_phases: 1
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-previous_milestone:
-  version: v1.0
-  name: Project Workspace & Dashboard
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 24
-  completed_plans: 24
-  closed_at: "2026-04-14T19:35:00.000Z"
-  note: v1.0 not formally archived via /gsd:complete-milestone; can be archived retroactively
+  total_phases: 9
+  completed_phases: 6
+  total_plans: 29
+  completed_plans: 25
 ---
 
 # Project State
@@ -28,14 +19,12 @@ previous_milestone:
 See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle.
-**Current focus:** Phase 09 — gsd-native-integration (v1.1)
+**Current focus:** Phase 09 — gsd-native-integration
 
 ## Current Position
 
-Phase: 09 (gsd-native-integration) — Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.1
-Last activity: 2026-04-14 — Milestone v1.1 started
+Phase: 09 (gsd-native-integration) — EXECUTING
+Plan: 2 of 11
 
 ## Performance Metrics
 
@@ -81,6 +70,7 @@ Last activity: 2026-04-14 — Milestone v1.1 started
 | Phase 08-projects-entry-point P03 | 10min | 1 tasks | 1 files |
 | Phase 08-projects-entry-point P04 | 8min | 1 tasks | 12 files |
 | Phase 08-projects-entry-point P05 | ~12min | 2 tasks | 12 files |
+| Phase 09-gsd-native-integration P00 | 6min | 2 tasks | 27 files |
 
 ## Accumulated Context
 
@@ -156,6 +146,11 @@ Recent decisions affecting current work:
 - [Phase 08-projects-entry-point]: Plan 08-05 Task 2 chain uses nested try/catch — init-labels failure surfaces inline amber warning via setInitLabelsWarning(t('create.initLabelsFailedWarning')) and the outer createProject flow continues (setForm reset + load() + onChanged). Project is still created per plan graceful-failure contract
 - [Phase 08-projects-entry-point]: Plan 08-05 PATCH /api/projects/{id} with { github_sync_enabled: 1 } intentionally fire-and-forget — backend init-labels already set github_labels_initialized=1; user can toggle sync manually from inline edit UI if PATCH silently fails
 - [Phase 08-projects-entry-point]: Plan 08-05 established src/components/modals/__tests__/ as canonical modal test directory (first consumer: project-manager-modal.test.tsx, 10 tests)
+- [Phase 09-gsd-native-integration]: Wave-0 it.todo()/test.fixme() scaffold pattern continues from Phases 01-08 — every Phase 09 wave has a named test bucket pre-created before any implementation
+- [Phase 09-gsd-native-integration]: Atomic 10-locale i18n seed of project.lifecycle.* + project.nav.lifecycle via ephemeral Node script — eliminates messages/*.json merge-conflict surface for parallel Wave 1-3 plans
+- [Phase 09-gsd-native-integration]: English-fallback policy for all 10 locales per D-37/D-38 — phase/track/gate-mode names remain literal English; ICU placeholders ({next},{toPhase},{reason},{remedy},{serverError}) preserved verbatim
+- [Phase 09-gsd-native-integration]: Top-of-file block comment in every scaffold enumerates covered GSD-IDs — downstream plans can locate test homes by requirement number
+- [Phase 09-gsd-native-integration]: Established src/components/project/lifecycle/__tests__/ and src/components/panels/task-card/__tests__/ as canonical unit-test directories for Wave 3 UI components
 
 ### Pending Todos
 
@@ -167,6 +162,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T19:35:00.000Z
-Stopped at: Completed 08-05-PLAN.md (UAT Gap 2 closed — ProjectManagerModal create-form upgrade with GitHub sync chain). Phase 08 complete.
+Last session: 2026-04-15T02:38:19.164Z
+Stopped at: Completed 09-00-PLAN.md (Wave 0 scaffolds + atomic 10-locale i18n seed)
 Resume file: None

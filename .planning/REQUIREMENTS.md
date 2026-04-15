@@ -106,7 +106,7 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 ### Events & i18n
 
 - [ ] **GSD-28**: Transitions and gate-status changes emit events via the existing `eventBus` (`project.gsd.transition`, `task.gate.changed`); existing `/api/activities` stream surfaces them automatically
-- [ ] **GSD-29**: All new user-facing strings go through next-intl under a `project.lifecycle.*` namespace with atomic coverage across all 10 locales
+- [x] **GSD-29**: All new user-facing strings go through next-intl under a `project.lifecycle.*` namespace with atomic coverage across all 10 locales
 
 ## v2 Requirements
 
@@ -198,7 +198,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-26 | Phase 9 | Pending |
 | GSD-27 | Phase 9 | Pending |
 | GSD-28 | Phase 9 | Pending |
-| GSD-29 | Phase 9 | Pending |
+| GSD-29 | Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 26 total, mapped 26 / unmapped 0 ✓
