@@ -30,6 +30,13 @@ const endpoints: Endpoint[] = [
   { path: '/api/projects/:id/agents', methods: ['GET', 'POST', 'DELETE'], description: 'Project agent assignments — list, assign, unassign', tag: 'Projects', auth: 'viewer/operator' },
   { path: '/api/projects/:id/gsd/bootstrap', methods: ['POST'], description: 'Phase 09 — Seed default phase tasks for a GSD-enabled project. Idempotent: re-runs skip tasks with matching (gsd_phase, ticket_ref). Loads external template from <dataDir>/gsd-templates/<track>.json with bundled fallback.', tag: 'Projects', auth: 'operator' },
   { path: '/api/projects/:id/gsd/transition', methods: ['POST'], description: 'Phase 09 — Advance a project through lifecycle phases (discuss → plan → execute → verify → done). Body: { to_phase, reason?, waive_remaining? }. Returns 409 with machine-readable code on illegal jumps or unmet preconditions.', tag: 'Projects', auth: 'operator' },
+  { path: '/api/projects/:id/gsd/workstreams', methods: ['GET', 'POST'], description: 'Phase 10 — Workstream listing and creation for a project. Body on POST: { key, name, status? }.', tag: 'Projects', auth: 'viewer/operator' },
+  { path: '/api/projects/:id/gsd/workstreams/:ws_id', methods: ['PATCH'], description: 'Phase 10 — Update a workstream. Body: partial { key, name, status, expected_updated_at? }. Returns 409 OPTIMISTIC_LOCK_FAILED on stale writes.', tag: 'Projects', auth: 'operator' },
+  { path: '/api/projects/:id/gsd/workstreams/:ws_id/complete', methods: ['POST'], description: 'Phase 10 — Mark a workstream complete. Body: { expected_updated_at? }.', tag: 'Projects', auth: 'operator' },
+  { path: '/api/projects/:id/gsd/milestones', methods: ['GET', 'POST'], description: 'Phase 10 — Milestone listing and creation for a project. Body on POST: { workstream_id?, version_label, title, status?, started_at?, completed_at? }.', tag: 'Projects', auth: 'viewer/operator' },
+  { path: '/api/projects/:id/gsd/milestones/:milestone_id', methods: ['PATCH'], description: 'Phase 10 — Update a milestone with optimistic locking. Returns 409 OPTIMISTIC_LOCK_FAILED on stale writes.', tag: 'Projects', auth: 'operator' },
+  { path: '/api/projects/:id/gsd/milestones/:milestone_id/complete', methods: ['POST'], description: 'Phase 10 — Mark a milestone complete and stamp completed_at if absent. Body: { expected_updated_at? }.', tag: 'Projects', auth: 'operator' },
+  { path: '/api/projects/:id/gsd/lifecycle-graph', methods: ['GET'], description: 'Phase 10 — Canonical hierarchical read model for the Lifecycle tab. Returns workstream → milestone → phase → plan tree plus rollups and legacy fallback data.', tag: 'Projects', auth: 'viewer' },
 
   // ── Agents ────────────────────────────────────────
   { path: '/api/agents', methods: ['GET', 'POST'], description: 'Agent CRUD — list, register', tag: 'Agents', auth: 'viewer/operator' },
@@ -57,6 +64,14 @@ const endpoints: Endpoint[] = [
   { path: '/api/sessions/continue', methods: ['POST'], description: 'Continue a local Claude/Codex session with a prompt', tag: 'Sessions', auth: 'operator' },
   { path: '/api/sessions/transcript', methods: ['GET'], description: 'Read local Claude/Codex session transcript snippets', tag: 'Sessions', auth: 'viewer' },
   { path: '/api/claude/sessions', methods: ['GET'], description: 'Claude CLI session scanner', tag: 'Sessions', auth: 'viewer' },
+
+  // ── GSD Hierarchy ────────────────────────────────
+  { path: '/api/gsd/milestones/:milestone_id/phases', methods: ['GET', 'POST'], description: 'Phase 10 — Phase listing and creation under a milestone. Body on POST: { phase_key, phase_slug, lifecycle_phase?, ordering_numeric, status?, depends_on_phase_ids? }.', tag: 'GSD', auth: 'viewer/operator' },
+  { path: '/api/gsd/phases/:phase_id', methods: ['PATCH'], description: 'Phase 10 — Update a phase with optimistic locking and same-milestone dependency validation.', tag: 'GSD', auth: 'operator' },
+  { path: '/api/gsd/phases/:phase_id/transition', methods: ['POST'], description: 'Phase 10 — Transition a phase lifecycle node linearly (discuss → plan → execute → verify → done). Returns 409 for dependency/order conflicts.', tag: 'GSD', auth: 'operator' },
+  { path: '/api/gsd/phases/:phase_id/plans', methods: ['GET', 'POST'], description: 'Phase 10 — Plan listing and creation under a phase. Body on POST: { plan_ref, title, wave?, status?, depends_on_plan_ids? }.', tag: 'GSD', auth: 'viewer/operator' },
+  { path: '/api/gsd/plans/:plan_id', methods: ['PATCH'], description: 'Phase 10 — Update a plan with optimistic locking and same-phase dependency validation.', tag: 'GSD', auth: 'operator' },
+  { path: '/api/gsd/plans/:plan_id/transition', methods: ['POST'], description: 'Phase 10 — Transition a plan status using legal edges only. Starting in_progress requires dependency plans to be done.', tag: 'GSD', auth: 'operator' },
 
   // ── Activities & Notifications ────────────────────
   { path: '/api/activities', methods: ['GET'], description: 'Activity feed', tag: 'Activities', auth: 'viewer' },

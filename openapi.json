@@ -81,6 +81,10 @@
       "description": "Project management and task grouping"
     },
     {
+      "name": "GSD",
+      "description": "Hierarchical Get Shit Done lifecycle management"
+    },
+    {
       "name": "Mentions",
       "description": "User and agent mention autocomplete"
     },
@@ -5482,6 +5486,658 @@
         }
       }
     },
+    "/api/projects/{id}/gsd/bootstrap": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Bootstrap legacy GSD phase tasks",
+        "operationId": "bootstrapProjectGsd",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bootstrap result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "created": {
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "type": "integer"
+                    },
+                    "tasks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Task"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/transition": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Advance the legacy project-level GSD lifecycle",
+        "operationId": "transitionProjectGsd",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdProjectTransitionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lifecycle advanced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "$ref": "#/components/schemas/Project"
+                    },
+                    "from_phase": {
+                      "$ref": "#/components/schemas/GsdLifecyclePhase"
+                    },
+                    "to_phase": {
+                      "$ref": "#/components/schemas/GsdLifecyclePhase"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/workstreams": {
+      "get": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "List workstreams for a project",
+        "operationId": "listProjectGsdWorkstreams",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Workstream list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workstreams": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GsdWorkstream"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Create a workstream for a project",
+        "operationId": "createProjectGsdWorkstream",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdWorkstreamCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Workstream created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workstream": {
+                      "$ref": "#/components/schemas/GsdWorkstream"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/workstreams/{ws_id}": {
+      "patch": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Update a project workstream",
+        "operationId": "updateProjectGsdWorkstream",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "ws_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdWorkstreamUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workstream updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workstream": {
+                      "$ref": "#/components/schemas/GsdWorkstream"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/workstreams/{ws_id}/complete": {
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Mark a workstream complete",
+        "operationId": "completeProjectGsdWorkstream",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "ws_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Workstream completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "workstream": {
+                      "$ref": "#/components/schemas/GsdWorkstream"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/milestones": {
+      "get": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "List milestones for a project",
+        "operationId": "listProjectGsdMilestones",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Milestone list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GsdMilestone"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Create a milestone for a project",
+        "operationId": "createProjectGsdMilestone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdMilestoneCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Milestone created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "milestone": {
+                      "$ref": "#/components/schemas/GsdMilestone"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/milestones/{milestone_id}": {
+      "patch": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Update a project milestone",
+        "operationId": "updateProjectGsdMilestone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "milestone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdMilestoneUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Milestone updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "milestone": {
+                      "$ref": "#/components/schemas/GsdMilestone"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/milestones/{milestone_id}/complete": {
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Mark a milestone complete",
+        "operationId": "completeProjectGsdMilestone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "milestone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Milestone completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "milestone": {
+                      "$ref": "#/components/schemas/GsdMilestone"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/gsd/lifecycle-graph": {
+      "get": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Get the hierarchical GSD lifecycle graph for a project",
+        "operationId": "getProjectGsdLifecycleGraph",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lifecycle graph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GsdLifecycleGraph"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/projects/{id}/tasks": {
       "get": {
         "tags": [
@@ -5502,6 +6158,606 @@
         "responses": {
           "200": {
             "description": "Tasks in project"
+          }
+        }
+      }
+    },
+    "/api/projects/{id}/sessions": {
+      "get": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "List project-scoped threads and runtime sessions",
+        "operationId": "listProjectSessions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project sessions and message threads",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "threads": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "conversationId": {
+                            "type": "string"
+                          },
+                          "agentName": {
+                            "type": "string"
+                          },
+                          "agentStatus": {
+                            "type": "string"
+                          },
+                          "lastMessage": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lastActivity": {
+                            "type": "integer"
+                          },
+                          "assignmentSource": {
+                            "type": "string",
+                            "enum": [
+                              "assigned",
+                              "task"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "runtimeSessions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "Claude",
+                              "Codex",
+                              "Hermes",
+                              "Gateway"
+                            ]
+                          },
+                          "ticketRef": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "startedAt": {
+                            "type": "integer"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "running",
+                              "finished",
+                              "failed"
+                            ]
+                          },
+                          "agent": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/gsd/milestones/{milestone_id}/phases": {
+      "get": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "List phases for a milestone",
+        "operationId": "listGsdMilestonePhases",
+        "parameters": [
+          {
+            "name": "milestone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Phase list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phases": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GsdPhase"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Create a phase under a milestone",
+        "operationId": "createGsdMilestonePhase",
+        "parameters": [
+          {
+            "name": "milestone_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdPhaseCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Phase created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "$ref": "#/components/schemas/GsdPhase"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/gsd/phases/{phase_id}": {
+      "patch": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Update a GSD phase",
+        "operationId": "updateGsdPhase",
+        "parameters": [
+          {
+            "name": "phase_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdPhaseUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phase updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "$ref": "#/components/schemas/GsdPhase"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/gsd/phases/{phase_id}/transition": {
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Transition a GSD phase lifecycle node",
+        "operationId": "transitionGsdPhase",
+        "parameters": [
+          {
+            "name": "phase_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdPhaseTransitionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phase transitioned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "$ref": "#/components/schemas/GsdPhase"
+                    },
+                    "from_phase": {
+                      "$ref": "#/components/schemas/GsdLifecyclePhase"
+                    },
+                    "to_phase": {
+                      "$ref": "#/components/schemas/GsdLifecyclePhase"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/gsd/phases/{phase_id}/plans": {
+      "get": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "List plans for a phase",
+        "operationId": "listGsdPhasePlans",
+        "parameters": [
+          {
+            "name": "phase_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GsdPlan"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Create a plan under a phase",
+        "operationId": "createGsdPhasePlan",
+        "parameters": [
+          {
+            "name": "phase_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdPlanCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Plan created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plan": {
+                      "$ref": "#/components/schemas/GsdPlan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/gsd/plans/{plan_id}": {
+      "patch": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Update a GSD plan",
+        "operationId": "updateGsdPlan",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdPlanUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plan updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plan": {
+                      "$ref": "#/components/schemas/GsdPlan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/api/gsd/plans/{plan_id}/transition": {
+      "post": {
+        "tags": [
+          "GSD"
+        ],
+        "summary": "Transition a GSD plan status",
+        "operationId": "transitionGsdPlan",
+        "parameters": [
+          {
+            "name": "plan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GsdPlanTransitionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plan transitioned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plan": {
+                      "$ref": "#/components/schemas/GsdPlan"
+                    },
+                    "from_status": {
+                      "$ref": "#/components/schemas/GsdPlanStatus"
+                    },
+                    "to_status": {
+                      "$ref": "#/components/schemas/GsdPlanStatus"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
           }
         }
       }
@@ -7529,6 +8785,79 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/tasks/{id}/gate": {
+      "patch": {
+        "tags": [
+          "Tasks"
+        ],
+        "summary": "Approve or reject a gate-required task",
+        "operationId": "updateTaskGate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "gate_status"
+                ],
+                "properties": {
+                  "gate_status": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task gate updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "task": {
+                      "$ref": "#/components/schemas/Task"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -11424,6 +12753,51 @@
           "metadata": {
             "type": "object"
           },
+          "gsd_phase": {
+            "$ref": "#/components/schemas/GsdLifecyclePhase"
+          },
+          "gate_required": {
+            "type": "integer"
+          },
+          "gate_status": {
+            "$ref": "#/components/schemas/GsdGateStatus"
+          },
+          "gate_approved_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gate_approved_at": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "gsd_workstream_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "gsd_milestone_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "gsd_phase_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "gsd_plan_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "created_at": {
             "type": "integer"
           },
@@ -11603,11 +12977,700 @@
           "description": {
             "type": "string"
           },
+          "gsd_enabled": {
+            "type": "integer"
+          },
+          "gsd_track": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ops",
+              "product",
+              "marketing",
+              "legal",
+              "firmvault",
+              "custom",
+              null
+            ]
+          },
+          "gsd_phase": {
+            "$ref": "#/components/schemas/GsdLifecyclePhase"
+          },
+          "gsd_gate_mode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "manual_approval",
+              "auto_internal",
+              null
+            ]
+          },
+          "gsd_project_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "gsd_updated_at": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "created_at": {
             "type": "integer"
           },
           "updated_at": {
             "type": "integer"
+          }
+        }
+      },
+      "GsdLifecyclePhase": {
+        "type": "string",
+        "enum": [
+          "discuss",
+          "plan",
+          "execute",
+          "verify",
+          "done"
+        ]
+      },
+      "GsdGateStatus": {
+        "type": "string",
+        "enum": [
+          "not_required",
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      },
+      "GsdWorkstreamStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "paused",
+          "complete"
+        ]
+      },
+      "GsdMilestoneStatus": {
+        "type": "string",
+        "enum": [
+          "planned",
+          "active",
+          "complete",
+          "archived"
+        ]
+      },
+      "GsdPhaseStatus": {
+        "type": "string",
+        "enum": [
+          "planned",
+          "active",
+          "complete",
+          "deferred"
+        ]
+      },
+      "GsdPlanStatus": {
+        "type": "string",
+        "enum": [
+          "todo",
+          "in_progress",
+          "review",
+          "done",
+          "failed"
+        ]
+      },
+      "GsdOptimisticLockRequest": {
+        "type": "object",
+        "properties": {
+          "expected_updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "GsdProjectTransitionRequest": {
+        "type": "object",
+        "required": [
+          "to_phase"
+        ],
+        "properties": {
+          "to_phase": {
+            "$ref": "#/components/schemas/GsdLifecyclePhase"
+          },
+          "waive_remaining": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "GsdWorkstream": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdWorkstreamStatus"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "GsdWorkstreamCreateRequest": {
+        "type": "object",
+        "required": [
+          "key",
+          "name"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdWorkstreamStatus"
+          }
+        }
+      },
+      "GsdWorkstreamUpdateRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/components/schemas/GsdWorkstreamStatus"
+              }
+            }
+          }
+        ]
+      },
+      "GsdMilestone": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "workstream_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "version_label": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdMilestoneStatus"
+          },
+          "started_at": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "completed_at": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "GsdMilestoneCreateRequest": {
+        "type": "object",
+        "required": [
+          "version_label",
+          "title"
+        ],
+        "properties": {
+          "workstream_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "version_label": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdMilestoneStatus"
+          },
+          "started_at": {
+            "type": "integer"
+          },
+          "completed_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "GsdMilestoneUpdateRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "workstream_id": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "version_label": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/components/schemas/GsdMilestoneStatus"
+              },
+              "started_at": {
+                "type": "integer"
+              },
+              "completed_at": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      },
+      "GsdPhase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "milestone_id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "phase_key": {
+            "type": "string"
+          },
+          "phase_slug": {
+            "type": "string"
+          },
+          "lifecycle_phase": {
+            "$ref": "#/components/schemas/GsdLifecyclePhase"
+          },
+          "ordering_numeric": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdPhaseStatus"
+          },
+          "depends_on_phase_ids": {
+            "type": "string",
+            "description": "JSON-encoded array of phase IDs in storage responses"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "GsdPhaseCreateRequest": {
+        "type": "object",
+        "required": [
+          "phase_key",
+          "phase_slug",
+          "ordering_numeric"
+        ],
+        "properties": {
+          "phase_key": {
+            "type": "string"
+          },
+          "phase_slug": {
+            "type": "string"
+          },
+          "lifecycle_phase": {
+            "$ref": "#/components/schemas/GsdLifecyclePhase"
+          },
+          "ordering_numeric": {
+            "type": "number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdPhaseStatus"
+          },
+          "depends_on_phase_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "GsdPhaseUpdateRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "phase_key": {
+                "type": "string"
+              },
+              "phase_slug": {
+                "type": "string"
+              },
+              "lifecycle_phase": {
+                "$ref": "#/components/schemas/GsdLifecyclePhase"
+              },
+              "ordering_numeric": {
+                "type": "number"
+              },
+              "status": {
+                "$ref": "#/components/schemas/GsdPhaseStatus"
+              },
+              "depends_on_phase_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "GsdPhaseTransitionRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "to_lifecycle_phase"
+            ],
+            "properties": {
+              "to_lifecycle_phase": {
+                "$ref": "#/components/schemas/GsdLifecyclePhase"
+              }
+            }
+          }
+        ]
+      },
+      "GsdPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "phase_id": {
+            "type": "integer"
+          },
+          "milestone_id": {
+            "type": "integer"
+          },
+          "project_id": {
+            "type": "integer"
+          },
+          "plan_ref": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "wave": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdPlanStatus"
+          },
+          "depends_on_plan_ids": {
+            "type": "string",
+            "description": "JSON-encoded array of plan IDs in storage responses"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "integer"
+          }
+        }
+      },
+      "GsdPlanCreateRequest": {
+        "type": "object",
+        "required": [
+          "plan_ref",
+          "title"
+        ],
+        "properties": {
+          "plan_ref": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "wave": {
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/GsdPlanStatus"
+          },
+          "depends_on_plan_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "GsdPlanUpdateRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "plan_ref": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "wave": {
+                "type": "integer"
+              },
+              "status": {
+                "$ref": "#/components/schemas/GsdPlanStatus"
+              },
+              "depends_on_plan_ids": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "GsdPlanTransitionRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/GsdOptimisticLockRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "to_status"
+            ],
+            "properties": {
+              "to_status": {
+                "$ref": "#/components/schemas/GsdPlanStatus"
+              }
+            }
+          }
+        ]
+      },
+      "GsdLifecycleGraph": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "rollups": {
+            "type": "object",
+            "properties": {
+              "active_workstreams": {
+                "type": "integer"
+              },
+              "active_milestones": {
+                "type": "integer"
+              },
+              "active_phases": {
+                "type": "integer"
+              },
+              "in_progress_plans": {
+                "type": "integer"
+              },
+              "blocked_gates": {
+                "type": "integer"
+              },
+              "wave_conflicts": {
+                "type": "integer"
+              }
+            }
+          },
+          "workstreams": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/GsdWorkstream"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/GsdMilestone"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "phases": {
+                                "type": "array",
+                                "items": {
+                                  "allOf": [
+                                    {
+                                      "$ref": "#/components/schemas/GsdPhase"
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "plans": {
+                                          "type": "array",
+                                          "items": {
+                                            "$ref": "#/components/schemas/GsdPlan"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "unscopedMilestones": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/GsdMilestone"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "phases": {
+                      "type": "array",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/GsdPhase"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "plans": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/components/schemas/GsdPlan"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "legacy": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "current_phase": {
+                "$ref": "#/components/schemas/GsdLifecyclePhase"
+              },
+              "track": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gate_mode": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "task_counts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phase": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "fallback_active": {
+                "type": "boolean"
+              }
+            }
           }
         }
       }

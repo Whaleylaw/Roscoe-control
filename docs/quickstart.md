@@ -212,6 +212,15 @@ node scripts/mc-cli.cjs tasks queue --agent scout --json
 
 # Watch events in real time
 node scripts/mc-cli.cjs events watch --types task,agent
+
+# Read the Phase 10 lifecycle graph
+node scripts/mc-cli.cjs projects lifecycle-graph --id 42 --json
+
+# Create hierarchy entities
+node scripts/mc-cli.cjs projects workstreams create --id 42 --key core --name "Core Platform" --json
+node scripts/mc-cli.cjs projects milestones create --id 42 --version v2.1 --title "Gateway parity rollout" --workstream-id 7 --json
+node scripts/mc-cli.cjs gsd phases create --milestone-id 11 --key 10-01 --slug schema-and-api-foundation --order 10.01 --json
+node scripts/mc-cli.cjs gsd plans transition --plan-id 27 --to in_progress --json
 ```
 
 See [CLI Reference](cli-agent-control.md) for the full command list.
@@ -229,6 +238,7 @@ Set `MC_URL` and `MC_API_KEY` in your environment. The MCP server exposes 35+ to
 ## What's Next?
 
 - **[Agent Setup Guide](agent-setup.md)** — Configure SOUL personalities, agent sources, and heartbeat settings
+- **[GSD Lifecycle Guide](agent-gsd-guide.md)** — Run projects through the legacy shell or the new Phase 10 workstream/milestone/phase/plan hierarchy
 - **[Orchestration Patterns](orchestration.md)** — Multi-agent workflows, auto-dispatch, quality review gates
 - **[CLI Reference](cli-agent-control.md)** — Full CLI command reference
 - **[CLI Integration](cli-integration.md)** — Direct CLI and gateway-free connections

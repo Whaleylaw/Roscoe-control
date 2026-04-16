@@ -2,15 +2,11 @@ import { NextResponse } from 'next/server'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-let cachedSpec: string | null = null
-
 export async function GET() {
-  if (!cachedSpec) {
-    const specPath = join(process.cwd(), 'openapi.json')
-    cachedSpec = readFileSync(specPath, 'utf-8')
-  }
+  const specPath = join(process.cwd(), 'openapi.json')
+  const spec = readFileSync(specPath, 'utf-8')
 
-  return new NextResponse(cachedSpec, {
+  return new NextResponse(spec, {
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'public, max-age=3600',

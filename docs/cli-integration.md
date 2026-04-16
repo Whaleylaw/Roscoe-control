@@ -64,7 +64,16 @@ curl -N http://localhost:3000/api/events \
   -H "x-api-key: YOUR_API_KEY"
 ```
 
-Receives real-time events: task assignments, mentions, agent status changes, etc.
+Receives real-time events: task assignments, mentions, agent status changes, and GSD lifecycle events.
+
+For Phase 10 projects, the Lifecycle tab listens for project-scoped `gsd.*` events and refetches `/api/projects/:id/gsd/lifecycle-graph` on changes. Headless clients can use the same pattern:
+
+- subscribe to `GET /api/events`
+- filter by `project_id`
+- on `gsd.workstream.*`, `gsd.milestone.*`, `gsd.phase.*`, `gsd.plan.*`, or `gsd.conflict.detected`
+- refetch the lifecycle graph
+
+When a plan transition is blocked by same-wave overlap, the server emits `gsd.conflict.detected` and the failed mutation returns `409` with `code: "WAVE_CONFLICT_BLOCKED"`, `blocking_plan_ids`, and `conflicting_paths`.
 
 ### 4. Report token usage
 
@@ -119,3 +128,4 @@ DELETE /api/connect  →  Agent set offline (if no other connections)
 - Each agent can only have one active connection at a time. A new `POST /api/connect` for the same agent deactivates the previous connection.
 - The `sessionId` format for token reporting follows `{agentName}:{chatType}` convention (e.g., `my-agent:chat`, `my-agent:cli`).
 - Heartbeat responses include pending work items (assigned tasks, mentions, notifications) so CLI tools can act on them.
+- The first-party CLI now wraps the Phase 10 hierarchy directly through `projects lifecycle-graph`, `projects workstreams ...`, `projects milestones ...`, `gsd phases ...`, and `gsd plans ...`.

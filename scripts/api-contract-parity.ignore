@@ -15,3 +15,6 @@ GET /api/gateways/control
 POST /api/gateways/control
 GET /api/mcp-audit/verify
 POST /api/hermes/events
+# Experimental untracked session-send routes remain out of public contract for now.
+POST /api/sessions/hermes/send
+POST /api/sessions/send

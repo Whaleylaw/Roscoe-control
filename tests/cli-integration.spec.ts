@@ -2,7 +2,15 @@ import { expect, test } from '@playwright/test'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import path from 'node:path'
-import { API_KEY_HEADER, createTestAgent, deleteTestAgent, createTestTask, deleteTestTask } from './helpers'
+import {
+  API_KEY_HEADER,
+  createTestAgent,
+  createTestProject,
+  createTestTask,
+  deleteTestAgent,
+  deleteTestProject,
+  deleteTestTask,
+} from './helpers'
 
 const execFileAsync = promisify(execFile)
 
@@ -153,6 +161,133 @@ test.describe('CLI Integration', () => {
       expect(listCode).toBe(0)
       const comments = parsed.data?.comments || parsed.comments || []
       expect(comments.length).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  test.describe('phase 10 hierarchy cli', () => {
+    const projectIds: number[] = []
+
+    test.afterEach(async ({ request }) => {
+      for (const id of projectIds.splice(0)) {
+        await deleteTestProject(request, id).catch(() => {})
+      }
+    })
+
+    test('projects/gsd commands can create and transition hierarchy entities', async ({ request }) => {
+      const project = await createTestProject(request, {
+        gsd_enabled: true,
+        gsd_track: 'product',
+        gsd_gate_mode: 'manual_approval',
+      })
+      projectIds.push(project.id)
+
+      const { parsed: graph1, exitCode: graphCode1 } = await mc('projects', 'lifecycle-graph', '--id', String(project.id))
+      expect(graphCode1).toBe(0)
+      expect((graph1.data || graph1).workstreams).toEqual([])
+
+      const { parsed: wsCreate, exitCode: wsCode } = await mc(
+        'projects',
+        'workstreams',
+        'create',
+        '--id',
+        String(project.id),
+        '--key',
+        'core',
+        '--name',
+        'Core Platform',
+      )
+      expect(wsCode).toBe(0)
+      const workstream = (wsCreate.data || wsCreate).workstream
+      expect(workstream.key).toBe('core')
+
+      const { parsed: msCreate, exitCode: msCode } = await mc(
+        'projects',
+        'milestones',
+        'create',
+        '--id',
+        String(project.id),
+        '--workstream-id',
+        String(workstream.id),
+        '--version',
+        'v2.1',
+        '--title',
+        'Gateway parity rollout',
+        '--status',
+        'active',
+      )
+      expect(msCode).toBe(0)
+      const milestone = (msCreate.data || msCreate).milestone
+      expect(milestone.version_label).toBe('v2.1')
+
+      const { parsed: phaseCreate, exitCode: phaseCode } = await mc(
+        'gsd',
+        'phases',
+        'create',
+        '--milestone-id',
+        String(milestone.id),
+        '--key',
+        '10-01',
+        '--slug',
+        'schema-and-api-foundation',
+        '--order',
+        '10.01',
+        '--lifecycle',
+        'discuss',
+        '--status',
+        'active',
+      )
+      expect(phaseCode).toBe(0)
+      const phase = (phaseCreate.data || phaseCreate).phase
+      expect(phase.phase_key).toBe('10-01')
+
+      const { parsed: planCreate, exitCode: planCode } = await mc(
+        'gsd',
+        'plans',
+        'create',
+        '--phase-id',
+        String(phase.id),
+        '--ref',
+        '10-01-PLAN',
+        '--title',
+        'Ship schema and validation',
+        '--wave',
+        '1',
+      )
+      expect(planCode).toBe(0)
+      const plan = (planCreate.data || planCreate).plan
+      expect(plan.plan_ref).toBe('10-01-PLAN')
+
+      const { parsed: phaseTransition, exitCode: phaseTransitionCode } = await mc(
+        'gsd',
+        'phases',
+        'transition',
+        '--phase-id',
+        String(phase.id),
+        '--to',
+        'plan',
+      )
+      expect(phaseTransitionCode).toBe(0)
+      expect((phaseTransition.data || phaseTransition).to_phase).toBe('plan')
+
+      const { parsed: planTransition, exitCode: planTransitionCode } = await mc(
+        'gsd',
+        'plans',
+        'transition',
+        '--plan-id',
+        String(plan.id),
+        '--to',
+        'in_progress',
+      )
+      expect(planTransitionCode).toBe(0)
+      expect((planTransition.data || planTransition).plan.status).toBe('in_progress')
+
+      const { parsed: graph2, exitCode: graphCode2 } = await mc('projects', 'lifecycle-graph', '--id', String(project.id))
+      expect(graphCode2).toBe(0)
+      const graph = graph2.data || graph2
+      expect(graph.rollups.active_workstreams).toBe(1)
+      expect(graph.rollups.active_milestones).toBe(1)
+      expect(graph.rollups.active_phases).toBe(1)
+      expect(graph.rollups.in_progress_plans).toBe(1)
     })
   })
 

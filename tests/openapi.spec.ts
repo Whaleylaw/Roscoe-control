@@ -24,6 +24,11 @@ test.describe('OpenAPI Documentation', () => {
     expect(paths).toContain('/api/tasks')
     expect(paths).toContain('/api/tokens')
     expect(paths).toContain('/api/auth/login')
+    expect(paths).toContain('/api/projects/{id}/gsd/lifecycle-graph')
+    expect(paths).toContain('/api/projects/{id}/gsd/workstreams')
+    expect(paths).toContain('/api/gsd/milestones/{milestone_id}/phases')
+    expect(paths).toContain('/api/gsd/phases/{phase_id}/plans')
+    expect(paths).toContain('/api/gsd/plans/{plan_id}/transition')
   })
 
   test('GET /api/docs is accessible without auth', async ({ request }) => {

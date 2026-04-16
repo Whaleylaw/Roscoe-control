@@ -51,7 +51,11 @@ Groups:
   auth         login/logout/whoami
   agents       list/get/create/update/delete/wake/diagnostics/heartbeat
                memory get|set|clear / soul get|set|templates / attribution
-  projects     create/list/get/bootstrap/transition
+  projects     create/list/get/bootstrap/transition/lifecycle-graph
+               workstreams list|create|update|complete
+               milestones list|create|update|complete
+  gsd          phases list|create|update|transition
+               plans list|create|update|transition
   tasks        list/get/create/update/delete/queue
                comments list|add / broadcast / gate
   sessions     list/control/continue/transcript
@@ -79,6 +83,11 @@ Examples:
   mc projects create --name "Q2 Pricing" --gsd --track product --json
   mc projects bootstrap --id 42 --json
   mc projects transition --id 42 --to plan --json
+  mc projects lifecycle-graph --id 42 --json
+  mc projects workstreams create --id 42 --key core --name "Core Platform" --json
+  mc projects milestones create --id 42 --version v2.1 --title "Gateway parity rollout" --workstream-id 7 --json
+  mc gsd phases create --milestone-id 11 --key 10-01 --slug schema-and-api-foundation --order 10.01 --json
+  mc gsd plans transition --plan-id 27 --to in_progress --json
   mc tasks queue --agent Aegis --max-capacity 2
   mc tasks comments list --id 42
   mc tasks comments add --id 42 --content "Looks good"
@@ -163,6 +172,24 @@ function optional(flags, key, fallback) {
 function bodyFromFlags(flags) {
   if (flags.body) return JSON.parse(String(flags.body));
   return undefined;
+}
+
+function parseOptionalInteger(value) {
+  if (value === undefined || value === true || value === null || value === '') return undefined;
+  return Number.parseInt(String(value), 10);
+}
+
+function parseOptionalNumber(value) {
+  if (value === undefined || value === true || value === null || value === '') return undefined;
+  return Number(String(value));
+}
+
+function parseIdListFlag(value) {
+  if (value === undefined || value === true || value === null || String(value).trim() === '') return [];
+  return String(value)
+    .split(',')
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((n) => Number.isInteger(n) && n > 0);
 }
 
 async function httpRequest({ baseUrl, apiKey, cookie, method, route, body, timeoutMs = 20000 }) {
@@ -390,9 +417,12 @@ const commands = {
     },
   },
 
-  // Compound: projects create|list|get|bootstrap|transition
+  // Compound: projects create|list|get|bootstrap|transition|lifecycle-graph
+  //          projects workstreams <list|create|update|complete>
+  //          projects milestones <list|create|update|complete>
   projects: (flags) => {
     const sub = flags._sub;
+    const sub2 = flags._sub2;
     if (sub === 'create') {
       if (flags.body) {
         return { method: 'POST', route: '/api/projects', body: bodyFromFlags(flags) };
@@ -431,7 +461,179 @@ const commands = {
         body,
       };
     }
-    throw new Error(`Unknown projects subcommand: ${sub}. Use create|list|get|bootstrap|transition`);
+    if (sub === 'lifecycle-graph') {
+      return {
+        method: 'GET',
+        route: `/api/projects/${required(flags, 'id')}/gsd/lifecycle-graph`,
+      };
+    }
+    if (sub === 'workstreams') {
+      const projectId = required(flags, 'id');
+      if (sub2 === 'list') {
+        return { method: 'GET', route: `/api/projects/${projectId}/gsd/workstreams` };
+      }
+      if (sub2 === 'create') {
+        const body = bodyFromFlags(flags) || {
+          key: required(flags, 'key'),
+          name: required(flags, 'name'),
+        };
+        if (!flags.body && flags.status) body.status = String(flags.status);
+        return { method: 'POST', route: `/api/projects/${projectId}/gsd/workstreams`, body };
+      }
+      if (sub2 === 'update') {
+        const body = bodyFromFlags(flags) || {};
+        if (!flags.body) {
+          if (flags.key) body.key = String(flags.key);
+          if (flags.name) body.name = String(flags.name);
+          if (flags.status) body.status = String(flags.status);
+          if (flags['expected-updated-at']) body.expected_updated_at = Number(flags['expected-updated-at']);
+        }
+        return {
+          method: 'PATCH',
+          route: `/api/projects/${projectId}/gsd/workstreams/${required(flags, 'ws-id')}`,
+          body,
+        };
+      }
+      if (sub2 === 'complete') {
+        const body = bodyFromFlags(flags) || {};
+        if (!flags.body && flags['expected-updated-at']) {
+          body.expected_updated_at = Number(flags['expected-updated-at']);
+        }
+        return {
+          method: 'POST',
+          route: `/api/projects/${projectId}/gsd/workstreams/${required(flags, 'ws-id')}/complete`,
+          body,
+        };
+      }
+      throw new Error('Unknown projects workstreams subcommand: use list|create|update|complete');
+    }
+    if (sub === 'milestones') {
+      const projectId = required(flags, 'id');
+      if (sub2 === 'list') {
+        return { method: 'GET', route: `/api/projects/${projectId}/gsd/milestones` };
+      }
+      if (sub2 === 'create') {
+        const body = bodyFromFlags(flags) || {
+          version_label: required(flags, 'version'),
+          title: required(flags, 'title'),
+        };
+        if (!flags.body) {
+          if (flags['workstream-id']) body.workstream_id = parseOptionalInteger(flags['workstream-id']);
+          if (flags.status) body.status = String(flags.status);
+          if (flags['started-at']) body.started_at = Number(flags['started-at']);
+          if (flags['completed-at']) body.completed_at = Number(flags['completed-at']);
+        }
+        return { method: 'POST', route: `/api/projects/${projectId}/gsd/milestones`, body };
+      }
+      if (sub2 === 'update') {
+        const body = bodyFromFlags(flags) || {};
+        if (!flags.body) {
+          if (flags['workstream-id'] !== undefined) body.workstream_id = parseOptionalInteger(flags['workstream-id']);
+          if (flags.version) body.version_label = String(flags.version);
+          if (flags.title) body.title = String(flags.title);
+          if (flags.status) body.status = String(flags.status);
+          if (flags['started-at']) body.started_at = Number(flags['started-at']);
+          if (flags['completed-at']) body.completed_at = Number(flags['completed-at']);
+          if (flags['expected-updated-at']) body.expected_updated_at = Number(flags['expected-updated-at']);
+        }
+        return {
+          method: 'PATCH',
+          route: `/api/projects/${projectId}/gsd/milestones/${required(flags, 'milestone-id')}`,
+          body,
+        };
+      }
+      if (sub2 === 'complete') {
+        const body = bodyFromFlags(flags) || {};
+        if (!flags.body && flags['expected-updated-at']) {
+          body.expected_updated_at = Number(flags['expected-updated-at']);
+        }
+        return {
+          method: 'POST',
+          route: `/api/projects/${projectId}/gsd/milestones/${required(flags, 'milestone-id')}/complete`,
+          body,
+        };
+      }
+      throw new Error('Unknown projects milestones subcommand: use list|create|update|complete');
+    }
+    throw new Error(`Unknown projects subcommand: ${sub}. Use create|list|get|bootstrap|transition|lifecycle-graph|workstreams|milestones`);
+  },
+
+  gsd: (flags) => {
+    const sub = flags._sub;
+    const sub2 = flags._sub2;
+    if (sub === 'phases') {
+      if (sub2 === 'list') {
+        return { method: 'GET', route: `/api/gsd/milestones/${required(flags, 'milestone-id')}/phases` };
+      }
+      if (sub2 === 'create') {
+        const body = bodyFromFlags(flags) || {
+          phase_key: required(flags, 'key'),
+          phase_slug: required(flags, 'slug'),
+          ordering_numeric: parseOptionalNumber(required(flags, 'order')),
+        };
+        if (!flags.body) {
+          if (flags.lifecycle) body.lifecycle_phase = String(flags.lifecycle);
+          if (flags.status) body.status = String(flags.status);
+          body.depends_on_phase_ids = parseIdListFlag(flags['depends-on']);
+        }
+        return { method: 'POST', route: `/api/gsd/milestones/${required(flags, 'milestone-id')}/phases`, body };
+      }
+      if (sub2 === 'update') {
+        const body = bodyFromFlags(flags) || {};
+        if (!flags.body) {
+          if (flags.key) body.phase_key = String(flags.key);
+          if (flags.slug) body.phase_slug = String(flags.slug);
+          if (flags.lifecycle) body.lifecycle_phase = String(flags.lifecycle);
+          if (flags.order) body.ordering_numeric = parseOptionalNumber(flags.order);
+          if (flags.status) body.status = String(flags.status);
+          if (flags['depends-on'] !== undefined) body.depends_on_phase_ids = parseIdListFlag(flags['depends-on']);
+          if (flags['expected-updated-at']) body.expected_updated_at = Number(flags['expected-updated-at']);
+        }
+        return { method: 'PATCH', route: `/api/gsd/phases/${required(flags, 'phase-id')}`, body };
+      }
+      if (sub2 === 'transition') {
+        const body = bodyFromFlags(flags) || { to_lifecycle_phase: required(flags, 'to') };
+        if (!flags.body && flags['expected-updated-at']) body.expected_updated_at = Number(flags['expected-updated-at']);
+        return { method: 'POST', route: `/api/gsd/phases/${required(flags, 'phase-id')}/transition`, body };
+      }
+      throw new Error('Unknown gsd phases subcommand: use list|create|update|transition');
+    }
+    if (sub === 'plans') {
+      if (sub2 === 'list') {
+        return { method: 'GET', route: `/api/gsd/phases/${required(flags, 'phase-id')}/plans` };
+      }
+      if (sub2 === 'create') {
+        const body = bodyFromFlags(flags) || {
+          plan_ref: required(flags, 'ref'),
+          title: required(flags, 'title'),
+        };
+        if (!flags.body) {
+          if (flags.wave) body.wave = Number(flags.wave);
+          if (flags.status) body.status = String(flags.status);
+          body.depends_on_plan_ids = parseIdListFlag(flags['depends-on']);
+        }
+        return { method: 'POST', route: `/api/gsd/phases/${required(flags, 'phase-id')}/plans`, body };
+      }
+      if (sub2 === 'update') {
+        const body = bodyFromFlags(flags) || {};
+        if (!flags.body) {
+          if (flags.ref) body.plan_ref = String(flags.ref);
+          if (flags.title) body.title = String(flags.title);
+          if (flags.wave) body.wave = Number(flags.wave);
+          if (flags.status) body.status = String(flags.status);
+          if (flags['depends-on'] !== undefined) body.depends_on_plan_ids = parseIdListFlag(flags['depends-on']);
+          if (flags['expected-updated-at']) body.expected_updated_at = Number(flags['expected-updated-at']);
+        }
+        return { method: 'PATCH', route: `/api/gsd/plans/${required(flags, 'plan-id')}`, body };
+      }
+      if (sub2 === 'transition') {
+        const body = bodyFromFlags(flags) || { to_status: required(flags, 'to') };
+        if (!flags.body && flags['expected-updated-at']) body.expected_updated_at = Number(flags['expected-updated-at']);
+        return { method: 'POST', route: `/api/gsd/plans/${required(flags, 'plan-id')}/transition`, body };
+      }
+      throw new Error('Unknown gsd plans subcommand: use list|create|update|transition');
+    }
+    throw new Error('Unknown gsd subcommand: use phases|plans');
   },
 
   tasks: {
@@ -767,6 +969,7 @@ async function run() {
       // The 2nd positional (action) is the subcommand.
       handler = groupMap;
       parsed.flags._sub = action;
+      parsed.flags._sub2 = sub;
     } else {
       handler = groupMap[action];
       if (!handler) {

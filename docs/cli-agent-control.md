@@ -61,6 +61,25 @@ node scripts/mc-cli.cjs sessions control --id <session-id> --action terminate
 - get --id
 - bootstrap --id
 - transition --id --to <discuss|plan|execute|verify|done> [--waive --reason "..."]
+- lifecycle-graph --id
+- workstreams list --id
+- workstreams create --id --key <key> --name <name> [--status <active|paused|complete>]
+- workstreams update --id --ws-id <id> [--key <key>] [--name <name>] [--status <active|paused|complete>] [--expected-updated-at <iso>]
+- workstreams complete --id --ws-id <id> [--expected-updated-at <iso>]
+- milestones list --id
+- milestones create --id --version <label> --title <title> [--workstream-id <id>] [--status <planned|active|complete|archived>] [--started-at <iso>] [--completed-at <iso>]
+- milestones update --id --milestone-id <id> [--version <label>] [--title <title>] [--workstream-id <id>] [--status <planned|active|complete|archived>] [--started-at <iso>] [--completed-at <iso>] [--expected-updated-at <iso>]
+- milestones complete --id --milestone-id <id> [--expected-updated-at <iso>]
+
+### gsd
+- phases list --milestone-id <id>
+- phases create --milestone-id <id> --key <phase_key> --slug <phase_slug> --order <number> [--lifecycle <discuss|plan|execute|verify|done>] [--status <planned|active|complete|deferred>] [--depends-on 1,2]
+- phases update --phase-id <id> [--key <phase_key>] [--slug <phase_slug>] [--order <number>] [--lifecycle <discuss|plan|execute|verify|done>] [--status <planned|active|complete|deferred>] [--depends-on 1,2] [--expected-updated-at <iso>]
+- phases transition --phase-id <id> --to <discuss|plan|execute|verify|done> [--expected-updated-at <iso>]
+- plans list --phase-id <id>
+- plans create --phase-id <id> --ref <plan_ref> --title <title> [--wave <string>] [--status <todo|in_progress|review|done|failed>] [--depends-on 1,2]
+- plans update --plan-id <id> [--ref <plan_ref>] [--title <title>] [--wave <string>] [--status <todo|in_progress|review|done|failed>] [--depends-on 1,2] [--expected-updated-at <iso>]
+- plans transition --plan-id <id> --to <todo|in_progress|review|done|failed> [--expected-updated-at <iso>]
 
 ### tasks
 - list [--project <id>] [--phase <discuss|plan|execute|verify>] [--gate-required]
@@ -130,6 +149,21 @@ node scripts/mc-cli.cjs sessions control --id <session-id> --action terminate
 ### raw
 - raw --method GET --path /api/... [--body '{}']
 
+  Phase 10 example:
+
+```bash
+node scripts/mc-cli.cjs raw \
+  --method GET \
+  --path /api/projects/42/gsd/lifecycle-graph
+```
+
+```bash
+node scripts/mc-cli.cjs raw \
+  --method POST \
+  --path /api/projects/42/gsd/workstreams \
+  --body '{"key":"core-platform","name":"Core Platform","status":"active"}'
+```
+
 ## Exit code contract
 
 - 0 success
@@ -138,6 +172,9 @@ node scripts/mc-cli.cjs sessions control --id <session-id> --action terminate
 - 4 permission error (403)
 - 5 network/timeout
 - 6 server error (5xx)
+
+Phase 10 note:
+- plan transitions can return `409` with `code: "WAVE_CONFLICT_BLOCKED"` when same-wave active plans point at overlapping task resource hints; the payload includes `blocking_plan_ids` and `conflicting_paths`
 
 ## API contract parity gate
 
@@ -168,5 +205,4 @@ Baseline policy in this repo:
 
 - Promote script to package.json bin entry (`mc`).
 - Add retry/backoff for transient failures.
-- Add integration tests that run the CLI against a test server fixture.
 - Add richer pagination/filter flags for list commands.
