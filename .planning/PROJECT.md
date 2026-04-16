@@ -4,15 +4,17 @@
 
 A full-takeover project workspace for Mission Control that elevates projects from a task-grouping label into a first-class destination. Users navigate into a project and get a dedicated dashboard with status overview, activity feed, and project brief — plus scoped views for tasks, agent sessions, agents, and settings. Breadcrumb navigation moves between projects and back to the main view.
 
-v1.1 extends this workspace with native GSD lifecycle support: projects can be flagged `gsd_enabled`, move through Discuss → Plan → Execute → Verify → Done phases, and gate critical tasks behind operator/admin approval — eliminating the need to reach for the CLI to track phase state.
+v1.1 extends this workspace with native GSD lifecycle support: projects can be flagged `gsd_enabled`, move through Discuss → Plan → Execute → Verify → Done phases, and gate critical tasks behind operator/admin approval.
+
+Phase 10 extends that model again: a single project can now host multiple workstreams, milestones, phases, and plans concurrently, with the Lifecycle tab acting as the primary operator surface over the hierarchical graph.
 
 ## Core Value
 
 When I click into a project, I see everything about that project — what it is, what's happening, what's next — and I can manage all its work from one place, including driving it through its GSD lifecycle.
 
-## Current Milestone: v1.1 Native GSD Integration
+## Current Milestone: v1.1 Native GSD Integration + Phase 10 Extension
 
-**Goal:** Build first-class GSD lifecycle support (Discuss → Plan → Execute → Verify → Done) directly into Mission Control so every project can be created, tracked, and executed through phases in one system.
+**Goal:** Keep the native GSD lifecycle from v1.1, while removing the single-lifecycle-per-project bottleneck by adding first-class workstreams, milestones, phases, and plans inside one project.
 
 **Target features:**
 - GSD-aware project schema (`gsd_enabled`, `gsd_phase`, `gsd_track`, `gsd_gate_mode`) with lifecycle transitions
@@ -21,6 +23,11 @@ When I click into a project, I see everything about that project — what it is,
 - External JSON template system for bootstrap task packs (`<DATA_DIR>/gsd-templates/*.json` with bundled default fallback)
 - Three new API endpoints: bootstrap, transition, gate approval
 - i18n coverage across all 10 locales for new UI strings
+- Hierarchical GSD model inside one project: workstreams, milestones, phases, plans
+- Graph-backed Lifecycle tab with inline create/edit/transition flows
+- SSE-driven live refresh and readable conflict surfacing for hierarchy mutations
+- First-class CLI wrappers for hierarchy CRUD, transitions, and lifecycle-graph reads
+- Same-wave conflict analysis backed by task resource hints and plan transition blocking
 
 **Starting point:** Phase 09-CONTEXT.md already captures 38 locked implementation decisions (D-01..38) from `/gsd:discuss-phase 09`.
 
@@ -63,6 +70,16 @@ When I click into a project, I see everything about that project — what it is,
 - [x] Phase state is visible on the task board as per-task badges — Validated in Phase 9: GSD Native Integration
 - [x] Project workspace exposes a dedicated Lifecycle tab — Validated in Phase 9: GSD Native Integration
 - [x] Bootstrap templates loadable from external JSON files with bundled fallback — Validated in Phase 9: GSD Native Integration
+- [x] One project can host multiple GSD workstreams concurrently — Implemented in Phase 10
+- [x] One project can host multiple active milestones concurrently — Implemented in Phase 10
+- [x] Milestones can contain ordered phases with dependency checks — Implemented in Phase 10
+- [x] Phases can contain plan waves with plan dependency checks — Implemented in Phase 10
+- [x] Lifecycle tab reads a hierarchical lifecycle graph with legacy fallback — Implemented in Phase 10
+- [x] Lifecycle tab supports inline create/edit/complete/transition for hierarchy entities — Implemented in Phase 10
+- [x] Lifecycle tab live-refreshes from project-scoped `gsd.*` SSE events — Implemented in Phase 10
+- [x] OpenAPI and focused E2E/regression coverage for Phase 10 hierarchy — Implemented in Phase 10
+- [x] CLI wrappers exist for Phase 10 workstreams, milestones, phases, plans, and lifecycle-graph reads — Implemented in Phase 10
+- [x] Same-wave conflicts are counted in `rollups.wave_conflicts` and can block `plan -> in_progress` transitions — Implemented in Phase 10
 
 ### Out of Scope
 
@@ -99,6 +116,10 @@ When I click into a project, I see everything about that project — what it is,
 | v1.1: Operator+admin required for all GSD endpoints | Reuses existing MC role model; no new per-project approver table | Landed in Phase 9 (`requireRole(request, 'operator')` on bootstrap/transition/gate routes) |
 | v1.1: External JSON templates with bundled default fallback | Flexibility for users without forcing code changes | Landed in Phase 9 (`loadGsdTemplate` resolves `<DATA_DIR>/gsd-templates/*.json` → `DEFAULT_TEMPLATE`) |
 | v1.1: Dedicated Lifecycle tab (not just settings) + task badges | Discoverable where work happens; matches existing workspace tab pattern | Landed in Phase 9 (lifecycle-view + phase/gate badges on task cards) |
+| Phase 10: Keep project-level `gsd_phase` as legacy shell while hierarchy becomes primary model | Preserves backward compatibility and avoids forced migration of Phase 9 projects | Landed in Phase 10 (`/api/projects/:id/gsd/lifecycle-graph` returns both graph + legacy fallback metadata) |
+| Phase 10: REST-first hierarchy surface before CLI parity | Keeps delivery moving while contracts stabilize; UI can ship immediately on top of canonical routes | Landed in Phase 10 (hierarchy routes + Lifecycle tab shipped first; CLI wrappers followed once contracts settled) |
+| Phase 10: Optimistic locking on hierarchy mutations | Prevents silent overwrite races in the interactive Lifecycle tab | Landed in Phase 10 (`expected_updated_at` on PATCH/complete/transition routes) |
+| Phase 10: No MCP parity in this phase | Operator explicitly chose CLI + REST plus conflict analysis, not a matching MCP tool surface | Landed in Phase 10 (CLI wrappers shipped; MCP parity intentionally deferred) |
 
 ## Evolution
 
@@ -118,4 +139,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 — Milestone v1.1 (Native GSD Integration) opened*
+*Last updated: 2026-04-16 — Phase 10 complete; hierarchy model/UI/OpenAPI/E2E/CLI/conflict analysis landed and verified*

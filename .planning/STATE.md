@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: — Project Workspace & Dashboard
-status: Milestone complete
-stopped_at: "Completed 09-10-PLAN.md (Wave 4: verification sweep — E2E, /api/index docs, infra fixes)"
-last_updated: "2026-04-15T04:17:01.650Z"
+milestone: v1.1
+milestone_name: — Native GSD Integration
+status: Phase 10 complete
+stopped_at: "Phase 10 verified complete: hierarchy APIs/UI/docs/OpenAPI/E2E/CLI/conflict analysis landed, closeout fixes for idempotent creates and gate-aware hierarchy transitions are in, and verification is green"
+last_updated: "2026-04-16T00:10:00Z"
 progress:
-  total_phases: 9
-  completed_phases: 7
-  total_plans: 29
+  total_phases: 10
+  completed_phases: 10
+  total_plans: 35
   completed_plans: 35
 ---
 
@@ -16,34 +16,42 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-14 — v1.1 opened)
+See: .planning/PROJECT.md (updated 2026-04-16 — Phase 10 complete)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle.
-**Current focus:** Phase 09 — gsd-native-integration
+**Current focus:** Phase 10 is closed. Multi-GSD per project is verified complete; next work should start from a new phase or quick task.
 
 ## Current Position
 
-Phase: 09
-Plan: Not started
+Phase: 10 complete
+Plan: Await next phase / next quick task
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: 0 hours
+- Total plans completed: 35
+- Average duration: 7.2 min
+- Total execution time: 4.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-foundation | 3 | 7 min | 2.3 min |
+| 02-navigation-workspace-shell | 2 | 4 min | 2.0 min |
+| 03-project-dashboard | 3 | 5 min | 1.7 min |
+| 04-project-tasks | 2 | 14 min | 7.0 min |
+| 05-sessions-agents | 4 | 23 min | 5.8 min |
+| 06-settings | 2 | 17 min | 8.5 min |
+| 07-post-audit-gap-closure | 2 | 10 min | 5.0 min |
+| 08-projects-entry-point | 6 | 46 min | 7.7 min |
+| 09-gsd-native-integration | 11 | 126 min | 11.5 min |
 
 **Recent Trend:**
 
-- Last 5 plans: —
-- Trend: —
+- Last 5 plans: 09-06 (6 min), 09-09 (7 min), 09-08 (5 min), 09-07 (10 min), 09-10 (59 min)
+- Trend: Elevated by final Wave 4 verification sweep (09-10)
 
 *Updated after each plan completion*
 | Phase 01-foundation P00 | 1min | 3 tasks | 3 files |
@@ -203,11 +211,13 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Refresh `ROADMAP.md` milestone-overview lines so v1.1/Phase 09 no longer read as "context captured, plans next".
+- Decide disposition of untracked session-send API experiments before starting Phase 10 (`src/app/api/sessions/send/route.ts`, `src/app/api/sessions/hermes/send/route.ts`).
 
 ### Blockers/Concerns
 
-None yet.
+- Untracked session-send routes are real code but currently have no callers in UI/tests/docs and overlap with existing chat/session delivery paths; treat as experimental until either wired and tested or removed.
+- `.claude/` worktrees and `get-shit-done-main/` appear to be local runtime/reference artifacts, not Mission Control product code; they should stay out of Phase 10 implementation scope unless explicitly needed.
 
 ### Quick Tasks Completed
 
@@ -217,6 +227,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T04:09:48.067Z
-Stopped at: Completed 09-10-PLAN.md (Wave 4: verification sweep — E2E, /api/index docs, infra fixes)
+Last session: 2026-04-15T21:55:00Z
+Stopped at: Phase 10 verified complete; hierarchy model, routes, Lifecycle tab interactivity, docs, OpenAPI coverage, lifecycle-graph fallback correction, hierarchy CLI wrappers, same-wave conflict detection, idempotent creates, and gate-aware hierarchy transitions are in place
 Resume file: None
