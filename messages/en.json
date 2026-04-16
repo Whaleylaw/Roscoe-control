@@ -2398,6 +2398,14 @@
         "bootstrapFailed": "Couldn't reach the server. Retry bootstrap in a moment.",
         "enableFailed": "Couldn't enable GSD. {serverError} Try again.",
         "transitionFailed": "Couldn't advance the phase. Check your connection and try again."
+      },
+      "rollups": {
+        "activeWorkstreams": "Active workstreams",
+        "activeMilestones": "Active milestones",
+        "activePhases": "Active phases",
+        "inProgressPlans": "In progress plans",
+        "blockedGates": "Blocked gates",
+        "waveConflicts": "Wave conflicts"
       }
     }
   }
