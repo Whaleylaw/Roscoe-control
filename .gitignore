@@ -45,3 +45,7 @@ playwright-report/
 # Claude Code context files (root CLAUDE.md is committed for AI agent discovery)
 **/CLAUDE.md
 !/CLAUDE.md
+
+# Local runtime / reference artifacts — not product code
+.claude/
+get-shit-done-main/
