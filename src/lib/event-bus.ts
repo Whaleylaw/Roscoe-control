@@ -40,6 +40,19 @@ export type EventType =
   | 'session.updated'
   | 'project.gsd.transition'   // Phase 09 GSD-28, D-34
   | 'task.gate.changed'         // Phase 09 GSD-28, D-34
+  | 'gsd.workstream.created'
+  | 'gsd.workstream.updated'
+  | 'gsd.workstream.completed'
+  | 'gsd.milestone.created'
+  | 'gsd.milestone.updated'
+  | 'gsd.milestone.completed'
+  | 'gsd.phase.created'
+  | 'gsd.phase.updated'
+  | 'gsd.phase.transitioned'
+  | 'gsd.plan.created'
+  | 'gsd.plan.updated'
+  | 'gsd.plan.transitioned'
+  | 'gsd.conflict.detected'
 
 class ServerEventBus extends EventEmitter {
   private static instance: ServerEventBus | null = null

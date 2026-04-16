@@ -1467,6 +1467,94 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gate_status ON tasks(gate_status)`)
       db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_project_gsd_phase ON tasks(project_id, gsd_phase)`)
     }
+  },
+  {
+    id: '053_gsd_hierarchy_foundation',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS gsd_workstreams (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          key TEXT NOT NULL,
+          name TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          UNIQUE(project_id, key)
+        )
+      `)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS gsd_milestones (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          project_id INTEGER NOT NULL,
+          workstream_id INTEGER,
+          version_label TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'planned',
+          started_at INTEGER,
+          completed_at INTEGER,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          FOREIGN KEY (workstream_id) REFERENCES gsd_workstreams(id) ON DELETE SET NULL
+        )
+      `)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS gsd_phases (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          milestone_id INTEGER NOT NULL,
+          phase_key TEXT NOT NULL,
+          phase_slug TEXT NOT NULL,
+          lifecycle_phase TEXT NOT NULL DEFAULT 'discuss',
+          ordering_numeric REAL NOT NULL,
+          status TEXT NOT NULL DEFAULT 'planned',
+          depends_on_phase_ids TEXT NOT NULL DEFAULT '[]',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (milestone_id) REFERENCES gsd_milestones(id) ON DELETE CASCADE,
+          UNIQUE(milestone_id, phase_key)
+        )
+      `)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS gsd_plans (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          phase_id INTEGER NOT NULL,
+          plan_ref TEXT NOT NULL,
+          title TEXT NOT NULL,
+          wave INTEGER NOT NULL DEFAULT 1,
+          status TEXT NOT NULL DEFAULT 'todo',
+          depends_on_plan_ids TEXT NOT NULL DEFAULT '[]',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (phase_id) REFERENCES gsd_phases(id) ON DELETE CASCADE,
+          UNIQUE(phase_id, plan_ref)
+        )
+      `)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_workstreams_project_status ON gsd_workstreams(project_id, status)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_milestones_project_status ON gsd_milestones(project_id, status)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_milestones_workstream ON gsd_milestones(workstream_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_phases_milestone_order ON gsd_phases(milestone_id, ordering_numeric)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_phases_status ON gsd_phases(status)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_plans_phase_wave ON gsd_plans(phase_id, wave)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_gsd_plans_status ON gsd_plans(status)`)
+
+      const taskCols = db.prepare(`PRAGMA table_info(tasks)`).all() as Array<{ name: string }>
+      const hasTaskCol = (n: string) => taskCols.some((c) => c.name === n)
+      if (!hasTaskCol('gsd_workstream_id')) db.exec(`ALTER TABLE tasks ADD COLUMN gsd_workstream_id INTEGER`)
+      if (!hasTaskCol('gsd_milestone_id')) db.exec(`ALTER TABLE tasks ADD COLUMN gsd_milestone_id INTEGER`)
+      if (!hasTaskCol('gsd_phase_id')) db.exec(`ALTER TABLE tasks ADD COLUMN gsd_phase_id INTEGER`)
+      if (!hasTaskCol('gsd_plan_id')) db.exec(`ALTER TABLE tasks ADD COLUMN gsd_plan_id INTEGER`)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_workstream_id ON tasks(gsd_workstream_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_milestone_id ON tasks(gsd_milestone_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_phase_id ON tasks(gsd_phase_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_plan_id ON tasks(gsd_plan_id)`)
+    }
   }
 ]
 

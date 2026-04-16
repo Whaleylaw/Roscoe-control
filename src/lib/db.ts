@@ -219,7 +219,18 @@ export interface Task {
   gate_approved_by?: string | null;
   gate_approved_at?: number | null;
   depends_on_task_ids?: string | null; // JSON string
+  // Phase 10 — hierarchical GSD linkage (additive, legacy gsd_phase retained)
+  gsd_workstream_id?: number | null;
+  gsd_milestone_id?: number | null;
+  gsd_phase_id?: number | null;
+  gsd_plan_id?: number | null;
 }
+
+export type GsdLifecyclePhase = 'discuss' | 'plan' | 'execute' | 'verify' | 'done';
+export type GsdWorkstreamStatus = 'active' | 'paused' | 'complete';
+export type GsdMilestoneStatus = 'planned' | 'active' | 'complete' | 'archived';
+export type GsdPhaseStatus = 'planned' | 'active' | 'complete' | 'deferred';
+export type GsdPlanStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'failed';
 
 export interface Project {
   id: number;
@@ -245,6 +256,54 @@ export interface Project {
   gsd_gate_mode?: 'manual_approval' | 'auto_internal';
   gsd_project_id?: string | null;
   gsd_updated_at?: number | null;
+}
+
+export interface GsdWorkstream {
+  id: number;
+  project_id: number;
+  key: string;
+  name: string;
+  status: GsdWorkstreamStatus;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface GsdMilestone {
+  id: number;
+  project_id: number;
+  workstream_id?: number | null;
+  version_label: string;
+  title: string;
+  status: GsdMilestoneStatus;
+  started_at?: number | null;
+  completed_at?: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface GsdPhase {
+  id: number;
+  milestone_id: number;
+  phase_key: string;
+  phase_slug: string;
+  lifecycle_phase: GsdLifecyclePhase;
+  ordering_numeric: number;
+  status: GsdPhaseStatus;
+  depends_on_phase_ids: string; // JSON string
+  created_at: number;
+  updated_at: number;
+}
+
+export interface GsdPlan {
+  id: number;
+  phase_id: number;
+  plan_ref: string;
+  title: string;
+  wave: number;
+  status: GsdPlanStatus;
+  depends_on_plan_ids: string; // JSON string
+  created_at: number;
+  updated_at: number;
 }
 
 export interface Agent {

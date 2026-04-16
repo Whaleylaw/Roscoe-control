@@ -246,3 +246,107 @@ export const gsdTemplateSchema = z.object({
     verify: z.array(gsdTemplatePhaseEntrySchema),
   }),
 })
+
+// Phase 10 — hierarchical GSD model
+export const GSD_WORKSTREAM_STATUSES = ['active', 'paused', 'complete'] as const
+export const GSD_MILESTONE_STATUSES = ['planned', 'active', 'complete', 'archived'] as const
+export const GSD_PHASE_STATUSES = ['planned', 'active', 'complete', 'deferred'] as const
+export const GSD_PLAN_STATUSES = ['todo', 'in_progress', 'review', 'done', 'failed'] as const
+
+export const gsdWorkstreamStatusSchema = z.enum(GSD_WORKSTREAM_STATUSES)
+export const gsdMilestoneStatusSchema = z.enum(GSD_MILESTONE_STATUSES)
+export const gsdPhaseStatusSchema = z.enum(GSD_PHASE_STATUSES)
+export const gsdPlanStatusSchema = z.enum(GSD_PLAN_STATUSES)
+
+export const gsdDependencyIdsSchema = z.array(z.number().int().positive()).max(200).default([])
+export const gsdOptimisticLockSchema = z.object({
+  expected_updated_at: z.number().int().nonnegative().optional(),
+})
+
+export const createGsdWorkstreamSchema = z.object({
+  key: z.string().min(1).max(100),
+  name: z.string().min(1).max(200),
+  status: gsdWorkstreamStatusSchema.default('active'),
+})
+
+export const updateGsdWorkstreamSchema = z.object({
+  key: z.string().min(1).max(100).optional(),
+  name: z.string().min(1).max(200).optional(),
+  status: gsdWorkstreamStatusSchema.optional(),
+  expected_updated_at: z.number().int().nonnegative().optional(),
+}).refine(
+  (v) => Object.keys(v).some((k) => k !== 'expected_updated_at'),
+  { message: 'at least one field is required' }
+)
+
+export const createGsdMilestoneSchema = z.object({
+  workstream_id: z.number().int().positive().nullable().optional(),
+  version_label: z.string().min(1).max(50),
+  title: z.string().min(1).max(200),
+  status: gsdMilestoneStatusSchema.default('planned'),
+  started_at: z.number().int().nonnegative().optional(),
+  completed_at: z.number().int().nonnegative().optional(),
+})
+
+export const updateGsdMilestoneSchema = z.object({
+  workstream_id: z.number().int().positive().nullable().optional(),
+  version_label: z.string().min(1).max(50).optional(),
+  title: z.string().min(1).max(200).optional(),
+  status: gsdMilestoneStatusSchema.optional(),
+  started_at: z.number().int().nonnegative().optional(),
+  completed_at: z.number().int().nonnegative().optional(),
+  expected_updated_at: z.number().int().nonnegative().optional(),
+}).refine(
+  (v) => Object.keys(v).some((k) => k !== 'expected_updated_at'),
+  { message: 'at least one field is required' }
+)
+
+export const createGsdPhaseSchema = z.object({
+  phase_key: z.string().min(1).max(20),
+  phase_slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'phase_slug must be kebab-case').max(100),
+  lifecycle_phase: gsdPhaseSchema.default('discuss'),
+  ordering_numeric: z.number().finite(),
+  status: gsdPhaseStatusSchema.default('planned'),
+  depends_on_phase_ids: gsdDependencyIdsSchema,
+})
+
+export const updateGsdPhaseSchema = z.object({
+  phase_key: z.string().min(1).max(20).optional(),
+  phase_slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'phase_slug must be kebab-case').max(100).optional(),
+  lifecycle_phase: gsdPhaseSchema.optional(),
+  ordering_numeric: z.number().finite().optional(),
+  status: gsdPhaseStatusSchema.optional(),
+  depends_on_phase_ids: z.array(z.number().int().positive()).max(200).optional(),
+  expected_updated_at: z.number().int().nonnegative().optional(),
+}).refine(
+  (v) => Object.keys(v).some((k) => k !== 'expected_updated_at'),
+  { message: 'at least one field is required' }
+)
+
+export const transitionGsdPhaseSchema = gsdOptimisticLockSchema.extend({
+  to_lifecycle_phase: gsdPhaseSchema,
+})
+
+export const createGsdPlanSchema = z.object({
+  plan_ref: z.string().min(1).max(30),
+  title: z.string().min(1).max(200),
+  wave: z.number().int().min(1).max(999).default(1),
+  status: gsdPlanStatusSchema.default('todo'),
+  depends_on_plan_ids: gsdDependencyIdsSchema,
+})
+
+export const updateGsdPlanSchema = z.object({
+  plan_ref: z.string().min(1).max(30).optional(),
+  title: z.string().min(1).max(200).optional(),
+  wave: z.number().int().min(1).max(999).optional(),
+  status: gsdPlanStatusSchema.optional(),
+  depends_on_plan_ids: z.array(z.number().int().positive()).max(200).optional(),
+  expected_updated_at: z.number().int().nonnegative().optional(),
+}).refine(
+  (v) => Object.keys(v).some((k) => k !== 'expected_updated_at'),
+  { message: 'at least one field is required' }
+)
+
+export const transitionGsdPlanSchema = gsdOptimisticLockSchema.extend({
+  to_status: gsdPlanStatusSchema,
+})
