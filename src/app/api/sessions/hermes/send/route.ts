@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { logger } from '@/lib/logger'
-import { getDatabase } from '@/lib/db'
+import { getDatabase, Message } from '@/lib/db'
+import { config } from '@/lib/config'
 import { eventBus } from '@/lib/event-bus'
 
 /**
@@ -35,14 +36,14 @@ export async function POST(request: NextRequest) {
       "SELECT config FROM agents WHERE lower(name) = 'hermes' AND workspace_id = ?"
     ).get(workspaceId) as { config?: string } | undefined
 
-    let apiUrl = 'http://127.0.0.1:8642'
+    let apiUrl = config.hermesApiUrl
     let apiKey = ''
 
     if (agent?.config) {
       try {
-        const config = JSON.parse(agent.config)
-        if (config.hermesApiUrl) apiUrl = config.hermesApiUrl
-        if (config.hermesApiKey) apiKey = config.hermesApiKey
+        const agentConfig = JSON.parse(agent.config)
+        if (agentConfig.hermesApiUrl) apiUrl = agentConfig.hermesApiUrl
+        if (agentConfig.hermesApiKey) apiKey = agentConfig.hermesApiKey
       } catch { /* use defaults */ }
     }
 
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     `).run(conversationId, 'human', 'Hermes', message, 'text', workspaceId)
 
     const userRow = db.prepare('SELECT * FROM messages WHERE id = ? AND workspace_id = ?')
-      .get(userMsg.lastInsertRowid, workspaceId) as any
+      .get(userMsg.lastInsertRowid, workspaceId) as Message | undefined
     // Don't broadcast user message — the client already shows it optimistically
     // and will replace it with this DB row when the response comes back
 
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
       `).run(conversationId, 'Hermes', 'human', reply, 'text', workspaceId)
 
       replyRow = db.prepare('SELECT * FROM messages WHERE id = ? AND workspace_id = ?')
-        .get(replyMsg.lastInsertRowid, workspaceId) as any
+        .get(replyMsg.lastInsertRowid, workspaceId) as Message | undefined
       if (replyRow) {
         eventBus.broadcast('chat.message', replyRow)
       }
@@ -117,10 +118,10 @@ export async function POST(request: NextRequest) {
       replyMessage: replyRow,
       sessionId: data?.id || sessionId || null,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, 'POST /api/sessions/hermes/send error')
     return NextResponse.json(
-      { error: error?.message || 'Failed to send message to Hermes' },
+      { error: error instanceof Error ? error.message : 'Failed to send message to Hermes' },
       { status: 500 },
     )
   }
