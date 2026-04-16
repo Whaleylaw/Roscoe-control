@@ -47,7 +47,15 @@ export async function POST(request: NextRequest) {
       } catch { /* use defaults */ }
     }
 
-    // Save user message to DB — use 'human' as from_agent so the UI renders it on the right
+    // Save user message to DB — use 'human' as from_agent so the UI renders it on the right.
+    //
+    // Insert user message and reply message inline rather than via a shared
+    // helper. The file-local createChatReply() in src/app/api/chat/messages/
+    // route.ts is tightly coupled to the coordinator/gateway flow (always
+    // broadcasts 'chat.message' and is not exported). The Hermes bridge
+    // deliberately suppresses the user-message broadcast (the client renders
+    // it optimistically — see below), so the shared helper's unconditional
+    // broadcast would cause the UI to flicker with a duplicate user bubble.
     const userMsg = db.prepare(`
       INSERT INTO messages (conversation_id, from_agent, to_agent, content, message_type, workspace_id)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -106,7 +114,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Keep Hermes agent marked as active so the heartbeat doesn't set it offline
+    // Keep Hermes agent marked as active so the scheduler heartbeat doesn't
+    // flip it offline between messages.
+    //
+    // Intentionally inlined, not routed through db_helpers.updateAgentStatus:
+    // that helper also broadcasts 'agent.status_changed' via eventBus and writes
+    // an 'agent_status_change' activity row on every call. Doing that on every
+    // Hermes reply would flood the live feed with a heartbeat-every-message
+    // signal. The same raw UPDATE pattern is used by the three other presence
+    // writers (src/lib/scheduler.ts, src/app/api/status/route.ts,
+    // src/app/api/agents/register/route.ts). If a shared silent-presence helper
+    // ever lands, all four call sites should migrate together.
     const now = Math.floor(Date.now() / 1000)
     db.prepare("UPDATE agents SET status = 'active', last_seen = ?, updated_at = ? WHERE lower(name) = 'hermes' AND workspace_id = ?")
       .run(now, now, workspaceId)
