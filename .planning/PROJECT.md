@@ -4,32 +4,35 @@
 
 A full-takeover project workspace for Mission Control that elevates projects from a task-grouping label into a first-class destination. Users navigate into a project and get a dedicated dashboard with status overview, activity feed, and project brief — plus scoped views for tasks, agent sessions, agents, and settings. Breadcrumb navigation moves between projects and back to the main view.
 
-v1.1 extends this workspace with native GSD lifecycle support: projects can be flagged `gsd_enabled`, move through Discuss → Plan → Execute → Verify → Done phases, and gate critical tasks behind operator/admin approval.
+v1.1 extends this workspace with native GSD lifecycle support: projects can be flagged `gsd_enabled`, move through Discuss → Plan → Execute → Verify → Done phases, and gate critical tasks behind operator/admin approval. Phase 10 extends that model again: a single project can now host multiple workstreams, milestones, phases, and plans concurrently, with the Lifecycle tab acting as the primary operator surface over the hierarchical graph.
 
-Phase 10 extends that model again: a single project can now host multiple workstreams, milestones, phases, and plans concurrently, with the Lifecycle tab acting as the primary operator surface over the hierarchical graph.
+v1.2 adds an agent execution layer: Kanban tasks can declare a **recipe card** (a markdown-plus-YAML bundle describing an agent's persona, tools, skills, container image, and model), and a dedicated runner daemon launches short-lived containers to execute those tasks. Work state lives in a per-task git worktree with a `.mc/` progress convention so crashed containers can resume without redoing work.
 
 ## Core Value
 
-When I click into a project, I see everything about that project — what it is, what's happening, what's next — and I can manage all its work from one place, including driving it through its GSD lifecycle.
+When I click into a project, I see everything about that project — what it is, what's happening, what's next — and I can manage all its work from one place, including driving it through its GSD lifecycle, and autonomous agents pick up assigned work, execute it in isolated containers, and move it through the Kanban for me.
 
-## Current Milestone: v1.1 Native GSD Integration + Phase 10 Extension
+## Current Milestone: v1.2 Recipe-Based Ephemeral Agent Runtime
 
-**Goal:** Keep the native GSD lifecycle from v1.1, while removing the single-lifecycle-per-project bottleneck by adding first-class workstreams, milestones, phases, and plans inside one project.
+**Goal:** Ship a complete recipe-card + runner system that lets Kanban tasks be executed by short-lived containerized agents, configured from filesystem-authored recipe cards, with crash-safe progress checkpoints and per-task-scoped authentication.
 
 **Target features:**
-- GSD-aware project schema (`gsd_enabled`, `gsd_phase`, `gsd_track`, `gsd_gate_mode`) with lifecycle transitions
-- Gate-required tasks that block in_progress/done without operator/admin approval
-- Dedicated "Lifecycle" tab in the project workspace + phase badges on tasks in the task board
-- External JSON template system for bootstrap task packs (`<DATA_DIR>/gsd-templates/*.json` with bundled default fallback)
-- Three new API endpoints: bootstrap, transition, gate approval
-- i18n coverage across all 10 locales for new UI strings
-- Hierarchical GSD model inside one project: workstreams, milestones, phases, plans
-- Graph-backed Lifecycle tab with inline create/edit/transition flows
-- SSE-driven live refresh and readable conflict surfacing for hierarchy mutations
-- First-class CLI wrappers for hierarchy CRUD, transitions, and lifecycle-graph reads
-- Same-wave conflict analysis backed by task resource hints and plan transition blocking
+- Filesystem-first recipe cards at `recipes/<slug>/` (SOUL.md, recipe.yaml, tools/, skills/) indexed to a `recipes` DB table via chokidar watcher
+- Recipe schema covering: container image, workspace mode (`none`/`worktree`), timeout, concurrency cap, env vars, secret keys, tags, model (primary + optional fallback + provider + params)
+- Task schema extensions: `recipe_slug`, task-level `workspace_source`, `read_only_mounts`, `extra_skills`, `model_override`, runner execution state, retry counters
+- `task_runner_tokens` table with per-task, per-attempt ephemeral bearer tokens
+- `task_checkpoints` table + matching `.mc/checkpoints.jsonl` in each worktree
+- Dedicated `scripts/mc-runner.mjs` daemon with its own LaunchAgent: claim-based dispatch, `docker run` with allowlisted mounts, heartbeat, exit handling, on-restart reconciliation
+- `.mc/` worktree convention (task.json, progress.md, checkpoints.jsonl) with agent preambles that differ for first vs resuming attempts
+- Mount allowlist enforced at task creation and at runner claim
+- New auth principals: `runner` (daemon-scoped) and `runner-token` (task-scoped, explicit opt-in)
+- Recipe CRUD + SQL-LIKE search API; task lifecycle API for runner-tokens; runner protocol API
+- Model registry (`src/lib/model-registry.ts`) validates recipes at index time
+- UI: recipe badge + model tier on task cards, runner-status banner on the task board, Progress tab on task detail with per-attempt checkpoint timeline, Recipe dropdown + Advanced (mounts/skills/model override) in task form
+- One reference image (`mc-hello-world-agent`) wired through the full flow for integration testing
+- Integration with existing scheduler (`autoRouteInboxTasks`, `requeueStaleTasks`) and Aegis review loop
 
-**Starting point:** Phase 09-CONTEXT.md already captures 38 locked implementation decisions (D-01..38) from `/gsd:discuss-phase 09`.
+**Design doc:** `docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`
 
 ## Requirements
 
@@ -139,4 +142,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-16 — Phase 10 complete; hierarchy model/UI/OpenAPI/E2E/CLI/conflict analysis landed and verified*
+*Last updated: 2026-04-18 — Milestone v1.2 Recipe-Based Ephemeral Agent Runtime initialized (design spec committed, requirements and roadmap next)*

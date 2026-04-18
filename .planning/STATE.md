@@ -1,30 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: — Native GSD Integration
-status: Phase 10 complete
-stopped_at: "Phase 10 verified complete: hierarchy APIs/UI/docs/OpenAPI/E2E/CLI/conflict analysis landed, closeout fixes for idempotent creates and gate-aware hierarchy transitions are in, and verification is green"
-last_updated: "2026-04-16T00:10:00Z"
+milestone: v1.2
+milestone_name: Recipe-Based Ephemeral Agent Runtime
+status: Defining requirements
+stopped_at: "Milestone v1.2 initialized; PROJECT.md updated, research skipped (design spec exists at docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md), REQUIREMENTS.md and ROADMAP.md next"
+last_updated: "2026-04-18T00:00:00Z"
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 35
-  completed_plans: 35
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-16 — Phase 10 complete)
+See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
-**Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle.
-**Current focus:** Phase 10 is closed. Multi-GSD per project is verified complete; next work should start from a new phase or quick task.
+**Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle, and autonomous agents pick up assigned work, execute it in isolated containers, and move it through the Kanban.
+**Current focus:** v1.2 milestone — recipe-based ephemeral agent runtime. Design spec committed at `docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`. Requirements and roadmap are the next artifacts.
 
 ## Current Position
 
-Phase: 10 complete
-Plan: Await next phase / next quick task
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-18 — Milestone v1.2 started
 
 ## Performance Metrics
 
