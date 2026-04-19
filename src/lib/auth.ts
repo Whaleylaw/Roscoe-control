@@ -4,6 +4,7 @@ import { hashPassword, verifyPassword, verifyPasswordWithRehashCheck } from './p
 import { logSecurityEvent } from './security-events'
 import { extractClientIpFromTrusted } from './request'
 import { parseMcSessionCookieHeader } from './session-cookie'
+import { getRunnerSecret } from './runner-secret'
 
 // Trusted IPs for proxy auth header (comma-separated)
 const PROXY_AUTH_TRUSTED_IPS = new Set(
@@ -454,6 +455,60 @@ export function getUserFromRequest(request: Request): User | null {
         }
       }
     }
+  }
+
+  // Runner principal — auto-generated .data/runner.secret, strictly scoped to /api/runner/*.
+  // See RAUTH-01 + .planning/phases/11-runtime-foundation-v1-2/11-CONTEXT.md.
+  //
+  // IMPORTANT: the url.pathname.startsWith('/api/runner/') gate is the ONLY check —
+  // if it fails, we never compare the bearer against the runner secret at all. A
+  // request hitting /api/tasks with the runner secret presented as a bearer falls
+  // through to the session-cookie / API-key / agent-key branches below and will
+  // be rejected there (because none of those will match the runner secret).
+  const url = new URL(request.url)
+  if (url.pathname.startsWith('/api/runner/')) {
+    const bearer = extractApiKeyFromHeaders(request.headers)
+    const runnerSecret = getRunnerSecret()
+    if (bearer && runnerSecret && safeCompare(bearer, runnerSecret)) {
+      try {
+        logSecurityEvent({
+          event_type: 'runner_auth',
+          severity: 'info',
+          source: 'auth',
+          // NEVER include the secret value, a prefix, or a hash of it. CONTEXT.md locks this.
+          detail: JSON.stringify({ principal: 'runner', path: url.pathname, method: request.method }),
+          ip_address: request.headers.get('x-real-ip') || 'unknown',
+          workspace_id: getDefaultWorkspaceContext().workspaceId,
+          tenant_id: getDefaultWorkspaceContext().tenantId,
+        })
+      } catch { /* startup race / DB not ready — non-fatal */ }
+      return {
+        // Negative sentinel id, well outside the 1..N user range AND outside the
+        // -agent_id range used by agent-scoped API keys (agent IDs will never be
+        // in the thousands in realistic deployments). Phase 14 claim-route code
+        // must treat id === -1000 as the runner principal explicitly.
+        id: -1000,
+        username: 'runner',
+        display_name: 'Runner Daemon',
+        // Operator-level: runner needs write access to checkpoints/claim endpoints
+        // (Phase 14/15) but is NOT admin.
+        role: 'operator',
+        workspace_id: getDefaultWorkspaceContext().workspaceId,
+        tenant_id: getDefaultWorkspaceContext().tenantId,
+        provider: 'local',
+        email: null,
+        avatar_url: null,
+        is_approved: 1,
+        created_at: 0,
+        updated_at: 0,
+        last_login_at: null,
+        agent_name: null,
+      }
+    }
+    // Fall through. If the path is /api/runner/* but the bearer is wrong or
+    // absent, we intentionally do NOT short-circuit — the request could carry
+    // a runner-token (Plan 11-04) or a valid session cookie. The subsequent
+    // branches handle those.
   }
 
   // Check session cookie
