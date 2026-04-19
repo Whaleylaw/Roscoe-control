@@ -323,6 +323,14 @@ export async function startRecipeWatcher(opts: StartWatcherOptions = {}): Promis
     logger.error({ err: (err as Error).message }, 'recipe watcher: chokidar error')
   })
 
+  // Wait for chokidar to finish scanning + registering its platform watchers
+  // before returning. Without this, tests (and production) can race: a write
+  // that happens in the first ~50ms after `watch()` returns may not fire any
+  // event on fsevents-backed platforms (macOS).
+  await new Promise<void>((resolveReady) => {
+    watcher.once('ready', () => resolveReady())
+  })
+
   _watcher = watcher
   logger.info({ root }, 'recipe watcher: started')
 }
