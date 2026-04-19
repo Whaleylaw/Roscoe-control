@@ -1,16 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Recipe-Based Ephemeral Agent Runtime
-status: In Progress — Phase 11 Runtime Foundation (Wave 1 substrate landed)
-stopped_at: "Completed 11-01-PLAN.md (MODEL-01 + MODEL-03); siblings 11-02, 11-03 also complete; 11-04 outstanding"
-last_updated: "2026-04-19T01:58:30.000Z"
-last_activity: "2026-04-19 — Phase 11 Plan 01 complete: typed model-registry module + createTaskSchema.model_override validation (23 new Vitest assertions)"
+milestone: v1.0
+milestone_name: — Project Workspace & Dashboard
+status: 3/4 Wave-1 plans committed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809); runner-token auth plan (11-04) is the last remaining Wave 1 plan
+stopped_at: "Completed 11-02-PLAN.md (RAUTH-01): runner-secret module (.data/runner.secret auto-gen, 0600 perms) + runner principal in getUserFromRequest strictly scoped to /api/runner/*"
+last_updated: "2026-04-19T02:00:00Z"
+last_activity: "2026-04-19 — Plan 11-02 complete (RAUTH-01: runner-secret module + runner principal branch in auth.ts at lines 460-513; 22 new Vitest cases covering path-scope, idempotency, audit-log safety)"
 progress:
-  total_phases: 17
-  completed_phases: 10
-  total_plans: 39
-  completed_plans: 36
+  total_phases: 8
+  completed_phases: 6
+  total_plans: 18
+  completed_plans: 24
+  percent: 100
 ---
 
 # Project State
@@ -25,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 11 (Runtime Foundation) — in progress (Wave 1 of 2)
-Plan: 11-01 (model registry + task-override validation) complete; siblings 11-02 (runner-secret), 11-03 (migrations) also complete; 11-04 (runner-token auth) remaining
-Status: 3/4 Wave-1 plans committed (5a3e166, f95b72e, e8594e7/53e4809, d6b53ca); runner-token auth plan (11-04) is the last remaining Wave 1 plan
-Last activity: 2026-04-19 — Plan 11-03 complete (TCTX-07: migrations 054–057 — recipes, task_runner_tokens, task_checkpoints tables + 12 additive tasks cols with 7-test Vitest coverage)
+Plan: 11-01 (model registry + task-override validation), 11-02 (runner-secret + runner principal), 11-03 (migrations) all complete; 11-04 (runner-token auth) remaining
+Status: 3/4 Wave-1 plans committed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809); runner-token auth plan (11-04) is the last remaining Wave 1 plan
+Last activity: 2026-04-19 — Plan 11-02 complete (RAUTH-01: runner-secret module + runner principal branch in auth.ts at lines 460-513; 22 new Vitest cases covering path-scope, idempotency, audit-log safety)
 
 ## Performance Metrics
 
@@ -94,6 +95,7 @@ Last activity: 2026-04-19 — Plan 11-03 complete (TCTX-07: migrations 054–057
 | Phase 09-gsd-native-integration P10 | 59min | 3 tasks | 7 files |
 | Phase 11 P03 | 8min | 2 tasks | 2 files |
 | Phase 11-runtime-foundation-v1-2 P01 | 7min | 2 tasks | 4 files |
+| Phase 11-runtime-foundation-v1-2 P02 | 10min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -115,6 +117,10 @@ Recent decisions affecting current work:
 - [Phase 11]: runner_attempts is the only new tasks column with a non-null default (INTEGER NOT NULL DEFAULT 0); all other runtime fields (recipe_slug, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_max_attempts, runner_last_failure_reason, workspace_source, read_only_mounts, extra_skills) are nullable — downstream code must handle NULL
 - [Phase 11-runtime-foundation-v1-2]: Model registry is code-seeded immutable const — no override file, no alias map, adding a model = a PR
 - [Phase 11-runtime-foundation-v1-2]: Zod v4 uses { error: (issue) => ... } for dynamic refine messages — the v3 function-form was removed
+- [Phase 11-02 / RAUTH-01]: Runner principal uses id=-1000 sentinel — outside both 1..N user range AND -agent_id range (agent API keys); Phase 14 claim-route code can dispatch on `user.id === -1000` without string-comparing username
+- [Phase 11-02 / RAUTH-01]: Runner role = 'operator' not 'admin' — write access for checkpoints/claim (Phase 14/15) but NOT superuser; matches RAUTH-01 principle of least privilege
+- [Phase 11-02 / RAUTH-01]: Path-scope gate (url.pathname.startsWith('/api/runner/')) is the SOLE check that ever compares a bearer against the runner secret; falls through on mismatch so session cookies and (Plan 11-04) runner-tokens can still resolve on runner paths
+- [Phase 11-02 / RAUTH-01]: extractApiKeyFromHeaders is the shared bearer extractor — Plan 11-04 must reuse, do not fork
 
 ### Pending Todos
 
@@ -137,6 +143,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T01:58:30.000Z
-Stopped at: Completed 11-01-PLAN.md (MODEL-01 + MODEL-03): model-registry module + createTaskSchema.model_override validation
+Last session: 2026-04-19T01:57:37Z
+Stopped at: Completed 11-02-PLAN.md (RAUTH-01) — runner-secret module + runner principal branch in auth.ts; strict /api/runner/* scope; 22 new Vitest cases; Plan 11-04 (runner-token principal) is next
 Resume file: None
