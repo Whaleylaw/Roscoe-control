@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { ZodSchema, ZodError } from 'zod'
 import { z } from 'zod'
+import { isKnownModel, MODEL_IDS } from './model-registry'
 
 export async function validateBody<T>(
   request: Request,
@@ -50,6 +51,15 @@ export const createTaskSchema = z.object({
   retry_count: z.number().int().min(0).optional(),
   completed_at: z.number().int().min(0).max(4102444800).optional(),
   tags: z.array(z.string().min(1).max(100)).max(50).default([] as string[]),
+  model_override: z
+    .string()
+    .min(1)
+    .max(200)
+    .refine(isKnownModel, {
+      error: (issue) =>
+        `model_override '${String(issue.input)}' is not in the model registry. Known models: ${MODEL_IDS.join(', ')}`,
+    })
+    .optional(),
   metadata: taskMetadataSchema.default({} as Record<string, unknown>),
 })
 
