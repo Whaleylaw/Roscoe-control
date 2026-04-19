@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { ZodSchema, ZodError } from 'zod'
 import { z } from 'zod'
 import { isKnownModel, MODEL_IDS } from './model-registry'
+import {
+  WorkspaceSourceSchema,
+  readOnlyMountsArraySchema,
+  extraSkillsArraySchema,
+} from './task-runtime-validation'
 
 export async function validateBody<T>(
   request: Request,
@@ -60,6 +65,22 @@ export const createTaskSchema = z.object({
         `model_override '${String(issue.input)}' is not in the model registry. Known models: ${MODEL_IDS.join(', ')}`,
     })
     .optional(),
+
+  // Phase 13 — Task Runtime Context (TCTX-01..04, TCTX-06). Field SHAPE
+  // enforced here (Zod). Business RULES (recipe existence, workspace_source
+  // gap, allowlist membership, caps) live in POST /api/tasks (Plan 13-02) and
+  // PATCH /api/tasks/[id] (Plan 13-03) and surface via
+  // buildAggregatedValidationResponse.
+  recipe_slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'recipe_slug must be kebab-case')
+    .optional(),
+  workspace_source: WorkspaceSourceSchema.optional(),
+  read_only_mounts: readOnlyMountsArraySchema.optional(),
+  extra_skills: extraSkillsArraySchema.optional(),
+
   metadata: taskMetadataSchema.default({} as Record<string, unknown>),
 })
 
