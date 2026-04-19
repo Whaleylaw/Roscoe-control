@@ -89,6 +89,21 @@ function initializeSchema() {
         }).catch(() => {
           // Silent - scheduler is optional
         });
+
+        // Start recipe watcher for runtime installs only.
+        // Phase 12 — see 12-04-PLAN.md. Eager blocking boot scan inside
+        // startRecipeWatcher reconciles the DB with the recipes/ directory
+        // before the first API request can land, then installs the chokidar
+        // watcher for live updates. Guarded by the same isBuildPhase / isTestMode
+        // checks as the scheduler so `next build` never touches disk and vitest
+        // runs can drive the watcher explicitly via start/stopRecipeWatcher.
+        import('./recipe-watcher').then(({ startRecipeWatcher }) => {
+          startRecipeWatcher().catch((err: Error) => {
+            logger.error({ err: err.message }, 'recipe watcher failed to start')
+          })
+        }).catch(() => {
+          // Silent - recipe system is optional in environments without recipes/
+        })
       }
     }
 
