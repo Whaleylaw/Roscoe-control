@@ -108,6 +108,117 @@ Requirements for milestone v1.1. Each maps to Phase 9 (gsd-native-integration).
 - [x] **GSD-28**: Transitions and gate-status changes emit events via the existing `eventBus` (`project.gsd.transition`, `task.gate.changed`); existing `/api/activities` stream surfaces them automatically
 - [x] **GSD-29**: All new user-facing strings go through next-intl under a `project.lifecycle.*` namespace with atomic coverage across all 10 locales
 
+## v1.2 Requirements — Recipe-Based Ephemeral Agent Runtime
+
+Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`.
+
+**Milestone goal:** Ship a complete recipe-card + runner system that lets Kanban tasks be executed by short-lived containerized agents, configured from filesystem-authored recipe cards, with crash-safe progress checkpoints and per-task-scoped authentication.
+
+### Recipe System
+
+- [ ] **RECIPE-01**: Recipe author can define a recipe as a directory under `recipes/<slug>/` containing `recipe.yaml`, `SOUL.md`, optional `tools/`, optional `skills/`, optional `README.md`
+- [ ] **RECIPE-02**: Recipes are indexed into a `recipes` SQLite table capturing slug, name, description, when_to_use, image, workspace_mode, timeout_seconds, max_concurrent, env_json, secrets_json, tags_json, model_json, version, and dir_sha
+- [ ] **RECIPE-03**: Filesystem watcher re-indexes recipes when files change under `recipes/`, drops rows whose directories disappear, and uses `dir_sha` to skip unchanged recipes
+- [ ] **RECIPE-04**: Recipe author can declare `model.primary` (required), `model.fallback`, `model.provider`, and `model.params` in `recipe.yaml`; primary validated against a known-model registry at index time
+- [ ] **RECIPE-05**: User or caller can list recipes, fetch one by slug, and search by task description through the recipe API
+- [ ] **RECIPE-06**: Caller (e.g., Hermes) can create a new recipe by posting `recipe.yaml` + `SOUL.md` body; system writes the files and indexes the row atomically
+- [ ] **RECIPE-07**: Admin can force a full re-scan of the `recipes/` directory via an API endpoint when the watcher falls behind
+- [ ] **RECIPE-08**: Recipe search ranks candidates against task description + tags using SQL matching in v1.2 (embedding search deferred)
+
+### Task Runtime Context
+
+- [ ] **TCTX-01**: Task author can set `recipe_slug` on a task at creation or update; task record references a valid recipe row
+- [ ] **TCTX-02**: Task author can specify `workspace_source` (project_id + base_ref) on a task when the recipe declares `workspace: worktree`; system rejects tasks missing this for worktree-mode recipes
+- [ ] **TCTX-03**: Task author can attach read-only reference mounts on a task as `{host_path, container_path, label}` entries, visible in the task UI
+- [ ] **TCTX-04**: Task author can attach extra skill files on a task as a list of host paths, mounted at `/skills/<name>` in the container
+- [ ] **TCTX-05**: Task author can set `model_override` on a task to force a specific model regardless of the recipe's default
+- [ ] **TCTX-06**: All user-supplied host paths on a task are validated against the runner's `mount_allowlist` at task creation, failing fast with a clear error if out of bounds
+- [ ] **TCTX-07**: Task record tracks runner execution state via `container_id`, `runner_started_at`, `runner_exit_code`, `worktree_path`, `runner_attempts`, `runner_max_attempts`, `runner_last_failure_reason`
+
+### Runner Daemon
+
+- [ ] **RUNNER-01**: Operator can run the runner as a standalone Node process (`scripts/mc-runner.mjs`) with its own LaunchAgent template, separate from the Mission Control web server
+- [ ] **RUNNER-02**: Runner registers with Mission Control on startup using a long-lived shared secret (auto-generated on first run, stored in `.data/runner.secret`)
+- [ ] **RUNNER-03**: Runner subscribes to `task.runner_requested` SSE events to claim work as soon as tasks become ready
+- [ ] **RUNNER-04**: Runner polls `/api/runner/ready-tasks` every 15 seconds as a fallback when SSE drops
+- [ ] **RUNNER-05**: Runner sends heartbeats every 10 seconds; Mission Control marks the runner offline and surfaces a UI banner when no heartbeat arrives for 60 seconds
+- [ ] **RUNNER-06**: Runner claims a task atomically via `POST /api/runner/claim/:task_id`, receiving a full dispatch payload (recipe content, task, mounts, fresh task-scoped token) or a 409 if already claimed
+- [ ] **RUNNER-07**: Runner validates every mount path against the allowlist at claim time as defense in depth, resolving symlinks and rejecting paths that escape
+- [ ] **RUNNER-08**: Runner enforces global (`MAX_CONCURRENT_CONTAINERS`) and per-recipe (`max_concurrent`) concurrency caps; over-cap claims return 409 and leave the task for the next cycle
+- [ ] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
+- [ ] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
+- [ ] **RUNNER-11**: Runner waits for container exit, posts `runner-exit` with exit code and stderr tail, and triggers Mission Control retry/fail logic
+- [ ] **RUNNER-12**: Runner gracefully stops the container when a `blocked` checkpoint arrives, preserving the worktree so the next attempt can resume
+- [ ] **RUNNER-13**: On startup after a crash, runner reconciles orphaned containers against the DB via `GET /api/runner/pending-containers` and adopts or cleans them up
+- [ ] **RUNNER-14**: On terminal task status, runner revokes the task token and destroys the worktree (preserving it for a GC window on failure)
+
+### Container Execution
+
+- [ ] **CONTAINER-01**: Container receives task context as env vars (`MC_API_URL`, `MC_TASK_ID`, `MC_API_TOKEN`, `MC_WORKSPACE`, `MC_RECIPE_PATH`, `MC_MODEL_*`) and recipe-declared secrets (e.g., `ANTHROPIC_API_KEY`) injected from the runner's secret store
+- [ ] **CONTAINER-02**: Container sees the worktree at `/workspace` (rw when recipe is worktree-mode), the recipe at `/recipe` (ro), read-only mounts at `/refs/<label-slug>/` (ro), and extra skills at `/skills/<name>` (ro)
+- [ ] **CONTAINER-03**: Container is hard-killed at `recipe.timeout_seconds`; runner reports the timeout as the failure reason
+- [ ] **CONTAINER-04**: One reference image (`mc-hello-world-agent`) exercises the full checkpoint → submit flow for integration testing
+
+### Worktree & Crash Recovery
+
+- [ ] **WORK-01**: On first launch, runner seeds `.mc/task.json`, `.mc/progress.md` (empty), `.mc/checkpoints.jsonl` (empty), and `.mc/.gitignore` in the worktree
+- [ ] **WORK-02**: `.mc/task.json` contains `task_id`, `recipe_slug`, `attempt`, `is_resuming`, and `prior_attempts[]` (each with started_at, exit_code, failure_reason)
+- [ ] **WORK-03**: Worktree is preserved across container crashes and retries; destroyed only when task reaches `done`, `failed`, or `cancelled` (failed tasks get a GC delay of N days)
+- [ ] **WORK-04**: On a resume attempt, runner injects an agent preamble above SOUL.md instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
+- [ ] **WORK-05**: On first attempt, runner injects a shorter preamble instructing the agent to write notes to `.mc/progress.md` as it works
+- [ ] **WORK-06**: Retry cap enforced via `runner_max_attempts` (default 3, recipe-overridable); exceeding the cap marks task `failed` with a clear reason
+- [ ] **WORK-07**: Scheduled garbage-collection job prunes worktrees for tasks terminal longer than N days (configurable, default 7)
+
+### Checkpoints
+
+- [ ] **CP-01**: Agent can post a checkpoint via `POST /api/tasks/:id/checkpoints` with `step`, `summary`, `status` (`completed` | `in_progress` | `blocked`), plus optional `artifacts`, `next_step`, `blocker_reason`, `tokens_used`, `duration_ms`
+- [ ] **CP-02**: Each checkpoint is stored both as a `task_checkpoints` row and as one JSON line appended to `<worktree>/.mc/checkpoints.jsonl` with identical field names
+- [ ] **CP-03**: `status: blocked` checkpoints transition the task `in_progress → awaiting_owner`, post an automatic comment with the blocker reason, and gracefully stop the container
+- [ ] **CP-04**: When the blocker is resolved (task back to `assigned`), runner relaunches with the resume flow
+- [ ] **CP-05**: Checkpoint artifact entries are typed (`kind: file | url | diff | test_result | comment | other`) with optional `path`, `url`, `ref`, `summary`
+- [ ] **CP-06**: Viewer can fetch the full checkpoint timeline for a task via `GET /api/tasks/:id/checkpoints`, filterable by `attempt`
+
+### Authentication
+
+- [ ] **RAUTH-01**: A new `runner` principal is defined in `src/lib/auth.ts`, authenticated by the shared `.data/runner.secret`, scoped strictly to `/api/runner/*` routes
+- [ ] **RAUTH-02**: A new `runner-token` principal is defined; tokens are per-task, per-attempt, stored as SHA-256 hashes in `task_runner_tokens`, expiring at `runner_started_at + recipe.timeout_seconds + 60s`
+- [ ] **RAUTH-03**: `runner-token` authentication verifies path parameter `:id` matches the token's embedded `task_id`, preventing cross-task access
+- [ ] **RAUTH-04**: Route handlers opt into `runner-token` auth explicitly (no rank-ordered escalation path from lower tiers)
+- [ ] **RAUTH-05**: When a task reaches a terminal status, its runner token is revoked (`revoked_at` set) and cannot be used again
+- [ ] **RAUTH-06**: A runner-token-authenticated call can hit only the narrow set of task-lifecycle endpoints (checkpoints, submit, fail, scoped status, read own task, read own task comments)
+
+### Model Registry
+
+- [ ] **MODEL-01**: A new `src/lib/model-registry.ts` module exports a typed map of model identifiers to `{provider, context_window, output_tokens_max, supports_tools, supports_thinking}` — seeded with Opus 4.7, Sonnet 4.6, and Haiku 4.5
+- [ ] **MODEL-02**: Recipe indexer rejects recipes whose `model.primary` is not in the registry, surfacing a human-readable error in the UI and indexer logs
+- [ ] **MODEL-03**: Task creation rejects `model_override` values not in the registry with a clear error
+- [ ] **MODEL-04**: Effective model is resolved at claim time as `task.model_override ?? recipe.model.primary` and passed to the container via env (`MC_MODEL_PRIMARY`, `MC_MODEL_PROVIDER`, `MC_MODEL_PARAMS_JSON`, optional `MC_MODEL_FALLBACK`)
+
+### UI Surfaces
+
+- [ ] **RUI-01**: Each task card on the Kanban displays a recipe badge when `recipe_slug` is set, including recipe name and model tier color
+- [ ] **RUI-02**: Task-board shell shows a runner-status banner with live state (`🟢 Runner online` / `🔴 Runner offline — tasks waiting: N`)
+- [ ] **RUI-03**: Task detail view has a new "Progress" tab showing a live checkpoint timeline grouped by attempt, updating via SSE
+- [ ] **RUI-04**: Task create/edit form has a Recipe dropdown (autocomplete via `/api/recipes/search`) and a collapsible "Advanced" section exposing `read_only_mounts`, `extra_skills`, and `model_override`
+- [ ] **RUI-05**: All new UI strings are translated across 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) atomically per the established pattern
+- [ ] **RUI-06**: Minimal recipe list panel (reachable from main nav) shows indexed recipes with name, description, model, tags, and a "Resync" button — authoring stays filesystem-first
+
+### Scheduler Integration
+
+- [ ] **SCHED-01**: `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox` to `assigned` without running agent-affinity scoring
+- [ ] **SCHED-02**: `dispatchAssignedTasks()` skips tasks with `recipe_slug` (legacy behavior preserved for non-recipe tasks)
+- [ ] **SCHED-03**: `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to existing legacy logic
+- [ ] **SCHED-04**: A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when runner is unreachable, so reconcile-on-reconnect works cleanly
+- [ ] **SCHED-05**: `task.runner_requested` event is emitted from three points: `autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` when a task is created directly as `assigned` with `recipe_slug`, and the runner-exit retry path on `in_progress → assigned`
+- [ ] **SCHED-06**: `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` events are broadcast on SSE for UI reactivity
+
+### Integration & Testing
+
+- [ ] **RTEST-01**: Unit tests cover recipe indexer parsing, mount-allowlist resolution, runner-token mint/verify/revoke, and checkpoint validation
+- [ ] **RTEST-02**: An integration test drives the full pipeline with the reference image: create task → runner claims → container emits checkpoints → container submits → task enters `review` → Aegis approves → `done`
+- [ ] **RTEST-03**: A crash-recovery integration test deliberately kills the container mid-task, verifies worktree and `.mc/` state preservation, then confirms retry reads `.mc/progress.md` and completes
+- [ ] **RTEST-04**: An E2E Playwright test verifies the recipe badge renders on task cards and the Progress tab updates live on checkpoint events
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -203,7 +314,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1 requirements: 26 total, mapped 26 / unmapped 0 ✓
 - v1.1 requirements: 29 total, mapped 29 / unmapped 0 ✓
+- v1.2 requirements: 60 total, mapped — / unmapped 60 (pending roadmap)
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-14 — v1.1 Native GSD Integration requirements added (29 new REQ-IDs: GSD-01..29)*
+*Last updated: 2026-04-18 — v1.2 Recipe-Based Ephemeral Agent Runtime requirements added (60 new REQ-IDs across RECIPE/TCTX/RUNNER/CONTAINER/WORK/CP/RAUTH/MODEL/RUI/SCHED/RTEST)*
