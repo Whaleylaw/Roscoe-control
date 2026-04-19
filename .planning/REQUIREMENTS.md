@@ -133,7 +133,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **TCTX-04**: Task author can attach extra skill files on a task as a list of host paths, mounted at `/skills/<name>` in the container
 - [ ] **TCTX-05**: Task author can set `model_override` on a task to force a specific model regardless of the recipe's default
 - [ ] **TCTX-06**: All user-supplied host paths on a task are validated against the runner's `mount_allowlist` at task creation, failing fast with a clear error if out of bounds
-- [ ] **TCTX-07**: Task record tracks runner execution state via `container_id`, `runner_started_at`, `runner_exit_code`, `worktree_path`, `runner_attempts`, `runner_max_attempts`, `runner_last_failure_reason`
+- [x] **TCTX-07**: Task record tracks runner execution state via `container_id`, `runner_started_at`, `runner_exit_code`, `worktree_path`, `runner_attempts`, `runner_max_attempts`, `runner_last_failure_reason`
 
 ### Runner Daemon
 
@@ -189,9 +189,9 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Model Registry
 
-- [ ] **MODEL-01**: A new `src/lib/model-registry.ts` module exports a typed map of model identifiers to `{provider, context_window, output_tokens_max, supports_tools, supports_thinking}` — seeded with Opus 4.7, Sonnet 4.6, and Haiku 4.5
+- [x] **MODEL-01**: A new `src/lib/model-registry.ts` module exports a typed map of model identifiers to `{provider, context_window, output_tokens_max, supports_tools, supports_thinking}` — seeded with Opus 4.7, Sonnet 4.6, and Haiku 4.5
 - [ ] **MODEL-02**: Recipe indexer rejects recipes whose `model.primary` is not in the registry, surfacing a human-readable error in the UI and indexer logs
-- [ ] **MODEL-03**: Task creation rejects `model_override` values not in the registry with a clear error
+- [x] **MODEL-03**: Task creation rejects `model_override` values not in the registry with a clear error
 - [ ] **MODEL-04**: Effective model is resolved at claim time as `task.model_override ?? recipe.model.primary` and passed to the container via env (`MC_MODEL_PRIMARY`, `MC_MODEL_PROVIDER`, `MC_MODEL_PARAMS_JSON`, optional `MC_MODEL_FALLBACK`)
 
 ### UI Surfaces
@@ -324,7 +324,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TCTX-04 | Phase 13 | Pending |
 | TCTX-05 | Phase 13 | Pending |
 | TCTX-06 | Phase 13 | Pending |
-| TCTX-07 | Phase 11 | Pending |
+| TCTX-07 | Phase 11 | Complete |
 | RUNNER-01 | Phase 14 | Pending |
 | RUNNER-02 | Phase 14 | Pending |
 | RUNNER-03 | Phase 14 | Pending |
@@ -362,9 +362,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RAUTH-04 | Phase 11 | Pending |
 | RAUTH-05 | Phase 11 | Pending |
 | RAUTH-06 | Phase 11 | Pending |
-| MODEL-01 | Phase 11 | Pending |
+| MODEL-01 | Phase 11 | Complete |
 | MODEL-02 | Phase 12 | Pending |
-| MODEL-03 | Phase 11 | Pending |
+| MODEL-03 | Phase 11 | Complete |
 | MODEL-04 | Phase 14 | Pending |
 | RUI-01 | Phase 16 | Pending |
 | RUI-02 | Phase 16 | Pending |

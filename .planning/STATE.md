@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Recipe-Based Ephemeral Agent Runtime
-status: Roadmap drafted
-stopped_at: "v1.2 roadmap drafted (Phases 11–17); 72 v1.2 REQ-IDs mapped across RECIPE/TCTX/RUNNER/CONTAINER/WORK/CP/RAUTH/MODEL/RUI/SCHED/RTEST; traceability table updated; Phase 11 (Runtime Foundation) is the next plan target"
-last_updated: "2026-04-18T00:00:00Z"
+status: In Progress — Phase 11 Runtime Foundation (Wave 1 substrate landed)
+stopped_at: "Completed 11-01-PLAN.md (MODEL-01 + MODEL-03); siblings 11-02, 11-03 also complete; 11-04 outstanding"
+last_updated: "2026-04-19T01:58:30.000Z"
+last_activity: "2026-04-19 — Phase 11 Plan 01 complete: typed model-registry module + createTaskSchema.model_override validation (23 new Vitest assertions)"
 progress:
   total_phases: 17
   completed_phases: 10
-  total_plans: 35
-  completed_plans: 35
+  total_plans: 39
+  completed_plans: 36
 ---
 
 # Project State
@@ -23,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 11 (Runtime Foundation) — not started
-Plan: —
-Status: Roadmap drafted, awaiting plan for Phase 11
-Last activity: 2026-04-18 — Milestone v1.2 roadmap drafted
+Phase: 11 (Runtime Foundation) — in progress (Wave 1 of 2)
+Plan: 11-01 (model registry + task-override validation) complete; siblings 11-02 (runner-secret), 11-03 (migrations) also complete; 11-04 (runner-token auth) remaining
+Status: 3/4 Wave-1 plans committed (5a3e166, f95b72e, e8594e7/53e4809, d6b53ca); runner-token auth plan (11-04) is the last remaining Wave 1 plan
+Last activity: 2026-04-19 — Plan 11-03 complete (TCTX-07: migrations 054–057 — recipes, task_runner_tokens, task_checkpoints tables + 12 additive tasks cols with 7-test Vitest coverage)
 
 ## Performance Metrics
 
@@ -91,6 +92,8 @@ Last activity: 2026-04-18 — Milestone v1.2 roadmap drafted
 | Phase 09-gsd-native-integration P08 | 5min | 2 tasks | 6 files |
 | Phase 09-gsd-native-integration P07 | 10min | 2 tasks tasks | 14 files files |
 | Phase 09-gsd-native-integration P10 | 59min | 3 tasks | 7 files |
+| Phase 11 P03 | 8min | 2 tasks | 2 files |
+| Phase 11-runtime-foundation-v1-2 P01 | 7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -107,6 +110,11 @@ Recent decisions affecting current work:
 - [v1.2 roadmap]: UI isolated to Phase 16 (and all UI REQs — RUI-01..06 — land there) so the runtime can be shipped and exercised via CLI/MCP/curl before the visual layer is built; matches v1.0/v1.1 precedent of UI-phase separation
 - [v1.2 roadmap]: Integration testing capped the milestone in Phase 17 to avoid scope pollution — unit tests for sharp-edge pieces live with each phase during execution, but the reference-image pipeline test, crash-recovery test, and Playwright E2E all depend on Phases 11–16 being fully wired
 - Recent phases (09/10) already logged in PROJECT.md Key Decisions table; not duplicated here
+- [Phase 11]: Migration IDs renumbered 054-057 (not 036-039 as plan specified) because migrations[] already extends through 053_gsd_hierarchy_foundation; downstream plans must reference the actual applied IDs
+- [Phase 11]: task_runner_tokens and task_checkpoints do NOT carry workspace_id/tenant_id columns — scoping flows through the parent tasks row and FK CASCADE handles cleanup; Plan 11-04 enforces task-to-workspace scoping at the auth layer
+- [Phase 11]: runner_attempts is the only new tasks column with a non-null default (INTEGER NOT NULL DEFAULT 0); all other runtime fields (recipe_slug, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_max_attempts, runner_last_failure_reason, workspace_source, read_only_mounts, extra_skills) are nullable — downstream code must handle NULL
+- [Phase 11-runtime-foundation-v1-2]: Model registry is code-seeded immutable const — no override file, no alias map, adding a model = a PR
+- [Phase 11-runtime-foundation-v1-2]: Zod v4 uses { error: (issue) => ... } for dynamic refine messages — the v3 function-form was removed
 
 ### Pending Todos
 
@@ -129,6 +137,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-18T00:00:00Z
-Stopped at: v1.2 roadmap drafted — Phases 11–17 defined, 72 v1.2 REQ-IDs mapped with 100% coverage, REQUIREMENTS.md traceability table updated. Next: `/gsd:plan-phase 11` for Runtime Foundation.
+Last session: 2026-04-19T01:58:30.000Z
+Stopped at: Completed 11-01-PLAN.md (MODEL-01 + MODEL-03): model-registry module + createTaskSchema.model_override validation
 Resume file: None
