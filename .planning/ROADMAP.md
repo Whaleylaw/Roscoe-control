@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### v1.2 — Recipe-Based Ephemeral Agent Runtime
 - [x] **Phase 11: Runtime Foundation** - DB migrations (recipes, task_runner_tokens, task_checkpoints, task column additions), model registry module, runner + runner-token auth principals (completed 2026-04-19)
-- [ ] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time
+- [x] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time (completed 2026-04-19)
 - [ ] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
 - [ ] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image
 - [ ] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast
@@ -241,7 +241,7 @@ Plans:
   4. `POST /api/recipes` (called by Hermes or an operator) writes the recipe files to disk and indexes the row atomically; the recipe appears in subsequent list/search responses
   5. An admin can `POST /api/recipes/resync` to force a full re-scan of `recipes/` when the watcher falls behind
   6. A recipe whose `model.primary` is not in the model registry fails to index with a human-readable error surfaced both in the indexer log and through the recipe API / UI fetch
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
 - [x] 12-01-PLAN.md — Additive migrations (058 error_message col + 059 recipes_fts5 virtual table) + recipe.yaml Zod schema + TypeScript types (RECIPE-02, RECIPE-04, RECIPE-08)
 - [x] 12-02-PLAN.md — Recipe indexer module (parse + dir_sha + UPSERT valid-or-error row) + deterministic recipe-hash (RECIPE-01, RECIPE-02, RECIPE-04, MODEL-02)
@@ -362,7 +362,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 9. GSD Native Integration *(v1.1)* | 11/11 | Complete | 2026-04-15 |
 | 10. Hierarchical Lifecycle Graph *(v1.1)* | — | Complete | 2026-04-15 |
 | 11. Runtime Foundation *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
-| 12. Recipe System *(v1.2)* | 3/4 | In Progress|  |
+| 12. Recipe System *(v1.2)* | 4/4 | Complete   | 2026-04-19 |
 | 13. Task Runtime Context *(v1.2)* | 0/— | Not started | - |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 0/— | Not started | - |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |

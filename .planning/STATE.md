@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: 3/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5); RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-07, RECIPE-08, MODEL-02 shipped
-stopped_at: Completed 12-03-PLAN.md — recipe watcher (chokidar + eager boot scan + 250ms debounce) + resyncRecipes admin entry point; 11 new Vitest cases; MISSION_CONTROL_RECIPES_DIR env var introduced; RECIPE-03 + RECIPE-07 shipped; chokidar@^5.0.0 dep
-last_updated: "2026-04-19T03:50:36.743Z"
-last_activity: 2026-04-19 — Plan 12-03 complete (recipe-watcher.ts exporting scanRecipesDir/resyncRecipes/startRecipeWatcher/stopRecipeWatcher/getRecipesRoot + ResyncReport/StartWatcherOptions types; chokidar@^5.0.0 dep; 250ms per-slug debounce; eager blocking boot scan; basename-filter 'ignored' function for .DS_Store/*.swp/*~/*.tmp; MISSION_CONTROL_RECIPES_DIR env var (cwd-relative default); 11 new Vitest cases; RECIPE-03 + RECIPE-07 shipped)
+status: 4/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5, 12-04 aac4613/510de96/5d456e1); RECIPE-01..08, MODEL-02 shipped; Phase 12 COMPLETE
+stopped_at: Completed 12-04-PLAN.md — recipe API (GET list/slug/search + POST create + POST resync) with FTS5 BM25 tag-weighting (RECIPE-08), admin-only mutations, disk-first atomic-write + rollback on indexRecipe failure, and watcher boot-wire inside initializeSchema; 24 new Vitest cases; RECIPE-05 + RECIPE-06 + RECIPE-07 + RECIPE-08 shipped; Phase 12 complete
+last_updated: "2026-04-19T04:11:32.780Z"
+last_activity: 2026-04-19 — Plan 12-04 complete (4 route files + 4 test suites + db.ts boot hook; GET /api/recipes list/slug/search with bm25(recipes_fts, 1.0, 1.0, 1.0, 2.0) tag-weighting; POST /api/recipes admin-only disk-first tmpdir-write + atomic fs.rename + EXDEV cp fallback + indexRecipe force + rollback; POST /api/recipes/resync admin-only synchronous ResyncReport; startRecipeWatcher dynamic-imported in initializeSchema's !isBuildPhase && !isTestMode branch; 24 new Vitest cases; full suite 1794 pass / 0 fail; typecheck clean; build succeeds; RECIPE-05 + RECIPE-06 + RECIPE-07 + RECIPE-08 shipped; Phase 12 COMPLETE)
 progress:
   total_phases: 12
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 37
-  completed_plans: 42
-  percent: 100
+  completed_plans: 43
 ---
 
 # Project State
@@ -25,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 12 (Recipe System) — Wave 3 IN PROGRESS
-Plan: 12-03 complete (recipe watcher: chokidar + eager boot scan + resyncRecipes). Next: 12-04 (API + server-start hook).
-Status: 3/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5); RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-07, RECIPE-08, MODEL-02 shipped
-Last activity: 2026-04-19 — Plan 12-03 complete (recipe-watcher.ts with chokidar@^5.0.0, 250ms per-slug debounce, eager blocking boot scan, basename-filter 'ignored' for editor/OS noise, MISSION_CONTROL_RECIPES_DIR env var cwd-relative default, 11 new Vitest cases, typecheck clean; unblocks 12-04's server-start hook and POST /api/recipes/resync)
-Next: Plan 12-04 (recipe API) — GET/POST /api/recipes + /api/recipes/:slug + POST /api/recipes/resync + boot wiring `await startRecipeWatcher()` before `server.listen()`
+Phase: 12 (Recipe System) — COMPLETE
+Plan: 12-04 complete (recipe API + boot wiring). Phase 12 complete: 4/4 plans shipped.
+Status: 4/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5, 12-04 aac4613/510de96/5d456e1); RECIPE-01..08, MODEL-02 shipped
+Last activity: 2026-04-19 — Plan 12-04 complete (src/app/api/recipes/{route,[slug]/route,search/route,resync/route}.ts + 4 test suites + src/lib/db.ts boot hook; GET list/slug/search w/ bm25(recipes_fts, 1.0, 1.0, 1.0, 2.0) tag-weighting RECIPE-08; POST create admin-only disk-first atomic-write + rollback; POST resync admin-only sync ResyncReport; startRecipeWatcher dynamic-imported in initializeSchema's !isBuildPhase && !isTestMode branch; 24 new Vitest cases; 1794 pass / 0 fail; typecheck clean; build succeeds)
+Next: Plan 13-01 (task-runtime-context) — task creation paths that reference `recipe_slug` reject on null OR error_message !== null; use getIndexedRecipeBySlug discrimination rule from 12-04-SUMMARY
 
 ## Performance Metrics
 
@@ -101,6 +100,7 @@ Next: Plan 12-04 (recipe API) — GET/POST /api/recipes + /api/recipes/:slug + P
 | Phase 12-recipe-system-v1-2 P01 | 7 | 2 tasks | 6 files |
 | Phase 12-recipe-system-v1-2 P02 | 9min | 2 tasks | 4 files |
 | Phase 12-recipe-system-v1-2 P03 | 5min | 2 tasks | 4 files |
+| Phase 12-recipe-system-v1-2 P04 | 13min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -142,6 +142,12 @@ Recent decisions affecting current work:
 - [Phase 12-recipe-system-v1-2]: [Phase 12-03]: chokidar 'ignored' is a basename-function filter (not a glob) — version-stable across chokidar majors and identical behaviour across fsevents/inotify/polling backends; rejects .DS_Store, *.swp, *~, *.tmp
 - [Phase 12-recipe-system-v1-2]: [Phase 12-03]: Partial-unlink events call indexRecipe (not removeRecipe directly); indexRecipe's 'skipped_missing' IndexResult tells the handler when to drop the row — one code path covers 'deleted sentinel recipe.yaml' and 'deleted side file' cases consistently
 - [Phase 12-recipe-system-v1-2]: [Phase 12-03]: startRecipeWatcher awaits chokidar 'ready' event before returning — avoids race between function-return and macOS fsevents registration that would drop writes issued immediately after boot
+- [Phase 12-recipe-system-v1-2]: [Phase 12-04]: `mutationLimiter` is a direct function — called `mutationLimiter(request)`, NOT `mutationLimiter.check(request, key)`; the plan's sketch used a non-existent `.check` API and had to be fixed. Every API route (alerts, webhooks, integrations) uses the direct form — any new mutation endpoint must match.
+- [Phase 12-recipe-system-v1-2]: [Phase 12-04]: `getRecipesRoot` cannot be intercepted via `vi.mock('@/lib/recipe-watcher')` for tests that exercise `resyncRecipes → scanRecipesDir` because the internal call is closure-bound, not an export-binding lookup; resync tests must set `MISSION_CONTROL_RECIPES_DIR` in `beforeEach` instead. Route-file tests (POST, etc.) CAN use vi.mock because route.ts imports `getRecipesRoot` at the top.
+- [Phase 12-recipe-system-v1-2]: [Phase 12-04]: POST /api/recipes rollback deletes BOTH the disk directory AND the error row `indexRecipe` wrote on failure — keeps retry semantics idempotent (otherwise the error row would be read by the 409 conflict check on a subsequent POST)
+- [Phase 12-recipe-system-v1-2]: [Phase 12-04]: Recipe watcher boot-wire lives INSIDE the scheduler's `if (!isBuildPhase && !isTestMode)` branch in `initializeSchema`, not in a parallel branch — both subsystems share the runtime-only gate so build/test behavior stays congruent
+- [Phase 12-recipe-system-v1-2]: [Phase 12-04]: `?include_broken=1` requires admin — error rows contain parser detail and path fragments that could leak filesystem structure; viewer tier sees only healthy recipes
+- [Phase 12-recipe-system-v1-2]: [Phase 12-04]: Phase 13 discrimination rule: task-creation handlers with `recipe_slug` MUST call `getIndexedRecipeBySlug(slug)` and reject when return is `null` OR `error_message !== null`; only dispatch when the returned row is a `RecipeRow` — documented in 12-04-SUMMARY "Phase 13 Entry Point"
 
 ### Pending Todos
 
@@ -164,6 +170,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T03:50:36.737Z
-Stopped at: Completed 12-03-PLAN.md — recipe watcher (chokidar + eager boot scan + 250ms debounce) + resyncRecipes admin entry point; 11 new Vitest cases; MISSION_CONTROL_RECIPES_DIR env var introduced; RECIPE-03 + RECIPE-07 shipped; chokidar@^5.0.0 dep
+Last session: 2026-04-19T04:11:32.780Z
+Stopped at: Completed 12-04-PLAN.md — recipe API (4 routes: GET list/slug/search + POST create + POST resync) with FTS5 BM25 tag-weighting (RECIPE-08), admin-only mutations, disk-first atomic-write + rollback on indexRecipe failure, watcher boot-wire in initializeSchema; 24 new Vitest cases; full suite 1794 pass; RECIPE-05 + RECIPE-06 + RECIPE-07 + RECIPE-08 shipped; Phase 12 COMPLETE (4/4 plans)
 Resume file: None
