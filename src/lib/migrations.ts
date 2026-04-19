@@ -1555,6 +1555,108 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_phase_id ON tasks(gsd_phase_id)`)
       db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_gsd_plan_id ON tasks(gsd_plan_id)`)
     }
+  },
+  {
+    id: '054_recipes',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS recipes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          description TEXT,
+          when_to_use TEXT,
+          image TEXT NOT NULL,
+          workspace_mode TEXT NOT NULL,
+          timeout_seconds INTEGER NOT NULL,
+          max_concurrent INTEGER NOT NULL DEFAULT 1,
+          env_json TEXT NOT NULL DEFAULT '{}',
+          secrets_json TEXT NOT NULL DEFAULT '[]',
+          tags_json TEXT NOT NULL DEFAULT '[]',
+          model_json TEXT NOT NULL DEFAULT '{}',
+          version INTEGER NOT NULL DEFAULT 1,
+          dir_sha TEXT NOT NULL,
+          soul_md TEXT,
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+        )
+      `)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_recipes_slug ON recipes(slug)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_recipes_workspace ON recipes(workspace_id)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_recipes_tags ON recipes(tags_json)`)
+    }
+  },
+  {
+    id: '055_task_runner_tokens',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_runner_tokens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          attempt INTEGER NOT NULL,
+          token_hash TEXT NOT NULL UNIQUE,
+          expires_at INTEGER NOT NULL,
+          revoked_at INTEGER,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+      `)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_runner_tokens_task_attempt ON task_runner_tokens(task_id, attempt)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_runner_tokens_token_hash ON task_runner_tokens(token_hash)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_runner_tokens_expires_not_revoked ON task_runner_tokens(expires_at) WHERE revoked_at IS NULL`)
+    }
+  },
+  {
+    id: '056_task_checkpoints',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_checkpoints (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          attempt INTEGER NOT NULL,
+          step TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          status TEXT NOT NULL,
+          artifacts_json TEXT NOT NULL DEFAULT '[]',
+          next_step TEXT,
+          blocker_reason TEXT,
+          tokens_used INTEGER,
+          duration_ms INTEGER,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+      `)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_checkpoints_task_attempt_created ON task_checkpoints(task_id, attempt, created_at)`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_checkpoints_status ON task_checkpoints(status)`)
+    }
+  },
+  {
+    id: '057_tasks_runtime_columns',
+    up(db: Database.Database) {
+      const taskCols = db.prepare(`PRAGMA table_info(tasks)`).all() as Array<{ name: string }>
+      const hasTaskCol = (n: string) => taskCols.some((c) => c.name === n)
+
+      if (!hasTaskCol('recipe_slug')) db.exec(`ALTER TABLE tasks ADD COLUMN recipe_slug TEXT`)
+      if (!hasTaskCol('workspace_source')) db.exec(`ALTER TABLE tasks ADD COLUMN workspace_source TEXT`)
+      if (!hasTaskCol('read_only_mounts')) db.exec(`ALTER TABLE tasks ADD COLUMN read_only_mounts TEXT`)
+      if (!hasTaskCol('extra_skills')) db.exec(`ALTER TABLE tasks ADD COLUMN extra_skills TEXT`)
+      if (!hasTaskCol('model_override')) db.exec(`ALTER TABLE tasks ADD COLUMN model_override TEXT`)
+      if (!hasTaskCol('container_id')) db.exec(`ALTER TABLE tasks ADD COLUMN container_id TEXT`)
+      if (!hasTaskCol('runner_started_at')) db.exec(`ALTER TABLE tasks ADD COLUMN runner_started_at INTEGER`)
+      if (!hasTaskCol('runner_exit_code')) db.exec(`ALTER TABLE tasks ADD COLUMN runner_exit_code INTEGER`)
+      if (!hasTaskCol('worktree_path')) db.exec(`ALTER TABLE tasks ADD COLUMN worktree_path TEXT`)
+      if (!hasTaskCol('runner_attempts')) db.exec(`ALTER TABLE tasks ADD COLUMN runner_attempts INTEGER NOT NULL DEFAULT 0`)
+      if (!hasTaskCol('runner_max_attempts')) db.exec(`ALTER TABLE tasks ADD COLUMN runner_max_attempts INTEGER`)
+      if (!hasTaskCol('runner_last_failure_reason')) db.exec(`ALTER TABLE tasks ADD COLUMN runner_last_failure_reason TEXT`)
+
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_recipe_slug ON tasks(recipe_slug) WHERE recipe_slug IS NOT NULL`)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_runner_started_at ON tasks(runner_started_at) WHERE runner_started_at IS NOT NULL`)
+    }
   }
 ]
 
