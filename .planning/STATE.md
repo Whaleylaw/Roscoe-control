@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-19T04:18:46.061Z"
+last_updated: "2026-04-19T15:52:09.662Z"
 progress:
-  total_phases: 12
+  total_phases: 13
   completed_phases: 9
-  total_plans: 37
-  completed_plans: 43
+  total_plans: 40
+  completed_plans: 45
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 12 (Recipe System) — COMPLETE
-Plan: 12-04 complete (recipe API + boot wiring). Phase 12 complete: 4/4 plans shipped.
-Status: 4/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5, 12-04 aac4613/510de96/5d456e1); RECIPE-01..08, MODEL-02 shipped
-Last activity: 2026-04-19 — Plan 12-04 complete (src/app/api/recipes/{route,[slug]/route,search/route,resync/route}.ts + 4 test suites + src/lib/db.ts boot hook; GET list/slug/search w/ bm25(recipes_fts, 1.0, 1.0, 1.0, 2.0) tag-weighting RECIPE-08; POST create admin-only disk-first atomic-write + rollback; POST resync admin-only sync ResyncReport; startRecipeWatcher dynamic-imported in initializeSchema's !isBuildPhase && !isTestMode branch; 24 new Vitest cases; 1794 pass / 0 fail; typecheck clean; build succeeds)
-Next: Plan 13-01 (task-runtime-context) — task creation paths that reference `recipe_slug` reject on null OR error_message !== null; use getIndexedRecipeBySlug discrimination rule from 12-04-SUMMARY
+Phase: 13 (Task Runtime Context) — IN PROGRESS
+Plan: 13-01 complete (task-runtime-context validation substrate). 3 plans in phase 13 — 1/3 shipped.
+Status: 13-01 committed (244ba2b/3f66cc3/94863c6); TCTX-01..06 shipped; 13-02 + 13-03 unblocked for wave-2 parallel execution
+Last activity: 2026-04-19 — Plan 13-01 complete (src/lib/task-runtime-settings.ts + src/lib/task-runtime-validation.ts + createTaskSchema extension in src/lib/validation.ts + 3 new runtime.* keys in /api/settings settingDefinitions; 57 new Vitest cases — 12 settings + 33 validation helpers + 12 schema shape; 1851 pass / 0 fail; typecheck + lint clean; TASK_RUNTIME_ERROR_CODES enum locked for Phase 14 runner re-validation; validateHostPathAgainstAllowlist uses parent-directory walk on ENOENT per CONTEXT.md existence-not-enforced-at-creation)
+Next: Plans 13-02 (POST /api/tasks runtime-context validation) + 13-03 (PATCH /api/tasks/[id] runtime-context validation) — file-disjoint, wave-2 parallel; both import from @/lib/task-runtime-validation + @/lib/task-runtime-settings + @/lib/validation (schema already extended)
 
 ## Performance Metrics
 
@@ -99,6 +99,7 @@ Next: Plan 13-01 (task-runtime-context) — task creation paths that reference `
 | Phase 12-recipe-system-v1-2 P02 | 9min | 2 tasks | 4 files |
 | Phase 12-recipe-system-v1-2 P03 | 5min | 2 tasks | 4 files |
 | Phase 12-recipe-system-v1-2 P04 | 13min | 3 tasks | 9 files |
+| Phase 13-task-runtime-context-v1-2 P01 | 10min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,11 @@ Recent decisions affecting current work:
 - [Phase 12-recipe-system-v1-2]: [Phase 12-04]: Recipe watcher boot-wire lives INSIDE the scheduler's `if (!isBuildPhase && !isTestMode)` branch in `initializeSchema`, not in a parallel branch — both subsystems share the runtime-only gate so build/test behavior stays congruent
 - [Phase 12-recipe-system-v1-2]: [Phase 12-04]: `?include_broken=1` requires admin — error rows contain parser detail and path fragments that could leak filesystem structure; viewer tier sees only healthy recipes
 - [Phase 12-recipe-system-v1-2]: [Phase 12-04]: Phase 13 discrimination rule: task-creation handlers with `recipe_slug` MUST call `getIndexedRecipeBySlug(slug)` and reject when return is `null` OR `error_message !== null`; only dispatch when the returned row is a `RecipeRow` — documented in 12-04-SUMMARY "Phase 13 Entry Point"
+- [Phase 13-01]: [Phase 13-01]: Moved createTaskSchema extension from Plan 13-02 into 13-01 so Plans 13-02 (POST handler) and 13-03 (PATCH handler) are file-disjoint for src/lib/validation.ts and can run in parallel in wave 2
+- [Phase 13-01]: [Phase 13-01]: validateHostPathAgainstAllowlist walks parent directories on ENOENT (re-attaches unresolved tail to realpath of nearest existing ancestor); lets not-yet-existing paths like worktree targets validate while preserving symlink semantics for whatever does exist. CONTEXT.md: existence NOT enforced at task creation
+- [Phase 13-01]: [Phase 13-01]: Allowlist entries that fail to realpath are silently skipped (not logged per-call) — a misconfigured entry must not bypass checks and must not spam logs; skipping means validation falls to OUT_OF_ALLOWLIST
+- [Phase 13-01]: [Phase 13-01]: TASK_RUNTIME_ERROR_CODES locked as SCREAMING_SNAKE const assertion — shared vocabulary for API validation (13-02/13-03), runner claim-time re-validation (Phase 14), and future UI error mapping (Phase 16). Phase 14 runner MUST import validateHostPathAgainstAllowlist and emit codes from the same enum
+- [Phase 13-01]: [Phase 13-01]: Caps (getMountsCap/getExtraSkillsCap) enforced in route handlers, not in Zod refinements — caps are admin-mutable via PUT /api/settings, and Zod closures would freeze the value at module-eval; route handlers call the getter per request
 
 ### Pending Todos
 

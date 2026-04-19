@@ -259,7 +259,7 @@ Plans:
   3. A task can carry zero or more `read_only_mounts` entries (`{ host_path, container_path, label }`), zero or more `extra_skills` host paths, and an optional `model_override`, and all three round-trip through the task read API
   4. Any `host_path` on a task (read_only_mount or extra_skill) that falls outside the runner's `mount_allowlist` is rejected at task creation with an actionable error referencing the offending path
   5. A `model_override` that is not in the model registry is rejected with a clear error
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 Plans:
 - [ ] 13-01-PLAN.md — Shared substrate: runtime.* settings definitions + task-runtime-settings.ts getters + task-runtime-validation.ts (Zod schemas, allowlist resolver with fs.realpath parent-walk, aggregated-error builder, zodErrorToIssues) (TCTX-03, TCTX-04, TCTX-06)
 - [ ] 13-02-PLAN.md — POST /api/tasks extension: createTaskSchema + manual safeParse → aggregated errors, recipe lookup (getIndexedRecipeBySlug), workspace_source gating, allowlist + caps enforcement, INSERT column extension, mapTaskRow round-trip (TCTX-01..06)
@@ -362,7 +362,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 10. Hierarchical Lifecycle Graph *(v1.1)* | — | Complete | 2026-04-15 |
 | 11. Runtime Foundation *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 12. Recipe System *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
-| 13. Task Runtime Context *(v1.2)* | 0/3 | Not started | - |
+| 13. Task Runtime Context *(v1.2)* | 1/3 | In Progress|  |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 0/— | Not started | - |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |
 | 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |

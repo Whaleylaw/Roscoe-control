@@ -127,12 +127,12 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Task Runtime Context
 
-- [ ] **TCTX-01**: Task author can set `recipe_slug` on a task at creation or update; task record references a valid recipe row
-- [ ] **TCTX-02**: Task author can specify `workspace_source` (project_id + base_ref) on a task when the recipe declares `workspace: worktree`; system rejects tasks missing this for worktree-mode recipes
-- [ ] **TCTX-03**: Task author can attach read-only reference mounts on a task as `{host_path, container_path, label}` entries, visible in the task UI
-- [ ] **TCTX-04**: Task author can attach extra skill files on a task as a list of host paths, mounted at `/skills/<name>` in the container
-- [ ] **TCTX-05**: Task author can set `model_override` on a task to force a specific model regardless of the recipe's default
-- [ ] **TCTX-06**: All user-supplied host paths on a task are validated against the runner's `mount_allowlist` at task creation, failing fast with a clear error if out of bounds
+- [x] **TCTX-01**: Task author can set `recipe_slug` on a task at creation or update; task record references a valid recipe row
+- [x] **TCTX-02**: Task author can specify `workspace_source` (project_id + base_ref) on a task when the recipe declares `workspace: worktree`; system rejects tasks missing this for worktree-mode recipes
+- [x] **TCTX-03**: Task author can attach read-only reference mounts on a task as `{host_path, container_path, label}` entries, visible in the task UI
+- [x] **TCTX-04**: Task author can attach extra skill files on a task as a list of host paths, mounted at `/skills/<name>` in the container
+- [x] **TCTX-05**: Task author can set `model_override` on a task to force a specific model regardless of the recipe's default
+- [x] **TCTX-06**: All user-supplied host paths on a task are validated against the runner's `mount_allowlist` at task creation, failing fast with a clear error if out of bounds
 - [x] **TCTX-07**: Task record tracks runner execution state via `container_id`, `runner_started_at`, `runner_exit_code`, `worktree_path`, `runner_attempts`, `runner_max_attempts`, `runner_last_failure_reason`
 
 ### Runner Daemon
@@ -318,12 +318,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RECIPE-06 | Phase 12 | Complete |
 | RECIPE-07 | Phase 12 | Complete |
 | RECIPE-08 | Phase 12 | Complete |
-| TCTX-01 | Phase 13 | Pending |
-| TCTX-02 | Phase 13 | Pending |
-| TCTX-03 | Phase 13 | Pending |
-| TCTX-04 | Phase 13 | Pending |
-| TCTX-05 | Phase 13 | Pending |
-| TCTX-06 | Phase 13 | Pending |
+| TCTX-01 | Phase 13 | Complete |
+| TCTX-02 | Phase 13 | Complete |
+| TCTX-03 | Phase 13 | Complete |
+| TCTX-04 | Phase 13 | Complete |
+| TCTX-05 | Phase 13 | Complete |
+| TCTX-06 | Phase 13 | Complete |
 | TCTX-07 | Phase 11 | Complete |
 | RUNNER-01 | Phase 14 | Pending |
 | RUNNER-02 | Phase 14 | Pending |
