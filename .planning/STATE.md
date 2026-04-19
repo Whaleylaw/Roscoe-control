@@ -2,10 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: 4/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5, 12-04 aac4613/510de96/5d456e1); RECIPE-01..08, MODEL-02 shipped; Phase 12 COMPLETE
-stopped_at: Completed 12-04-PLAN.md — recipe API (GET list/slug/search + POST create + POST resync) with FTS5 BM25 tag-weighting (RECIPE-08), admin-only mutations, disk-first atomic-write + rollback on indexRecipe failure, and watcher boot-wire inside initializeSchema; 24 new Vitest cases; RECIPE-05 + RECIPE-06 + RECIPE-07 + RECIPE-08 shipped; Phase 12 complete
-last_updated: "2026-04-19T04:11:32.780Z"
-last_activity: 2026-04-19 — Plan 12-04 complete (4 route files + 4 test suites + db.ts boot hook; GET /api/recipes list/slug/search with bm25(recipes_fts, 1.0, 1.0, 1.0, 2.0) tag-weighting; POST /api/recipes admin-only disk-first tmpdir-write + atomic fs.rename + EXDEV cp fallback + indexRecipe force + rollback; POST /api/recipes/resync admin-only synchronous ResyncReport; startRecipeWatcher dynamic-imported in initializeSchema's !isBuildPhase && !isTestMode branch; 24 new Vitest cases; full suite 1794 pass / 0 fail; typecheck clean; build succeeds; RECIPE-05 + RECIPE-06 + RECIPE-07 + RECIPE-08 shipped; Phase 12 COMPLETE)
+status: unknown
+last_updated: "2026-04-19T04:18:46.061Z"
 progress:
   total_phases: 12
   completed_phases: 9
