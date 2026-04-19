@@ -55,6 +55,23 @@ const settingDefinitions: Record<string, { category: string; description: string
   'onboarding.skipped': { category: 'onboarding', description: 'Whether onboarding was skipped', default: 'false' },
   'onboarding.completed_steps': { category: 'onboarding', description: 'JSON array of completed step IDs', default: '[]' },
   'onboarding.checklist_dismissed': { category: 'onboarding', description: 'Whether the onboarding checklist has been dismissed', default: 'false' },
+
+  // Runtime (task-runtime-context, Phase 13 — TCTX-04, TCTX-06)
+  'runtime.mount_allowlist': {
+    category: 'runtime',
+    description: 'JSON array of absolute path prefixes allowed as read_only_mounts host_path or extra_skills paths on tasks. Empty array rejects all mounts. Evaluated after fs.realpath. Example: ["/Users/me/repos","/opt/refs"]',
+    default: '[]',
+  },
+  'runtime.read_only_mounts_cap': {
+    category: 'runtime',
+    description: 'Maximum number of read_only_mounts entries allowed per task. Tasks exceeding this cap fail validation at creation.',
+    default: '10',
+  },
+  'runtime.extra_skills_cap': {
+    category: 'runtime',
+    description: 'Maximum number of extra_skills entries allowed per task.',
+    default: '20',
+  },
 }
 
 /**
