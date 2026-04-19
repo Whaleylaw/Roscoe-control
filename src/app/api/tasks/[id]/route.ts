@@ -10,6 +10,15 @@ import { normalizeTaskUpdateStatus } from '@/lib/task-status';
 import { syncTaskOutbound } from '@/lib/github-sync-engine';
 import { removeTaskFromGnap } from '@/lib/gnap-sync';
 import { config } from '@/lib/config';
+import { revokeTokensForTask } from '@/lib/runner-tokens';
+
+/**
+ * Terminal task statuses — when a task transitions INTO one of these, any live
+ * runner-tokens (Plan 11-04) must be atomically revoked in the same transaction
+ * as the status UPDATE. `cancelled` is defensive: not in the current status enum
+ * but self-activates if a future migration widens it. See 11-CONTEXT.md locks.
+ */
+const TERMINAL_TASK_STATUSES = new Set(['done', 'failed', 'cancelled']);
 
 function formatTicketRef(prefix?: string | null, num?: number | null): string | undefined {
   if (!prefix || typeof num !== 'number' || !Number.isFinite(num) || num <= 0) return undefined
@@ -298,12 +307,25 @@ export async function PUT(
     }
     
     const stmt = db.prepare(`
-      UPDATE tasks 
+      UPDATE tasks
       SET ${fieldsToUpdate.join(', ')}
       WHERE id = ? AND workspace_id = ?
     `);
-    
-    stmt.run(...updateParams);
+
+    // Plan 11-04 / RAUTH-05: when a task transitions INTO a terminal status, revoke
+    // live runner-tokens in the SAME transaction as the status write. A crash between
+    // the two MUST roll both back. `isTerminalTransition` guards against re-revoking
+    // on terminal→terminal writes (harmless but noise; revokeTokensForTask is idempotent).
+    const isTerminalTransition = normalizedStatus !== undefined
+      && TERMINAL_TASK_STATUSES.has(normalizedStatus)
+      && !TERMINAL_TASK_STATUSES.has(currentTask.status as string);
+
+    db.transaction(() => {
+      stmt.run(...updateParams);
+      if (isTerminalTransition) {
+        revokeTokensForTask(db, taskId);
+      }
+    })();
     
     // Track changes and log activities
     const changes: string[] = [];

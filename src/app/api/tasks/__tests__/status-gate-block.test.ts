@@ -91,6 +91,11 @@ function prepareImpl(sql: string) {
 vi.mock('@/lib/db', () => ({
   getDatabase: () => ({
     prepare: (sql: string) => prepareImpl(sql),
+    // Plan 11-04: the PUT route wraps UPDATE + runner-token revocation in a
+    // db.transaction(() => { ... })() block. Mock it as an immediate-runner:
+    // call the fn synchronously, return its result. Better-sqlite3 itself
+    // behaves the same for a successful transaction.
+    transaction: (fn: () => unknown) => () => fn(),
   }),
   db_helpers: {
     logActivity: (...args: unknown[]) => logActivityMock(...args),
