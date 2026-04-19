@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: unknown
-last_updated: "2026-04-19T03:24:57.380Z"
+status: 1/4 plans committed (12-01 b8472c2/d764b05); RECIPE-02, RECIPE-04, RECIPE-08 shipped
+stopped_at: Completed 12-02-PLAN.md — computeDirSha (recipe directory SHA-256 dedup) + recipe-indexer (indexRecipe/removeRecipe/getIndexedRecipeBySlug); 16 new Vitest cases (5 hash + 11 indexer); IndexResult union ready for 12-03 watcher and 12-04 API
+last_updated: "2026-04-19T03:40:39.967Z"
+last_activity: 2026-04-19 — Plan 12-01 complete (migrations 058_recipes_error_message + 059_recipes_fts5; parseRecipeYaml Zod schema with MODEL-02 registry refinement; RecipeRow/RecipeErrorRow/RecipeModel types; yaml@^2.8.3 dep; 13 new Vitest cases)
 progress:
   total_phases: 12
   completed_phases: 8
   total_plans: 37
-  completed_plans: 40
+  completed_plans: 41
+  percent: 100
 ---
 
 # Project State
@@ -22,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 12 (Recipe System) — Wave 1 IN PROGRESS
-Plan: 12-01 complete (recipe substrate: migrations 058+059, parseRecipeYaml, types). Next: 12-02 (indexer), 12-03 (watcher), 12-04 (API).
-Status: 1/4 plans committed (12-01 b8472c2/d764b05); RECIPE-02, RECIPE-04, RECIPE-08 shipped
-Last activity: 2026-04-19 — Plan 12-01 complete (migrations 058_recipes_error_message + 059_recipes_fts5; parseRecipeYaml Zod schema with MODEL-02 registry refinement; RecipeRow/RecipeErrorRow/RecipeModel types; yaml@^2.8.3 dep; 13 new Vitest cases)
-Next: Plan 12-02 (recipe indexer) — consumes parseRecipeYaml + RecipeRow from 12-01
+Phase: 12 (Recipe System) — Wave 2 IN PROGRESS
+Plan: 12-02 complete (recipe indexer: computeDirSha + indexRecipe/removeRecipe/getIndexedRecipeBySlug). Next: 12-03 (watcher), 12-04 (API).
+Status: 2/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f); RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-08, MODEL-02 shipped
+Last activity: 2026-04-19 — Plan 12-02 complete (computeDirSha recipe directory SHA-256 with POSIX sort-invariant hash stream; indexRecipe single write path with UPSERT + error-row flow + dedup; removeRecipe w/ FTS cascade via migration 059; getIndexedRecipeBySlug with JSON column deserialisation; 16 new Vitest cases; IndexResult union ready for 12-03/12-04)
+Next: Plan 12-03 (recipe watcher) — chokidar watcher over recipes directory, switches on IndexResult.status from 12-02
 
 ## Performance Metrics
 
@@ -96,6 +99,7 @@ Next: Plan 12-02 (recipe indexer) — consumes parseRecipeYaml + RecipeRow from 
 | Phase 11-runtime-foundation-v1-2 P02 | 10min | 2 tasks | 6 files |
 | Phase 11-runtime-foundation-v1-2 P04 | 10min | 3 tasks | 7 files |
 | Phase 12-recipe-system-v1-2 P01 | 7 | 2 tasks | 6 files |
+| Phase 12-recipe-system-v1-2 P02 | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -129,6 +133,9 @@ Recent decisions affecting current work:
 - [Phase 12-recipe-system-v1-2]: [Phase 12-01]: FTS5 table is standalone (contentful), not external-content — content='recipes' requires FTS5 column names to match content-table columns, and 'tags' vs 'tags_json' mismatch blocked external-content; triggers give equivalent sync semantics
 - [Phase 12-recipe-system-v1-2]: [Phase 12-01]: bm25 column weights (tags 2x) applied at QUERY time (Plan 12-04), not in the FTS5 schema — keeps virtual table neutral and lets callers tune ranking without re-migrating
 - [Phase 12-recipe-system-v1-2]: [Phase 12-01]: parseRecipeYaml returns discriminated ParseResult ({ok,value}|{ok,error}) — never throws; aligns with error_message column flow so indexer/API uniformly write messages without try/catch
+- [Phase 12-recipe-system-v1-2]: [Phase 12-02]: Error rows carry computed dir_sha (not empty string) so future joins on dir_sha stay consistent; fast-path dedup blocked by error_message IS NOT NULL so a fix re-parses even with no other file changes
+- [Phase 12-recipe-system-v1-2]: [Phase 12-02]: Slug-mismatch between directory basename and recipe.yaml slug is a hard-fail error-row path — prevents watcher/API disagreement on which row to target
+- [Phase 12-recipe-system-v1-2]: [Phase 12-02]: getIndexedRecipeBySlug owns JSON column deserialisation (env_json → env, etc.); API routes in 12-04 never call JSON.parse directly — one place to change if JSON encoding evolves
 
 ### Pending Todos
 
@@ -151,6 +158,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T03:23:20Z
-Stopped at: Completed 12-01-PLAN.md — migrations 058+059 (recipes.error_message + recipes_fts5 with sync triggers), parseRecipeYaml Zod schema with MODEL-02 registry refinement, RecipeRow/RecipeErrorRow/RecipeModel types, yaml@^2.8.3 dep; 13 new Vitest cases; full suite 1743 pass; Phase 12 wave-1 substrate ready for 12-02/12-03/12-04
+Last session: 2026-04-19T03:40:39.962Z
+Stopped at: Completed 12-02-PLAN.md — computeDirSha (recipe directory SHA-256 dedup) + recipe-indexer (indexRecipe/removeRecipe/getIndexedRecipeBySlug); 16 new Vitest cases (5 hash + 11 indexer); IndexResult union ready for 12-03 watcher and 12-04 API
 Resume file: None

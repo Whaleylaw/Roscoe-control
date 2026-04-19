@@ -241,10 +241,10 @@ Plans:
   4. `POST /api/recipes` (called by Hermes or an operator) writes the recipe files to disk and indexes the row atomically; the recipe appears in subsequent list/search responses
   5. An admin can `POST /api/recipes/resync` to force a full re-scan of `recipes/` when the watcher falls behind
   6. A recipe whose `model.primary` is not in the model registry fails to index with a human-readable error surfaced both in the indexer log and through the recipe API / UI fetch
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 Plans:
-- [ ] 12-01-PLAN.md — Additive migrations (058 error_message col + 059 recipes_fts5 virtual table) + recipe.yaml Zod schema + TypeScript types (RECIPE-02, RECIPE-04, RECIPE-08)
-- [ ] 12-02-PLAN.md — Recipe indexer module (parse + dir_sha + UPSERT valid-or-error row) + deterministic recipe-hash (RECIPE-01, RECIPE-02, RECIPE-04, MODEL-02)
+- [x] 12-01-PLAN.md — Additive migrations (058 error_message col + 059 recipes_fts5 virtual table) + recipe.yaml Zod schema + TypeScript types (RECIPE-02, RECIPE-04, RECIPE-08)
+- [x] 12-02-PLAN.md — Recipe indexer module (parse + dir_sha + UPSERT valid-or-error row) + deterministic recipe-hash (RECIPE-01, RECIPE-02, RECIPE-04, MODEL-02)
 - [ ] 12-03-PLAN.md — Chokidar watcher + eager boot scanner + synchronous resyncRecipes function (RECIPE-03, RECIPE-07)
 - [ ] 12-04-PLAN.md — REST endpoints (GET list / GET :slug / GET search with FTS5 BM25 tag-weighted 2x / POST create atomic disk+index / POST /resync admin) + boot wiring in db.ts (RECIPE-05, RECIPE-06, RECIPE-07, RECIPE-08)
 **UI hint**: no (API + backend; recipe list panel ships in Phase 16)
@@ -362,7 +362,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 9. GSD Native Integration *(v1.1)* | 11/11 | Complete | 2026-04-15 |
 | 10. Hierarchical Lifecycle Graph *(v1.1)* | — | Complete | 2026-04-15 |
 | 11. Runtime Foundation *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
-| 12. Recipe System *(v1.2)* | 1/4 | In Progress|  |
+| 12. Recipe System *(v1.2)* | 2/4 | In Progress|  |
 | 13. Task Runtime Context *(v1.2)* | 0/— | Not started | - |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 0/— | Not started | - |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |

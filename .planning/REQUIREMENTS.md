@@ -116,7 +116,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Recipe System
 
-- [ ] **RECIPE-01**: Recipe author can define a recipe as a directory under `recipes/<slug>/` containing `recipe.yaml`, `SOUL.md`, optional `tools/`, optional `skills/`, optional `README.md`
+- [x] **RECIPE-01**: Recipe author can define a recipe as a directory under `recipes/<slug>/` containing `recipe.yaml`, `SOUL.md`, optional `tools/`, optional `skills/`, optional `README.md`
 - [x] **RECIPE-02**: Recipes are indexed into a `recipes` SQLite table capturing slug, name, description, when_to_use, image, workspace_mode, timeout_seconds, max_concurrent, env_json, secrets_json, tags_json, model_json, version, and dir_sha
 - [ ] **RECIPE-03**: Filesystem watcher re-indexes recipes when files change under `recipes/`, drops rows whose directories disappear, and uses `dir_sha` to skip unchanged recipes
 - [x] **RECIPE-04**: Recipe author can declare `model.primary` (required), `model.fallback`, `model.provider`, and `model.params` in `recipe.yaml`; primary validated against a known-model registry at index time
@@ -190,7 +190,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 ### Model Registry
 
 - [x] **MODEL-01**: A new `src/lib/model-registry.ts` module exports a typed map of model identifiers to `{provider, context_window, output_tokens_max, supports_tools, supports_thinking}` — seeded with Opus 4.7, Sonnet 4.6, and Haiku 4.5
-- [ ] **MODEL-02**: Recipe indexer rejects recipes whose `model.primary` is not in the registry, surfacing a human-readable error in the UI and indexer logs
+- [x] **MODEL-02**: Recipe indexer rejects recipes whose `model.primary` is not in the registry, surfacing a human-readable error in the UI and indexer logs
 - [x] **MODEL-03**: Task creation rejects `model_override` values not in the registry with a clear error
 - [ ] **MODEL-04**: Effective model is resolved at claim time as `task.model_override ?? recipe.model.primary` and passed to the container via env (`MC_MODEL_PRIMARY`, `MC_MODEL_PROVIDER`, `MC_MODEL_PARAMS_JSON`, optional `MC_MODEL_FALLBACK`)
 
@@ -310,7 +310,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-27 | Phase 9 | Complete |
 | GSD-28 | Phase 9 | Complete |
 | GSD-29 | Phase 9 | Complete |
-| RECIPE-01 | Phase 12 | Pending |
+| RECIPE-01 | Phase 12 | Complete |
 | RECIPE-02 | Phase 12 | Complete |
 | RECIPE-03 | Phase 12 | Pending |
 | RECIPE-04 | Phase 12 | Complete |
@@ -363,7 +363,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RAUTH-05 | Phase 11 | Complete |
 | RAUTH-06 | Phase 11 | Complete |
 | MODEL-01 | Phase 11 | Complete |
-| MODEL-02 | Phase 12 | Pending |
+| MODEL-02 | Phase 12 | Complete |
 | MODEL-03 | Phase 11 | Complete |
 | MODEL-04 | Phase 14 | Pending |
 | RUI-01 | Phase 16 | Pending |
