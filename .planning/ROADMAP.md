@@ -2,12 +2,13 @@
 
 ## Overview
 
-Transform projects from a task-grouping label into a first-class destination. v1.0 built the workspace itself — foundations, navigation shell, dashboard, scoped tasks/sessions/agents, settings, and entry points. v1.1 layers native GSD lifecycle support onto that workspace so every project can be tracked through Discuss → Plan → Execute → Verify → Done phases directly inside Mission Control.
+Transform projects from a task-grouping label into a first-class destination. v1.0 built the workspace itself — foundations, navigation shell, dashboard, scoped tasks/sessions/agents, settings, and entry points. v1.1 layered native GSD lifecycle support onto that workspace (Discuss → Plan → Execute → Verify → Done). Phase 10 extended that model so a single project can host multiple workstreams, milestones, phases, and plans concurrently via a hierarchical Lifecycle tab. v1.2 now adds an agent execution layer: Kanban tasks declare a recipe card, and a dedicated runner daemon launches short-lived containerized agents to execute them, with crash-safe progress checkpoints and per-task-scoped authentication.
 
 ## Milestones
 
 **v1.0 — Project Workspace & Dashboard** (Phases 1–8): ✓ Complete
-**v1.1 — Native GSD Integration** (Phase 9): In progress — context captured, plan next
+**v1.1 — Native GSD Integration** (Phases 9–10): ✓ Complete
+**v1.2 — Recipe-Based Ephemeral Agent Runtime** (Phases 11–17): In progress — roadmap drafted, planning next
 
 ## Phases
 
@@ -20,15 +21,25 @@ Decimal phases appear between their surrounding integers in numeric order.
 ### v1.0 — Project Workspace & Dashboard
 - [x] **Phase 1: Foundation** - Technical underpinnings: URL-driven state, DB indexes, component structure, i18n
 - [x] **Phase 2: Navigation & Workspace Shell** - Full-takeover workspace entry point with breadcrumb navigation and sub-view routing
-- [x] **Phase 3: Project Dashboard** - Dashboard with status overview, progress, project brief, activity feed, and real-time updates (completed 2026-04-13)
+- [x] **Phase 3: Project Dashboard** - Dashboard with status overview, progress, project brief, activity feed, and real-time updates
 - [x] **Phase 4: Project Tasks** - Scoped task list with create, reassign, and full board functionality within the workspace
 - [x] **Phase 5: Sessions & Agents** - Scoped session and agent views with detail access from within the project context
 - [x] **Phase 6: Settings** - Project settings panel for name, description, status, color, prefix, deadline, and GitHub repo
 - [x] **Phase 7: Post-Audit Gap Closure** - Resolve FLOW-E archive visibility decision + project-context loading-timeout escape hatch
-- [x] **Phase 8: Projects Entry Point** - Wire the main-UI path INTO the project workspace (nav-rail item, projects list panel, deep-link from existing project pickers) — closes real-world NAV-01 gap
+- [x] **Phase 8: Projects Entry Point** - Wire the main-UI path INTO the project workspace (nav-rail item, projects list panel, deep-link from existing project pickers)
 
 ### v1.1 — Native GSD Integration
-- [ ] **Phase 9: GSD Native Integration** - First-class lifecycle tracking inside MC: schema extensions, three new APIs (bootstrap / transition / gate), gate-required task enforcement, dedicated Lifecycle tab + task-board phase badges, external JSON template system
+- [x] **Phase 9: GSD Native Integration** - First-class lifecycle tracking inside MC: schema extensions, three new APIs (bootstrap / transition / gate), gate-required task enforcement, dedicated Lifecycle tab + task-board phase badges, external JSON template system
+- [x] **Phase 10: Hierarchical Lifecycle Graph** - Multiple concurrent workstreams/milestones/phases/plans per project, Lifecycle tab reads hierarchical graph with legacy fallback, CLI wrappers, same-wave conflict detection
+
+### v1.2 — Recipe-Based Ephemeral Agent Runtime
+- [ ] **Phase 11: Runtime Foundation** - DB migrations (recipes, task_runner_tokens, task_checkpoints, task column additions), model registry module, runner + runner-token auth principals
+- [ ] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time
+- [ ] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
+- [ ] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image
+- [ ] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast
+- [ ] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n
+- [ ] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage
 
 ## Phase Details
 
@@ -169,12 +180,8 @@ Plans:
 
 ### Phase 9: GSD Native Integration  *(v1.1)*
 **Goal**: Build first-class GSD lifecycle (Discuss → Plan → Execute → Verify → Done) into Mission Control so projects can be tracked through phases, bootstrap default task packs, and enforce gate approval on critical tasks — all without reaching for the CLI
-**Depends on**: Phase 8 (project workspace shell, settings view, task board — all v1.0 foundations used by the Lifecycle tab and phase badges)
+**Depends on**: Phase 8
 **Requirements**: GSD-01..29 (29 requirements — schema, API, gate enforcement, templates, Lifecycle tab, task-board badges, settings section, events, i18n)
-**Canonical refs**:
-  - `.planning/phases/09-gsd-native-integration/09-CONTEXT.md` — 38 locked decisions (D-01..38)
-  - `.planning/phases/09-gsd-native-integration/09-00-SPEC.md` — narrative spec (schema, endpoints, transition rules, templates)
-  - `.planning/phases/09-gsd-native-integration/09-02-COMMIT-SEQUENCE-SPEC.md` — proposed commit ordering (informational)
 **Success Criteria** (what must be TRUE):
   1. A new GSD-enabled project can be created with `gsd_enabled=1`, `gsd_track` set, and appear on GET with all GSD fields populated
   2. `POST /api/projects/:id/gsd/bootstrap` creates the default phase tasks exactly once (idempotent) and is sourced from external JSON templates at `$DATA_DIR/gsd-templates/` with a bundled fallback if no file exists
@@ -189,24 +196,123 @@ Plans:
   11. Migration is additive and runs cleanly on existing production DBs; non-GSD projects behave identically to v1.0
   12. Test suite covers: project CRUD with GSD fields, bootstrap idempotency, illegal transition rejection, gate-block on task status, gate-approval unblocks, role enforcement on new endpoints
 **Plans:** 11 plans
-Plans:
-- [x] 09-00-PLAN.md — Wave 0: 17 test scaffolds + atomic 10-locale i18n seed (project.lifecycle.*)
-- [x] 09-01-PLAN.md — Wave 1: Migration 052 + Zod schemas + EventType union
-- [x] 09-02-PLAN.md — Wave 2: Projects API GET/POST/PATCH extensions + Project/Task type plumbing
-- [x] 09-03-PLAN.md — Wave 2: Bootstrap endpoint + DEFAULT_TEMPLATE + loadGsdTemplate
-- [x] 09-04-PLAN.md — Wave 2: Transition endpoint with 4 rules + waiver + illegal-jump
-- [x] 09-05-PLAN.md — Wave 2: Gate PATCH endpoint + task GET field audit
-- [x] 09-06-PLAN.md — Wave 3: Gate enforcement hook in task PUT at line 172
-- [x] 09-07-PLAN.md — Wave 3: Lifecycle tab (6 components) + project-tabs + project-view-router
-- [x] 09-08-PLAN.md — Wave 3: PhaseBadge + GateBadge + task-board-panel injection
-- [x] 09-09-PLAN.md — Wave 3: Settings view GSD section
-- [x] 09-10-PLAN.md — Wave 4: Playwright E2E + /api/index docs + test:all green
 **UI hint**: yes
+
+### Phase 10: Hierarchical Lifecycle Graph  *(v1.1)*
+**Goal**: Projects can host multiple concurrent workstreams, milestones, phases, and plans with dependency-aware advancement, surfaced through an interactive Lifecycle tab and CLI wrappers
+**Depends on**: Phase 9
+**Requirements**: Phase-10 hierarchy extensions tracked in PROJECT.md (workstreams, milestones, phases, plans, wave conflicts)
+**Success Criteria** (what must be TRUE):
+  1. One project hosts multiple workstreams and multiple active milestones concurrently
+  2. Milestones contain ordered phases with dependency-checked transitions; phases contain plan waves with plan dependency checks
+  3. Lifecycle tab reads a hierarchical `/api/projects/:id/gsd/lifecycle-graph` with legacy fallback and live-refreshes via project-scoped `gsd.*` SSE events
+  4. Operators can inline-create/edit/complete/transition hierarchy entities from the Lifecycle tab with optimistic-locking (`expected_updated_at`) race guards
+  5. Same-wave conflicts are counted in `rollups.wave_conflicts` and block `plan → in_progress` transitions
+  6. CLI wrappers exist for workstreams, milestones, phases, plans, and lifecycle-graph reads
+**UI hint**: yes
+
+### Phase 11: Runtime Foundation  *(v1.2)*
+**Goal**: The database schema, model registry, and auth principals that every later v1.2 phase depends on are in place — no runtime code yet, just the substrate
+**Depends on**: Phase 10
+**Requirements**: TCTX-07, RAUTH-01, RAUTH-02, RAUTH-03, RAUTH-04, RAUTH-05, RAUTH-06, MODEL-01, MODEL-03
+**Success Criteria** (what must be TRUE):
+  1. A fresh DB and an existing production DB both migrate cleanly to include the `recipes`, `task_runner_tokens`, and `task_checkpoints` tables plus the additive `tasks` columns (`recipe_slug`, workspace / mounts / skills JSON, `model_override`, `container_id`, `runner_started_at`, `runner_exit_code`, `worktree_path`, `runner_attempts`, `runner_max_attempts`, `runner_last_failure_reason`)
+  2. A developer can import `src/lib/model-registry.ts` and look up Opus 4.7, Sonnet 4.6, and Haiku 4.5 by identifier and get typed `{provider, context_window, output_tokens_max, supports_tools, supports_thinking}` back; unknown identifiers return null / a typed error
+  3. Creating a task with `model_override` set to an unknown model is rejected with a clear validation error referencing the registry
+  4. A request presenting `.data/runner.secret` authenticates as the `runner` principal and only resolves on `/api/runner/*` routes; other paths reject
+  5. A request presenting a valid per-task, per-attempt bearer token authenticates as `runner-token`, and handlers that opt in verify the path `:id` matches the token's `task_id` (cross-task access blocked); tokens are SHA-256 hashed at rest and carry an expiry of `runner_started_at + recipe.timeout_seconds + 60s`
+  6. When a task reaches a terminal status the associated runner token row is marked `revoked_at` and subsequent presentations are rejected
+**Plans:** TBD
+**UI hint**: no
+
+### Phase 12: Recipe System  *(v1.2)*
+**Goal**: Recipes exist as filesystem-authored directories under `recipes/<slug>/`, are indexed into the DB via a chokidar watcher with content-hash dedup, and can be listed, fetched, searched, created, and resynced through the API
+**Depends on**: Phase 11
+**Requirements**: RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-05, RECIPE-06, RECIPE-07, RECIPE-08, MODEL-02
+**Success Criteria** (what must be TRUE):
+  1. A recipe author can drop a directory at `recipes/<slug>/` with `recipe.yaml` + `SOUL.md` (plus optional `tools/`, `skills/`, `README.md`) and within seconds see a matching row appear in the `recipes` table with slug, name, description, when_to_use, image, workspace_mode, timeout_seconds, max_concurrent, env/secrets/tags/model JSON, version, and `dir_sha`
+  2. Editing, renaming, or deleting files under `recipes/` causes the watcher to re-index (or drop) only the affected rows; unchanged recipes are skipped via `dir_sha` equality
+  3. `GET /api/recipes`, `GET /api/recipes/:slug`, and `GET /api/recipes/search?q=...` return recipe metadata and SOUL.md body, with search ranking candidates against task description + tags using SQL matching
+  4. `POST /api/recipes` (called by Hermes or an operator) writes the recipe files to disk and indexes the row atomically; the recipe appears in subsequent list/search responses
+  5. An admin can `POST /api/recipes/resync` to force a full re-scan of `recipes/` when the watcher falls behind
+  6. A recipe whose `model.primary` is not in the model registry fails to index with a human-readable error surfaced both in the indexer log and through the recipe API / UI fetch
+**Plans:** TBD
+**UI hint**: no (API + backend; recipe list panel ships in Phase 16)
+
+### Phase 13: Task Runtime Context  *(v1.2)*
+**Goal**: A task can reference a recipe and declare the runtime specifics the runner will need — workspace source, read-only mounts, extra skills, model override — with mount-allowlist validation enforced at task creation
+**Depends on**: Phase 12
+**Requirements**: TCTX-01, TCTX-02, TCTX-03, TCTX-04, TCTX-05, TCTX-06
+**Success Criteria** (what must be TRUE):
+  1. Creating or updating a task with `recipe_slug` pointing at an indexed recipe succeeds and the task record persists the reference; pointing at a missing recipe fails with a clear error
+  2. When the referenced recipe declares `workspace: worktree`, the task must carry `workspace_source = { project_id, base_ref }`; tasks missing this are rejected at creation time
+  3. A task can carry zero or more `read_only_mounts` entries (`{ host_path, container_path, label }`), zero or more `extra_skills` host paths, and an optional `model_override`, and all three round-trip through the task read API
+  4. Any `host_path` on a task (read_only_mount or extra_skill) that falls outside the runner's `mount_allowlist` is rejected at task creation with an actionable error referencing the offending path
+  5. A `model_override` that is not in the model registry is rejected with a clear error
+**Plans:** TBD
+**UI hint**: no (UI form updates ship in Phase 16)
+
+### Phase 14: Runner Daemon & Container Execution  *(v1.2)*
+**Goal**: A standalone runner process can claim recipe-tagged tasks, launch short-lived containers against a per-task git worktree, monitor exit, and safely preserve state across crashes so a retry resumes without redoing work
+**Depends on**: Phase 13
+**Requirements**: RUNNER-01, RUNNER-02, RUNNER-03, RUNNER-04, RUNNER-05, RUNNER-06, RUNNER-07, RUNNER-08, RUNNER-09, RUNNER-10, RUNNER-11, RUNNER-12, RUNNER-13, RUNNER-14, CONTAINER-01, CONTAINER-02, CONTAINER-03, CONTAINER-04, WORK-01, WORK-02, WORK-03, WORK-04, WORK-05, WORK-06, WORK-07, MODEL-04
+**Success Criteria** (what must be TRUE):
+  1. An operator can launch `scripts/mc-runner.mjs` from the supplied LaunchAgent template and it registers with MC using the shared `.data/runner.secret`, begins sending 10-second heartbeats, and subscribes to `task.runner_requested` SSE events with a 15-second poll fallback; MC flips the runner-online indicator based on heartbeat freshness (offline after 60s silence)
+  2. When a recipe-tagged task becomes `assigned`, the runner atomically claims it, receives a dispatch payload with recipe content + fresh per-task runner-token, re-validates every mount against the allowlist with symlink resolution, and enforces global (`MAX_CONCURRENT_CONTAINERS`) + per-recipe (`max_concurrent`) concurrency caps; over-cap claims 409 and leave the task for the next cycle
+  3. For `workspace: worktree` recipes, the runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/`, seeds `.mc/task.json` (with `task_id`, `recipe_slug`, `attempt`, `is_resuming`, `prior_attempts[]`), `.mc/progress.md`, `.mc/checkpoints.jsonl`, and `.mc/.gitignore`, and records `worktree_path` on the task
+  4. The runner launches the container via `docker run --rm -d` with the documented mount layout (`/workspace`, `/recipe`, `/refs/<label>/`, `/skills/<name>`), env vars (`MC_API_URL`, `MC_TASK_ID`, `MC_API_TOKEN`, `MC_WORKSPACE`, `MC_RECIPE_PATH`, `MC_MODEL_PRIMARY`, `MC_MODEL_FALLBACK`, `MC_MODEL_PROVIDER`, `MC_MODEL_PARAMS_JSON`) and recipe-declared secrets from the runner store; `MC_MODEL_PRIMARY` resolves as `task.model_override ?? recipe.model.primary` at claim time
+  5. On first attempt, the runner injects a short preamble above SOUL.md instructing the agent to write notes to `.mc/progress.md`; on a resume attempt, it injects a longer preamble instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
+  6. The container is hard-killed at `recipe.timeout_seconds` and the runner reports `reason='timeout'`; stdout/stderr stream to `.data/runner/logs/task-<id>/attempt-<n>/`; on non-zero exit or timeout the runner posts `runner-exit` and MC drives retry/fail with `runner_max_attempts` (default 3, recipe-overridable) — exceeding the cap marks the task `failed` with a clear reason
+  7. Worktrees are preserved across container crashes and retries and destroyed only when a task reaches `done`, `cancelled`, or (after a GC window of N days, default 7) `failed`; a scheduled GC job prunes worktrees for long-terminal tasks
+  8. After a runner crash, starting the runner reconciles live Docker containers (`mc-task-*`) against `GET /api/runner/pending-containers` and either adopts or cleans them up; when a task reaches terminal status, the runner revokes its token and destroys the worktree (subject to the failure GC window)
+  9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
+**Plans:** TBD
+**UI hint**: no (runner status banner ships in Phase 16)
+
+### Phase 15: Checkpoints & Scheduler Integration  *(v1.2)*
+**Goal**: Agents can post checkpoints that persist to both the DB and the worktree journal, blockers flip the task to `awaiting_owner` and stop the container gracefully, and the MC scheduler treats recipe-tagged tasks correctly across the inbox → assigned → in_progress → review pipeline
+**Depends on**: Phase 14
+**Requirements**: CP-01, CP-02, CP-03, CP-04, CP-05, CP-06, SCHED-01, SCHED-02, SCHED-03, SCHED-04, SCHED-05, SCHED-06
+**Success Criteria** (what must be TRUE):
+  1. An agent authenticated with a runner-token can `POST /api/tasks/:id/checkpoints` with `step`, `summary`, `status` (`completed` / `in_progress` / `blocked`) plus optional `artifacts` (typed `kind: file | url | diff | test_result | comment | other`), `next_step`, `blocker_reason`, `tokens_used`, `duration_ms`; each checkpoint lands both as a `task_checkpoints` row AND as one JSON line appended to `<worktree>/.mc/checkpoints.jsonl` with identical field names
+  2. A `status: blocked` checkpoint transitions the task `in_progress → awaiting_owner`, posts an automatic comment with `blocker_reason`, and causes the runner to gracefully stop the container while preserving the worktree; when the blocker is resolved and the task returns to `assigned`, the runner relaunches with the resume flow
+  3. A viewer can `GET /api/tasks/:id/checkpoints?attempt=N` and receive the full timeline, filterable by attempt
+  4. `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox → assigned` without running agent-affinity scoring; `dispatchAssignedTasks()` skips tasks with `recipe_slug` so legacy behavior is preserved for non-recipe tasks; `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to legacy logic
+  5. A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when the runner has been unreachable beyond the threshold, so reconcile-on-reconnect works cleanly
+  6. `task.runner_requested` fires from all three emission points (`autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` on direct-assigned creation with `recipe_slug`, the runner-exit retry path on `in_progress → assigned`), and `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` are broadcast on SSE for UI reactivity
+**Plans:** TBD
+**UI hint**: no (UI listeners ship in Phase 16)
+
+### Phase 16: Runtime UI Surfaces  *(v1.2)*
+**Goal**: Operators can see recipes and runner state in Mission Control's UI — a recipe badge per task card, a live runner-status banner, a checkpoint-timeline Progress tab on task detail, a Recipe dropdown + Advanced section on the task form, and a minimal recipes list panel — all localized across 10 locales
+**Depends on**: Phase 15
+**Requirements**: RUI-01, RUI-02, RUI-03, RUI-04, RUI-05, RUI-06
+**Success Criteria** (what must be TRUE):
+  1. Every task card on the Kanban displays a recipe badge (recipe name + model-tier color) when `recipe_slug` is set; cards without a recipe look identical to today
+  2. The task-board shell shows a live runner-status banner that flips between "Runner online" and "Runner offline — tasks waiting: N" in real time based on heartbeat SSE events
+  3. The task detail view has a "Progress" tab that renders a live checkpoint timeline grouped by attempt and updates via `task.checkpoint_added` SSE without a page reload
+  4. The task create/edit form exposes a Recipe dropdown backed by `/api/recipes/search` autocomplete and a collapsible "Advanced" section for editing `read_only_mounts`, `extra_skills`, and `model_override`
+  5. A minimal Recipes panel (reachable from the main nav) lists indexed recipes with name, description, model, tags, and a "Resync" button — authoring stays filesystem-first
+  6. All new UI strings ship atomically across en/es/fr/de/ja/ko/pt/ru/zh/ar
+**Plans:** TBD
+**UI hint**: yes
+
+### Phase 17: Integration Testing & Reference Pipeline  *(v1.2)*
+**Goal**: The runtime ships with end-to-end confidence — unit tests on the sharp-edged pieces, a full integration test driving a real container through the pipeline with the reference image, a crash-recovery test proving `.mc/` persistence works, and a Playwright E2E proving the UI surfaces update live
+**Depends on**: Phase 16
+**Requirements**: RTEST-01, RTEST-02, RTEST-03, RTEST-04
+**Success Criteria** (what must be TRUE):
+  1. Unit tests cover recipe-indexer parsing (including malformed YAML and unknown-model rejection), mount-allowlist resolution (including symlink escape attempts), runner-token mint/verify/revoke (including cross-task rejection and expiry), and checkpoint validation (including blocked-without-reason rejection)
+  2. An integration test drives the full pipeline with the `mc-hello-world-agent` reference image end to end: create a task with `recipe_slug`, runner claims, container starts, emits checkpoints, submits, task enters `review`, Aegis approves, task reaches `done`
+  3. A crash-recovery integration test deliberately kills the container mid-task, asserts the worktree and `.mc/` state are preserved, then confirms the retry attempt reads `.mc/progress.md` + `.mc/checkpoints.jsonl` and completes without redoing prior work
+  4. An E2E Playwright test verifies the recipe badge renders on task cards and the Progress tab updates live when a checkpoint event fires
+**Plans:** TBD
+**UI hint**: no (test coverage only — no new UI surface)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -218,4 +324,12 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 6. Settings | 2/2 | Complete | 2026-04-14 |
 | 7. Post-Audit Gap Closure | 2/2 | Complete | 2026-04-14 |
 | 8. Projects Entry Point | 6/6 | Complete | 2026-04-14 |
-| 9. GSD Native Integration *(v1.1)* | — | Context captured, plans next | - |
+| 9. GSD Native Integration *(v1.1)* | 11/11 | Complete | 2026-04-15 |
+| 10. Hierarchical Lifecycle Graph *(v1.1)* | — | Complete | 2026-04-15 |
+| 11. Runtime Foundation *(v1.2)* | 0/— | Not started — plans next | - |
+| 12. Recipe System *(v1.2)* | 0/— | Not started | - |
+| 13. Task Runtime Context *(v1.2)* | 0/— | Not started | - |
+| 14. Runner Daemon & Container Execution *(v1.2)* | 0/— | Not started | - |
+| 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |
+| 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |
+| 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |

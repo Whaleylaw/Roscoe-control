@@ -259,7 +259,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUN-02 | Phase 1 | Complete |
 | FOUN-03 | Phase 1 | Complete |
 | FOUN-04 | Phase 1 | Complete |
-| NAV-01 | Phase 8 | Pending (reopened — Phase 2 shipped workspace code but no main-UI entry point; discovered during v1.0 human verification) |
+| NAV-01 | Phase 8 | Complete (reopened — Phase 2 shipped workspace code but no main-UI entry point; closed in Phase 8) |
 | NAV-02 | Phase 2 | Complete |
 | NAV-03 | Phase 2 | Complete |
 | NAV-04 | Phase 2 | Complete |
@@ -310,12 +310,84 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-27 | Phase 9 | Complete |
 | GSD-28 | Phase 9 | Complete |
 | GSD-29 | Phase 9 | Complete |
+| RECIPE-01 | Phase 12 | Pending |
+| RECIPE-02 | Phase 12 | Pending |
+| RECIPE-03 | Phase 12 | Pending |
+| RECIPE-04 | Phase 12 | Pending |
+| RECIPE-05 | Phase 12 | Pending |
+| RECIPE-06 | Phase 12 | Pending |
+| RECIPE-07 | Phase 12 | Pending |
+| RECIPE-08 | Phase 12 | Pending |
+| TCTX-01 | Phase 13 | Pending |
+| TCTX-02 | Phase 13 | Pending |
+| TCTX-03 | Phase 13 | Pending |
+| TCTX-04 | Phase 13 | Pending |
+| TCTX-05 | Phase 13 | Pending |
+| TCTX-06 | Phase 13 | Pending |
+| TCTX-07 | Phase 11 | Pending |
+| RUNNER-01 | Phase 14 | Pending |
+| RUNNER-02 | Phase 14 | Pending |
+| RUNNER-03 | Phase 14 | Pending |
+| RUNNER-04 | Phase 14 | Pending |
+| RUNNER-05 | Phase 14 | Pending |
+| RUNNER-06 | Phase 14 | Pending |
+| RUNNER-07 | Phase 14 | Pending |
+| RUNNER-08 | Phase 14 | Pending |
+| RUNNER-09 | Phase 14 | Pending |
+| RUNNER-10 | Phase 14 | Pending |
+| RUNNER-11 | Phase 14 | Pending |
+| RUNNER-12 | Phase 14 | Pending |
+| RUNNER-13 | Phase 14 | Pending |
+| RUNNER-14 | Phase 14 | Pending |
+| CONTAINER-01 | Phase 14 | Pending |
+| CONTAINER-02 | Phase 14 | Pending |
+| CONTAINER-03 | Phase 14 | Pending |
+| CONTAINER-04 | Phase 14 | Pending |
+| WORK-01 | Phase 14 | Pending |
+| WORK-02 | Phase 14 | Pending |
+| WORK-03 | Phase 14 | Pending |
+| WORK-04 | Phase 14 | Pending |
+| WORK-05 | Phase 14 | Pending |
+| WORK-06 | Phase 14 | Pending |
+| WORK-07 | Phase 14 | Pending |
+| CP-01 | Phase 15 | Pending |
+| CP-02 | Phase 15 | Pending |
+| CP-03 | Phase 15 | Pending |
+| CP-04 | Phase 15 | Pending |
+| CP-05 | Phase 15 | Pending |
+| CP-06 | Phase 15 | Pending |
+| RAUTH-01 | Phase 11 | Pending |
+| RAUTH-02 | Phase 11 | Pending |
+| RAUTH-03 | Phase 11 | Pending |
+| RAUTH-04 | Phase 11 | Pending |
+| RAUTH-05 | Phase 11 | Pending |
+| RAUTH-06 | Phase 11 | Pending |
+| MODEL-01 | Phase 11 | Pending |
+| MODEL-02 | Phase 12 | Pending |
+| MODEL-03 | Phase 11 | Pending |
+| MODEL-04 | Phase 14 | Pending |
+| RUI-01 | Phase 16 | Pending |
+| RUI-02 | Phase 16 | Pending |
+| RUI-03 | Phase 16 | Pending |
+| RUI-04 | Phase 16 | Pending |
+| RUI-05 | Phase 16 | Pending |
+| RUI-06 | Phase 16 | Pending |
+| SCHED-01 | Phase 15 | Pending |
+| SCHED-02 | Phase 15 | Pending |
+| SCHED-03 | Phase 15 | Pending |
+| SCHED-04 | Phase 15 | Pending |
+| SCHED-05 | Phase 15 | Pending |
+| SCHED-06 | Phase 15 | Pending |
+| RTEST-01 | Phase 17 | Pending |
+| RTEST-02 | Phase 17 | Pending |
+| RTEST-03 | Phase 17 | Pending |
+| RTEST-04 | Phase 17 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total, mapped 26 / unmapped 0 ✓
 - v1.1 requirements: 29 total, mapped 29 / unmapped 0 ✓
-- v1.2 requirements: 60 total, mapped — / unmapped 60 (pending roadmap)
+- v1.2 requirements: 72 total, mapped 72 / unmapped 0 ✓ (note: summary footer previously listed 60; actual count includes all RECIPE/TCTX/RUNNER/CONTAINER/WORK/CP/RAUTH/MODEL/RUI/SCHED/RTEST REQ-IDs)
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-18 — v1.2 Recipe-Based Ephemeral Agent Runtime requirements added (60 new REQ-IDs across RECIPE/TCTX/RUNNER/CONTAINER/WORK/CP/RAUTH/MODEL/RUI/SCHED/RTEST)*
+*Last updated: 2026-04-18 — v1.2 traceability table populated across Phases 11–17 (72 REQ-IDs mapped; 0 orphans)*
