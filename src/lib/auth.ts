@@ -5,6 +5,7 @@ import { logSecurityEvent } from './security-events'
 import { extractClientIpFromTrusted } from './request'
 import { parseMcSessionCookieHeader } from './session-cookie'
 import { getRunnerSecret } from './runner-secret'
+import { verifyRunnerToken, RUNNER_TOKEN_ALLOWLIST, type VerifiedRunnerToken } from './runner-tokens'
 
 // Trusted IPs for proxy auth header (comma-separated)
 const PROXY_AUTH_TRUSTED_IPS = new Set(
@@ -70,6 +71,8 @@ export interface User {
   last_login_at: number | null
   /** Agent name when request is made on behalf of a specific agent (via X-Agent-Name header) */
   agent_name?: string | null
+  /** When authenticated via runner-token, the task_id embedded in the token. Handlers MUST verify this matches the :id path param. */
+  runner_token_task_id?: number | null
 }
 
 export interface UserSession {
@@ -511,6 +514,63 @@ export function getUserFromRequest(request: Request): User | null {
     // branches handle those.
   }
 
+  // Runner-token principal — per-task, per-attempt bearer; allowlist-scoped; expiring; revocable.
+  // See RAUTH-02..06 + Plan 11-04. Placed adjacent to the runner-secret branch above: a request
+  // to /api/runner/tasks/:id/* may carry EITHER the runner secret (admin-path access from the
+  // daemon, handled above) OR a runner-token (task-scoped, handled here). The runner-secret
+  // branch fell through (no runner bearer match), so we now try the token path.
+  //
+  // Cross-task 403 is enforced in requireRunnerToken(), NOT here — getUserFromRequest returns
+  // null for "no valid principal for this request", and the 401-vs-403 decision is concentrated
+  // in the wrapper below so route handlers have a single source of truth.
+  if (url.pathname.startsWith('/api/runner/')) {
+    const bearer = extractApiKeyFromHeaders(request.headers)
+    if (bearer) {
+      // (a) Path must match one of the six allowlisted patterns AND method.
+      const match = RUNNER_TOKEN_ALLOWLIST.find(
+        (rule) => rule.method === request.method && rule.pathPattern.test(url.pathname),
+      )
+      if (match) {
+        const pathIdMatch = url.pathname.match(match.pathPattern)
+        const pathTaskId = pathIdMatch ? Number(pathIdMatch[1]) : NaN
+        if (Number.isFinite(pathTaskId)) {
+          // (b) Verify bearer against DB. verifyRunnerToken returns null on unknown / expired / revoked.
+          try {
+            const db = getDatabase()
+            const verified = verifyRunnerToken(db, bearer)
+            if (verified && verified.task_id === pathTaskId) {
+              // (c) Happy path: issue principal with task_id attribution.
+              const { workspaceId, tenantId } = getDefaultWorkspaceContext()
+              return {
+                id: -2000,
+                username: 'runner-token',
+                display_name: 'Runner Token',
+                role: 'operator',
+                workspace_id: workspaceId,
+                tenant_id: tenantId,
+                provider: 'local',
+                email: null,
+                avatar_url: null,
+                is_approved: 1,
+                created_at: 0,
+                updated_at: 0,
+                last_login_at: null,
+                agent_name: null,
+                runner_token_task_id: verified.task_id,
+              }
+            }
+            // Cross-task case (verified && verified.task_id !== pathTaskId): fall through.
+            // requireRunnerToken() will re-run verifyRunnerToken and see the mismatch → 403.
+          } catch {
+            // DB not ready or transient — fall through; no principal issued.
+          }
+        }
+      }
+      // Path under /api/runner/ but NOT on allowlist: fall through (non-matching paths go to
+      // session / api-key auth below).
+    }
+  }
+
   // Check session cookie
   const cookieHeader = request.headers.get('cookie') || ''
   const sessionToken = parseMcSessionCookieHeader(cookieHeader)
@@ -693,5 +753,86 @@ export function requireRole(
     return { error: `Requires ${minRole} role or higher`, status: 403 }
   }
   return { user }
+}
+
+/**
+ * Require a valid runner-token bearer for the given taskId.
+ *
+ * This wrapper exists to distinguish 401 from 403 at the auth substrate layer,
+ * per RAUTH-03 + the Phase 11 CONTEXT.md lock "cross-task access blocked → 403".
+ * Do NOT use getUserFromRequest() directly for runner-token routes — use this.
+ *
+ * Returns:
+ *   - { user }                            — valid token, matches taskId; handler proceeds
+ *   - { error: '...', status: 401 }       — no bearer, invalid bearer, expired, revoked,
+ *                                            or path is not in RAUTH-06 allowlist
+ *   - { error: '...', status: 403 }       — valid+unexpired+unrevoked bearer, but its
+ *                                            embedded task_id does NOT match the taskId
+ *                                            the caller is operating on (cross-task block)
+ *
+ * Phase 14/15 route handlers are the primary callers. They extract `:id` from the path
+ * params and pass it in as `taskId`.
+ */
+export function requireRunnerToken(
+  request: Request,
+  taskId: number,
+):
+  | { user: User; error?: never; status?: never }
+  | { user?: never; error: string; status: 401 | 403 }
+{
+  const url = new URL(request.url)
+  // Path must be on the RAUTH-06 allowlist. If a caller invokes this from a non-runner
+  // path, something is wrong upstream — treat as 401.
+  const match = RUNNER_TOKEN_ALLOWLIST.find(
+    (rule) => rule.method === request.method && rule.pathPattern.test(url.pathname),
+  )
+  if (!match) {
+    return { error: 'runner-token authentication is not permitted on this endpoint', status: 401 }
+  }
+
+  const bearer = extractApiKeyFromHeaders(request.headers)
+  if (!bearer) {
+    return { error: 'runner-token bearer missing', status: 401 }
+  }
+
+  let verified: VerifiedRunnerToken | null = null
+  try {
+    const db = getDatabase()
+    verified = verifyRunnerToken(db, bearer)
+  } catch {
+    return { error: 'runner-token verification failed', status: 401 }
+  }
+
+  if (!verified) {
+    // unknown / expired / revoked — all surface as 401. The token IS NOT valid.
+    return { error: 'runner-token invalid, expired, or revoked', status: 401 }
+  }
+
+  if (verified.task_id !== taskId) {
+    // Valid token, wrong task. This is the RAUTH-03 cross-task block — 403.
+    return { error: 'cross-task access forbidden', status: 403 }
+  }
+
+  // Happy path — construct the same principal shape as the getUserFromRequest branch.
+  const { workspaceId, tenantId } = getDefaultWorkspaceContext()
+  return {
+    user: {
+      id: -2000,
+      username: 'runner-token',
+      display_name: 'Runner Token',
+      role: 'operator',
+      workspace_id: workspaceId,
+      tenant_id: tenantId,
+      provider: 'local',
+      email: null,
+      avatar_url: null,
+      is_approved: 1,
+      created_at: 0,
+      updated_at: 0,
+      last_login_at: null,
+      agent_name: null,
+      runner_token_task_id: verified.task_id,
+    },
+  }
 }
 
