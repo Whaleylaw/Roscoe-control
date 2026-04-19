@@ -2,15 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: Phase 11 Wave 1 COMPLETE — all four plans landed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809, 11-04 bdbd9f5/01ba0e6/c3b10c3); RAUTH-01..06 all shipped; ready for Phase 12 (recipe indexer)
-stopped_at: "Completed 11-04-PLAN.md (RAUTH-02..06): runner-token module + requireRunnerToken wrapper + atomic revocation in task PUT handler; 62 new Vitest cases; full suite 1730 pass"
-last_updated: "2026-04-19T02:20:00Z"
-last_activity: "2026-04-19 — Plan 11-04 complete (RAUTH-02..06: runner-token bearer principal with per-task/per-attempt tokens, SHA-256-hashed in task_runner_tokens, cross-task 403 via requireRunnerToken wrapper, atomic revocation on terminal task transitions); Phase 11 Wave 1 is now complete"
+status: unknown
+last_updated: "2026-04-19T02:27:41.180Z"
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 33
-  completed_plans: 40
+  completed_plans: 39
 ---
 
 # Project State
