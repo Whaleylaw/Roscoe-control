@@ -243,10 +243,10 @@ Plans:
   6. A recipe whose `model.primary` is not in the model registry fails to index with a human-readable error surfaced both in the indexer log and through the recipe API / UI fetch
 **Plans:** 4 plans
 Plans:
-- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
-- [x] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
-- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
-- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
+- [ ] 12-01-PLAN.md — Additive migrations (058 error_message col + 059 recipes_fts5 virtual table) + recipe.yaml Zod schema + TypeScript types (RECIPE-02, RECIPE-04, RECIPE-08)
+- [ ] 12-02-PLAN.md — Recipe indexer module (parse + dir_sha + UPSERT valid-or-error row) + deterministic recipe-hash (RECIPE-01, RECIPE-02, RECIPE-04, MODEL-02)
+- [ ] 12-03-PLAN.md — Chokidar watcher + eager boot scanner + synchronous resyncRecipes function (RECIPE-03, RECIPE-07)
+- [ ] 12-04-PLAN.md — REST endpoints (GET list / GET :slug / GET search with FTS5 BM25 tag-weighted 2x / POST create atomic disk+index / POST /resync admin) + boot wiring in db.ts (RECIPE-05, RECIPE-06, RECIPE-07, RECIPE-08)
 **UI hint**: no (API + backend; recipe list panel ships in Phase 16)
 
 ### Phase 13: Task Runtime Context  *(v1.2)*
