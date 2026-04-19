@@ -222,7 +222,12 @@ Plans:
   4. A request presenting `.data/runner.secret` authenticates as the `runner` principal and only resolves on `/api/runner/*` routes; other paths reject
   5. A request presenting a valid per-task, per-attempt bearer token authenticates as `runner-token`, and handlers that opt in verify the path `:id` matches the token's `task_id` (cross-task access blocked); tokens are SHA-256 hashed at rest and carry an expiry of `runner_started_at + recipe.timeout_seconds + 60s`
   6. When a task reaches a terminal status the associated runner token row is marked `revoked_at` and subsequent presentations are rejected
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: no
 
 ### Phase 12: Recipe System  *(v1.2)*
@@ -236,7 +241,12 @@ Plans:
   4. `POST /api/recipes` (called by Hermes or an operator) writes the recipe files to disk and indexes the row atomically; the recipe appears in subsequent list/search responses
   5. An admin can `POST /api/recipes/resync` to force a full re-scan of `recipes/` when the watcher falls behind
   6. A recipe whose `model.primary` is not in the model registry fails to index with a human-readable error surfaced both in the indexer log and through the recipe API / UI fetch
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: no (API + backend; recipe list panel ships in Phase 16)
 
 ### Phase 13: Task Runtime Context  *(v1.2)*
@@ -249,7 +259,12 @@ Plans:
   3. A task can carry zero or more `read_only_mounts` entries (`{ host_path, container_path, label }`), zero or more `extra_skills` host paths, and an optional `model_override`, and all three round-trip through the task read API
   4. Any `host_path` on a task (read_only_mount or extra_skill) that falls outside the runner's `mount_allowlist` is rejected at task creation with an actionable error referencing the offending path
   5. A `model_override` that is not in the model registry is rejected with a clear error
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: no (UI form updates ship in Phase 16)
 
 ### Phase 14: Runner Daemon & Container Execution  *(v1.2)*
@@ -266,7 +281,12 @@ Plans:
   7. Worktrees are preserved across container crashes and retries and destroyed only when a task reaches `done`, `cancelled`, or (after a GC window of N days, default 7) `failed`; a scheduled GC job prunes worktrees for long-terminal tasks
   8. After a runner crash, starting the runner reconciles live Docker containers (`mc-task-*`) against `GET /api/runner/pending-containers` and either adopts or cleans them up; when a task reaches terminal status, the runner revokes its token and destroys the worktree (subject to the failure GC window)
   9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: no (runner status banner ships in Phase 16)
 
 ### Phase 15: Checkpoints & Scheduler Integration  *(v1.2)*
@@ -280,7 +300,12 @@ Plans:
   4. `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox → assigned` without running agent-affinity scoring; `dispatchAssignedTasks()` skips tasks with `recipe_slug` so legacy behavior is preserved for non-recipe tasks; `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to legacy logic
   5. A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when the runner has been unreachable beyond the threshold, so reconcile-on-reconnect works cleanly
   6. `task.runner_requested` fires from all three emission points (`autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` on direct-assigned creation with `recipe_slug`, the runner-exit retry path on `in_progress → assigned`), and `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` are broadcast on SSE for UI reactivity
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: no (UI listeners ship in Phase 16)
 
 ### Phase 16: Runtime UI Surfaces  *(v1.2)*
@@ -294,7 +319,12 @@ Plans:
   4. The task create/edit form exposes a Recipe dropdown backed by `/api/recipes/search` autocomplete and a collapsible "Advanced" section for editing `read_only_mounts`, `extra_skills`, and `model_override`
   5. A minimal Recipes panel (reachable from the main nav) lists indexed recipes with name, description, model, tags, and a "Resync" button — authoring stays filesystem-first
   6. All new UI strings ship atomically across en/es/fr/de/ja/ko/pt/ru/zh/ar
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: yes
 
 ### Phase 17: Integration Testing & Reference Pipeline  *(v1.2)*
@@ -306,7 +336,12 @@ Plans:
   2. An integration test drives the full pipeline with the `mc-hello-world-agent` reference image end to end: create a task with `recipe_slug`, runner claims, container starts, emits checkpoints, submits, task enters `review`, Aegis approves, task reaches `done`
   3. A crash-recovery integration test deliberately kills the container mid-task, asserts the worktree and `.mc/` state are preserved, then confirms the retry attempt reads `.mc/progress.md` + `.mc/checkpoints.jsonl` and completes without redoing prior work
   4. An E2E Playwright test verifies the recipe badge renders on task cards and the Progress tab updates live when a checkpoint event fires
-**Plans:** TBD
+**Plans:** 4 plans
+Plans:
+- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
+- [ ] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
+- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
+- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
 **UI hint**: no (test coverage only — no new UI surface)
 
 ## Progress
@@ -326,7 +361,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 8. Projects Entry Point | 6/6 | Complete | 2026-04-14 |
 | 9. GSD Native Integration *(v1.1)* | 11/11 | Complete | 2026-04-15 |
 | 10. Hierarchical Lifecycle Graph *(v1.1)* | — | Complete | 2026-04-15 |
-| 11. Runtime Foundation *(v1.2)* | 0/— | Not started — plans next | - |
+| 11. Runtime Foundation *(v1.2)* | 0/4 | Plans drafted — ready to execute | - |
 | 12. Recipe System *(v1.2)* | 0/— | Not started | - |
 | 13. Task Runtime Context *(v1.2)* | 0/— | Not started | - |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 0/— | Not started | - |
