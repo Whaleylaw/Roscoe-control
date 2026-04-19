@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-19T02:27:41.180Z"
+last_updated: "2026-04-19T03:24:57.380Z"
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 8
-  total_plans: 33
-  completed_plans: 39
+  total_plans: 37
+  completed_plans: 40
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 11 (Runtime Foundation) — Wave 1 COMPLETE
-Plan: All four Wave-1 plans complete. 11-01 (model registry + task-override validation), 11-02 (runner-secret + runner principal), 11-03 (migrations), 11-04 (runner-token principal + requireRunnerToken wrapper + atomic revocation)
-Status: 4/4 Wave-1 plans committed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809, 11-04 bdbd9f5/01ba0e6/c3b10c3); RAUTH-01..06 all shipped
-Last activity: 2026-04-19 — Plan 11-04 complete (RAUTH-02..06: runner-token module + requireRunnerToken wrapper + atomic revocation; 62 new Vitest cases; Phase 11 Wave 1 is now fully complete)
-Next: Phase 12 (recipe indexer) — consumes recipes table from Plan 11-03
+Phase: 12 (Recipe System) — Wave 1 IN PROGRESS
+Plan: 12-01 complete (recipe substrate: migrations 058+059, parseRecipeYaml, types). Next: 12-02 (indexer), 12-03 (watcher), 12-04 (API).
+Status: 1/4 plans committed (12-01 b8472c2/d764b05); RECIPE-02, RECIPE-04, RECIPE-08 shipped
+Last activity: 2026-04-19 — Plan 12-01 complete (migrations 058_recipes_error_message + 059_recipes_fts5; parseRecipeYaml Zod schema with MODEL-02 registry refinement; RecipeRow/RecipeErrorRow/RecipeModel types; yaml@^2.8.3 dep; 13 new Vitest cases)
+Next: Plan 12-02 (recipe indexer) — consumes parseRecipeYaml + RecipeRow from 12-01
 
 ## Performance Metrics
 
@@ -95,6 +95,7 @@ Next: Phase 12 (recipe indexer) — consumes recipes table from Plan 11-03
 | Phase 11-runtime-foundation-v1-2 P01 | 7min | 2 tasks | 4 files |
 | Phase 11-runtime-foundation-v1-2 P02 | 10min | 2 tasks | 6 files |
 | Phase 11-runtime-foundation-v1-2 P04 | 10min | 3 tasks | 7 files |
+| Phase 12-recipe-system-v1-2 P01 | 7 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,9 @@ Recent decisions affecting current work:
 - [Phase 11-04]: Atomic revocation on terminal task transitions (done/failed/cancelled) wrapped in SAME db.transaction as status UPDATE — no sweeper, no lazy-on-reuse; crash rolls BOTH back
 - [Phase 11-04]: runner_token_task_id populated in BOTH getUserFromRequest branch AND requireRunnerToken wrapper — downstream handlers cross-check as defense-in-depth
 - [Phase 11-04]: Strict <= expiry rejection in verifyRunnerToken so a token cannot be used AT its exact expiry moment — guards against clock-skew
+- [Phase 12-recipe-system-v1-2]: [Phase 12-01]: FTS5 table is standalone (contentful), not external-content — content='recipes' requires FTS5 column names to match content-table columns, and 'tags' vs 'tags_json' mismatch blocked external-content; triggers give equivalent sync semantics
+- [Phase 12-recipe-system-v1-2]: [Phase 12-01]: bm25 column weights (tags 2x) applied at QUERY time (Plan 12-04), not in the FTS5 schema — keeps virtual table neutral and lets callers tune ranking without re-migrating
+- [Phase 12-recipe-system-v1-2]: [Phase 12-01]: parseRecipeYaml returns discriminated ParseResult ({ok,value}|{ok,error}) — never throws; aligns with error_message column flow so indexer/API uniformly write messages without try/catch
 
 ### Pending Todos
 
@@ -147,6 +151,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T02:17:24Z
-Stopped at: Completed 11-04-PLAN.md (RAUTH-02..06) — runner-token module + requireRunnerToken wrapper (401 vs 403 cross-task discrimination) + atomic revocation on terminal task transitions (done/failed/cancelled); 62 new Vitest cases; full suite 1730 pass; Phase 11 Wave 1 COMPLETE
+Last session: 2026-04-19T03:23:20Z
+Stopped at: Completed 12-01-PLAN.md — migrations 058+059 (recipes.error_message + recipes_fts5 with sync triggers), parseRecipeYaml Zod schema with MODEL-02 registry refinement, RecipeRow/RecipeErrorRow/RecipeModel types, yaml@^2.8.3 dep; 13 new Vitest cases; full suite 1743 pass; Phase 12 wave-1 substrate ready for 12-02/12-03/12-04
 Resume file: None
