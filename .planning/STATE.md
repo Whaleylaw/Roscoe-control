@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: 1/4 plans committed (12-01 b8472c2/d764b05); RECIPE-02, RECIPE-04, RECIPE-08 shipped
-stopped_at: Completed 12-02-PLAN.md — computeDirSha (recipe directory SHA-256 dedup) + recipe-indexer (indexRecipe/removeRecipe/getIndexedRecipeBySlug); 16 new Vitest cases (5 hash + 11 indexer); IndexResult union ready for 12-03 watcher and 12-04 API
-last_updated: "2026-04-19T03:40:39.967Z"
-last_activity: 2026-04-19 — Plan 12-01 complete (migrations 058_recipes_error_message + 059_recipes_fts5; parseRecipeYaml Zod schema with MODEL-02 registry refinement; RecipeRow/RecipeErrorRow/RecipeModel types; yaml@^2.8.3 dep; 13 new Vitest cases)
+status: 3/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5); RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-07, RECIPE-08, MODEL-02 shipped
+stopped_at: Completed 12-03-PLAN.md — recipe watcher (chokidar + eager boot scan + 250ms debounce) + resyncRecipes admin entry point; 11 new Vitest cases; MISSION_CONTROL_RECIPES_DIR env var introduced; RECIPE-03 + RECIPE-07 shipped; chokidar@^5.0.0 dep
+last_updated: "2026-04-19T03:50:36.743Z"
+last_activity: 2026-04-19 — Plan 12-03 complete (recipe-watcher.ts exporting scanRecipesDir/resyncRecipes/startRecipeWatcher/stopRecipeWatcher/getRecipesRoot + ResyncReport/StartWatcherOptions types; chokidar@^5.0.0 dep; 250ms per-slug debounce; eager blocking boot scan; basename-filter 'ignored' function for .DS_Store/*.swp/*~/*.tmp; MISSION_CONTROL_RECIPES_DIR env var (cwd-relative default); 11 new Vitest cases; RECIPE-03 + RECIPE-07 shipped)
 progress:
   total_phases: 12
   completed_phases: 8
   total_plans: 37
-  completed_plans: 41
+  completed_plans: 42
   percent: 100
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 12 (Recipe System) — Wave 2 IN PROGRESS
-Plan: 12-02 complete (recipe indexer: computeDirSha + indexRecipe/removeRecipe/getIndexedRecipeBySlug). Next: 12-03 (watcher), 12-04 (API).
-Status: 2/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f); RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-08, MODEL-02 shipped
-Last activity: 2026-04-19 — Plan 12-02 complete (computeDirSha recipe directory SHA-256 with POSIX sort-invariant hash stream; indexRecipe single write path with UPSERT + error-row flow + dedup; removeRecipe w/ FTS cascade via migration 059; getIndexedRecipeBySlug with JSON column deserialisation; 16 new Vitest cases; IndexResult union ready for 12-03/12-04)
-Next: Plan 12-03 (recipe watcher) — chokidar watcher over recipes directory, switches on IndexResult.status from 12-02
+Phase: 12 (Recipe System) — Wave 3 IN PROGRESS
+Plan: 12-03 complete (recipe watcher: chokidar + eager boot scan + resyncRecipes). Next: 12-04 (API + server-start hook).
+Status: 3/4 plans committed (12-01 b8472c2/d764b05, 12-02 b0976e5/ddc6b3f, 12-03 6592a29/9e053d5); RECIPE-01, RECIPE-02, RECIPE-03, RECIPE-04, RECIPE-07, RECIPE-08, MODEL-02 shipped
+Last activity: 2026-04-19 — Plan 12-03 complete (recipe-watcher.ts with chokidar@^5.0.0, 250ms per-slug debounce, eager blocking boot scan, basename-filter 'ignored' for editor/OS noise, MISSION_CONTROL_RECIPES_DIR env var cwd-relative default, 11 new Vitest cases, typecheck clean; unblocks 12-04's server-start hook and POST /api/recipes/resync)
+Next: Plan 12-04 (recipe API) — GET/POST /api/recipes + /api/recipes/:slug + POST /api/recipes/resync + boot wiring `await startRecipeWatcher()` before `server.listen()`
 
 ## Performance Metrics
 
@@ -100,6 +100,7 @@ Next: Plan 12-03 (recipe watcher) — chokidar watcher over recipes directory, s
 | Phase 11-runtime-foundation-v1-2 P04 | 10min | 3 tasks | 7 files |
 | Phase 12-recipe-system-v1-2 P01 | 7 | 2 tasks | 6 files |
 | Phase 12-recipe-system-v1-2 P02 | 9min | 2 tasks | 4 files |
+| Phase 12-recipe-system-v1-2 P03 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -136,6 +137,11 @@ Recent decisions affecting current work:
 - [Phase 12-recipe-system-v1-2]: [Phase 12-02]: Error rows carry computed dir_sha (not empty string) so future joins on dir_sha stay consistent; fast-path dedup blocked by error_message IS NOT NULL so a fix re-parses even with no other file changes
 - [Phase 12-recipe-system-v1-2]: [Phase 12-02]: Slug-mismatch between directory basename and recipe.yaml slug is a hard-fail error-row path — prevents watcher/API disagreement on which row to target
 - [Phase 12-recipe-system-v1-2]: [Phase 12-02]: getIndexedRecipeBySlug owns JSON column deserialisation (env_json → env, etc.); API routes in 12-04 never call JSON.parse directly — one place to change if JSON encoding evolves
+- [Phase 12-recipe-system-v1-2]: [Phase 12-03]: Recipes root defaults to <cwd>/recipes via MISSION_CONTROL_RECIPES_DIR, NOT MISSION_CONTROL_DATA_DIR — recipe directories are authored code living alongside src/ and scripts/, not runtime state
+- [Phase 12-recipe-system-v1-2]: [Phase 12-03]: Boot scan is BLOCKING — startRecipeWatcher awaits scanRecipesDir before the chokidar watcher is created and before the function returns; 12-04's boot hook must await startRecipeWatcher BEFORE server.listen() so DB matches disk when traffic opens
+- [Phase 12-recipe-system-v1-2]: [Phase 12-03]: chokidar 'ignored' is a basename-function filter (not a glob) — version-stable across chokidar majors and identical behaviour across fsevents/inotify/polling backends; rejects .DS_Store, *.swp, *~, *.tmp
+- [Phase 12-recipe-system-v1-2]: [Phase 12-03]: Partial-unlink events call indexRecipe (not removeRecipe directly); indexRecipe's 'skipped_missing' IndexResult tells the handler when to drop the row — one code path covers 'deleted sentinel recipe.yaml' and 'deleted side file' cases consistently
+- [Phase 12-recipe-system-v1-2]: [Phase 12-03]: startRecipeWatcher awaits chokidar 'ready' event before returning — avoids race between function-return and macOS fsevents registration that would drop writes issued immediately after boot
 
 ### Pending Todos
 
@@ -158,6 +164,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T03:40:39.962Z
-Stopped at: Completed 12-02-PLAN.md — computeDirSha (recipe directory SHA-256 dedup) + recipe-indexer (indexRecipe/removeRecipe/getIndexedRecipeBySlug); 16 new Vitest cases (5 hash + 11 indexer); IndexResult union ready for 12-03 watcher and 12-04 API
+Last session: 2026-04-19T03:50:36.737Z
+Stopped at: Completed 12-03-PLAN.md — recipe watcher (chokidar + eager boot scan + 250ms debounce) + resyncRecipes admin entry point; 11 new Vitest cases; MISSION_CONTROL_RECIPES_DIR env var introduced; RECIPE-03 + RECIPE-07 shipped; chokidar@^5.0.0 dep
 Resume file: None

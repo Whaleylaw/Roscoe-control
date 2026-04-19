@@ -118,11 +118,11 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 - [x] **RECIPE-01**: Recipe author can define a recipe as a directory under `recipes/<slug>/` containing `recipe.yaml`, `SOUL.md`, optional `tools/`, optional `skills/`, optional `README.md`
 - [x] **RECIPE-02**: Recipes are indexed into a `recipes` SQLite table capturing slug, name, description, when_to_use, image, workspace_mode, timeout_seconds, max_concurrent, env_json, secrets_json, tags_json, model_json, version, and dir_sha
-- [ ] **RECIPE-03**: Filesystem watcher re-indexes recipes when files change under `recipes/`, drops rows whose directories disappear, and uses `dir_sha` to skip unchanged recipes
+- [x] **RECIPE-03**: Filesystem watcher re-indexes recipes when files change under `recipes/`, drops rows whose directories disappear, and uses `dir_sha` to skip unchanged recipes
 - [x] **RECIPE-04**: Recipe author can declare `model.primary` (required), `model.fallback`, `model.provider`, and `model.params` in `recipe.yaml`; primary validated against a known-model registry at index time
 - [ ] **RECIPE-05**: User or caller can list recipes, fetch one by slug, and search by task description through the recipe API
 - [ ] **RECIPE-06**: Caller (e.g., Hermes) can create a new recipe by posting `recipe.yaml` + `SOUL.md` body; system writes the files and indexes the row atomically
-- [ ] **RECIPE-07**: Admin can force a full re-scan of the `recipes/` directory via an API endpoint when the watcher falls behind
+- [x] **RECIPE-07**: Admin can force a full re-scan of the `recipes/` directory via an API endpoint when the watcher falls behind
 - [x] **RECIPE-08**: Recipe search ranks candidates against task description + tags using SQL matching in v1.2 (embedding search deferred)
 
 ### Task Runtime Context
@@ -312,11 +312,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GSD-29 | Phase 9 | Complete |
 | RECIPE-01 | Phase 12 | Complete |
 | RECIPE-02 | Phase 12 | Complete |
-| RECIPE-03 | Phase 12 | Pending |
+| RECIPE-03 | Phase 12 | Complete |
 | RECIPE-04 | Phase 12 | Complete |
 | RECIPE-05 | Phase 12 | Pending |
 | RECIPE-06 | Phase 12 | Pending |
-| RECIPE-07 | Phase 12 | Pending |
+| RECIPE-07 | Phase 12 | Complete |
 | RECIPE-08 | Phase 12 | Complete |
 | TCTX-01 | Phase 13 | Pending |
 | TCTX-02 | Phase 13 | Pending |
