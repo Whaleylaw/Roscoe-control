@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: Hierarchical Lifecycle Graph** - Multiple concurrent workstreams/milestones/phases/plans per project, Lifecycle tab reads hierarchical graph with legacy fallback, CLI wrappers, same-wave conflict detection
 
 ### v1.2 — Recipe-Based Ephemeral Agent Runtime
-- [ ] **Phase 11: Runtime Foundation** - DB migrations (recipes, task_runner_tokens, task_checkpoints, task column additions), model registry module, runner + runner-token auth principals
+- [x] **Phase 11: Runtime Foundation** - DB migrations (recipes, task_runner_tokens, task_checkpoints, task column additions), model registry module, runner + runner-token auth principals (completed 2026-04-19)
 - [ ] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time
 - [ ] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
 - [ ] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image
@@ -222,7 +222,7 @@ Plans:
   4. A request presenting `.data/runner.secret` authenticates as the `runner` principal and only resolves on `/api/runner/*` routes; other paths reject
   5. A request presenting a valid per-task, per-attempt bearer token authenticates as `runner-token`, and handlers that opt in verify the path `:id` matches the token's `task_id` (cross-task access blocked); tokens are SHA-256 hashed at rest and carry an expiry of `runner_started_at + recipe.timeout_seconds + 60s`
   6. When a task reaches a terminal status the associated runner token row is marked `revoked_at` and subsequent presentations are rejected
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 Plans:
 - [x] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
 - [x] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
@@ -361,7 +361,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 8. Projects Entry Point | 6/6 | Complete | 2026-04-14 |
 | 9. GSD Native Integration *(v1.1)* | 11/11 | Complete | 2026-04-15 |
 | 10. Hierarchical Lifecycle Graph *(v1.1)* | — | Complete | 2026-04-15 |
-| 11. Runtime Foundation *(v1.2)* | 3/4 | In Progress|  |
+| 11. Runtime Foundation *(v1.2)* | 4/4 | Complete   | 2026-04-19 |
 | 12. Recipe System *(v1.2)* | 0/— | Not started | - |
 | 13. Task Runtime Context *(v1.2)* | 0/— | Not started | - |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 0/— | Not started | - |

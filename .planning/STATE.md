@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: 3/4 Wave-1 plans committed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809); runner-token auth plan (11-04) is the last remaining Wave 1 plan
-stopped_at: "Completed 11-02-PLAN.md (RAUTH-01): runner-secret module (.data/runner.secret auto-gen, 0600 perms) + runner principal in getUserFromRequest strictly scoped to /api/runner/*"
-last_updated: "2026-04-19T02:00:00Z"
-last_activity: "2026-04-19 — Plan 11-02 complete (RAUTH-01: runner-secret module + runner principal branch in auth.ts at lines 460-513; 22 new Vitest cases covering path-scope, idempotency, audit-log safety)"
+status: Phase 11 Wave 1 COMPLETE — all four plans landed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809, 11-04 bdbd9f5/01ba0e6/c3b10c3); RAUTH-01..06 all shipped; ready for Phase 12 (recipe indexer)
+stopped_at: "Completed 11-04-PLAN.md (RAUTH-02..06): runner-token module + requireRunnerToken wrapper + atomic revocation in task PUT handler; 62 new Vitest cases; full suite 1730 pass"
+last_updated: "2026-04-19T02:20:00Z"
+last_activity: "2026-04-19 — Plan 11-04 complete (RAUTH-02..06: runner-token bearer principal with per-task/per-attempt tokens, SHA-256-hashed in task_runner_tokens, cross-task 403 via requireRunnerToken wrapper, atomic revocation on terminal task transitions); Phase 11 Wave 1 is now complete"
 progress:
-  total_phases: 8
-  completed_phases: 6
-  total_plans: 18
-  completed_plans: 24
-  percent: 100
+  total_phases: 11
+  completed_phases: 8
+  total_plans: 33
+  completed_plans: 40
 ---
 
 # Project State
@@ -25,10 +24,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 11 (Runtime Foundation) — in progress (Wave 1 of 2)
-Plan: 11-01 (model registry + task-override validation), 11-02 (runner-secret + runner principal), 11-03 (migrations) all complete; 11-04 (runner-token auth) remaining
-Status: 3/4 Wave-1 plans committed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809); runner-token auth plan (11-04) is the last remaining Wave 1 plan
-Last activity: 2026-04-19 — Plan 11-02 complete (RAUTH-01: runner-secret module + runner principal branch in auth.ts at lines 460-513; 22 new Vitest cases covering path-scope, idempotency, audit-log safety)
+Phase: 11 (Runtime Foundation) — Wave 1 COMPLETE
+Plan: All four Wave-1 plans complete. 11-01 (model registry + task-override validation), 11-02 (runner-secret + runner principal), 11-03 (migrations), 11-04 (runner-token principal + requireRunnerToken wrapper + atomic revocation)
+Status: 4/4 Wave-1 plans committed (11-01 d6b53ca, 11-02 f95b72e/94b3ff2, 11-03 e8594e7/53e4809, 11-04 bdbd9f5/01ba0e6/c3b10c3); RAUTH-01..06 all shipped
+Last activity: 2026-04-19 — Plan 11-04 complete (RAUTH-02..06: runner-token module + requireRunnerToken wrapper + atomic revocation; 62 new Vitest cases; Phase 11 Wave 1 is now fully complete)
+Next: Phase 12 (recipe indexer) — consumes recipes table from Plan 11-03
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Last activity: 2026-04-19 — Plan 11-02 complete (RAUTH-01: runner-secret modul
 | Phase 11 P03 | 8min | 2 tasks | 2 files |
 | Phase 11-runtime-foundation-v1-2 P01 | 7min | 2 tasks | 4 files |
 | Phase 11-runtime-foundation-v1-2 P02 | 10min | 2 tasks | 6 files |
+| Phase 11-runtime-foundation-v1-2 P04 | 10min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,11 @@ Recent decisions affecting current work:
 - [Phase 11-02 / RAUTH-01]: Runner role = 'operator' not 'admin' — write access for checkpoints/claim (Phase 14/15) but NOT superuser; matches RAUTH-01 principle of least privilege
 - [Phase 11-02 / RAUTH-01]: Path-scope gate (url.pathname.startsWith('/api/runner/')) is the SOLE check that ever compares a bearer against the runner secret; falls through on mismatch so session cookies and (Plan 11-04) runner-tokens can still resolve on runner paths
 - [Phase 11-02 / RAUTH-01]: extractApiKeyFromHeaders is the shared bearer extractor — Plan 11-04 must reuse, do not fork
+- [Phase 11-04]: Cross-task 403 enforced in requireRunnerToken wrapper, NOT in getUserFromRequest — concentrates 401-vs-403 decision in one place; route handlers MUST use wrapper
+- [Phase 11-04]: Runner-token principal uses id=-2000 sentinel — distinct from -1000 (runner-secret) and -agent_id (agent keys); Phase 14/15 can dispatch on user.id === -2000
+- [Phase 11-04]: Atomic revocation on terminal task transitions (done/failed/cancelled) wrapped in SAME db.transaction as status UPDATE — no sweeper, no lazy-on-reuse; crash rolls BOTH back
+- [Phase 11-04]: runner_token_task_id populated in BOTH getUserFromRequest branch AND requireRunnerToken wrapper — downstream handlers cross-check as defense-in-depth
+- [Phase 11-04]: Strict <= expiry rejection in verifyRunnerToken so a token cannot be used AT its exact expiry moment — guards against clock-skew
 
 ### Pending Todos
 
@@ -143,6 +149,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T01:57:37Z
-Stopped at: Completed 11-02-PLAN.md (RAUTH-01) — runner-secret module + runner principal branch in auth.ts; strict /api/runner/* scope; 22 new Vitest cases; Plan 11-04 (runner-token principal) is next
+Last session: 2026-04-19T02:17:24Z
+Stopped at: Completed 11-04-PLAN.md (RAUTH-02..06) — runner-token module + requireRunnerToken wrapper (401 vs 403 cross-task discrimination) + atomic revocation on terminal task transitions (done/failed/cancelled); 62 new Vitest cases; full suite 1730 pass; Phase 11 Wave 1 COMPLETE
 Resume file: None

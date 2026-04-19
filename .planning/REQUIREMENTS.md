@@ -181,11 +181,11 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 ### Authentication
 
 - [x] **RAUTH-01**: A new `runner` principal is defined in `src/lib/auth.ts`, authenticated by the shared `.data/runner.secret`, scoped strictly to `/api/runner/*` routes
-- [ ] **RAUTH-02**: A new `runner-token` principal is defined; tokens are per-task, per-attempt, stored as SHA-256 hashes in `task_runner_tokens`, expiring at `runner_started_at + recipe.timeout_seconds + 60s`
-- [ ] **RAUTH-03**: `runner-token` authentication verifies path parameter `:id` matches the token's embedded `task_id`, preventing cross-task access
-- [ ] **RAUTH-04**: Route handlers opt into `runner-token` auth explicitly (no rank-ordered escalation path from lower tiers)
-- [ ] **RAUTH-05**: When a task reaches a terminal status, its runner token is revoked (`revoked_at` set) and cannot be used again
-- [ ] **RAUTH-06**: A runner-token-authenticated call can hit only the narrow set of task-lifecycle endpoints (checkpoints, submit, fail, scoped status, read own task, read own task comments)
+- [x] **RAUTH-02**: A new `runner-token` principal is defined; tokens are per-task, per-attempt, stored as SHA-256 hashes in `task_runner_tokens`, expiring at `runner_started_at + recipe.timeout_seconds + 60s`
+- [x] **RAUTH-03**: `runner-token` authentication verifies path parameter `:id` matches the token's embedded `task_id`, preventing cross-task access
+- [x] **RAUTH-04**: Route handlers opt into `runner-token` auth explicitly (no rank-ordered escalation path from lower tiers)
+- [x] **RAUTH-05**: When a task reaches a terminal status, its runner token is revoked (`revoked_at` set) and cannot be used again
+- [x] **RAUTH-06**: A runner-token-authenticated call can hit only the narrow set of task-lifecycle endpoints (checkpoints, submit, fail, scoped status, read own task, read own task comments)
 
 ### Model Registry
 
@@ -357,11 +357,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CP-05 | Phase 15 | Pending |
 | CP-06 | Phase 15 | Pending |
 | RAUTH-01 | Phase 11 | Complete |
-| RAUTH-02 | Phase 11 | Pending |
-| RAUTH-03 | Phase 11 | Pending |
-| RAUTH-04 | Phase 11 | Pending |
-| RAUTH-05 | Phase 11 | Pending |
-| RAUTH-06 | Phase 11 | Pending |
+| RAUTH-02 | Phase 11 | Complete |
+| RAUTH-03 | Phase 11 | Complete |
+| RAUTH-04 | Phase 11 | Complete |
+| RAUTH-05 | Phase 11 | Complete |
+| RAUTH-06 | Phase 11 | Complete |
 | MODEL-01 | Phase 11 | Complete |
 | MODEL-02 | Phase 12 | Pending |
 | MODEL-03 | Phase 11 | Complete |
