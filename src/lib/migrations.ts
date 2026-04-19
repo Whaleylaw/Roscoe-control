@@ -1657,6 +1657,73 @@ const migrations: Migration[] = [
       db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_recipe_slug ON tasks(recipe_slug) WHERE recipe_slug IS NOT NULL`)
       db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_runner_started_at ON tasks(runner_started_at) WHERE runner_started_at IS NOT NULL`)
     }
+  },
+  {
+    id: '058_recipes_error_message',
+    up(db: Database.Database) {
+      const recipeCols = db.prepare(`PRAGMA table_info(recipes)`).all() as Array<{ name: string }>
+      const hasRecipeCol = (n: string) => recipeCols.some((c) => c.name === n)
+
+      if (!hasRecipeCol('error_message')) {
+        db.exec(`ALTER TABLE recipes ADD COLUMN error_message TEXT`)
+      }
+
+      // Partial index so search's WHERE error_message IS NULL runs fast
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_recipes_error_null ON recipes(slug) WHERE error_message IS NULL`)
+    }
+  },
+  {
+    id: '059_recipes_fts5',
+    up(db: Database.Database) {
+      // FTS5 over name, description, when_to_use, tags.
+      // NOTE: We intentionally do NOT use content='recipes' external-content because the
+      // FTS5 column name we want ('tags') does not match the recipes-table column name
+      // ('tags_json'), and external-content FTS5 requires identical column names. Using
+      // a standalone (contentful) virtual table avoids that constraint while the triggers
+      // below keep it in sync. Callers still JOIN recipes_fts.rowid = recipes.id.
+      db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS recipes_fts USING fts5(
+          name,
+          description,
+          when_to_use,
+          tags,
+          tokenize='unicode61'
+        )
+      `)
+
+      // Triggers keep FTS5 in sync with recipes. Standalone (contentful) FTS5 means
+      // DELETE uses a plain DELETE FROM recipes_fts WHERE rowid = old.id (external-content
+      // 'delete' sentinel would apply only with content='recipes').
+      // Broken-recipe rows (error_message IS NOT NULL) are still indexed here — callers
+      // filter them out in the query layer via JOIN on recipes.error_message IS NULL.
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS recipes_fts_ai AFTER INSERT ON recipes BEGIN
+          INSERT INTO recipes_fts(rowid, name, description, when_to_use, tags)
+          VALUES (new.id, coalesce(new.name,''), coalesce(new.description,''), coalesce(new.when_to_use,''), coalesce(new.tags_json,''));
+        END
+      `)
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS recipes_fts_ad AFTER DELETE ON recipes BEGIN
+          DELETE FROM recipes_fts WHERE rowid = old.id;
+        END
+      `)
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS recipes_fts_au AFTER UPDATE ON recipes BEGIN
+          DELETE FROM recipes_fts WHERE rowid = old.id;
+          INSERT INTO recipes_fts(rowid, name, description, when_to_use, tags)
+          VALUES (new.id, coalesce(new.name,''), coalesce(new.description,''), coalesce(new.when_to_use,''), coalesce(new.tags_json,''));
+        END
+      `)
+
+      // Backfill any rows already inserted via migration 054 (unlikely in fresh DBs, but
+      // defensive for the production upgrade path):
+      db.exec(`
+        INSERT INTO recipes_fts(rowid, name, description, when_to_use, tags)
+        SELECT id, coalesce(name,''), coalesce(description,''), coalesce(when_to_use,''), coalesce(tags_json,'')
+        FROM recipes
+        WHERE id NOT IN (SELECT rowid FROM recipes_fts)
+      `)
+    }
   }
 ]
 
