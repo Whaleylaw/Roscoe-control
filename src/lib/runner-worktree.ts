@@ -110,21 +110,37 @@ export function buildPriorAttemptsEntry(
   }
 }
 
+export interface SeedMcDirInput {
+  task: McTaskJson
+  /**
+   * Phase 15 CP-04: when the task resumes AFTER a blocker, the marker
+   * is appended as a single visible line to progress.md. Ignored on
+   * first attempts (is_resuming=false). Null / undefined means no marker.
+   *
+   * Marker format (LOCKED by 15-CONTEXT.md):
+   *   <at_iso> | <<< RESUMED AFTER BLOCKER: <blocker_reason> >>>
+   */
+  resume_marker?: { blocker_reason: string; at_iso: string } | null
+}
+
 /**
  * Seed `.mc/` for a given attempt.
  *
  * On a first attempt (is_resuming=false): create the dir, write task.json,
  * write an empty progress.md (with a small header), write an empty
- * checkpoints.jsonl, write .gitignore.
+ * checkpoints.jsonl, write .gitignore. `resume_marker` is IGNORED on first
+ * attempts — first attempts are never marker-prefixed.
  *
  * On a resume attempt (is_resuming=true): create the dir if absent, REWRITE
  * task.json with the new attempt counter + prior_attempts, PRESERVE existing
  * progress.md and checkpoints.jsonl (no overwrite), rewrite .gitignore.
+ * If `resume_marker` is provided, append a single marker line to progress.md
+ * AFTER the defensive fallback ensures the file exists.
  *
  * mkdirSync recursive is idempotent — calling seedMcDir twice is safe.
  */
-export function seedMcDir(worktreePath: string, input: { task: McTaskJson }): void {
-  const { task } = input
+export function seedMcDir(worktreePath: string, input: SeedMcDirInput): void {
+  const { task, resume_marker } = input
   fs.mkdirSync(mcDir(worktreePath), { recursive: true })
 
   // task.json is always rewritten (new attempt counter on resume, fresh shape on first attempt)
@@ -132,6 +148,7 @@ export function seedMcDir(worktreePath: string, input: { task: McTaskJson }): vo
 
   // progress.md + checkpoints.jsonl: created on first attempt, preserved on resume
   if (!task.is_resuming) {
+    // First attempt — unchanged from Phase 14. resume_marker is IGNORED.
     const progressHeader = `# Progress — Task ${task.task_id}\n\n`
     fs.writeFileSync(progressPath(worktreePath), progressHeader)
     fs.writeFileSync(checkpointsPath(worktreePath), '')
@@ -143,6 +160,14 @@ export function seedMcDir(worktreePath: string, input: { task: McTaskJson }): vo
     }
     if (!fs.existsSync(checkpointsPath(worktreePath))) {
       fs.writeFileSync(checkpointsPath(worktreePath), '')
+    }
+
+    // Phase 15 CP-04: append the blocker-resume marker line if provided.
+    // The agent's preamble reads progress.md at startup, so this surfaces
+    // the blocker reason without expanding the runtime env surface.
+    if (resume_marker) {
+      const line = `${resume_marker.at_iso} | <<< RESUMED AFTER BLOCKER: ${resume_marker.blocker_reason} >>>\n`
+      fs.appendFileSync(progressPath(worktreePath), line)
     }
   }
 
