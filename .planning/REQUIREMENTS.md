@@ -144,8 +144,8 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **RUNNER-05**: Runner sends heartbeats every 10 seconds; Mission Control marks the runner offline and surfaces a UI banner when no heartbeat arrives for 60 seconds
 - [ ] **RUNNER-06**: Runner claims a task atomically via `POST /api/runner/claim/:task_id`, receiving a full dispatch payload (recipe content, task, mounts, fresh task-scoped token) or a 409 if already claimed
 - [ ] **RUNNER-07**: Runner validates every mount path against the allowlist at claim time as defense in depth, resolving symlinks and rejecting paths that escape
-- [ ] **RUNNER-08**: Runner enforces global (`MAX_CONCURRENT_CONTAINERS`) and per-recipe (`max_concurrent`) concurrency caps; over-cap claims return 409 and leave the task for the next cycle
-- [ ] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
+- [x] **RUNNER-08**: Runner enforces global (`MAX_CONCURRENT_CONTAINERS`) and per-recipe (`max_concurrent`) concurrency caps; over-cap claims return 409 and leave the task for the next cycle
+- [x] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
 - [ ] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
 - [ ] **RUNNER-11**: Runner waits for container exit, posts `runner-exit` with exit code and stderr tail, and triggers Mission Control retry/fail logic
 - [ ] **RUNNER-12**: Runner gracefully stops the container when a `blocked` checkpoint arrives, preserving the worktree so the next attempt can resume
@@ -166,7 +166,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **WORK-03**: Worktree is preserved across container crashes and retries; destroyed only when task reaches `done`, `failed`, or `cancelled` (failed tasks get a GC delay of N days)
 - [ ] **WORK-04**: On a resume attempt, runner injects an agent preamble above SOUL.md instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
 - [ ] **WORK-05**: On first attempt, runner injects a shorter preamble instructing the agent to write notes to `.mc/progress.md` as it works
-- [ ] **WORK-06**: Retry cap enforced via `runner_max_attempts` (default 3, recipe-overridable); exceeding the cap marks task `failed` with a clear reason
+- [x] **WORK-06**: Retry cap enforced via `runner_max_attempts` (default 3, recipe-overridable); exceeding the cap marks task `failed` with a clear reason
 - [ ] **WORK-07**: Scheduled garbage-collection job prunes worktrees for tasks terminal longer than N days (configurable, default 7)
 
 ### Checkpoints
@@ -332,8 +332,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNNER-05 | Phase 14 | Pending |
 | RUNNER-06 | Phase 14 | Pending |
 | RUNNER-07 | Phase 14 | Pending |
-| RUNNER-08 | Phase 14 | Pending |
-| RUNNER-09 | Phase 14 | Pending |
+| RUNNER-08 | Phase 14 | Complete |
+| RUNNER-09 | Phase 14 | Complete |
 | RUNNER-10 | Phase 14 | Pending |
 | RUNNER-11 | Phase 14 | Pending |
 | RUNNER-12 | Phase 14 | Pending |
@@ -348,7 +348,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORK-03 | Phase 14 | Pending |
 | WORK-04 | Phase 14 | Pending |
 | WORK-05 | Phase 14 | Pending |
-| WORK-06 | Phase 14 | Pending |
+| WORK-06 | Phase 14 | Complete |
 | WORK-07 | Phase 14 | Pending |
 | CP-01 | Phase 15 | Pending |
 | CP-02 | Phase 15 | Pending |

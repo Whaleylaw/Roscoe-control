@@ -2,16 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: Phase 14 Wave 0 test scaffolding landed — 11 new test files (6 route + 5 lib) with 60 it.todo stubs covering Phase 14's full requirement set. Requirement→test mapping locked for Wave 1/2 executors. pnpm test + typecheck clean.
-stopped_at: "Plan 14-03 complete. 11 test scaffolds committed (2c0fe32 carries Task 1 files + pre-existing 14-01 migrations due to a combined auto-commit; 1c80701 carries Task 2 cleanly). Next plan: 14-04 (read-side runner API — heartbeat, ready-tasks, pending-containers, terminal-tasks) which replaces the corresponding it.todo stubs in-place."
-last_updated: "2026-04-20T18:02:19Z"
-last_activity: 2026-04-20 — Plan 14-03 executed. Task 1 created 6 route-test scaffolds under src/app/api/runner/**/__tests__/ (heartbeat, ready-tasks, claim/[task_id], pending-containers, terminal-tasks, tasks/[task_id]/runner-exit) with 30 it.todo stubs. Task 2 created 5 lib-test scaffolds under src/lib/__tests__/ (runner-preamble, runner-worktree-seed, runner-docker-args, runner-env-file, runner-recipe-stage) with 30 it.todo stubs. Total 60 todos; all 11 files skip cleanly under vitest; typecheck passes. Requirements RUNNER-01..14 + CONTAINER-01..03 + WORK-01/02/04/05/06/07 + MODEL-04 all have scaffolded test homes (none marked complete — Wave 1/2 lands the real implementations).
+status: unknown
+last_updated: "2026-04-20T18:06:57.064Z"
 progress:
   total_phases: 14
   completed_phases: 10
-  total_plans: 53
-  completed_plans: 48
-  percent: 91
+  total_plans: 52
+  completed_plans: 50
 ---
 
 # Project State
@@ -25,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 14 (Runner & Container v1.2) — IN PROGRESS (2/11 plans shipped: 14-01 migrations, 14-03 test scaffolds)
-Plans: 14-01 ✓ (migrations 060/061), 14-02 ⏳, 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-04..14-11 ⏳
-Status: Plan 14-03 scaffolded the full Phase 14 Wave-0 test coverage. 6 route-test stubs under src/app/api/runner/ and 5 lib-test stubs under src/lib/__tests__/. Wave 1/2 executors (14-04..14-09) will replace each .todo in-place rather than create new test files. typecheck + vitest clean.
-Last activity: 2026-04-20 — Plan 14-03 executed. Task 1 (commit 2c0fe32, conflated with 14-01 migrations due to auto-commit batching): 6 route-test scaffolds / 30 it.todos. Task 2 (commit 1c80701, clean message): 5 lib-test scaffolds / 30 it.todos. Total 11 files / 60 todos. `pnpm test src/app/api/runner src/lib/__tests__/runner-*.test.ts -- --run` passes (all skipped); `pnpm typecheck` clean.
-Next: Plan 14-04 (read-side runner API) — replace the 14 it.todo stubs under heartbeat/ + ready-tasks/ + pending-containers/ + terminal-tasks/ with real it() bodies and implement the corresponding route.ts handlers. Per CONTEXT.md the claim route (14-05) MUST import validateHostPathAgainstAllowlist from @/lib/task-runtime-validation for claim-time re-validation (symlink-at-create + symlink-at-claim defense-in-depth).
+Phase: 14 (Runner & Container v1.2) — IN PROGRESS (3/11 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds)
+Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-04..14-11 ⏳
+Status: Wave 0 complete. Plan 14-02 shipped runtime.max_concurrent_containers / project_repo_map / max_memory_per_container / max_cpu_per_container / failed_gc_window_days with typed getters (getMaxConcurrentContainers, getProjectRepoMap, getMaxMemoryPerContainer, getMaxCpuPerContainer, getFailedGcWindowDays) and the optional `max_attempts` field on `recipeYamlSchema`. DEFAULT_* constants + TASK_RUNTIME_SETTING_KEYS entries exported for downstream plans. 17 Vitest cases in src/lib/__tests__/runtime-settings-phase14.test.ts, all passing. typecheck + lint clean (0 errors).
+Last activity: 2026-04-20 — Plan 14-02 executed. Task 1 commit 0bd4575 (settingDefinitions extension, 5 new runtime.* keys). Task 2 commit 4121dbe (5 getters in task-runtime-settings.ts + max_attempts on recipe-schema.ts). Task 3 commit 8437747 (runtime-settings-phase14.test.ts — 17 tests / 17 pass). Plan locked decision: `max_attempts` NOT round-tripped through recipes DB row; Plans 14-05 / 14-06 re-parse recipe.yaml from filesystem at claim / exit time (resolution: task.runner_max_attempts ?? recipe.max_attempts ?? 3).
+Next: Plan 14-04 (read-side runner API) — replace the 14 it.todo stubs under heartbeat/ + ready-tasks/ + pending-containers/ + terminal-tasks/ with real it() bodies and implement the corresponding route.ts handlers. Per CONTEXT.md the claim route (14-05) MUST import validateHostPathAgainstAllowlist from @/lib/task-runtime-validation for claim-time re-validation (symlink-at-create + symlink-at-claim defense-in-depth); it MUST also import getMaxConcurrentContainers / getProjectRepoMap / getMaxMemoryPerContainer / getMaxCpuPerContainer from @/lib/task-runtime-settings (landed this plan).
 
 ## Performance Metrics
 
@@ -106,6 +103,7 @@ Next: Plan 14-04 (read-side runner API) — replace the 14 it.todo stubs under h
 | Phase 13-task-runtime-context-v1-2 P02 | 7min | 2 tasks | 2 files |
 | Phase 13-task-runtime-context-v1-2 P03 | 10min | 2 tasks | 5 files |
 | Phase 14-runner-container-v1-2 P03 | 4min | 2 tasks | 11 files |
+| Phase 14-runner-container-v1-2 P02 | 4min | 3 tasks tasks | 4 files files |
 
 ## Accumulated Context
 
@@ -162,6 +160,9 @@ Recent decisions affecting current work:
 - [Phase 14-03]: Claim-route scaffold placed at src/app/api/runner/claim/[task_id]/__tests__/route.test.ts — dynamic [task_id] segment is part of the directory path (Next.js App Router convention, matches src/app/api/tasks/[id]/__tests__/).
 - [Phase 14-03]: runner-recipe-stage scaffold encodes Pitfall 10 (stage path must resolve OUTSIDE MISSION_CONTROL_RECIPES_DIR or chokidar re-indexes the staged copy); runner-docker-args scaffold encodes CONTAINER-01 invariant (no --env flag on argv carries MC_API_TOKEN value — secrets pass via --env-file only).
 - [Phase 14-03]: Did NOT scaffold runner-worktree-git.test.ts (child_process against real git). Reason: git worktree operations are integration-heavy and belong to Plan 14-08b, which owns its own test file on top of this Wave-0 set.
+- [Phase 14-02]: max_attempts NOT persisted to recipes DB row; Plan 14-05 / 14-06 re-parse recipe.yaml from disk. Resolution rule: task.runner_max_attempts ?? recipe.max_attempts ?? 3
+- [Phase 14-02]: Five Phase 14 runtime.* getters use Phase 13 defensive-default pattern; missing row / junk value falls back to documented default — corrupt settings row cannot brick claim or GC
+- [Phase 14-02]: getProjectRepoMap filters non-string / empty values at read time so claim code gets a guaranteed Record<string,string> and dispatches MISSING_PROJECT_REPO purely on key membership
 
 ### Pending Todos
 
@@ -184,6 +185,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T18:02:19Z
-Stopped at: Plan 14-03 complete. 11 Wave-0 test scaffolds committed (6 route + 5 lib, 60 it.todos total). SUMMARY.md documents Task 1 / Task 2 file set + hand-off map (which Wave 1/2 plan consumes each scaffold group) + deviations (auto-commit conflation with 14-01 migrations; stray-quote fix in runner-recipe-stage.test.ts). Next plan: 14-04 (read-side runner API — heartbeat + ready-tasks + pending-containers + terminal-tasks route.ts handlers, replacing 14 it.todo stubs in-place).
-Resume file: .planning/phases/14-runner-container-v1-2/14-03-SUMMARY.md
+Last session: 2026-04-20T18:05:22Z
+Stopped at: Plan 14-02 complete. 5 new runtime.* setting definitions added to settingDefinitions (route.ts), 5 typed getters added to task-runtime-settings.ts (defensive-default pattern, DEFAULT_* constants exported), optional `max_attempts` field added to recipeYamlSchema (NOT round-tripped through recipes DB row — Plans 14-05 / 14-06 re-parse recipe.yaml from disk). 17 Vitest cases in runtime-settings-phase14.test.ts all pass; typecheck + lint clean. Commits 0bd4575 / 4121dbe / 8437747. Next plan: 14-04 (read-side runner API).
+Resume file: .planning/phases/14-runner-container-v1-2/14-02-SUMMARY.md

@@ -280,7 +280,7 @@ Plans:
   7. Worktrees are preserved across container crashes and retries and destroyed only when a task reaches `done`, `cancelled`, or (after a GC window of N days, default 7) `failed`; a scheduled GC job prunes worktrees for long-terminal tasks
   8. After a runner crash, starting the runner reconciles live Docker containers (`mc-task-*`) against `GET /api/runner/pending-containers` and either adopts or cleans them up; when a task reaches terminal status, the runner revokes its token and destroys the worktree (subject to the failure GC window)
   9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
-**Plans:** 12 plans
+**Plans:** 3/12 plans executed
 Plans:
 - [x] 14-01-PLAN.md — Migrations 060 (runner_heartbeats) + 061 (task_runner_attempts) + tests (RUNNER-05, WORK-02)
 - [ ] 14-02-PLAN.md — 5 runtime.* settings + recipe-schema max_attempts + typed getters + tests (RUNNER-08, WORK-06, RUNNER-09)
@@ -371,7 +371,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 11. Runtime Foundation *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 12. Recipe System *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
-| 14. Runner Daemon & Container Execution *(v1.2)* | 0/12 | In Progress | - |
+| 14. Runner Daemon & Container Execution *(v1.2)* | 3/12 | In Progress|  |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |
 | 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |
