@@ -1074,3 +1074,16 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
       : `${inboxTasks.length} inbox task(s), no suitable agents found`,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 15 SCHED-04: reconcile runner heartbeat (stub — filled in by Plan 15-02 Task 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Placeholder export so scheduler.ts imports compile during Task 1 of Plan 15-02.
+ * Task 4 of the same plan replaces this body with the real heartbeat reconciliation
+ * logic defined in 15-RESEARCH.md § "Scheduler reconcile tick".
+ */
+export async function reconcileRunnerHeartbeat(): Promise<{ ok: boolean; message: string }> {
+  return { ok: true, message: 'reconcileRunnerHeartbeat stub — awaiting Plan 15-02 Task 4 implementation' }
+}

@@ -10,7 +10,7 @@ import { pruneGatewaySessionsOlderThan, getAgentLiveStatuses } from './sessions'
 import { eventBus } from './event-bus'
 import { syncSkillsFromDisk } from './skill-sync'
 import { syncLocalAgents } from './local-agent-sync'
-import { dispatchAssignedTasks, runAegisReviews, requeueStaleTasks, autoRouteInboxTasks } from './task-dispatch'
+import { dispatchAssignedTasks, runAegisReviews, requeueStaleTasks, autoRouteInboxTasks, reconcileRunnerHeartbeat } from './task-dispatch'
 import { spawnRecurringTasks } from './recurring-tasks'
 
 const BACKUP_DIR = join(dirname(config.dbPath), 'backups')
@@ -273,7 +273,8 @@ async function syncAgentLiveStatuses(): Promise<number> {
 
 const DAILY_MS = 24 * 60 * 60 * 1000
 const FIVE_MINUTES_MS = 5 * 60 * 1000
-const TICK_MS = 60 * 1000 // Check every minute
+// Phase 15 SCHED-04: reduced from 60s to 30s to honor the LOCKED 90s stale window (3× tick).
+const TICK_MS = 30 * 1000 // Check every 30 seconds
 
 /** Initialize the scheduler */
 export function initScheduler() {
@@ -391,16 +392,25 @@ export function initScheduler() {
 
   tasks.set('stale_task_requeue', {
     name: 'Stale Task Requeue',
-    intervalMs: TICK_MS, // Every 60s — check for stale in_progress tasks
+    intervalMs: TICK_MS, // Every 30s — check for stale in_progress tasks
     lastRun: null,
     nextRun: now + 25_000, // First check 25s after startup
     enabled: true,
     running: false,
   })
 
+  tasks.set('reconcile_runner_heartbeat', {
+    name: 'Reconcile Runner Heartbeat',
+    intervalMs: 30_000, // LOCKED: 30s cadence per 15-CONTEXT.md Heartbeat & Stale Detection
+    lastRun: null,
+    nextRun: now + 30_000, // First check 30s after startup
+    enabled: true,
+    running: false,
+  })
+
   // Start the tick loop
   tickInterval = setInterval(tick, TICK_MS)
-  logger.info('Scheduler initialized - backup at ~3AM, cleanup at ~4AM, heartbeat every 5m, webhook/claude/skill/local-agent/gateway-agent sync every 60s')
+  logger.info('Scheduler initialized - backup at ~3AM, cleanup at ~4AM, heartbeat every 5m, webhook/claude/skill/local-agent/gateway-agent sync every 30s, runner reconcile every 30s')
 }
 
 /** Calculate ms until next occurrence of a given hour (UTC) */
@@ -433,8 +443,9 @@ async function tick() {
       : id === 'aegis_review' ? 'general.aegis_review'
       : id === 'recurring_task_spawn' ? 'general.recurring_task_spawn'
       : id === 'stale_task_requeue' ? 'general.stale_task_requeue'
+      : id === 'reconcile_runner_heartbeat' ? 'general.reconcile_runner_heartbeat'
       : 'general.agent_heartbeat'
-    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue'
+    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue' || id === 'reconcile_runner_heartbeat'
     if (!isSettingEnabled(settingKey, defaultEnabled)) continue
 
     task.running = true
@@ -457,6 +468,7 @@ async function tick() {
         : id === 'aegis_review' ? await runAegisReviews()
         : id === 'recurring_task_spawn' ? await spawnRecurringTasks()
         : id === 'stale_task_requeue' ? await requeueStaleTasks()
+        : id === 'reconcile_runner_heartbeat' ? await reconcileRunnerHeartbeat()
         : await runCleanup()
       task.lastResult = { ...result, timestamp: now }
     } catch (err: any) {
@@ -493,8 +505,9 @@ export function getSchedulerStatus() {
       : id === 'aegis_review' ? 'general.aegis_review'
       : id === 'recurring_task_spawn' ? 'general.recurring_task_spawn'
       : id === 'stale_task_requeue' ? 'general.stale_task_requeue'
+      : id === 'reconcile_runner_heartbeat' ? 'general.reconcile_runner_heartbeat'
       : 'general.agent_heartbeat'
-    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue'
+    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue' || id === 'reconcile_runner_heartbeat'
     result.push({
       id,
       name: task.name,
@@ -523,6 +536,7 @@ export async function triggerTask(taskId: string): Promise<{ ok: boolean; messag
   if (taskId === 'aegis_review') return runAegisReviews()
   if (taskId === 'recurring_task_spawn') return spawnRecurringTasks()
   if (taskId === 'stale_task_requeue') return requeueStaleTasks()
+  if (taskId === 'reconcile_runner_heartbeat') return reconcileRunnerHeartbeat()
   return { ok: false, message: `Unknown task: ${taskId}` }
 }
 
