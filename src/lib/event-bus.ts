@@ -53,6 +53,12 @@ export type EventType =
   | 'gsd.plan.updated'
   | 'gsd.plan.transitioned'
   | 'gsd.conflict.detected'
+  | 'task.runner_requested'     // SCHED-05 — MC tells runner a recipe-tagged task is ready for claim
+  | 'task.container_started'    // SCHED-06 — emitted from POST /api/runner/tasks/:id/container-started
+  | 'task.container_exited'     // SCHED-06 — emitted from POST /api/runner/tasks/:id/runner-exit
+  | 'task.checkpoint_added'     // SCHED-06 — emitted from POST /api/tasks/:id/checkpoints
+  | 'recipe.indexed'            // SCHED-06 — emitted from recipe-watcher scheduleReindex
+  | 'recipe.removed'            // SCHED-06 — emitted from recipe-watcher scheduleReindex
 
 class ServerEventBus extends EventEmitter {
   private static instance: ServerEventBus | null = null
