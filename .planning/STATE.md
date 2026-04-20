@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-20T18:19:03.523Z"
+last_updated: "2026-04-20T18:23:51.517Z"
 progress:
   total_phases: 14
   completed_phases: 10
-  total_plans: 53
-  completed_plans: 50
+  total_plans: 52
+  completed_plans: 53
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 14 (Runner & Container v1.2) — IN PROGRESS (4/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-08a runner daemon primitives)
-Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-08a ✓ (runner-gc + runner-reconcile + runner-timeout + runner-log-layout — 4 pure-logic helpers + 26 unit tests), 14-04..14-07, 14-08b, 14-09..14-11 ⏳
-Status: Plan 14-08a shipped the pure-logic primitives the runner daemon (Plan 14-08b) needs: GC decision tree (gcShouldDestroy + planDestroy), reconciliation diff (reconcileContainers → {adopt, kill, orphaned}), timeout arithmetic (computeRemainingTimeoutMs with defensive clamping), and log-layout manager (resolveLogPaths + ensureAttemptDir + updateLatestSymlink + finalizeMeta). 26 Vitest cases across 4 new test files, all pass. Lint clean on the new surface; typecheck clean on the new files (pre-existing heartbeat test TS2345 error from 14-04 remains tracked in deferred-items.md).
-Last activity: 2026-04-20 — Plan 14-08a executed. Task 1 commit c7e84fd (runner-gc.ts + runner-reconcile.ts + runner-timeout.ts + 3 test files — 18 tests). Task 2 commit e1cdaff (runner-log-layout.ts + 1 test file — 8 tests). Decisions: latest symlink target RELATIVE for portability; exited containers ignored by reconcile; computeRemainingTimeoutMs resync-safe (re-derives from mc.runner_started_at label, never local timer); Plan 14-08b daemon either imports these modules or inline-duplicates — either way this plan is the contract + source of truth.
-Next: Plan 14-08b (runner daemon `scripts/mc-runner.mjs`) — wires Plan 14-08a primitives together with `docker run`/`docker ps`/`docker kill`/`docker logs -f` + HTTP (SSE subscribe + poll fallback + claim/exit/checkpoint calls). Import or inline: gcShouldDestroy/planDestroy, reconcileContainers, computeRemainingTimeoutMs, resolveLogPaths/ensureAttemptDir/updateLatestSymlink/finalizeMeta from src/lib/runner-{gc,reconcile,timeout,log-layout}.ts.
+Phase: 14 (Runner & Container v1.2) — IN PROGRESS (5/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-08a runner daemon primitives, 14-11 submit+container-started+config endpoints)
+Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-08a ✓ (runner-gc + runner-reconcile + runner-timeout + runner-log-layout — 4 pure-logic helpers + 26 unit tests), 14-11 ✓ (POST /api/runner/tasks/:id/submit + POST /api/runner/tasks/:id/container-started + GET /api/runner/config — 3 routes + 17 tests), 14-04..14-07, 14-08b, 14-09..14-10 ⏳
+Status: Plan 14-11 shipped three runner-facing HTTP endpoints missing from the v1 Phase 14 plan. POST /api/runner/tasks/:id/submit is runner-token scoped (-2000); the agent container uses it for its terminal-flip to 'done' with atomic revokeTokensForTask. POST /api/runner/tasks/:id/container-started is runner-secret scoped (-1000); the daemon calls it right after `docker run` returns to swap the 'pending:<task>:<attempt>' placeholder for the real container_id. GET /api/runner/config is runner-secret scoped; returns the five runtime.* settings (max_concurrent_containers, project_repo_map, max_memory_per_container, max_cpu_per_container, failed_gc_window_days) in one payload for daemon startup + SIGHUP reload. 17 tests (7 + 6 + 4); lint 0 errors; typecheck unchanged (pre-existing heartbeat TS2345 from 14-04 still tracked in deferred-items.md).
+Last activity: 2026-04-20 — Plan 14-11 executed. Task 1 commit 3daf4e4 (submit route + 7 tests). Task 2 commit 547e902 (container-started route + 6 tests). Task 3 commit f10f386 (config route + 4 tests). Decisions: resolution body field is advisory with pragma_table_info probe; placeholder-swap is a three-way fork (idempotent retry / swap / conflict) not two; runner-secret vs runner-token dispatch is explicit via id-sentinel check, never inferred from role; /api/runner/config has no rate limit (read-only, matches other runner-secret GETs).
+Next: Plan 14-08b (runner daemon `scripts/mc-runner.mjs`) — wires Plan 14-08a primitives together with `docker run`/`docker ps`/`docker kill`/`docker logs -f` + HTTP. Can now call: GET /api/runner/config at startup (Plan 14-11), POST /api/runner/tasks/:id/container-started after docker run (Plan 14-11), and rely on revokeTokensForTask firing transactionally when the agent /submits (Plan 14-11 + Plan 11-04).
 
 ## Performance Metrics
 
@@ -106,6 +106,8 @@ Next: Plan 14-08b (runner daemon `scripts/mc-runner.mjs`) — wires Plan 14-08a 
 | Phase 14-runner-container-v1-2 P02 | 4min | 3 tasks tasks | 4 files files |
 | Phase 14-runner-container-v1-2 P01 | 7 | 2 tasks | 2 files |
 | Phase 14-runner-container-v1-2 P08a | 4 | 2 tasks | 8 files |
+| Phase 14-runner-container-v1-2 P11 | 5min | 3 tasks | 6 files |
+| Phase 14-runner-container-v1-2 P04 | 9min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -172,6 +174,10 @@ Recent decisions affecting current work:
 - [Phase 14-08a]: latest symlink target is RELATIVE (attempt-<n>, not absolute) so .data/runner/logs/ stays portable if moved; readlinkSync(latest) === 'attempt-<n>'
 - [Phase 14-08a]: reconcileContainers ignores exited containers entirely — docker --rm removes them, treating transient exited rows as kill targets would docker-kill an already-removed container
 - [Phase 14-08a]: computeRemainingTimeoutMs is resync-safe: daemon re-derives remaining time from mc.runner_started_at label on every tick, never starts local timer — restart does NOT extend deadline (Pitfall 9)
+- [Phase 14-11]: /submit resolution field is advisory and guarded by pragma_table_info probe — migration 061 does NOT include resolution_notes on task_runner_attempts; handler writes only when the column exists (forward-compat hook for a later migration)
+- [Phase 14-11]: /container-started is a three-way fork (same id → 204 idempotent / placeholder or NULL → swap → 204 / different real id → 409 conflict); two-way fork would break idempotent retries from network timeouts
+- [Phase 14-11]: Runner-secret (-1000) vs runner-token (-2000) dispatch is explicit at route layer via `if (auth.user.id !== EXPECTED_SENTINEL) return 403` — never relies on role='operator' (both principals share the role)
+- [Phase 14-11]: GET /api/runner/config has no rate limit — read-only endpoint matches precedent for other runner-secret GETs; daemon polls on SIGHUP, not per-request
 
 ### Pending Todos
 
@@ -194,6 +200,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T18:20:00Z
-Stopped at: Plan 14-08a complete. 4 new pure-logic helpers in src/lib/: runner-gc.ts (gcShouldDestroy + planDestroy), runner-reconcile.ts (reconcileContainers → adopt/kill/orphaned partition), runner-timeout.ts (computeRemainingTimeoutMs, defensively clamped, resync-safe), runner-log-layout.ts (resolveLogPaths + ensureAttemptDir + updateLatestSymlink + finalizeMeta). 26 Vitest cases across 4 new test files all pass; lint clean on new surface; typecheck clean on new files (pre-existing heartbeat TS2345 from 14-04 remains tracked). Commits c7e84fd (Task 1) / e1cdaff (Task 2). Next plan: 14-08b — runner daemon scripts/mc-runner.mjs that wires these four helpers to docker + HTTP.
-Resume file: .planning/phases/14-runner-container-v1-2/14-08a-SUMMARY.md
+Last session: 2026-04-20T18:22:00Z
+Stopped at: Plan 14-11 complete. Three runner-facing HTTP endpoints: POST /api/runner/tasks/:task_id/submit (runner-token; agent terminal-flip to 'done' + atomic revokeTokensForTask), POST /api/runner/tasks/:task_id/container-started (runner-secret; placeholder-swap from pending:* to real docker container_id, three-way fork for idempotency/conflict), GET /api/runner/config (runner-secret; five runtime.* settings in one payload). 17 Vitest cases (7 + 6 + 4) all pass; lint 0 errors; typecheck unchanged. Commits 3daf4e4 (Task 1 submit) / 547e902 (Task 2 container-started) / f10f386 (Task 3 config). Plan 14-09's hello-world agent can now submit via the supported path (not PUT /api/tasks/:id which fails the RUNNER_TOKEN_ALLOWLIST); Plan 14-08b's daemon can boot-config + swap placeholders.
+Resume file: .planning/phases/14-runner-container-v1-2/14-11-SUMMARY.md

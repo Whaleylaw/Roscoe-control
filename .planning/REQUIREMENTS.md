@@ -140,14 +140,14 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **RUNNER-01**: Operator can run the runner as a standalone Node process (`scripts/mc-runner.mjs`) with its own LaunchAgent template, separate from the Mission Control web server
 - [ ] **RUNNER-02**: Runner registers with Mission Control on startup using a long-lived shared secret (auto-generated on first run, stored in `.data/runner.secret`)
 - [ ] **RUNNER-03**: Runner subscribes to `task.runner_requested` SSE events to claim work as soon as tasks become ready
-- [ ] **RUNNER-04**: Runner polls `/api/runner/ready-tasks` every 15 seconds as a fallback when SSE drops
+- [x] **RUNNER-04**: Runner polls `/api/runner/ready-tasks` every 15 seconds as a fallback when SSE drops
 - [x] **RUNNER-05**: Runner sends heartbeats every 10 seconds; Mission Control marks the runner offline and surfaces a UI banner when no heartbeat arrives for 60 seconds
-- [ ] **RUNNER-06**: Runner claims a task atomically via `POST /api/runner/claim/:task_id`, receiving a full dispatch payload (recipe content, task, mounts, fresh task-scoped token) or a 409 if already claimed
+- [x] **RUNNER-06**: Runner claims a task atomically via `POST /api/runner/claim/:task_id`, receiving a full dispatch payload (recipe content, task, mounts, fresh task-scoped token) or a 409 if already claimed
 - [ ] **RUNNER-07**: Runner validates every mount path against the allowlist at claim time as defense in depth, resolving symlinks and rejecting paths that escape
 - [x] **RUNNER-08**: Runner enforces global (`MAX_CONCURRENT_CONTAINERS`) and per-recipe (`max_concurrent`) concurrency caps; over-cap claims return 409 and leave the task for the next cycle
 - [x] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
 - [ ] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
-- [ ] **RUNNER-11**: Runner waits for container exit, posts `runner-exit` with exit code and stderr tail, and triggers Mission Control retry/fail logic
+- [x] **RUNNER-11**: Runner waits for container exit, posts `runner-exit` with exit code and stderr tail, and triggers Mission Control retry/fail logic
 - [x] **RUNNER-12**: Runner gracefully stops the container when a `blocked` checkpoint arrives, preserving the worktree so the next attempt can resume
 - [x] **RUNNER-13**: On startup after a crash, runner reconciles orphaned containers against the DB via `GET /api/runner/pending-containers` and adopts or cleans them up
 - [x] **RUNNER-14**: On terminal task status, runner revokes the task token and destroys the worktree (preserving it for a GC window on failure)
@@ -328,14 +328,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNNER-01 | Phase 14 | Pending |
 | RUNNER-02 | Phase 14 | Pending |
 | RUNNER-03 | Phase 14 | Pending |
-| RUNNER-04 | Phase 14 | Pending |
+| RUNNER-04 | Phase 14 | Complete |
 | RUNNER-05 | Phase 14 | Complete |
-| RUNNER-06 | Phase 14 | Pending |
+| RUNNER-06 | Phase 14 | Complete |
 | RUNNER-07 | Phase 14 | Pending |
 | RUNNER-08 | Phase 14 | Complete |
 | RUNNER-09 | Phase 14 | Complete |
 | RUNNER-10 | Phase 14 | Pending |
-| RUNNER-11 | Phase 14 | Pending |
+| RUNNER-11 | Phase 14 | Complete |
 | RUNNER-12 | Phase 14 | Complete |
 | RUNNER-13 | Phase 14 | Complete |
 | RUNNER-14 | Phase 14 | Complete |
