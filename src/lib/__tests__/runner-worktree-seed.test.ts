@@ -136,7 +136,6 @@ describe('runner worktree .mc/ seeding', () => {
     seedMcDir(worktree, { task: firstAttemptTask() })
     const stat = fs.statSync(path.join(worktree, '.mc', 'task.json'))
     // Mask off the file-type bits, keep only the permission bits.
-    // eslint-disable-next-line no-bitwise
     expect(stat.mode & 0o777).toBe(0o600)
   })
 

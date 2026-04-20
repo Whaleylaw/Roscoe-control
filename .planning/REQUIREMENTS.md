@@ -146,7 +146,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **RUNNER-07**: Runner validates every mount path against the allowlist at claim time as defense in depth, resolving symlinks and rejecting paths that escape
 - [x] **RUNNER-08**: Runner enforces global (`MAX_CONCURRENT_CONTAINERS`) and per-recipe (`max_concurrent`) concurrency caps; over-cap claims return 409 and leave the task for the next cycle
 - [x] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
-- [ ] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
+- [x] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
 - [x] **RUNNER-11**: Runner waits for container exit, posts `runner-exit` with exit code and stderr tail, and triggers Mission Control retry/fail logic
 - [x] **RUNNER-12**: Runner gracefully stops the container when a `blocked` checkpoint arrives, preserving the worktree so the next attempt can resume
 - [x] **RUNNER-13**: On startup after a crash, runner reconciles orphaned containers against the DB via `GET /api/runner/pending-containers` and adopts or cleans them up
@@ -154,18 +154,18 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Container Execution
 
-- [ ] **CONTAINER-01**: Container receives task context as env vars (`MC_API_URL`, `MC_TASK_ID`, `MC_API_TOKEN`, `MC_WORKSPACE`, `MC_RECIPE_PATH`, `MC_MODEL_*`) and recipe-declared secrets (e.g., `ANTHROPIC_API_KEY`) injected from the runner's secret store
-- [ ] **CONTAINER-02**: Container sees the worktree at `/workspace` (rw when recipe is worktree-mode), the recipe at `/recipe` (ro), read-only mounts at `/refs/<label-slug>/` (ro), and extra skills at `/skills/<name>` (ro)
+- [x] **CONTAINER-01**: Container receives task context as env vars (`MC_API_URL`, `MC_TASK_ID`, `MC_API_TOKEN`, `MC_WORKSPACE`, `MC_RECIPE_PATH`, `MC_MODEL_*`) and recipe-declared secrets (e.g., `ANTHROPIC_API_KEY`) injected from the runner's secret store
+- [x] **CONTAINER-02**: Container sees the worktree at `/workspace` (rw when recipe is worktree-mode), the recipe at `/recipe` (ro), read-only mounts at `/refs/<label-slug>/` (ro), and extra skills at `/skills/<name>` (ro)
 - [x] **CONTAINER-03**: Container is hard-killed at `recipe.timeout_seconds`; runner reports the timeout as the failure reason
 - [ ] **CONTAINER-04**: One reference image (`mc-hello-world-agent`) exercises the full checkpoint → submit flow for integration testing
 
 ### Worktree & Crash Recovery
 
-- [ ] **WORK-01**: On first launch, runner seeds `.mc/task.json`, `.mc/progress.md` (empty), `.mc/checkpoints.jsonl` (empty), and `.mc/.gitignore` in the worktree
+- [x] **WORK-01**: On first launch, runner seeds `.mc/task.json`, `.mc/progress.md` (empty), `.mc/checkpoints.jsonl` (empty), and `.mc/.gitignore` in the worktree
 - [x] **WORK-02**: `.mc/task.json` contains `task_id`, `recipe_slug`, `attempt`, `is_resuming`, and `prior_attempts[]` (each with started_at, exit_code, failure_reason)
 - [ ] **WORK-03**: Worktree is preserved across container crashes and retries; destroyed only when task reaches `done`, `failed`, or `cancelled` (failed tasks get a GC delay of N days)
-- [ ] **WORK-04**: On a resume attempt, runner injects an agent preamble above SOUL.md instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
-- [ ] **WORK-05**: On first attempt, runner injects a shorter preamble instructing the agent to write notes to `.mc/progress.md` as it works
+- [x] **WORK-04**: On a resume attempt, runner injects an agent preamble above SOUL.md instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
+- [x] **WORK-05**: On first attempt, runner injects a shorter preamble instructing the agent to write notes to `.mc/progress.md` as it works
 - [x] **WORK-06**: Retry cap enforced via `runner_max_attempts` (default 3, recipe-overridable); exceeding the cap marks task `failed` with a clear reason
 - [x] **WORK-07**: Scheduled garbage-collection job prunes worktrees for tasks terminal longer than N days (configurable, default 7)
 
@@ -334,20 +334,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNNER-07 | Phase 14 | Pending |
 | RUNNER-08 | Phase 14 | Complete |
 | RUNNER-09 | Phase 14 | Complete |
-| RUNNER-10 | Phase 14 | Pending |
+| RUNNER-10 | Phase 14 | Complete |
 | RUNNER-11 | Phase 14 | Complete |
 | RUNNER-12 | Phase 14 | Complete |
 | RUNNER-13 | Phase 14 | Complete |
 | RUNNER-14 | Phase 14 | Complete |
-| CONTAINER-01 | Phase 14 | Pending |
-| CONTAINER-02 | Phase 14 | Pending |
+| CONTAINER-01 | Phase 14 | Complete |
+| CONTAINER-02 | Phase 14 | Complete |
 | CONTAINER-03 | Phase 14 | Complete |
 | CONTAINER-04 | Phase 14 | Pending |
-| WORK-01 | Phase 14 | Pending |
+| WORK-01 | Phase 14 | Complete |
 | WORK-02 | Phase 14 | Complete |
 | WORK-03 | Phase 14 | Pending |
-| WORK-04 | Phase 14 | Pending |
-| WORK-05 | Phase 14 | Pending |
+| WORK-04 | Phase 14 | Complete |
+| WORK-05 | Phase 14 | Complete |
 | WORK-06 | Phase 14 | Complete |
 | WORK-07 | Phase 14 | Complete |
 | CP-01 | Phase 15 | Pending |
