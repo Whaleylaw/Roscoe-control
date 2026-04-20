@@ -57,6 +57,11 @@ Phase 15 closes the v1.2 control loop between agents and Mission Control:
   3. **MC server does NOT shell out to `docker inspect`** — no Docker socket coupling between MC server and runner host.
 - **Reconnect recovery = runner reconcile-on-boot + selective re-emission.** When a previously-stale runner heartbeats again, MC compares `assigned` recipe-tasks against the runner's reported inventory; for any task the runner doesn't have, MC re-emits `task.runner_requested`. Daemon's claim path is idempotent (runner-token mint guards), so duplicate emissions are safe.
 
+### Checkpoint Endpoint Auth Path (added 2026-04-20 after research)
+
+- **POST path = literal `/api/tasks/:id/checkpoints`.** To preserve the roadmap success criterion path, the planner MUST extend `RUNNER_TOKEN_ALLOWLIST` in `src/lib/runner-tokens.ts` to include `POST /api/tasks/:id/checkpoints`. Do NOT relocate the POST under `/api/runner/*` and do NOT refactor the runner-token path scope more broadly. The allowlist was designed for exactly this kind of targeted extension.
+- **GET path = same route module.** `GET /api/tasks/:id/checkpoints?attempt=N` is viewer-authed via the standard `requireRole` flow — same `route.ts` file, two exported handlers (GET + POST) with different auth requirements.
+
 ### Event Emission & SSE Fan-out
 
 - **`task.runner_requested` dedup policy: emit-on-every-transition, daemon dedupes.** Each of the three SCHED-05 emission points (`autoRouteInboxTasks` on `inbox→assigned`, `POST /api/tasks` direct-assigned creation with `recipe_slug`, runner-exit retry path on `in_progress→assigned`) emits unconditionally. The daemon's claim path is idempotent (runner-token mint by `task_id+attempt` is the natural guard), so duplicate consume is safe. **No server-side suppression window or scheduler-tick coalescing.**
