@@ -24,10 +24,19 @@ export const TASK_RUNTIME_SETTING_KEYS = {
   MOUNT_ALLOWLIST: 'runtime.mount_allowlist',
   READ_ONLY_MOUNTS_CAP: 'runtime.read_only_mounts_cap',
   EXTRA_SKILLS_CAP: 'runtime.extra_skills_cap',
+  MAX_CONCURRENT_CONTAINERS: 'runtime.max_concurrent_containers',
+  PROJECT_REPO_MAP: 'runtime.project_repo_map',
+  MAX_MEMORY_PER_CONTAINER: 'runtime.max_memory_per_container',
+  MAX_CPU_PER_CONTAINER: 'runtime.max_cpu_per_container',
+  FAILED_GC_WINDOW_DAYS: 'runtime.failed_gc_window_days',
 } as const
 
 export const DEFAULT_READ_ONLY_MOUNTS_CAP = 10
 export const DEFAULT_EXTRA_SKILLS_CAP = 20
+export const DEFAULT_MAX_CONCURRENT_CONTAINERS = 4
+export const DEFAULT_MAX_MEMORY_PER_CONTAINER = '8g'
+export const DEFAULT_MAX_CPU_PER_CONTAINER = 4.0
+export const DEFAULT_FAILED_GC_WINDOW_DAYS = 7
 
 function readSettingValue(key: string): string | undefined {
   const db = getDatabase()
@@ -101,4 +110,72 @@ export function getMountsCap(): number {
 
 export function getExtraSkillsCap(): number {
   return readCap(TASK_RUNTIME_SETTING_KEYS.EXTRA_SKILLS_CAP, DEFAULT_EXTRA_SKILLS_CAP)
+}
+
+/**
+ * Phase 14 runner getters (RUNNER-08, WORK-06, RUNNER-09).
+ *
+ * Consumers:
+ *   - Plan 14-05 claim route: global cap + resource ceilings + project repo map
+ *   - Plan 14-08b runner daemon GC tick: failed-task retention window
+ *
+ * Defensive-default pattern mirrors getMountsCap / getExtraSkillsCap: missing
+ * row, empty string, or unparseable content falls back to the documented
+ * default. A corrupt row must never brick claim or GC.
+ */
+
+export function getMaxConcurrentContainers(): number {
+  const db = getDatabase()
+  const row = db
+    .prepare(`SELECT value FROM settings WHERE key = 'runtime.max_concurrent_containers'`)
+    .get() as { value: string } | undefined
+  const parsed = row ? parseInt(row.value, 10) : DEFAULT_MAX_CONCURRENT_CONTAINERS
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_CONCURRENT_CONTAINERS
+}
+
+export function getProjectRepoMap(): Record<string, string> {
+  const db = getDatabase()
+  const row = db
+    .prepare(`SELECT value FROM settings WHERE key = 'runtime.project_repo_map'`)
+    .get() as { value: string } | undefined
+  if (!row?.value) return {}
+  try {
+    const parsed: unknown = JSON.parse(row.value)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const out: Record<string, string> = {}
+      for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof v === 'string' && v.length > 0) out[k] = v
+      }
+      return out
+    }
+  } catch {
+    /* fall through */
+  }
+  return {}
+}
+
+export function getMaxMemoryPerContainer(): string {
+  const db = getDatabase()
+  const row = db
+    .prepare(`SELECT value FROM settings WHERE key = 'runtime.max_memory_per_container'`)
+    .get() as { value: string } | undefined
+  return row?.value && row.value.length > 0 ? row.value : DEFAULT_MAX_MEMORY_PER_CONTAINER
+}
+
+export function getMaxCpuPerContainer(): number {
+  const db = getDatabase()
+  const row = db
+    .prepare(`SELECT value FROM settings WHERE key = 'runtime.max_cpu_per_container'`)
+    .get() as { value: string } | undefined
+  const parsed = row ? parseFloat(row.value) : DEFAULT_MAX_CPU_PER_CONTAINER
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_CPU_PER_CONTAINER
+}
+
+export function getFailedGcWindowDays(): number {
+  const db = getDatabase()
+  const row = db
+    .prepare(`SELECT value FROM settings WHERE key = 'runtime.failed_gc_window_days'`)
+    .get() as { value: string } | undefined
+  const parsed = row ? parseInt(row.value, 10) : DEFAULT_FAILED_GC_WINDOW_DAYS
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_FAILED_GC_WINDOW_DAYS
 }

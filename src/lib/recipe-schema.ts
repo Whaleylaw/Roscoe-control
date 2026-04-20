@@ -12,6 +12,10 @@
  *   - `workspace_mode` ∈ { 'worktree', 'readonly', 'none' }
  *   - `timeout_seconds`: integer in [10, 86400]
  *   - `max_concurrent`: integer in [1, 100], default 1
+ *   - `max_attempts`: OPTIONAL integer in [1, 10] (Phase 14 — RUNNER-08).
+ *       NOT round-tripped through the recipes DB row; Plan 14-05 / 14-06
+ *       re-read recipe.yaml from disk (`getRecipesRoot()/<slug>/recipe.yaml`)
+ *       and call `parseRecipeYaml()` to resolve the value at claim / exit time.
  *   - `model.primary`: MUST be in `model-registry` (MODEL-02)
  *   - `env`: Record<string, string>, default {}
  *   - `secrets`: string[] (ENV VAR names, not values), default []
@@ -46,6 +50,7 @@ export const recipeYamlSchema = z.object({
   workspace_mode: z.enum(['worktree', 'readonly', 'none']),
   timeout_seconds: z.number().int().min(10).max(86400),
   max_concurrent: z.number().int().min(1).max(100).default(1),
+  max_attempts: z.number().int().min(1).max(10).optional(),
   env: z.record(z.string(), z.string()).default({}),
   secrets: z.array(z.string().min(1)).default([]),
   tags: z.array(z.string().min(1)).default([]),
