@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: completed
-stopped_at: "Plans 15-04 AND 15-06 both complete (parallel Wave 1). SCHED-06 emission set mostly live: recipe.indexed, recipe.removed, task.container_started (15-06), task.checkpoint_added (15-04). Remaining for SCHED-06: task.container_exited + runner-exit retry path of task.runner_requested (Plan 15-05). Plan 15-07 (integration tests) blocks on 15-05."
-last_updated: "2026-04-20T22:52:08Z"
-last_activity: "2026-04-20 — Plan 15-06 complete. 3 task commits (c950794 recipe-watcher broadcasts, c896641 heartbeat metadata + daemon, 32eac1f inventory + container-started broadcast). Decisions logged (15-06): 7-site recipe-watcher emission covering all valid-indexed transitions, passthrough() on heartbeat metadata schema, 90s inventory stale window as module-local const, broadcast-on-committed-state-change for task.container_started, defensive-read filter on inventory active_task_ids."
+stopped_at: Plan 15-05 complete — blocker flow + resume path + runner-exit emissions delivered. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) addressed. Plan 15-07 (integration tests) is the remaining Phase 15 work item.
+last_updated: "2026-04-20T23:14:08.479Z"
+last_activity: "2026-04-20 — Plan 15-05 complete. 4 task commits (14139d0 blocker atomic transaction, 8b4689d daemon SSE + seedMcDir passthrough, 6ce7e78 resolveResumeMarker + dispatch wiring, ba35547 runner-exit emissions). Phase 15 control loop fully operational: all 12 requirement IDs (CP-01..06 + SCHED-01..06) addressed across Plans 15-01..06. 27 new tests pass; 156 adjacent tests pass; 1 pre-existing failure (runner-tokens.test.ts:194) pre-dates this plan."
 progress:
   total_phases: 15
   completed_phases: 11
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 complete; Wave 2 pending.
-Plans: 15-01 ✓, 15-02 ✓, 15-03 ✓, 15-04 ✓ (checkpoints POST+GET route, landed in parallel with 15-06), 15-06 ✓ (recipe.* + task.container_started SSE + heartbeat metadata + inventory endpoint). 15-05 / 15-07 pending.
-Status: Plan 15-06 complete — recipe-watcher now broadcasts recipe.indexed / recipe.removed across 7 sites (scanRecipesDir indexed + skipped_missing removal, reconciliation sweep, scheduleReindex change + unlink branches, unlinkDir handler); HeartbeatMetadataSchema tightened to z.object({ active_task_ids: z.array(z.number().int().positive()).optional() }).passthrough() giving SCHED-03 a validated data source without locking out daemon-side forward-compat; scripts/mc-runner.mjs heartbeatTick now posts metadata.active_task_ids = Array.from(activeTasks.keys()) on every 10s beat; new GET /api/runner/inventory (runner-secret only, 90s LOCKED stale window) provides a read-through view over runner_heartbeats.metadata_json for observability + Phase 15-07 integration tests; container-started route broadcasts task.container_started on the committed swap branch ONLY — idempotent (204) and conflict (409) branches stay silent. 29/29 new tests pass across 4 new/extended test files (5 recipe-watcher-events + 8 heartbeat-metadata + 7 inventory + 9 container-started including 3 broadcast cases); 44/44 adjacent related tests pass. Commits c950794 (recipe-watcher), c896641 (heartbeat + daemon), 32eac1f (inventory + container-started broadcast). SCHED-06 emission set COMPLETE: recipe.indexed, recipe.removed, task.container_started, task.checkpoint_added (15-04), with task.container_exited + runner-exit task.runner_requested retry path remaining for Plan 15-05.
-Last activity: 2026-04-20 — Plan 15-06 complete. 3 task commits. Decisions logged (15-06): 7-site recipe-watcher emission, passthrough() metadata forward-compat, 90s inventory stale window as module-local const, broadcast-on-committed-state-change for task.container_started, defensive-read filter on inventory active_task_ids.
-Next: Plan 15-05 (blocker flow + runner-exit retry emission). Plan 15-07 (integration tests) blocks on 15-05.
+Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 + Wave 2/3 complete; Wave 4 (integration tests) pending.
+Plans: 15-01 ✓, 15-02 ✓, 15-03 ✓, 15-04 ✓, 15-05 ✓, 15-06 ✓. 15-07 pending.
+Status: Plan 15-05 complete — Phase 15 control loop is OPERATIONAL. Blocker checkpoints now atomically flip tasks 'in_progress' → 'awaiting_owner' (via extraOps callback extending Plan 15-04's writeCheckpoint) and insert a system-authored comment with the blocker_reason + attempt number, all in the SAME db.transaction as the checkpoint INSERT + JSONL append. POST fires task.status_changed (reason='blocked_checkpoint') BEFORE task.checkpoint_added so UI subscribers see the cause before the effect. Daemon (scripts/mc-runner.mjs) SSE handler for task.checkpoint_added (Option D from RESEARCH.md Focus Area 11) triggers `docker stop --time=15` when status='blocked' AND activeTasks.has(taskId); watchContainerExit fires as usual and runner-exit detects the awaiting_owner status to override its broadcast reason to 'blocked'. resolveResumeMarker(db, taskId) in src/lib/runner-claim.ts queries the latest checkpoint via ORDER BY id DESC LIMIT 1 and returns the marker only when the latest is status='blocked' (stale-marker rule prevents re-injection on resolved-then-progressed tasks); claim route's buildDispatchPayload carries it to the daemon which forwards into the inline seedMcDir's resume branch to append the LOCKED marker line to progress.md. runner-exit emits task.container_exited on every exit (success/retry/fail/timeout/worktree_create_failed/oom/crash) with blocker-override rule, and task.runner_requested on the retry path when the task carries a recipe_slug (3rd and final SCHED-05 emission point). 27/27 new tests pass (6 blocker-route + 7 resume-marker + 14 runner-exit including 6 new cases); 156/156 adjacent tests pass; pnpm typecheck exits 0; node --check mc-runner.mjs exits 0. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) addressed across Plans 15-01..06.
+Last activity: 2026-04-20 — Plan 15-05 complete. 4 task commits: 14139d0 (blocker atomic transaction), 8b4689d (daemon SSE + seedMcDir resume_marker), 6ce7e78 (resolveResumeMarker + dispatch wiring), ba35547 (runner-exit emissions). 6 decisions logged. 1 auto-fix applied (Rule 1) to update Plan 15-04's route test that asserted broadcast order by mock-call index, now finds task.checkpoint_added by event type.
+Next: Plan 15-07 (integration tests) — the remaining Phase 15 work item. Known v1.3 optimization target: awaiting_owner → assigned PUT /api/tasks/:id does not re-emit task.runner_requested today, so resume latency is ~30s (daemon poll + reconcile tick).
 
 ## Performance Metrics
 
@@ -122,6 +122,7 @@ Next: Plan 15-05 (blocker flow + runner-exit retry emission). Plan 15-07 (integr
 | Phase 15-checkpoints-scheduler-v1-2 P02 | 11min | 5 tasks | 9 files |
 | Phase 15-checkpoints-scheduler-v1-2 P06 | 9min | 3 tasks | 9 files |
 | Phase 15-checkpoints-scheduler-v1-2 P04 | 7min | 2 tasks | 4 files |
+| Phase 15-checkpoints-scheduler-v1-2 P05 | 10min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -259,6 +260,12 @@ Recent decisions affecting current work:
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: Plan 15-05 extension path LOCKED: add optional extraOps(db, id, nowUnix) callback to writeCheckpoint. Keeps atomic-write contract in one module; avoids duplicating JSONL append/truncate logic in 15-05 route code
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: GET workspace mismatch returns 404 (masquerade), not 403 — matches comments route convention; never leaks task existence across workspaces
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: ?attempt= validation rejects String(n) !== trim() (catches '1e5', '1.5', '01') rather than accepting parseInt-truncated values
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: Adopted Plan 15-04 LOCKED extraOps recommendation — writeCheckpoint gains onInsert(db, id, nowUnix) callback that runs inside the atomic db.transaction; the blocker branch closure does tasks UPDATE + system comment INSERT so all 4 DB ops + JSONL append are atomic together
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: Blocker-path broadcast ordering LOCKED — task.status_changed (reason='blocked_checkpoint') fires BEFORE task.checkpoint_added; UI subscribers that listen for both see the status change FIRST (cause), then the checkpoint that triggered it
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: Daemon SSE handler for task.checkpoint_added gated on BOTH status==='blocked' AND activeTasks.has(taskId) — multi-runner safety; only docker-stop containers THIS runner is tracking. Uses same spawnSync('docker', ['stop', '--time=15']) as timeout watchdog
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: resolveResumeMarker uses ORDER BY id DESC LIMIT 1 (AUTOINCREMENT monotonic) with 'latest checkpoint must be status=blocked' rule — a resolved-then-progressed task returns null, preventing stale marker re-injection on later attempts
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: runner-exit blocker-override rule — post-transaction SELECT task.status; when status='awaiting_owner' the task.container_exited broadcast reason is overridden from runner-reported value to 'blocked'. Single coherent UI story: blocker flip → docker stop → container_exited reason='blocked'
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: runner-exit captures container_id BEFORE the state-machine transaction (which NULLs it on retry/fail) so the task.container_exited broadcast carries the container that just exited — matches Plan 15-06 task.container_started convention
 
 ### Pending Todos
 
@@ -281,6 +288,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T22:52:08Z
-Stopped at: Plans 15-04 AND 15-06 both complete (parallel Wave 1). SCHED-06 emission set mostly live: recipe.indexed, recipe.removed, task.container_started (15-06), task.checkpoint_added (15-04). Remaining: task.container_exited + runner-exit retry path of task.runner_requested (Plan 15-05, Wave 2). Plan 15-07 (integration tests) blocks on 15-05.
-Resume file: Continue `/gsd:execute-phase 15` to pick up Plan 15-05. See .planning/phases/15-checkpoints-scheduler-v1-2/15-06-SUMMARY.md for the inventory endpoint contract and active_task_ids metadata shape that 15-07's integration suite will probe.
+Last session: 2026-04-20T23:14:08Z
+Stopped at: Plan 15-05 complete — blocker flow + resume path + runner-exit emissions delivered. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) addressed. Plan 15-07 (integration tests) is the remaining Phase 15 work item.
+Resume file: Continue `/gsd:execute-phase 15` to pick up Plan 15-07. See .planning/phases/15-checkpoints-scheduler-v1-2/15-05-SUMMARY.md for the complete Phase 15 requirement coverage matrix and the known v1.3 optimization target (awaiting_owner → assigned PUT re-emission).
