@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: unknown
-last_updated: "2026-04-20T18:23:51.517Z"
+status: completed
+stopped_at: "Plan 14-06 complete. POST /api/runner/tasks/:task_id/runner-exit daemon-facing endpoint: runner-SECRET authenticated (id=-1000, not runner-token since per-attempt token may be expired at container-exit). Zod body {exit_code, reason, stderr_tail?, attempt}. Atomically UPDATEs task_runner_attempts and drives the retry/fail state machine: attempts<cap → status='assigned' + container_id cleared; attempts>=cap or reason='worktree_create_failed' → status='failed' + revokeTokensForTask fired atomically. Successful exits (exit_code=0, reason='exit') persist attempt row but DO NOT flip task.status — /submit (Plan 14-11) owns that. Cap resolution: task.runner_max_attempts ?? resolveRecipeMaxAttempts(slug) ?? 3; the filesystem re-parse helper shipped in src/lib/runner-claim.ts (Plan 14-05 will extend same module). 8 Vitest integration tests all green; lint 0 errors; typecheck clean. Commits f7be87e (runner-claim helper) / 0aa2c49 (route) / a68dc1d (tests)."
+last_updated: "2026-04-20T18:22:01Z"
+last_activity: "2026-04-20 — Plan 14-06 executed. Task 0 (Rule 3 pre-req) commit f7be87e (src/lib/runner-claim.ts with resolveRecipeMaxAttempts — filesystem re-parse of recipe.yaml). Task 1 commit 0aa2c49 (POST /api/runner/tasks/:task_id/runner-exit route, 273 LOC, atomic retry/fail transaction with revokeTokensForTask wiring on terminal-fail branch). Task 2 commit a68dc1d (8 integration tests replacing all 6 Wave-0 it.todo stubs plus 2 additional cases — worktree_create_failed fast-fail and missing-attempt-row defensive warn-log). Decisions: formatFailureReason produces 'exit:0' on successful exits (preserves exit code in attempt history); resolveRecipeMaxAttempts silently returns undefined on missing/unparseable recipe.yaml (corrupt recipe must not wedge state machine); idempotency 409 guard runs BEFORE any write so daemon retries after terminal never overwrite attempt rows."
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 52
-  completed_plans: 53
+  completed_plans: 55
+  percent: 100
 ---
 
 # Project State
@@ -22,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 14 (Runner & Container v1.2) — IN PROGRESS (5/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-08a runner daemon primitives, 14-11 submit+container-started+config endpoints)
-Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-08a ✓ (runner-gc + runner-reconcile + runner-timeout + runner-log-layout — 4 pure-logic helpers + 26 unit tests), 14-11 ✓ (POST /api/runner/tasks/:id/submit + POST /api/runner/tasks/:id/container-started + GET /api/runner/config — 3 routes + 17 tests), 14-04..14-07, 14-08b, 14-09..14-10 ⏳
-Status: Plan 14-11 shipped three runner-facing HTTP endpoints missing from the v1 Phase 14 plan. POST /api/runner/tasks/:id/submit is runner-token scoped (-2000); the agent container uses it for its terminal-flip to 'done' with atomic revokeTokensForTask. POST /api/runner/tasks/:id/container-started is runner-secret scoped (-1000); the daemon calls it right after `docker run` returns to swap the 'pending:<task>:<attempt>' placeholder for the real container_id. GET /api/runner/config is runner-secret scoped; returns the five runtime.* settings (max_concurrent_containers, project_repo_map, max_memory_per_container, max_cpu_per_container, failed_gc_window_days) in one payload for daemon startup + SIGHUP reload. 17 tests (7 + 6 + 4); lint 0 errors; typecheck unchanged (pre-existing heartbeat TS2345 from 14-04 still tracked in deferred-items.md).
-Last activity: 2026-04-20 — Plan 14-11 executed. Task 1 commit 3daf4e4 (submit route + 7 tests). Task 2 commit 547e902 (container-started route + 6 tests). Task 3 commit f10f386 (config route + 4 tests). Decisions: resolution body field is advisory with pragma_table_info probe; placeholder-swap is a three-way fork (idempotent retry / swap / conflict) not two; runner-secret vs runner-token dispatch is explicit via id-sentinel check, never inferred from role; /api/runner/config has no rate limit (read-only, matches other runner-secret GETs).
-Next: Plan 14-08b (runner daemon `scripts/mc-runner.mjs`) — wires Plan 14-08a primitives together with `docker run`/`docker ps`/`docker kill`/`docker logs -f` + HTTP. Can now call: GET /api/runner/config at startup (Plan 14-11), POST /api/runner/tasks/:id/container-started after docker run (Plan 14-11), and rely on revokeTokensForTask firing transactionally when the agent /submits (Plan 14-11 + Plan 11-04).
+Phase: 14 (Runner & Container v1.2) — IN PROGRESS (7/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-04 read-side runner API, 14-06 runner-exit, 14-08a runner daemon primitives, 14-11 submit+container-started+config endpoints)
+Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-04 ✓ (heartbeat + ready-tasks + pending-containers + terminal-tasks — 4 routes + 15 tests), 14-06 ✓ (runner-exit retry/fail driver), 14-08a ✓ (runner-gc + runner-reconcile + runner-timeout + runner-log-layout — 4 pure-logic helpers + 26 unit tests), 14-11 ✓ (POST /api/runner/tasks/:id/submit + POST /api/runner/tasks/:id/container-started + GET /api/runner/config — 3 routes + 17 tests), 14-05, 14-07, 14-08b, 14-09..14-10 ⏳
+Status: Plan 14-04 shipped the four runner-secret-authenticated daemon-facing endpoints: POST /api/runner/heartbeat (UPSERT runner_heartbeats row, 204 on success, Zod body validation, mutationLimiter defensively wired); GET /api/runner/ready-tasks (status='assigned' AND recipe_slug IS NOT NULL AND container_id IS NULL, LIMIT 50, JSON columns parsed server-side); GET /api/runner/pending-containers (container_id IS NOT NULL AND status IN (assigned,in_progress), no limit — reconciliation must see all); GET /api/runner/terminal-tasks?since=<iso8601> (status IN (done,failed,cancelled) AND updated_at >= since, LIMIT 200, ORDER BY updated_at ASC, response re-keyed to {task_id, status, terminal_at}). 15 Vitest cases across the 4 routes (4+4+3+4). Typecheck + lint clean.
+Last activity: 2026-04-20 — Plan 14-04 executed. Task 1 commit 60155f7 (heartbeat route + 4 tests). Task 1 fix commit 7fad5d6 (typecheck: mutationLimiter mock now uses NextResponse.json). Task 2 commit 8d597cf (ready-tasks route + 4 tests). Task 3 commit e0ac72f (pending-containers + terminal-tasks routes + 7 tests). Decisions: heartbeat ts (ms) → last_heartbeat_at (s) via Math.floor; UPSERT preserves registered_at (inherits 060 semantic); terminal_at projects tasks.updated_at (no dedicated column in Phase 14 scope); 400 on missing/malformed since (defensive guard); /ready-tasks LIMIT 50 matches single-poll-batch intent.
+Next: Plan 14-05 (claim route POST /api/runner/claim/[task_id]) — atomic claim with allowlist re-validation, concurrency caps enforcement (getMaxConcurrentContainers + recipe.max_concurrent), runner-token mint, dispatch payload. Can now rely on the same runner-secret guard idiom (requireRole + user.id === -1000 check) used across the four 14-04 endpoints.
 
 ## Performance Metrics
 
@@ -108,6 +111,7 @@ Next: Plan 14-08b (runner daemon `scripts/mc-runner.mjs`) — wires Plan 14-08a 
 | Phase 14-runner-container-v1-2 P08a | 4 | 2 tasks | 8 files |
 | Phase 14-runner-container-v1-2 P11 | 5min | 3 tasks | 6 files |
 | Phase 14-runner-container-v1-2 P04 | 9min | 3 tasks | 8 files |
+| Phase 14-runner-container-v1-2 P06 | 9min | 2 tasks + 1 pre-req | 3 files |
 
 ## Accumulated Context
 
@@ -178,6 +182,19 @@ Recent decisions affecting current work:
 - [Phase 14-11]: /container-started is a three-way fork (same id → 204 idempotent / placeholder or NULL → swap → 204 / different real id → 409 conflict); two-way fork would break idempotent retries from network timeouts
 - [Phase 14-11]: Runner-secret (-1000) vs runner-token (-2000) dispatch is explicit at route layer via `if (auth.user.id !== EXPECTED_SENTINEL) return 403` — never relies on role='operator' (both principals share the role)
 - [Phase 14-11]: GET /api/runner/config has no rate limit — read-only endpoint matches precedent for other runner-secret GETs; daemon polls on SIGHUP, not per-request
+- [Phase 14-04]: Heartbeat body uses Math.floor(ts / 1000) to convert client-supplied unix-ms to column's unix-seconds; runner daemon sends Date.now() for JS parity, DB column is seconds matching migration 060 shape
+- [Phase 14-04]: POST /api/runner/heartbeat uses mutationLimiter (60/min default) rather than a runner-specific limiter — at 10s heartbeat rhythm (6/min) this leaves 10x headroom; multi-runner deployments sharing an IP may need a runner-specific limiter in Phase 16 (documented as a route-level comment)
+- [Phase 14-04]: /terminal-tasks response's `terminal_at` field is projected from tasks.updated_at (no dedicated column) — filter already ensures rows are in terminal status; a dedicated terminal_at column is a Phase 15+ concern if ever needed
+- [Phase 14-04]: /terminal-tasks returns 400 on missing or unparseable ?since= rather than silently defaulting — runner tracks cursor locally, a malformed value indicates a client bug that silent fallback would mask
+- [Phase 14-04]: All four 14-04 routes share the identical runner-secret guard prefix (requireRole(operator) → error check → user.id === -1000 check). Plans 14-05/14-06 must use the same 3-line idiom, not reinvent it
+- [Phase 14-06]: runner-exit is runner-SECRET authenticated (id=-1000), not runner-TOKEN — the per-attempt runner-token may have expired by the time the container exits (especially on timeouts), and the daemon holding the long-lived secret is the reliable reporter.
+- [Phase 14-06]: Successful exit (exit_code=0 AND reason='exit') DOES NOT flip task.status. The attempt row is persisted but the terminal transition to 'done' belongs to POST /api/runner/tasks/:id/submit (Plan 14-11) — the agent inside the container makes the deliberate choice, not the runner-exit reporter.
+- [Phase 14-06]: reason='worktree_create_failed' short-circuits to terminal fail regardless of runner_attempts. Rationale: worktree creation failures are infrastructure-level (missing project repo, fs perms) and won't succeed on retry within the same task's lifetime.
+- [Phase 14-06]: formatFailureReason produces 'exit:0' for successful exits (preserves exit code in attempt history). Applied the plan's exact rule: `reason='exit' && exit_code !== null` → `exit:${exit_code}`; exit_code=0 is non-null, so 'exit:0' appears in the attempt row — UI can distinguish a recorded successful run from a missing row.
+- [Phase 14-06]: Defensive warn-log on task_runner_attempts UPDATE affecting 0 rows — handler continues with status transition rather than hard-failing. Losing attempt metadata is strictly preferable to wedging the state machine; the warn-log is a breadcrumb for investigating a broken claim-route invariant.
+- [Phase 14-06]: Idempotency 409 guard (task.status IN ('done','failed','cancelled')) runs BEFORE any write. Daemon retries after a previously-successful POST get clean 409s and never overwrite attempt rows.
+- [Phase 14-06]: Atomic revokeTokensForTask wrapped in the SAME db.transaction as the terminal-fail UPDATE — mirrors the Phase 11-04 invariant on src/app/api/tasks/[id]/route.ts. A crash between the two MUST roll both back.
+- [Phase 14-06]: Created src/lib/runner-claim.ts with resolveRecipeMaxAttempts ahead of Plan 14-05 (same wave) — the route cannot compile without the import target. Plan 14-05 will extend the module with its additional helpers (resolveEffectiveModel, composeEnvMap, resolveResourceLimits, checkGlobalCap, checkPerRecipeCap, readPriorAttempts, buildDispatchPayload); no conflict.
 
 ### Pending Todos
 
