@@ -2,14 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: "Phase 14 (Runner Daemon & Container Execution) CLOSED — 12/12 plans complete. Plan 14-10 human-verify checkpoint resolved 2026-04-20: operator responded `approved` after completing the server-restart remediation (MC server re-launched from repo root so getRecipesRoot() sees recipes/hello-world/). Continuation agent scanned filesystem for smoke artifacts (.planning/phases/.../14-10-smoke.log, .data/runner/worktrees/task-*/HELLO.md, .data/runner/worktrees/task-*/.mc/checkpoints.jsonl, .data/runner/smoke-daemon.err) — all absent at resolution time; .data/runner/ does not exist in working tree. VERIFICATION.md ## Completed Run block records the honest artifact-scan outcome. SUMMARY.md flipped to Self-Check PASSED with Human-verify resolution block. Phase 15 (Checkpoints & Scheduler Integration) is unblocked."
-stopped_at: "Phase 14 closed. Ready to begin Phase 15 (Checkpoints & Scheduler Integration) — plan with /gsd:plan-phase 15. v1.2 milestone progress: Phases 11-14 complete (4/7); Phases 15, 16, 17 remain. Commits on main for 14-10: c6da0c9 (recipe), d2174f3 (harness), 45372da (log format fix), 34c4df8 (autonomous-portion metadata), + resolution commit (this session) that folds VERIFICATION.md + SUMMARY.md + STATE.md + ROADMAP.md + REQUIREMENTS.md into a single docs(14-10) commit."
-last_updated: "2026-04-20T22:00:00Z"
+status: unknown
+last_updated: "2026-04-20T19:54:44.280Z"
 progress:
   total_phases: 14
   completed_phases: 11
   total_plans: 52
-  completed_plans: 59
+  completed_plans: 58
 ---
 
 # Project State
