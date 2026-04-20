@@ -291,7 +291,7 @@ Plans:
 - [x] 14-07-PLAN.md — runner-preamble + runner-worktree + runner-docker pure-logic lib modules + tests (WORK-01, 02, 04, 05; CONTAINER-01, 02; RUNNER-09, 10)
 - [x] 14-08a-PLAN.md — runner-gc + runner-reconcile + runner-timeout + runner-log-layout pure-logic helpers + tests (RUNNER-12, 13, 14, CONTAINER-03, WORK-07)
 - [x] 14-08b-PLAN.md — scripts/mc-runner.mjs daemon + LaunchAgent + README (RUNNER-01..14, CONTAINER-03, WORK-03, 06, 07, MODEL-04)
-- [ ] 14-09-PLAN.md — docker/hello-world-agent reference image calling /submit endpoint (CONTAINER-04)
+- [x] 14-09-PLAN.md — docker/hello-world-agent reference image calling /submit endpoint (CONTAINER-04)
 - [ ] 14-10-PLAN.md — recipes/hello-world/ + smoke harness + human-verify end-to-end checkpoint (CONTAINER-04, RUNNER-09..11, WORK-01..03, MODEL-04)
 - [x] 14-11-PLAN.md — submit + container-started + /api/runner/config routes (RUNNER-06, 11, 13, WORK-06)
 **UI hint**: no (runner status banner ships in Phase 16)
@@ -371,7 +371,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 11. Runtime Foundation *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 12. Recipe System *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
-| 14. Runner Daemon & Container Execution *(v1.2)* | 8/12 | In Progress|  |
+| 14. Runner Daemon & Container Execution *(v1.2)* | 11/12 | In Progress|  |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |
 | 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |

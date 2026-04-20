@@ -157,7 +157,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [x] **CONTAINER-01**: Container receives task context as env vars (`MC_API_URL`, `MC_TASK_ID`, `MC_API_TOKEN`, `MC_WORKSPACE`, `MC_RECIPE_PATH`, `MC_MODEL_*`) and recipe-declared secrets (e.g., `ANTHROPIC_API_KEY`) injected from the runner's secret store
 - [x] **CONTAINER-02**: Container sees the worktree at `/workspace` (rw when recipe is worktree-mode), the recipe at `/recipe` (ro), read-only mounts at `/refs/<label-slug>/` (ro), and extra skills at `/skills/<name>` (ro)
 - [x] **CONTAINER-03**: Container is hard-killed at `recipe.timeout_seconds`; runner reports the timeout as the failure reason
-- [ ] **CONTAINER-04**: One reference image (`mc-hello-world-agent`) exercises the full checkpoint → submit flow for integration testing
+- [x] **CONTAINER-04**: One reference image (`mc-hello-world-agent`) exercises the full checkpoint → submit flow for integration testing
 
 ### Worktree & Crash Recovery
 
@@ -342,7 +342,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONTAINER-01 | Phase 14 | Complete |
 | CONTAINER-02 | Phase 14 | Complete |
 | CONTAINER-03 | Phase 14 | Complete |
-| CONTAINER-04 | Phase 14 | Pending |
+| CONTAINER-04 | Phase 14 | Complete |
 | WORK-01 | Phase 14 | Complete |
 | WORK-02 | Phase 14 | Complete |
 | WORK-03 | Phase 14 | Complete |
