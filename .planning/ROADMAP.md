@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 ### v1.2 — Recipe-Based Ephemeral Agent Runtime
 - [x] **Phase 11: Runtime Foundation** - DB migrations (recipes, task_runner_tokens, task_checkpoints, task column additions), model registry module, runner + runner-token auth principals (completed 2026-04-19)
 - [x] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time (completed 2026-04-19)
-- [ ] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
+- [x] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
 - [ ] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image
 - [ ] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast
 - [ ] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n
@@ -259,11 +259,11 @@ Plans:
   3. A task can carry zero or more `read_only_mounts` entries (`{ host_path, container_path, label }`), zero or more `extra_skills` host paths, and an optional `model_override`, and all three round-trip through the task read API
   4. Any `host_path` on a task (read_only_mount or extra_skill) that falls outside the runner's `mount_allowlist` is rejected at task creation with an actionable error referencing the offending path
   5. A `model_override` that is not in the model registry is rejected with a clear error
-**Plans:** 1/3 plans executed
+**Plans:** 3/3 plans executed
 Plans:
-- [ ] 13-01-PLAN.md — Shared substrate: runtime.* settings definitions + task-runtime-settings.ts getters + task-runtime-validation.ts (Zod schemas, allowlist resolver with fs.realpath parent-walk, aggregated-error builder, zodErrorToIssues) (TCTX-03, TCTX-04, TCTX-06)
-- [ ] 13-02-PLAN.md — POST /api/tasks extension: createTaskSchema + manual safeParse → aggregated errors, recipe lookup (getIndexedRecipeBySlug), workspace_source gating, allowlist + caps enforcement, INSERT column extension, mapTaskRow round-trip (TCTX-01..06)
-- [ ] 13-03-PLAN.md — PATCH /api/tasks/[id] extension: updateTaskSchema + manual safeParse, pre-dispatch-only recipe_slug mutability (RECIPE_LOCKED), atomic workspace_source gap rejection, preserve-and-revalidate, mapTaskRow symmetry, RAUTH-05 revocation preserved (TCTX-01..06)
+- [x] 13-01-PLAN.md — Shared substrate: runtime.* settings definitions + task-runtime-settings.ts getters + task-runtime-validation.ts (Zod schemas, allowlist resolver with fs.realpath parent-walk, aggregated-error builder, zodErrorToIssues) (TCTX-03, TCTX-04, TCTX-06)
+- [x] 13-02-PLAN.md — POST /api/tasks extension: createTaskSchema + manual safeParse → aggregated errors, recipe lookup (getIndexedRecipeBySlug), workspace_source gating, allowlist + caps enforcement, INSERT column extension, mapTaskRow round-trip (TCTX-01..06)
+- [x] 13-03-PLAN.md — PATCH /api/tasks/[id] extension: updateTaskSchema + manual safeParse, pre-dispatch-only recipe_slug mutability (RECIPE_LOCKED), atomic workspace_source gap rejection, preserve-and-revalidate, mapTaskRow symmetry, RAUTH-05 revocation preserved (TCTX-01..06)
 **UI hint**: no (UI form updates ship in Phase 16)
 
 ### Phase 14: Runner Daemon & Container Execution  *(v1.2)*

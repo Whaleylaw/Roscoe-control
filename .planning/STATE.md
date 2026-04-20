@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: unknown
-last_updated: "2026-04-19T15:52:09.662Z"
+status: phase-complete
+last_updated: "2026-04-20T16:00:00.000Z"
 progress:
   total_phases: 13
-  completed_phases: 9
-  total_plans: 40
-  completed_plans: 45
+  completed_phases: 13
+  total_plans: 42
+  completed_plans: 47
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 13 (Task Runtime Context) — IN PROGRESS
-Plan: 13-01 complete (task-runtime-context validation substrate). 3 plans in phase 13 — 1/3 shipped.
-Status: 13-01 committed (244ba2b/3f66cc3/94863c6); TCTX-01..06 shipped; 13-02 + 13-03 unblocked for wave-2 parallel execution
-Last activity: 2026-04-19 — Plan 13-01 complete (src/lib/task-runtime-settings.ts + src/lib/task-runtime-validation.ts + createTaskSchema extension in src/lib/validation.ts + 3 new runtime.* keys in /api/settings settingDefinitions; 57 new Vitest cases — 12 settings + 33 validation helpers + 12 schema shape; 1851 pass / 0 fail; typecheck + lint clean; TASK_RUNTIME_ERROR_CODES enum locked for Phase 14 runner re-validation; validateHostPathAgainstAllowlist uses parent-directory walk on ENOENT per CONTEXT.md existence-not-enforced-at-creation)
-Next: Plans 13-02 (POST /api/tasks runtime-context validation) + 13-03 (PATCH /api/tasks/[id] runtime-context validation) — file-disjoint, wave-2 parallel; both import from @/lib/task-runtime-validation + @/lib/task-runtime-settings + @/lib/validation (schema already extended)
+Phase: 13 (Task Runtime Context) — COMPLETE (3/3 plans shipped)
+Plans: 13-01 ✓, 13-02 ✓, 13-03 ✓
+Status: Wave 2 parallel execution landed on 2026-04-20 — POST + PUT /api/tasks handlers extended with manual Zod safeParse, recipe-slug lookup, workspace_source gating, allowlist + cap validation, aggregated-error response, JSON-column persistence, mapTaskRow JSON.parse symmetry. 41 new Vitest cases (20 POST + 21 PATCH). 1892 pass / 0 fail / 44 todo. typecheck + lint clean.
+Last activity: 2026-04-20 — Phase 13 complete. 13-02 commits b280e62/84471d5/afd797f (POST + 20 route tests); 13-03 commits fe2dd86/d1df9d5/9aa5a0f (PUT + 21 route tests + sibling-test mock fixes); merged via cb15e18. Rebuilt better-sqlite3 native addon post-merge (was compiled against Node 24, workstation runs Node 22). TCTX-01..06 fully closed at both POST and PATCH surfaces. Manual safeParse + zodErrorToIssues + buildAggregatedValidationResponse pattern locked in both surfaces for Phase 14 runner re-validation reuse.
+Next: Phase 14 (Runner & Container) — runner daemon + worktree lifecycle + .mc/ seeding + reference image. Phase 14 MUST import validateHostPathAgainstAllowlist from @/lib/task-runtime-validation for claim-time re-validation per CONTEXT.md (symlink-at-create + symlink-at-claim defense-in-depth).
 
 ## Performance Metrics
 
@@ -100,6 +100,8 @@ Next: Plans 13-02 (POST /api/tasks runtime-context validation) + 13-03 (PATCH /a
 | Phase 12-recipe-system-v1-2 P03 | 5min | 2 tasks | 4 files |
 | Phase 12-recipe-system-v1-2 P04 | 13min | 3 tasks | 9 files |
 | Phase 13-task-runtime-context-v1-2 P01 | 10min | 3 tasks | 7 files |
+| Phase 13-task-runtime-context-v1-2 P02 | 7min | 2 tasks | 2 files |
+| Phase 13-task-runtime-context-v1-2 P03 | 10min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -174,6 +176,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-19T04:11:32.780Z
-Stopped at: Completed 12-04-PLAN.md — recipe API (4 routes: GET list/slug/search + POST create + POST resync) with FTS5 BM25 tag-weighting (RECIPE-08), admin-only mutations, disk-first atomic-write + rollback on indexRecipe failure, watcher boot-wire in initializeSchema; 24 new Vitest cases; full suite 1794 pass; RECIPE-05 + RECIPE-06 + RECIPE-07 + RECIPE-08 shipped; Phase 12 COMPLETE (4/4 plans)
+Last session: 2026-04-20T16:00:00.000Z
+Stopped at: Phase 13 COMPLETE — wave-2 parallel execution (13-02 POST + 13-03 PATCH) landed; 41 new route tests; 1892 pass / 0 fail. TCTX-01..06 fully closed at both create + update surfaces. Manual safeParse + zodErrorToIssues + buildAggregatedValidationResponse pattern now consistent across POST /api/tasks and PUT /api/tasks/[id]. Ready for `/gsd:verify-work 13` or Phase 14 planning.
 Resume file: None
