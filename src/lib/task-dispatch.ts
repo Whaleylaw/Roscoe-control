@@ -582,8 +582,57 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
 }
 
 /**
+ * Determine whether a stale recipe-tagged task's runner has forgotten about it.
+ *
+ * Phase 15 SCHED-03 liveness probe: combine (a) runner heartbeat freshness
+ * with (b) the heartbeat metadata's `active_task_ids` inventory. A task is
+ * stuck when either:
+ *   - no heartbeat is fresh (runner died), OR
+ *   - a heartbeat IS fresh but the runner's active-task set does not contain
+ *     this task id (runner silently dropped it).
+ *
+ * Heartbeat freshness window = 90s (LOCKED per 15-CONTEXT.md § Heartbeat & Stale Detection).
+ */
+function isRecipeTaskStuck(
+  db: ReturnType<typeof getDatabase>,
+  taskId: number,
+  nowSec: number,
+): boolean {
+  const STALE_WINDOW_SECS = 90
+  const freshRow = db.prepare(`
+    SELECT metadata_json FROM runner_heartbeats
+    WHERE last_heartbeat_at >= ?
+    ORDER BY last_heartbeat_at DESC
+    LIMIT 1
+  `).get(nowSec - STALE_WINDOW_SECS) as { metadata_json: string | null } | undefined
+
+  if (!freshRow) return true // no fresh heartbeat → runner dead → task stuck
+
+  let activeIds: number[] = []
+  if (freshRow.metadata_json) {
+    try {
+      const parsed = JSON.parse(freshRow.metadata_json) as { active_task_ids?: unknown }
+      if (Array.isArray(parsed.active_task_ids)) {
+        activeIds = parsed.active_task_ids.filter((n): n is number => typeof n === 'number')
+      }
+    } catch { /* malformed metadata → treat inventory as unknown, fall through */ }
+  }
+
+  // If inventory is absent entirely, fall back to "runner alive but we can't
+  // see its task set" — conservatively leave the task alone rather than flip
+  // it and risk double-processing. Only flip when we have a definitive NOT-IN.
+  if (activeIds.length === 0) return false
+
+  return !activeIds.includes(taskId)
+}
+
+/**
  * Requeue stale tasks stuck in 'in_progress' whose assigned agent is offline.
  * Prevents tasks from being permanently stuck when agents crash or disconnect.
+ *
+ * Phase 15 SCHED-03: recipe-tagged rows use runner-heartbeat + runner-inventory
+ * liveness (agents table is irrelevant for those rows); legacy rows continue
+ * using the agents.status === 'offline' probe.
  */
 export async function requeueStaleTasks(): Promise<{ ok: boolean; message: string }> {
   const db = getDatabase()
@@ -593,6 +642,7 @@ export async function requeueStaleTasks(): Promise<{ ok: boolean; message: strin
 
   const staleTasks = db.prepare(`
     SELECT t.id, t.title, t.assigned_to, t.dispatch_attempts, t.workspace_id,
+           t.recipe_slug, t.container_id,
            a.status as agent_status, a.last_seen as agent_last_seen
     FROM tasks t
     LEFT JOIN agents a ON a.name = t.assigned_to AND a.workspace_id = t.workspace_id
@@ -600,7 +650,8 @@ export async function requeueStaleTasks(): Promise<{ ok: boolean; message: strin
       AND t.updated_at < ?
   `).all(staleThreshold) as Array<{
     id: number; title: string; assigned_to: string | null; dispatch_attempts: number
-    workspace_id: number; agent_status: string | null; agent_last_seen: number | null
+    workspace_id: number; recipe_slug: string | null; container_id: string | null
+    agent_status: string | null; agent_last_seen: number | null
   }>
 
   if (staleTasks.length === 0) {
@@ -609,8 +660,42 @@ export async function requeueStaleTasks(): Promise<{ ok: boolean; message: strin
 
   let requeued = 0
   let failed = 0
+  let recipeRequeued = 0
 
   for (const task of staleTasks) {
+    // --- Recipe-tagged branch: heartbeat + runner inventory ---------------
+    if (task.recipe_slug) {
+      if (!isRecipeTaskStuck(db, task.id, now)) continue
+
+      db.transaction(() => {
+        const res = db.prepare(`
+          UPDATE tasks
+          SET status = 'assigned',
+              container_id = NULL,
+              runner_started_at = NULL,
+              runner_last_failure_reason = 'runner_heartbeat_stale',
+              updated_at = ?
+          WHERE id = ? AND status = 'in_progress' AND recipe_slug IS NOT NULL
+        `).run(now, task.id)
+        if (res.changes > 0) {
+          recipeRequeued++
+          eventBus.broadcast('task.runner_requested', {
+            task_id: task.id,
+            recipe_slug: task.recipe_slug,
+            workspace_id: task.workspace_id,
+          })
+          eventBus.broadcast('task.status_changed', {
+            id: task.id,
+            status: 'assigned',
+            previous_status: 'in_progress',
+            reason: 'runner_heartbeat_stale',
+          })
+        }
+      })()
+      continue
+    }
+
+    // --- Legacy branch: agents.status == 'offline' ------------------------
     // Only requeue if the agent is offline or unknown
     const agentOffline = !task.agent_status || task.agent_status === 'offline'
     if (!agentOffline) continue
@@ -654,12 +739,17 @@ export async function requeueStaleTasks(): Promise<{ ok: boolean; message: strin
     }
   }
 
-  const total = requeued + failed
+  const total = requeued + failed + recipeRequeued
+  const parts: string[] = []
+  if (recipeRequeued > 0) parts.push(`${recipeRequeued} recipe-tagged requeued`)
+  if (requeued > 0) parts.push(`${requeued} legacy requeued`)
+  if (failed > 0) parts.push(`${failed} legacy failed`)
+
   return {
     ok: true,
     message: total === 0
-      ? `Found ${staleTasks.length} stale task(s) but agents still online`
-      : `Requeued ${requeued}, failed ${failed} of ${staleTasks.length} stale task(s)`,
+      ? `Found ${staleTasks.length} stale task(s) but no action required (agents online + runner heartbeat fresh)`
+      : `${parts.join(', ')} of ${staleTasks.length} stale task(s)`,
   }
 }
 
@@ -674,6 +764,8 @@ export async function dispatchAssignedTasks(): Promise<{ ok: boolean; message: s
     LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
     WHERE t.status = 'assigned'
       AND t.assigned_to IS NOT NULL
+      -- Phase 15 SCHED-02: recipe-tagged tasks handled by runner daemon, not legacy dispatch
+      AND t.recipe_slug IS NULL
     ORDER BY
       CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC,
       t.created_at ASC
