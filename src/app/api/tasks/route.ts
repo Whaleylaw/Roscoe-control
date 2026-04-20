@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getDatabase, Task, db_helpers } from '@/lib/db';
 import { eventBus } from '@/lib/event-bus';
 import { requireRole } from '@/lib/auth';
@@ -10,17 +11,37 @@ import { normalizeTaskCreateStatus } from '@/lib/task-status';
 import { pushTaskToGitHub, syncTaskOutbound } from '@/lib/github-sync-engine';
 import { pushTaskToGnap } from '@/lib/gnap-sync';
 import { config } from '@/lib/config';
+import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer';
+import { getMountsCap, getExtraSkillsCap } from '@/lib/task-runtime-settings';
+import {
+  validateHostPathAgainstAllowlist,
+  buildAggregatedValidationResponse,
+  zodErrorToIssues,
+  TASK_RUNTIME_ERROR_CODES,
+  type TaskRuntimeValidationIssue,
+} from '@/lib/task-runtime-validation';
 
 function formatTicketRef(prefix?: string | null, num?: number | null): string | undefined {
   if (!prefix || typeof num !== 'number' || !Number.isFinite(num) || num <= 0) return undefined
   return `${prefix}-${String(num).padStart(3, '0')}`
 }
 
-function mapTaskRow(task: any): Task & { tags: string[]; metadata: Record<string, unknown> } {
+function mapTaskRow(task: any): Task & {
+  tags: string[]
+  metadata: Record<string, unknown>
+  workspace_source: { project_id: number; base_ref: string } | null
+  read_only_mounts: Array<{ host_path: string; container_path: string; label: string }>
+  extra_skills: string[]
+} {
   return {
     ...task,
     tags: task.tags ? JSON.parse(task.tags) : [],
     metadata: task.metadata ? JSON.parse(task.metadata) : {},
+    // Phase 13 runtime-context JSON columns. Default to null / [] for
+    // pre-Phase-13 rows where the column is NULL.
+    workspace_source: task.workspace_source ? JSON.parse(task.workspace_source) : null,
+    read_only_mounts: task.read_only_mounts ? JSON.parse(task.read_only_mounts) : [],
+    extra_skills: task.extra_skills ? JSON.parse(task.extra_skills) : [],
     ticket_ref: formatTicketRef(task.project_prefix, task.project_ticket_no),
   }
 }
@@ -160,9 +181,120 @@ export async function POST(request: NextRequest) {
   try {
     const db = getDatabase();
     const workspaceId = auth.user.workspace_id;
-    const validated = await validateBody(request, createTaskSchema);
-    if ('error' in validated) return validated.error;
-    const body = validated.data;
+
+    // Phase 13 — manual Zod parse so every Phase-13 runtime-context body error
+    // (recipe_slug regex, workspace_source refine, duplicate labels/basenames,
+    // unknown model_override) surfaces through the aggregated { errors: [...] }
+    // shape alongside the business-rule checks below. validateBody's legacy
+    // { error: 'Validation failed', details: [...] } shape is used by 60+ other
+    // endpoints — we keep it intact and only diverge HERE.
+    let body: z.infer<typeof createTaskSchema>
+    try {
+      const json = await request.json()
+      const parsed = createTaskSchema.safeParse(json)
+      if (!parsed.success) {
+        return buildAggregatedValidationResponse(zodErrorToIssues(parsed.error))
+      }
+      body = parsed.data
+    } catch {
+      return buildAggregatedValidationResponse([
+        {
+          field: '(root)',
+          code: TASK_RUNTIME_ERROR_CODES.INVALID_FIELD,
+          message: 'Request body is not valid JSON',
+          hint: 'Send a JSON object with a Content-Type: application/json header.',
+        },
+      ])
+    }
+
+    // Phase 13 — runtime-context BUSINESS RULES (TCTX-01..06). Collects every
+    // failure across all checks before returning so the caller sees all validation
+    // errors in one response (CONTEXT.md: "aggregated in a single 400 Bad Request").
+    const runtimeIssues: TaskRuntimeValidationIssue[] = []
+    let resolvedRecipe: ReturnType<typeof getIndexedRecipeBySlug> = null
+
+    if (body.recipe_slug) {
+      resolvedRecipe = getIndexedRecipeBySlug(body.recipe_slug)
+      if (resolvedRecipe === null) {
+        runtimeIssues.push({
+          field: 'recipe_slug',
+          code: TASK_RUNTIME_ERROR_CODES.RECIPE_NOT_FOUND,
+          message: `recipe_slug '${body.recipe_slug}' does not reference an indexed recipe`,
+          hint: 'Verify the slug via GET /api/recipes/:slug or POST /api/recipes/resync.',
+        })
+      } else if ('error_message' in resolvedRecipe && resolvedRecipe.error_message !== null) {
+        runtimeIssues.push({
+          field: 'recipe_slug',
+          code: TASK_RUNTIME_ERROR_CODES.RECIPE_BROKEN,
+          message: `recipe_slug '${body.recipe_slug}' references a broken recipe: ${resolvedRecipe.error_message}`,
+          hint: 'Fix the recipe under recipes/<slug>/ and wait for the watcher to re-index, or call POST /api/recipes/resync.',
+        })
+        resolvedRecipe = null
+      } else {
+        // resolvedRecipe is RecipeRow (fully indexed, error_message === null)
+        if (resolvedRecipe.workspace_mode === 'worktree' && !body.workspace_source) {
+          runtimeIssues.push({
+            field: 'workspace_source',
+            code: TASK_RUNTIME_ERROR_CODES.REQUIRED_BY_RECIPE,
+            message: `recipe '${body.recipe_slug}' declares workspace: worktree — task must carry workspace_source`,
+            hint: 'Supply workspace_source: { project_id, base_ref } in the same request.',
+          })
+        }
+      }
+    }
+
+    // Cap checks — apply regardless of recipe resolution state.
+    const mountsCap = getMountsCap()
+    if (body.read_only_mounts && body.read_only_mounts.length > mountsCap) {
+      runtimeIssues.push({
+        field: 'read_only_mounts',
+        code: TASK_RUNTIME_ERROR_CODES.CAP_EXCEEDED,
+        message: `read_only_mounts has ${body.read_only_mounts.length} entries; the configured cap is ${mountsCap}`,
+        hint: `Reduce the list to at most ${mountsCap} entries, or ask an admin to raise 'runtime.read_only_mounts_cap'.`,
+      })
+    }
+    const skillsCap = getExtraSkillsCap()
+    if (body.extra_skills && body.extra_skills.length > skillsCap) {
+      runtimeIssues.push({
+        field: 'extra_skills',
+        code: TASK_RUNTIME_ERROR_CODES.CAP_EXCEEDED,
+        message: `extra_skills has ${body.extra_skills.length} entries; the configured cap is ${skillsCap}`,
+        hint: `Reduce the list to at most ${skillsCap} entries, or ask an admin to raise 'runtime.extra_skills_cap'.`,
+      })
+    }
+
+    // Allowlist checks for every host_path + extra_skill path.
+    if (body.read_only_mounts) {
+      for (let i = 0; i < body.read_only_mounts.length; i++) {
+        const mount = body.read_only_mounts[i]
+        const result = await validateHostPathAgainstAllowlist(mount.host_path)
+        if (!result.ok) {
+          runtimeIssues.push({
+            field: `read_only_mounts.${i}.host_path`,
+            code: result.code,
+            message: result.message,
+            hint: result.hint,
+          })
+        }
+      }
+    }
+    if (body.extra_skills) {
+      for (let i = 0; i < body.extra_skills.length; i++) {
+        const result = await validateHostPathAgainstAllowlist(body.extra_skills[i])
+        if (!result.ok) {
+          runtimeIssues.push({
+            field: `extra_skills.${i}`,
+            code: result.code,
+            message: result.message,
+            hint: result.hint,
+          })
+        }
+      }
+    }
+
+    if (runtimeIssues.length > 0) {
+      return buildAggregatedValidationResponse(runtimeIssues)
+    }
 
     const user = auth.user
     const actor = user.display_name || user.username || 'system'
@@ -219,8 +351,9 @@ export async function POST(request: NextRequest) {
           title, description, status, priority, project_id, project_ticket_no, assigned_to, created_by,
           created_at, updated_at, due_date, estimated_hours, actual_hours,
           outcome, error_message, resolution, feedback_rating, feedback_notes, retry_count, completed_at,
-          tags, metadata, workspace_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tags, metadata, workspace_id,
+          recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       const dbResult = insertStmt.run(
@@ -246,7 +379,15 @@ export async function POST(request: NextRequest) {
         resolvedCompletedAt,
         JSON.stringify(tags),
         JSON.stringify(metadata),
-        workspaceId
+        workspaceId,
+        // Phase 13 — runtime-context columns. Destructured body.X direct to avoid
+        // extending the already-15-deep destructure above. Object/array columns
+        // are JSON-stringified; TEXT columns pass through.
+        body.recipe_slug ?? null,
+        body.workspace_source ? JSON.stringify(body.workspace_source) : null,
+        body.read_only_mounts ? JSON.stringify(body.read_only_mounts) : null,
+        body.extra_skills ? JSON.stringify(body.extra_skills) : null,
+        body.model_override ?? null
       )
       return Number(dbResult.lastInsertRowid)
     })
