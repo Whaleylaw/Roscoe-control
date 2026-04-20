@@ -173,10 +173,10 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 - [x] **CP-01**: Agent can post a checkpoint via `POST /api/tasks/:id/checkpoints` with `step`, `summary`, `status` (`completed` | `in_progress` | `blocked`), plus optional `artifacts`, `next_step`, `blocker_reason`, `tokens_used`, `duration_ms`
 - [x] **CP-02**: Each checkpoint is stored both as a `task_checkpoints` row and as one JSON line appended to `<worktree>/.mc/checkpoints.jsonl` with identical field names
-- [ ] **CP-03**: `status: blocked` checkpoints transition the task `in_progress → awaiting_owner`, post an automatic comment with the blocker reason, and gracefully stop the container
+- [x] **CP-03**: `status: blocked` checkpoints transition the task `in_progress → awaiting_owner`, post an automatic comment with the blocker reason, and gracefully stop the container
 - [x] **CP-04**: When the blocker is resolved (task back to `assigned`), runner relaunches with the resume flow
-- [ ] **CP-05**: Checkpoint artifact entries are typed (`kind: file | url | diff | test_result | comment | other`) with optional `path`, `url`, `ref`, `summary`
-- [ ] **CP-06**: Viewer can fetch the full checkpoint timeline for a task via `GET /api/tasks/:id/checkpoints`, filterable by `attempt`
+- [x] **CP-05**: Checkpoint artifact entries are typed (`kind: file | url | diff | test_result | comment | other`) with optional `path`, `url`, `ref`, `summary`
+- [x] **CP-06**: Viewer can fetch the full checkpoint timeline for a task via `GET /api/tasks/:id/checkpoints`, filterable by `attempt`
 
 ### Authentication
 
@@ -352,10 +352,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORK-07 | Phase 14 | Complete |
 | CP-01 | Phase 15 | Complete |
 | CP-02 | Phase 15 | Complete |
-| CP-03 | Phase 15 | Pending |
+| CP-03 | Phase 15 | Complete |
 | CP-04 | Phase 15 | Complete |
-| CP-05 | Phase 15 | Pending |
-| CP-06 | Phase 15 | Pending |
+| CP-05 | Phase 15 | Complete |
+| CP-06 | Phase 15 | Complete |
 | RAUTH-01 | Phase 11 | Complete |
 | RAUTH-02 | Phase 11 | Complete |
 | RAUTH-03 | Phase 11 | Complete |

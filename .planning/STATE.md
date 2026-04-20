@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: unknown
-last_updated: "2026-04-20T22:41:02.394Z"
+status: completed
+stopped_at: "Plan 15-04 complete — Wave 2 POST+GET /api/tasks/:id/checkpoints route delivered (atomic DB+JSONL write, broadcast after commit, workspace-scoped GET). 56 new tests passing. Plan 15-05 unblocked: recommended extraOps(db, id, nowUnix) callback path documented in SUMMARY."
+last_updated: "2026-04-20T22:56:51.920Z"
+last_activity: "2026-04-20 — Plan 15-02 complete. 5 task commits. Decisions logged (15-02): TICK_MS=30_000 locked cadence; STALE_WINDOW_SECS=90 module-private constant; isRecipeTaskStuck conservative skip on missing inventory metadata; dispatch-lane separation by recipe_slug; Task interface local cast in POST /api/tasks emission block. Wave 1 parallel execution continues (15-04/15-06 pending)."
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 59
-  completed_plans: 61
+  completed_plans: 63
+  percent: 100
 ---
 
 # Project State
@@ -117,6 +120,8 @@ Next: Await remaining Wave 1 plans (15-04, 15-06) to complete before Wave 2 (15-
 | Phase 15-checkpoints-scheduler-v1-2 P03 | 4min | 2 tasks tasks | 2 files files |
 | Phase 15-checkpoints-scheduler-v1-2 P01 | 4min | 2 tasks tasks | 5 files files |
 | Phase 15-checkpoints-scheduler-v1-2 P02 | 11min | 5 tasks | 9 files |
+| Phase 15-checkpoints-scheduler-v1-2 P06 | 9min | 3 tasks | 9 files |
+| Phase 15-checkpoints-scheduler-v1-2 P04 | 7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -244,6 +249,16 @@ Recent decisions affecting current work:
 - [Phase 15-02]: isRecipeTaskStuck returns false when fresh heartbeat has no active_task_ids metadata — conservative skip. reconcileRunnerHeartbeat covers the 'no heartbeat at all' case unambiguously.
 - [Phase 15-02]: Dispatch-lane separation by recipe_slug: autoRouteInbox recipe fast-path + dispatchAssignedTasks 'recipe_slug IS NULL' filter + requeueStale two-branch. Recipe rows and legacy rows never cross lanes.
 - [Phase 15-02]: Task interface in db.ts doesn't yet have recipe_slug/workspace_id — Plan 15-02 Task 5 uses a scoped local cast in the POST /api/tasks emission block; widening Task belongs to a separate refactor.
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-06]: Recipe events broadcast on 7 sites (scanRecipesDir indexed + skipped_missing, reconciliation sweep, scheduleReindex change/unlink paths, unlinkDir handler) — covering all transitions into/out of the 'valid indexed' state rather than just scheduleReindex
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-06]: HeartbeatMetadataSchema uses z.object({ active_task_ids: z.array(z.number().int().positive()).optional() }).passthrough() — explicit typing for the known field plus daemon-side forward-compat for future keys without requiring coordinated MC deploys
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-06]: Inventory endpoint 90s stale window is a module-local const (duplicating task-dispatch.ts) rather than a shared export — preserves file-disjoint plan structure and makes the semantic visible at every read site
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-06]: task.container_started broadcasts ONLY on the committed placeholder-swap branch — the 204 idempotent (same-id retry) and 409 conflict branches stay silent because no state change happened; event stream reserved for real transitions per 15-CONTEXT.md emission policy
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-06]: Inventory active_task_ids READ filter accepts any finite positive number (strict int validation lives in write-path schema); malformed metadata_json returns empty array not 500 — live-but-corrupted runners still give callers useful signal
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: writeCheckpoint returns {id, attempt, ts, nowUnix}; nowUnix added so Plan 15-05's tasks UPDATE+comment INSERT stamp identical created_at/updated_at to the checkpoint row (cross-table timestamp alignment under same transaction)
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: Broadcast payload includes blocker_reason on status='blocked' FROM 15-04 (not deferred to 15-05) — schema already validated non-empty so daemon SSE handler receives reason from first frame with no schema bump
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: Plan 15-05 extension path LOCKED: add optional extraOps(db, id, nowUnix) callback to writeCheckpoint. Keeps atomic-write contract in one module; avoids duplicating JSONL append/truncate logic in 15-05 route code
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: GET workspace mismatch returns 404 (masquerade), not 403 — matches comments route convention; never leaks task existence across workspaces
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-04]: ?attempt= validation rejects String(n) !== trim() (catches '1e5', '1.5', '01') rather than accepting parseInt-truncated values
 
 ### Pending Todos
 
@@ -266,6 +281,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T22:30:00Z
-Stopped at: Phase 15 Wave 1 in flight — Plan 15-03 complete (seedMcDir resume_marker extension, commits 2409141 + 85af186). Phase 14 regression-free; 8/8 new tests pass. Plans 15-01 and 15-02 concurrently landing commits. Plan 15-05 (Wave 2) unblocked on the filesystem side — awaits 15-01..15-04 completion before the blocker-flow state machine integrates.
-Resume file: Continue `/gsd:execute-phase 15` to pick up remaining Wave 1 plans. See .planning/phases/15-checkpoints-scheduler-v1-2/15-03-SUMMARY.md for the resume_marker contract handoff to Plan 15-05.
+Last session: 2026-04-20T22:56:51.913Z
+Stopped at: Plan 15-04 complete — Wave 2 POST+GET /api/tasks/:id/checkpoints route delivered (atomic DB+JSONL write, broadcast after commit, workspace-scoped GET). 56 new tests passing. Plan 15-05 unblocked: recommended extraOps(db, id, nowUnix) callback path documented in SUMMARY.
+Resume file: None
