@@ -467,6 +467,30 @@ export async function POST(request: NextRequest) {
     // Broadcast to SSE clients
     eventBus.broadcast('task.created', parsedTask);
 
+    // Phase 15 SCHED-05: direct-assigned recipe-tagged task signals runner.
+    // parsedTask.status reflects the post-normalizeTaskCreateStatus value, so a
+    // body of {status:'inbox', assigned_to:'x', recipe_slug:'y'} that was
+    // auto-upgraded to 'assigned' IS caught here. Tasks that remain 'inbox'
+    // (no assigned_to) do NOT emit — autoRouteInboxTasks handles that path.
+    //
+    // Note: the Task interface in db.ts doesn't yet include recipe_slug /
+    // workspace_id because those columns were added after the interface was
+    // authored. Read them off the underlying row (typed as unknown → cast)
+    // rather than extending the shared interface in this plan's file surface.
+    const parsedTaskAny = parsedTask as unknown as {
+      status: string;
+      id: number;
+      recipe_slug?: string | null;
+      workspace_id?: number;
+    };
+    if (parsedTaskAny.status === 'assigned' && parsedTaskAny.recipe_slug) {
+      eventBus.broadcast('task.runner_requested', {
+        task_id: parsedTaskAny.id,
+        recipe_slug: parsedTaskAny.recipe_slug,
+        workspace_id: parsedTaskAny.workspace_id,
+      })
+    }
+
     return NextResponse.json({ task: parsedTask }, { status: 201 });
   } catch (error) {
     logger.error({ err: error }, 'POST /api/tasks error');
