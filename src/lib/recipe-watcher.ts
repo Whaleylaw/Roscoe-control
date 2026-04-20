@@ -28,6 +28,7 @@ import type { FSWatcher } from 'chokidar'
 import chokidar from 'chokidar'
 import { logger } from './logger'
 import { indexRecipe, removeRecipe } from './recipe-indexer'
+import { eventBus } from './event-bus'
 
 /**
  * Returns the absolute recipes directory.
@@ -108,6 +109,11 @@ export async function scanRecipesDir(opts?: {
             // every successful write as 'updated'. The caller sees the total
             // number of rows touched without needing a pre-SELECT.
             report.updated += 1
+            // SCHED-06: broadcast recipe.indexed on initial/boot index. Global
+            // (no workspace_id) per 15-CONTEXT.md — recipes are cross-workspace
+            // and the SSE route only drops events with a PRESENT-but-mismatched
+            // workspace_id (absent flows through to every subscriber).
+            eventBus.broadcast('recipe.indexed', { slug: result.slug, dir_sha: result.dirSha })
             break
           case 'unchanged':
             // Fast-path dedup. Not counted.
@@ -116,6 +122,9 @@ export async function scanRecipesDir(opts?: {
             report.errors.push({ slug: result.slug, reason: result.error })
             // Error rows still land in the DB — diskSlugs already contains
             // this slug, so reconciliation below will NOT delete the error row.
+            // No event emitted: the event stream is reserved for transitions
+            // into/out of the "valid indexed" state; Phase 16 UI polls the DB
+            // for error rows directly.
             break
           case 'skipped_missing': {
             // Directory exists but recipe.yaml is absent — not an error, just
@@ -123,7 +132,12 @@ export async function scanRecipesDir(opts?: {
             // it's orphaned: remove it. Users can re-add recipe.yaml later
             // to resurrect it.
             const { removed } = removeRecipe(result.slug)
-            if (removed) report.deleted += 1
+            if (removed) {
+              report.deleted += 1
+              // SCHED-06: broadcast recipe.removed only when a row was actually
+              // dropped — a directory that never had a row doesn't need an event.
+              eventBus.broadcast('recipe.removed', { slug: result.slug })
+            }
             // Drop from diskSlugs so the reconciliation sweep below doesn't
             // also try to remove it (avoids double-counting report.deleted).
             diskSlugs.delete(result.slug)
@@ -146,7 +160,11 @@ export async function scanRecipesDir(opts?: {
   for (const row of allRows) {
     if (!diskSlugs.has(row.slug)) {
       const { removed } = removeRecipe(row.slug)
-      if (removed) report.deleted += 1
+      if (removed) {
+        report.deleted += 1
+        // SCHED-06: cross-workspace global event (no workspace_id).
+        eventBus.broadcast('recipe.removed', { slug: row.slug })
+      }
     }
   }
 
@@ -215,14 +233,27 @@ function scheduleReindex(slug: string, absDir: string, kind: 'change' | 'unlink'
         if (result.status === 'skipped_missing') {
           removeRecipe(slug)
           logger.info({ slug, path: absDir }, 'recipe removed (recipe.yaml gone)')
+          // SCHED-06: cross-workspace global event (no workspace_id).
+          eventBus.broadcast('recipe.removed', { slug })
         } else if (result.status === 'indexed') {
           logger.info({ slug, path: absDir }, 'recipe re-indexed after partial unlink')
+          // SCHED-06: carry dir_sha so clients can correlate with DB rows.
+          eventBus.broadcast('recipe.indexed', { slug, dir_sha: result.dirSha })
         } else if (result.status === 'error') {
           logger.error({ slug, path: absDir, reason: result.error }, 'recipe index failed post-unlink')
+          // No event on error path — error_message row persists in DB for
+          // polling-based UIs, but the event stream stays clean (no
+          // transition into the "valid indexed" state).
         }
       } else {
         const result = await indexRecipe(absDir)
         logger.debug({ slug, status: result.status }, 'recipe watcher: reindex')
+        if (result.status === 'indexed') {
+          // SCHED-06: cross-workspace global event (no workspace_id).
+          eventBus.broadcast('recipe.indexed', { slug, dir_sha: result.dirSha })
+        }
+        // 'unchanged' and 'error' do not transition into/out of the valid
+        // indexed state, so no event.
       }
     } catch (err) {
       logger.error({ slug, path: absDir, err: (err as Error).message }, 'recipe watcher: reindex threw')
@@ -317,6 +348,10 @@ export async function startRecipeWatcher(opts: StartWatcherOptions = {}): Promis
     if (slug && resolve(p) === resolve(join(root, slug))) {
       const { removed } = removeRecipe(slug)
       logger.info({ slug, removed }, 'recipe watcher: directory removed')
+      if (removed) {
+        // SCHED-06: cross-workspace global event (no workspace_id).
+        eventBus.broadcast('recipe.removed', { slug })
+      }
     }
   })
   watcher.on('error', (err) => {
