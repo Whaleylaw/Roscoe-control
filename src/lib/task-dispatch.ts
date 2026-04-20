@@ -1218,14 +1218,81 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
 }
 
 // ---------------------------------------------------------------------------
-// Phase 15 SCHED-04: reconcile runner heartbeat (stub — filled in by Plan 15-02 Task 4)
+// Phase 15 SCHED-04: reconcile runner heartbeat
 // ---------------------------------------------------------------------------
 
 /**
- * Placeholder export so scheduler.ts imports compile during Task 1 of Plan 15-02.
- * Task 4 of the same plan replaces this body with the real heartbeat reconciliation
- * logic defined in 15-RESEARCH.md § "Scheduler reconcile tick".
+ * Runs every 30s via the scheduler tick (see src/lib/scheduler.ts tasks.set
+ * entry for 'reconcile_runner_heartbeat'). When no runner has heartbeated in
+ * the LOCKED 90s window (3× 30s tick per 15-CONTEXT.md § Heartbeat & Stale
+ * Detection), any in_progress recipe-tagged task whose updated_at is ALSO
+ * stale gets flipped back to `assigned`. The stale-updated_at guard prevents
+ * racing a freshly-claimed task (which hasn't had time to log its first
+ * heartbeat yet) through the reconciliation.
+ *
+ * Emits task.runner_requested + task.status_changed on every successful flip.
+ * Daemon claim path is idempotent (runner-token mint keyed by task_id+attempt),
+ * so duplicate emissions are safe.
  */
 export async function reconcileRunnerHeartbeat(): Promise<{ ok: boolean; message: string }> {
-  return { ok: true, message: 'reconcileRunnerHeartbeat stub — awaiting Plan 15-02 Task 4 implementation' }
+  const db = getDatabase()
+  const nowUnix = Math.floor(Date.now() / 1000)
+  const STALE_WINDOW_SECS = 90 // LOCKED: 15-CONTEXT.md § Heartbeat & Stale Detection (3× 30s tick)
+
+  const fresh = db.prepare(
+    'SELECT 1 FROM runner_heartbeats WHERE last_heartbeat_at >= ? LIMIT 1'
+  ).get(nowUnix - STALE_WINDOW_SECS)
+
+  if (fresh) {
+    return { ok: true, message: 'Runner heartbeat fresh' }
+  }
+
+  // No runner fresh. Flip any in_progress recipe-task whose last update is
+  // ALSO stale (prevents flipping a just-claimed task before the first
+  // heartbeat window elapses).
+  const stuck = db.prepare(`
+    SELECT id, recipe_slug, workspace_id FROM tasks
+    WHERE status = 'in_progress' AND recipe_slug IS NOT NULL
+      AND updated_at < ?
+  `).all(nowUnix - STALE_WINDOW_SECS) as Array<{ id: number; recipe_slug: string; workspace_id: number }>
+
+  if (stuck.length === 0) {
+    return { ok: true, message: 'No stale in_progress recipe-tasks' }
+  }
+
+  let flipped = 0
+  for (const t of stuck) {
+    let rowFlipped = false
+    db.transaction(() => {
+      const res = db.prepare(`
+        UPDATE tasks
+        SET status = 'assigned',
+            container_id = NULL,
+            runner_started_at = NULL,
+            runner_last_failure_reason = 'runner_heartbeat_stale',
+            updated_at = ?
+        WHERE id = ? AND status = 'in_progress' AND recipe_slug IS NOT NULL
+      `).run(nowUnix, t.id)
+      if (res.changes > 0) {
+        flipped++
+        rowFlipped = true
+      }
+    })()
+
+    if (rowFlipped) {
+      eventBus.broadcast('task.runner_requested', {
+        task_id: t.id,
+        recipe_slug: t.recipe_slug,
+        workspace_id: t.workspace_id,
+      })
+      eventBus.broadcast('task.status_changed', {
+        id: t.id,
+        status: 'assigned',
+        previous_status: 'in_progress',
+        reason: 'runner_heartbeat_stale',
+      })
+    }
+  }
+
+  return { ok: true, message: `Flipped ${flipped} stale recipe-task(s) back to assigned` }
 }
