@@ -280,14 +280,14 @@ Plans:
   7. Worktrees are preserved across container crashes and retries and destroyed only when a task reaches `done`, `cancelled`, or (after a GC window of N days, default 7) `failed`; a scheduled GC job prunes worktrees for long-terminal tasks
   8. After a runner crash, starting the runner reconciles live Docker containers (`mc-task-*`) against `GET /api/runner/pending-containers` and either adopts or cleans them up; when a task reaches terminal status, the runner revokes its token and destroys the worktree (subject to the failure GC window)
   9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
-**Plans:** 7/12 plans executed
+**Plans:** 8/12 plans executed
 Plans:
 - [x] 14-01-PLAN.md — Migrations 060 (runner_heartbeats) + 061 (task_runner_attempts) + tests (RUNNER-05, WORK-02)
 - [x] 14-02-PLAN.md — 5 runtime.* settings + recipe-schema max_attempts + typed getters + tests (RUNNER-08, WORK-06, RUNNER-09)
 - [x] 14-03-PLAN.md — Wave 0 test scaffolds (11 files, ≥60 it.todo stubs)
 - [x] 14-04-PLAN.md — heartbeat + ready-tasks + pending-containers + terminal-tasks routes (RUNNER-04, RUNNER-05, RUNNER-13, WORK-07)
 - [ ] 14-05-PLAN.md — POST /api/runner/claim/[task_id] atomic claim with allowlist + caps + token mint + dispatch payload (RUNNER-06..08, MODEL-04)
-- [ ] 14-06-PLAN.md — POST /api/runner/tasks/[task_id]/runner-exit retry/fail driver (RUNNER-11, WORK-06)
+- [x] 14-06-PLAN.md — POST /api/runner/tasks/[task_id]/runner-exit retry/fail driver (RUNNER-11, WORK-06)
 - [ ] 14-07-PLAN.md — runner-preamble + runner-worktree + runner-docker pure-logic lib modules + tests (WORK-01, 02, 04, 05; CONTAINER-01, 02; RUNNER-09, 10)
 - [x] 14-08a-PLAN.md — runner-gc + runner-reconcile + runner-timeout + runner-log-layout pure-logic helpers + tests (RUNNER-12, 13, 14, CONTAINER-03, WORK-07)
 - [ ] 14-08b-PLAN.md — scripts/mc-runner.mjs daemon + LaunchAgent + README (RUNNER-01..14, CONTAINER-03, WORK-03, 06, 07, MODEL-04)
