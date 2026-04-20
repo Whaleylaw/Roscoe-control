@@ -307,12 +307,15 @@ Plans:
   4. `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox → assigned` without running agent-affinity scoring; `dispatchAssignedTasks()` skips tasks with `recipe_slug` so legacy behavior is preserved for non-recipe tasks; `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to legacy logic
   5. A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when the runner has been unreachable beyond the threshold, so reconcile-on-reconnect works cleanly
   6. `task.runner_requested` fires from all three emission points (`autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` on direct-assigned creation with `recipe_slug`, the runner-exit retry path on `in_progress → assigned`), and `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` are broadcast on SSE for UI reactivity
-**Plans:** 4 plans
+**Plans:** 7 plans
 Plans:
-- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
-- [x] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
-- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
-- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
+- [ ] 15-01-PLAN.md — Extend EventType union + RUNNER_TOKEN_ALLOWLIST for POST /api/tasks/:id/checkpoints (CP-01 foundation, SCHED-06 foundation)
+- [ ] 15-02-PLAN.md — Scheduler refactor (TICK_MS 60→30s, reconcileRunnerHeartbeat) + task-dispatch recipe branches + POST /api/tasks emission (SCHED-01..06)
+- [ ] 15-03-PLAN.md — Extend seedMcDir with resume_marker for blocker-resume (CP-02, CP-04)
+- [ ] 15-04-PLAN.md — Checkpoint helper module + POST/GET route handlers with atomic DB+JSONL write (CP-01, CP-03, CP-05, CP-06, SCHED-06)
+- [ ] 15-05-PLAN.md — Blocker flow (awaiting_owner + auto-comment + daemon docker-stop) + runner-exit broadcasts + resume_marker wiring (CP-02..06, SCHED-05, SCHED-06)
+- [ ] 15-06-PLAN.md — Recipe watcher SSE emissions + heartbeat active_task_ids metadata + /api/runner/inventory + task.container_started (SCHED-03, SCHED-06)
+- [ ] 15-07-PLAN.md — Phase 15 integration test sweep (CP-01..06, SCHED-01..06)
 **UI hint**: no (UI listeners ship in Phase 16)
 
 ### Phase 16: Runtime UI Surfaces  *(v1.2)*
