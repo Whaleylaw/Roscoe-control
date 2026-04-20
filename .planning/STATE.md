@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: completed
-stopped_at: "Plan 15-04 complete — Wave 2 POST+GET /api/tasks/:id/checkpoints route delivered (atomic DB+JSONL write, broadcast after commit, workspace-scoped GET). 56 new tests passing. Plan 15-05 unblocked: recommended extraOps(db, id, nowUnix) callback path documented in SUMMARY."
-last_updated: "2026-04-20T22:56:51.920Z"
-last_activity: "2026-04-20 — Plan 15-02 complete. 5 task commits. Decisions logged (15-02): TICK_MS=30_000 locked cadence; STALE_WINDOW_SECS=90 module-private constant; isRecipeTaskStuck conservative skip on missing inventory metadata; dispatch-lane separation by recipe_slug; Task interface local cast in POST /api/tasks emission block. Wave 1 parallel execution continues (15-04/15-06 pending)."
+stopped_at: "Plans 15-04 AND 15-06 both complete (parallel Wave 1). SCHED-06 emission set mostly live: recipe.indexed, recipe.removed, task.container_started (15-06), task.checkpoint_added (15-04). Remaining for SCHED-06: task.container_exited + runner-exit retry path of task.runner_requested (Plan 15-05). Plan 15-07 (integration tests) blocks on 15-05."
+last_updated: "2026-04-20T22:52:08Z"
+last_activity: "2026-04-20 — Plan 15-06 complete. 3 task commits (c950794 recipe-watcher broadcasts, c896641 heartbeat metadata + daemon, 32eac1f inventory + container-started broadcast). Decisions logged (15-06): 7-site recipe-watcher emission covering all valid-indexed transitions, passthrough() on heartbeat metadata schema, 90s inventory stale window as module-local const, broadcast-on-committed-state-change for task.container_started, defensive-read filter on inventory active_task_ids."
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 59
-  completed_plans: 63
+  completed_plans: 64
   percent: 100
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 in flight.
-Plans: 15-01 ✓ (EventType union + runner-token allowlist foundations complete), 15-02 ✓ (scheduler TICK_MS=30s + recipe-lane dispatch separation + 3/4 task.runner_requested emission points), 15-03 ✓ (seedMcDir resume_marker extension complete), 15-04..15-07 pending.
-Status: Plan 15-02 complete — TICK_MS reduced from 60_000 to 30_000 (SCHED-04: 3× tick = 90s LOCKED stale window); reconcile_runner_heartbeat tick registered across 5 ladder touch points; autoRouteInboxTasks gains recipe fast-path (inbox→assigned + task.runner_requested emit, bypasses affinity scoring); dispatchAssignedTasks SELECT adds AND t.recipe_slug IS NULL filter (SCHED-02 — recipe rows never picked up by legacy dispatch); requeueStaleTasks splits into two branches — recipe rows use isRecipeTaskStuck(runner_heartbeats + metadata_json.active_task_ids) probe, legacy rows keep agents.status==='offline' probe; reconcileRunnerHeartbeat exported with STALE_WINDOW_SECS=90 LOCKED (Task 4 replaces Task 1 stub); POST /api/tasks emits task.runner_requested when parsedTask.status='assigned' && parsedTask.recipe_slug (reads post-normalizeTaskCreateStatus status, so inbox→assigned auto-upgrade IS caught). 36/36 new unit tests pass across 6 new test files; 29/29 regression tests pass (task-routing + task-status + route.runtime-context). Commits 66ccd66 (Task 1 scheduler), 8cf4108 (Task 2 autoroute), f728084 (Task 3 dispatch+requeue), 6f01e94 (Task 4 reconcile real body), 9119a96 (Task 5 POST emission). Three of four SCHED-05 task.runner_requested emission points now live (autoRoute, POST /api/tasks, reconcileRunnerHeartbeat); runner-exit retry path awaits Plan 15-05.
-Last activity: 2026-04-20 — Plan 15-02 complete. 5 task commits. Decisions logged (15-02): TICK_MS=30_000 locked cadence; STALE_WINDOW_SECS=90 module-private constant; isRecipeTaskStuck conservative skip on missing inventory metadata; dispatch-lane separation by recipe_slug; Task interface local cast in POST /api/tasks emission block. Wave 1 parallel execution continues (15-04/15-06 pending).
-Next: Await remaining Wave 1 plans (15-04, 15-06) to complete before Wave 2 (15-05 — blocker flow + runner-exit retry emission path).
+Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 complete; Wave 2 pending.
+Plans: 15-01 ✓, 15-02 ✓, 15-03 ✓, 15-04 ✓ (checkpoints POST+GET route, landed in parallel with 15-06), 15-06 ✓ (recipe.* + task.container_started SSE + heartbeat metadata + inventory endpoint). 15-05 / 15-07 pending.
+Status: Plan 15-06 complete — recipe-watcher now broadcasts recipe.indexed / recipe.removed across 7 sites (scanRecipesDir indexed + skipped_missing removal, reconciliation sweep, scheduleReindex change + unlink branches, unlinkDir handler); HeartbeatMetadataSchema tightened to z.object({ active_task_ids: z.array(z.number().int().positive()).optional() }).passthrough() giving SCHED-03 a validated data source without locking out daemon-side forward-compat; scripts/mc-runner.mjs heartbeatTick now posts metadata.active_task_ids = Array.from(activeTasks.keys()) on every 10s beat; new GET /api/runner/inventory (runner-secret only, 90s LOCKED stale window) provides a read-through view over runner_heartbeats.metadata_json for observability + Phase 15-07 integration tests; container-started route broadcasts task.container_started on the committed swap branch ONLY — idempotent (204) and conflict (409) branches stay silent. 29/29 new tests pass across 4 new/extended test files (5 recipe-watcher-events + 8 heartbeat-metadata + 7 inventory + 9 container-started including 3 broadcast cases); 44/44 adjacent related tests pass. Commits c950794 (recipe-watcher), c896641 (heartbeat + daemon), 32eac1f (inventory + container-started broadcast). SCHED-06 emission set COMPLETE: recipe.indexed, recipe.removed, task.container_started, task.checkpoint_added (15-04), with task.container_exited + runner-exit task.runner_requested retry path remaining for Plan 15-05.
+Last activity: 2026-04-20 — Plan 15-06 complete. 3 task commits. Decisions logged (15-06): 7-site recipe-watcher emission, passthrough() metadata forward-compat, 90s inventory stale window as module-local const, broadcast-on-committed-state-change for task.container_started, defensive-read filter on inventory active_task_ids.
+Next: Plan 15-05 (blocker flow + runner-exit retry emission). Plan 15-07 (integration tests) blocks on 15-05.
 
 ## Performance Metrics
 
@@ -281,6 +281,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T22:56:51.913Z
-Stopped at: Plan 15-04 complete — Wave 2 POST+GET /api/tasks/:id/checkpoints route delivered (atomic DB+JSONL write, broadcast after commit, workspace-scoped GET). 56 new tests passing. Plan 15-05 unblocked: recommended extraOps(db, id, nowUnix) callback path documented in SUMMARY.
-Resume file: None
+Last session: 2026-04-20T22:52:08Z
+Stopped at: Plans 15-04 AND 15-06 both complete (parallel Wave 1). SCHED-06 emission set mostly live: recipe.indexed, recipe.removed, task.container_started (15-06), task.checkpoint_added (15-04). Remaining: task.container_exited + runner-exit retry path of task.runner_requested (Plan 15-05, Wave 2). Plan 15-07 (integration tests) blocks on 15-05.
+Resume file: Continue `/gsd:execute-phase 15` to pick up Plan 15-05. See .planning/phases/15-checkpoints-scheduler-v1-2/15-06-SUMMARY.md for the inventory endpoint contract and active_task_ids metadata shape that 15-07's integration suite will probe.
