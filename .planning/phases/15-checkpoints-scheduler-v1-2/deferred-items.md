@@ -72,3 +72,18 @@ these match their expected deliverables or rewrite as needed.
 - Impact on 15-04: `pnpm test --run` full-suite reports 1 failed / 2208
   passed / 44 todo. All 56 new 15-04 tests (31 helper + 25 route) pass.
   `pnpm typecheck` exits 0.
+
+## From Plan 15-07 execution (2026-04-20)
+
+### Pre-existing failing test confirmed (still not fixed)
+
+- **`src/lib/__tests__/runner-tokens.test.ts:194`** — same failure as logged
+  under 15-04 / 15-06 above. Plan 15-07 is integration-tests-only (no
+  production code modifications per plan frontmatter) and does NOT own the
+  runner-tokens allowlist module. Per the scope boundary rule we re-confirmed
+  the failure exists on a clean checkout before committing the three
+  integration files.
+- Impact on 15-07: `pnpm test --run` full-suite reports 1 failed / 2245
+  passed / 44 todo — same shape as 15-04/15-06 full-suite reports. All 18
+  new 15-07 tests (9 checkpoint POST+GET + 8 scheduler orchestration + 1
+  blocker→resume end-to-end) pass. `pnpm typecheck` exits 0.

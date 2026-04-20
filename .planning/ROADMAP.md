@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time (completed 2026-04-19)
 - [x] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
 - [x] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image (completed 2026-04-20)
-- [ ] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast
+- [x] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast (completed 2026-04-20)
 - [ ] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n
 - [ ] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage
 
@@ -307,7 +307,7 @@ Plans:
   4. `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox → assigned` without running agent-affinity scoring; `dispatchAssignedTasks()` skips tasks with `recipe_slug` so legacy behavior is preserved for non-recipe tasks; `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to legacy logic
   5. A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when the runner has been unreachable beyond the threshold, so reconcile-on-reconnect works cleanly
   6. `task.runner_requested` fires from all three emission points (`autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` on direct-assigned creation with `recipe_slug`, the runner-exit retry path on `in_progress → assigned`), and `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` are broadcast on SSE for UI reactivity
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans complete
 Plans:
 - [x] 15-01-PLAN.md — Extend EventType union + RUNNER_TOKEN_ALLOWLIST for POST /api/tasks/:id/checkpoints (CP-01 foundation, SCHED-06 foundation)
 - [x] 15-02-PLAN.md — Scheduler refactor (TICK_MS 60→30s, reconcileRunnerHeartbeat) + task-dispatch recipe branches + POST /api/tasks emission (SCHED-01..06)
@@ -315,7 +315,7 @@ Plans:
 - [x] 15-04-PLAN.md — Checkpoint helper module + POST/GET route handlers with atomic DB+JSONL write (CP-01, CP-03, CP-05, CP-06, SCHED-06)
 - [x] 15-05-PLAN.md — Blocker flow (awaiting_owner + auto-comment + daemon docker-stop) + runner-exit broadcasts + resume_marker wiring (CP-02..06, SCHED-05, SCHED-06)
 - [x] 15-06-PLAN.md — Recipe watcher SSE emissions + heartbeat active_task_ids metadata + /api/runner/inventory + task.container_started (SCHED-03, SCHED-06)
-- [ ] 15-07-PLAN.md — Phase 15 integration test sweep (CP-01..06, SCHED-01..06)
+- [x] 15-07-PLAN.md — Phase 15 integration test sweep (CP-01..06, SCHED-01..06)
 **UI hint**: no (UI listeners ship in Phase 16)
 
 ### Phase 16: Runtime UI Surfaces  *(v1.2)*
@@ -375,6 +375,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 12. Recipe System *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 12/12 | Complete    | 2026-04-20 |
-| 15. Checkpoints & Scheduler Integration *(v1.2)* | 6/7 | In Progress|  |
+| 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete   | 2026-04-20 |
 | 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |

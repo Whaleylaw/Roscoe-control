@@ -3,15 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: completed
-stopped_at: Plan 15-05 complete — blocker flow + resume path + runner-exit emissions delivered. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) addressed. Plan 15-07 (integration tests) is the remaining Phase 15 work item.
-last_updated: "2026-04-20T23:14:08.479Z"
-last_activity: "2026-04-20 — Plan 15-05 complete. 4 task commits (14139d0 blocker atomic transaction, 8b4689d daemon SSE + seedMcDir passthrough, 6ce7e78 resolveResumeMarker + dispatch wiring, ba35547 runner-exit emissions). Phase 15 control loop fully operational: all 12 requirement IDs (CP-01..06 + SCHED-01..06) addressed across Plans 15-01..06. 27 new tests pass; 156 adjacent tests pass; 1 pre-existing failure (runner-tokens.test.ts:194) pre-dates this plan."
+stopped_at: Plan 15-07 complete — three integration test files delivered (18 tests pass, zero production code changed). Phase 15 complete: all 12 requirement IDs (CP-01..06 + SCHED-01..06) have unit + integration coverage. Phase 16 UI surfaces unblocked.
+last_updated: "2026-04-20T23:25:15Z"
+last_activity: "2026-04-20 — Plan 15-07 complete. 3 task commits (584ed43 checkpoint POST+GET integration, 3dee4d0 scheduler orchestration integration, 9ca965b blocker→resume end-to-end). 4 decisions logged. 1 auto-fix applied (Rule 3 - Blocking) to split dynamic import type re-export into static import type + runtime-only await import."
 progress:
   total_phases: 15
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 59
-  completed_plans: 64
-  percent: 100
+  completed_plans: 66
 ---
 
 # Project State
@@ -25,11 +24,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 + Wave 2/3 complete; Wave 4 (integration tests) pending.
-Plans: 15-01 ✓, 15-02 ✓, 15-03 ✓, 15-04 ✓, 15-05 ✓, 15-06 ✓. 15-07 pending.
-Status: Plan 15-05 complete — Phase 15 control loop is OPERATIONAL. Blocker checkpoints now atomically flip tasks 'in_progress' → 'awaiting_owner' (via extraOps callback extending Plan 15-04's writeCheckpoint) and insert a system-authored comment with the blocker_reason + attempt number, all in the SAME db.transaction as the checkpoint INSERT + JSONL append. POST fires task.status_changed (reason='blocked_checkpoint') BEFORE task.checkpoint_added so UI subscribers see the cause before the effect. Daemon (scripts/mc-runner.mjs) SSE handler for task.checkpoint_added (Option D from RESEARCH.md Focus Area 11) triggers `docker stop --time=15` when status='blocked' AND activeTasks.has(taskId); watchContainerExit fires as usual and runner-exit detects the awaiting_owner status to override its broadcast reason to 'blocked'. resolveResumeMarker(db, taskId) in src/lib/runner-claim.ts queries the latest checkpoint via ORDER BY id DESC LIMIT 1 and returns the marker only when the latest is status='blocked' (stale-marker rule prevents re-injection on resolved-then-progressed tasks); claim route's buildDispatchPayload carries it to the daemon which forwards into the inline seedMcDir's resume branch to append the LOCKED marker line to progress.md. runner-exit emits task.container_exited on every exit (success/retry/fail/timeout/worktree_create_failed/oom/crash) with blocker-override rule, and task.runner_requested on the retry path when the task carries a recipe_slug (3rd and final SCHED-05 emission point). 27/27 new tests pass (6 blocker-route + 7 resume-marker + 14 runner-exit including 6 new cases); 156/156 adjacent tests pass; pnpm typecheck exits 0; node --check mc-runner.mjs exits 0. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) addressed across Plans 15-01..06.
-Last activity: 2026-04-20 — Plan 15-05 complete. 4 task commits: 14139d0 (blocker atomic transaction), 8b4689d (daemon SSE + seedMcDir resume_marker), 6ce7e78 (resolveResumeMarker + dispatch wiring), ba35547 (runner-exit emissions). 6 decisions logged. 1 auto-fix applied (Rule 1) to update Plan 15-04's route test that asserted broadcast order by mock-call index, now finds task.checkpoint_added by event type.
-Next: Plan 15-07 (integration tests) — the remaining Phase 15 work item. Known v1.3 optimization target: awaiting_owner → assigned PUT /api/tasks/:id does not re-emit task.runner_requested today, so resume latency is ~30s (daemon poll + reconcile tick).
+Phase: 15 (Checkpoints & Scheduler Integration) — COMPLETE. All 7 plans done.
+Plans: 15-01 ✓, 15-02 ✓, 15-03 ✓, 15-04 ✓, 15-05 ✓, 15-06 ✓, 15-07 ✓.
+Status: Plan 15-07 complete — three integration test files delivered (18 new tests, all passing). Zero production code modified. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) now carry BOTH unit test coverage (per-plan via Plans 15-01..06) AND integration test coverage (Plan 15-07). Integration suites: `src/app/api/tasks/[id]/checkpoints/__tests__/integration.test.ts` (9 cases — full completed→in_progress→blocked sequence, CP-05 artifact matrix round-trip, atomic rollback under JSONL throw AND DB INSERT throw injection, Zod refinements, cross-workspace 404 masquerade, attempt filter); `src/lib/__tests__/phase-15-scheduler-integration.test.ts` (8 cases — SCHED-01 autoRoute recipe fast-path, SCHED-02 dispatchAssigned recipe-skip, SCHED-03 heartbeat+active_task_ids three-case inventory probe, SCHED-04 reconcile 90s/just-claimed boundaries with vi.useFakeTimers, scheduler ladder wiring, legacy regression); `src/lib/__tests__/phase-15-blocker-flow-integration.test.ts` (1 cohesive `it(...)` — 5-phase end-to-end: seed → blocker POST → owner flip → resolveResumeMarker → seedMcDir marker append with byte-for-byte LOCKED format assertion). Full `pnpm test --run` shows 2245 passed + 44 todo + 1 pre-existing failure (runner-tokens.test.ts:194 allowlist-length drift — documented in deferred-items.md since 15-04). `pnpm typecheck` exits 0.
+Last activity: 2026-04-20 — Plan 15-07 complete. 3 task commits: 584ed43 (checkpoint POST+GET integration), 3dee4d0 (scheduler orchestration integration), 9ca965b (blocker → resume end-to-end). 4 decisions logged. 1 auto-fix applied (Rule 3 - Blocking): split dynamic `await import()` destructured `type` re-export into static `import type` + runtime-only dynamic import (esbuild rejects `import { ..., type X }` in dynamic imports).
+Next: Phase 16 UI surfaces (RUI-01..06) unblocked. Phase 17 RTEST recommendation: extend with container-driven end-to-end test using `mc-hello-world-agent` reference image + multi-runner scenario; 15-07 covers in-process wiring but not real HTTP transport or concurrent-runner claim paths.
 
 ## Performance Metrics
 
@@ -123,6 +122,7 @@ Next: Plan 15-07 (integration tests) — the remaining Phase 15 work item. Known
 | Phase 15-checkpoints-scheduler-v1-2 P06 | 9min | 3 tasks | 9 files |
 | Phase 15-checkpoints-scheduler-v1-2 P04 | 7min | 2 tasks | 4 files |
 | Phase 15-checkpoints-scheduler-v1-2 P05 | 10min | 4 tasks | 8 files |
+| Phase 15-checkpoints-scheduler-v1-2 P07 | 7min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -266,6 +266,10 @@ Recent decisions affecting current work:
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: resolveResumeMarker uses ORDER BY id DESC LIMIT 1 (AUTOINCREMENT monotonic) with 'latest checkpoint must be status=blocked' rule — a resolved-then-progressed task returns null, preventing stale marker re-injection on later attempts
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: runner-exit blocker-override rule — post-transaction SELECT task.status; when status='awaiting_owner' the task.container_exited broadcast reason is overridden from runner-reported value to 'blocked'. Single coherent UI story: blocker flip → docker stop → container_exited reason='blocked'
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-05]: runner-exit captures container_id BEFORE the state-machine transaction (which NULLs it on retry/fail) so the task.container_exited broadcast carries the container that just exited — matches Plan 15-06 task.container_started convention
+- [Phase 15-07]: Integration-test strategy for Phase 15: boundary-mock-only pattern. ONLY event-bus, rate-limit, runner-secret, security-events, and @/lib/db are mocked; production modules under test are imported for real
+- [Phase 15-07]: Dynamic await import() cannot destructure type re-exports — use top-level 'import type { X }' plus runtime-only dynamic 'await import' when a test needs both runtime + type from a mocked module
+- [Phase 15-07]: Fake-timer discipline for scheduler integration: vi.useFakeTimers() + vi.setSystemTime(BASE_TIME_MS); seed future-dated updated_at when the test fast-forwards the clock so arithmetic works regardless of harness wall-clock drift
+- [Phase 15-07]: LOCKED marker format byte-asserted with expect(progress).toBe(initialProgress + expectedMarker) — not regex — so any format drift breaks Phase 16 Progress-tab consumers loudly
 
 ### Pending Todos
 
