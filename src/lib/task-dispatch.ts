@@ -979,10 +979,52 @@ function scoreAgentForTask(
 export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: string }> {
   const db = getDatabase()
 
+  // -------------------------------------------------------------------------
+  // Phase 15 SCHED-01: recipe-tagged fast path.
+  // Recipe-tagged tasks skip the legacy affinity scoring entirely. They move
+  // `inbox → assigned` atomically and emit `task.runner_requested` so the
+  // runner daemon claims them via the Phase 14 claim route. The concurrent-
+  // modification guard (WHERE status = 'inbox' AND recipe_slug IS NOT NULL)
+  // in the UPDATE ensures we never re-emit for a row another tick already
+  // flipped.
+  // -------------------------------------------------------------------------
+  const recipeInboxTasks = db.prepare(`
+    SELECT id, recipe_slug, workspace_id
+    FROM tasks
+    WHERE status = 'inbox' AND recipe_slug IS NOT NULL
+  `).all() as Array<{ id: number; recipe_slug: string; workspace_id: number }>
+
+  const nowSec = Math.floor(Date.now() / 1000)
+  let recipeRouted = 0
+  for (const t of recipeInboxTasks) {
+    const res = db.prepare(`
+      UPDATE tasks
+      SET status = 'assigned', updated_at = ?
+      WHERE id = ? AND status = 'inbox' AND recipe_slug IS NOT NULL
+    `).run(nowSec, t.id)
+    if (res.changes > 0) {
+      recipeRouted++
+      eventBus.broadcast('task.runner_requested', {
+        task_id: t.id,
+        recipe_slug: t.recipe_slug,
+        workspace_id: t.workspace_id,
+      })
+      eventBus.broadcast('task.status_changed', {
+        id: t.id,
+        status: 'assigned',
+        previous_status: 'inbox',
+        reason: 'auto_route_recipe',
+      })
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Legacy path — affinity-scored inbox tasks (recipe-tagged rows excluded).
+  // -------------------------------------------------------------------------
   const inboxTasks = db.prepare(`
     SELECT id, title, description, priority, tags, workspace_id
     FROM tasks
-    WHERE status = 'inbox' AND assigned_to IS NULL
+    WHERE status = 'inbox' AND assigned_to IS NULL AND recipe_slug IS NULL
     ORDER BY
       CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC,
       created_at ASC
@@ -990,6 +1032,9 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
   `).all() as Array<{ id: number; title: string; description: string | null; priority: string; tags: string | null; workspace_id: number }>
 
   if (inboxTasks.length === 0) {
+    if (recipeRouted > 0) {
+      return { ok: true, message: `Routed ${recipeRouted} recipe-tagged task(s); no legacy inbox tasks to route` }
+    }
     return { ok: true, message: 'No inbox tasks to route' }
   }
 
@@ -1002,7 +1047,8 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
   `).all() as Array<{ id: number; name: string; role: string; status: string; config: string | null }>
 
   if (agents.length === 0) {
-    return { ok: true, message: `${inboxTasks.length} inbox task(s) but no available agents` }
+    const prefix = recipeRouted > 0 ? `Routed ${recipeRouted} recipe-tagged; ` : ''
+    return { ok: true, message: `${prefix}${inboxTasks.length} inbox task(s) but no available agents` }
   }
 
   let routed = 0
@@ -1069,9 +1115,13 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
 
   return {
     ok: true,
-    message: routed > 0
-      ? `Auto-routed ${routed}/${inboxTasks.length} inbox task(s)`
-      : `${inboxTasks.length} inbox task(s), no suitable agents found`,
+    message: recipeRouted > 0
+      ? (routed > 0
+        ? `Routed ${recipeRouted} recipe-tagged + ${routed}/${inboxTasks.length} legacy inbox task(s)`
+        : `Routed ${recipeRouted} recipe-tagged; ${inboxTasks.length} legacy inbox task(s), no suitable agents found`)
+      : (routed > 0
+        ? `Auto-routed ${routed}/${inboxTasks.length} inbox task(s)`
+        : `${inboxTasks.length} inbox task(s), no suitable agents found`),
   }
 }
 
