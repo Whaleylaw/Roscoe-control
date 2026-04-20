@@ -49,6 +49,7 @@ const taskFixtures: Record<number, Record<string, unknown> | undefined> = {}
 function prepareImpl(sql: string) {
   // The route executes several prepared statements in a PUT flow:
   //  - SELECT * FROM tasks WHERE id = ? AND workspace_id = ?       (currentTask)
+  //  - SELECT value FROM settings WHERE key = ?                     (Phase 13 caps/allowlist)
   //  - (maybe) project lookups / ticket counter updates
   //  - UPDATE tasks SET ... WHERE id = ? AND workspace_id = ?      (writes)
   //  - SELECT t.*, p.name ... FROM tasks t LEFT JOIN projects p    (re-fetch)
@@ -56,6 +57,16 @@ function prepareImpl(sql: string) {
   if (/^\s*SELECT\s+\*\s+FROM\s+tasks\b/i.test(sql)) {
     return {
       get: (taskId: number, _ws: number) => taskFixtures[taskId],
+    }
+  }
+  if (/SELECT\s+value\s+FROM\s+settings\s+WHERE\s+key/i.test(sql)) {
+    // Phase 13: runtime settings getters (mount allowlist + caps). Returning
+    // undefined falls back to defaults (empty allowlist, default caps 10/20).
+    // Gate-block tests never exercise runtime-context fields, so the default
+    // state is fine — the route's runtime-context block is a no-op when the
+    // PATCH body has no recipe_slug/mounts/skills.
+    return {
+      get: (_key: string) => undefined,
     }
   }
   if (/SELECT\s+status\s+FROM\s+quality_reviews/i.test(sql)) {
@@ -112,10 +123,13 @@ vi.mock('@/lib/rate-limit', () => ({
   mutationLimiter: mutationLimiterMock,
 }))
 
-vi.mock('@/lib/validation', () => ({
-  validateBody: validateBodyMock,
-  updateTaskSchema: {},
-}))
+vi.mock('@/lib/validation', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/validation')>('@/lib/validation')
+  return {
+    ...actual,
+    validateBody: validateBodyMock,
+  }
+})
 
 vi.mock('@/lib/mentions', () => ({
   resolveMentionRecipients: resolveMentionRecipientsMock,

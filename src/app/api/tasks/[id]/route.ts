@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { z } from 'zod';
 import { getDatabase, Task, db_helpers } from '@/lib/db';
 import { eventBus } from '@/lib/event-bus';
 import { requireRole } from '@/lib/auth';
@@ -11,6 +12,20 @@ import { syncTaskOutbound } from '@/lib/github-sync-engine';
 import { removeTaskFromGnap } from '@/lib/gnap-sync';
 import { config } from '@/lib/config';
 import { revokeTokensForTask } from '@/lib/runner-tokens';
+import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer';
+import { getMountsCap, getExtraSkillsCap } from '@/lib/task-runtime-settings';
+import { isKnownModel, MODEL_IDS } from '@/lib/model-registry';
+import {
+  validateHostPathAgainstAllowlist,
+  buildAggregatedValidationResponse,
+  zodErrorToIssues,
+  TASK_RUNTIME_ERROR_CODES,
+  type TaskRuntimeValidationIssue,
+} from '@/lib/task-runtime-validation';
+
+// Suppress unused-import warnings for legacy consumers; validateBody is still
+// referenced by other handlers in the codebase that share this import shape.
+void validateBody;
 
 /**
  * Terminal task statuses — when a task transitions INTO one of these, any live
@@ -20,16 +35,34 @@ import { revokeTokensForTask } from '@/lib/runner-tokens';
  */
 const TERMINAL_TASK_STATUSES = new Set(['done', 'failed', 'cancelled']);
 
+/**
+ * Phase 13 — TCTX-01 / CONTEXT.md "Recipe binding mutability":
+ * recipe_slug is mutable only while the task is pre-dispatch (status IN
+ * {backlog, inbox}). Any later status returns 400 RECIPE_LOCKED on any
+ * attempt to CHANGE recipe_slug. Identity PATCH (body.recipe_slug ===
+ * currentTask.recipe_slug) is allowed through all statuses.
+ */
+const RECIPE_SLUG_MUTABLE_STATUSES = new Set<string>(['backlog', 'inbox']);
+
 function formatTicketRef(prefix?: string | null, num?: number | null): string | undefined {
   if (!prefix || typeof num !== 'number' || !Number.isFinite(num) || num <= 0) return undefined
   return `${prefix}-${String(num).padStart(3, '0')}`
 }
 
-function mapTaskRow(task: any): Task & { tags: string[]; metadata: Record<string, unknown> } {
+function mapTaskRow(task: any): Task & {
+  tags: string[]
+  metadata: Record<string, unknown>
+  workspace_source: { project_id: number; base_ref: string } | null
+  read_only_mounts: Array<{ host_path: string; container_path: string; label: string }>
+  extra_skills: string[]
+} {
   return {
     ...task,
     tags: task.tags ? JSON.parse(task.tags) : [],
     metadata: task.metadata ? JSON.parse(task.metadata) : {},
+    workspace_source: task.workspace_source ? JSON.parse(task.workspace_source) : null,
+    read_only_mounts: task.read_only_mounts ? JSON.parse(task.read_only_mounts) : [],
+    extra_skills: task.extra_skills ? JSON.parse(task.extra_skills) : [],
     ticket_ref: formatTicketRef(task.project_prefix, task.project_ticket_no),
   }
 }
@@ -108,10 +141,42 @@ export async function PUT(
     const resolvedParams = await params;
     const taskId = parseInt(resolvedParams.id);
     const workspaceId = auth.user.workspace_id ?? 1;
-    const validated = await validateBody(request, updateTaskSchema);
-    if ('error' in validated) return validated.error;
-    const body = validated.data;
-    
+
+    // Phase 13 — manual Zod parse so runtime-context body errors (unknown
+    // model_override, duplicate labels/basenames, base_ref whitespace) flow
+    // through the aggregated { errors: [...] } shape matching Plan 13-02's
+    // POST handler. Non-runtime PATCH callers are unaffected — legacy body
+    // shapes still parse identically via updateTaskSchema.
+    let body: z.infer<typeof updateTaskSchema>;
+    let rawBody: Record<string, unknown>;
+    try {
+      const json = await request.json();
+      rawBody = (json && typeof json === 'object') ? json as Record<string, unknown> : {};
+      const parsed = updateTaskSchema.safeParse(json);
+      if (!parsed.success) {
+        return buildAggregatedValidationResponse(zodErrorToIssues(parsed.error));
+      }
+      body = parsed.data;
+    } catch {
+      return buildAggregatedValidationResponse([
+        {
+          field: '(root)',
+          code: TASK_RUNTIME_ERROR_CODES.INVALID_FIELD,
+          message: 'Request body is not valid JSON',
+          hint: 'Send a JSON object with a Content-Type: application/json header.',
+        },
+      ]);
+    }
+
+    // A field is "provided" in the PATCH body when the caller sent the key.
+    // Distinguishes {undefined (not provided)} from {null (explicit unset)} so
+    // preserve-and-revalidate semantics work: omitted = keep current, explicit
+    // null = clear. Use rawBody (pre-Zod) because Zod strips unknown keys by
+    // default and sets undefined for optional unset fields, so `in body` would
+    // be unreliable. rawBody preserves the caller's intent.
+    const patchProvided = (key: string): boolean =>
+      Object.prototype.hasOwnProperty.call(rawBody, key);
+
     if (isNaN(taskId)) {
       return NextResponse.json({ error: 'Invalid task ID' }, { status: 400 });
     }
@@ -164,7 +229,172 @@ export async function PUT(
     }
 
     const previousDescriptionMentionRecipients = resolveMentionRecipients(currentTask.description || '', db, workspaceId).recipients;
-    
+
+    // ---------------------------------------------------------------------------
+    // Phase 13 — runtime-context business rules (TCTX-01..06).
+    //
+    // Semantics:
+    //   - Body shape already validated by safeParse above; here we enforce:
+    //     1. recipe_slug mutability gate (pre-dispatch only).
+    //     2. Recipe existence + workspace_source gap (atomic; reject before UPDATE).
+    //     3. Preserve-and-revalidate: if the PATCH omits read_only_mounts /
+    //        extra_skills / model_override but changes recipe_slug (or just
+    //        revisits the row), we re-validate the EXISTING task values against
+    //        the current allowlist + registry. Catches the case where an admin
+    //        tightened the allowlist after task creation.
+    //     4. Cap checks + allowlist checks against EFFECTIVE arrays (what would
+    //        land after the UPDATE).
+    // ---------------------------------------------------------------------------
+    const runtimeIssues: TaskRuntimeValidationIssue[] = [];
+
+    // Current runtime-context values parsed from the DB row.
+    const currentRow = currentTask as unknown as {
+      recipe_slug: string | null
+      workspace_source: string | null
+      read_only_mounts: string | null
+      extra_skills: string | null
+      model_override: string | null
+    };
+    const currentRecipeSlug = currentRow.recipe_slug ?? null;
+    const currentWorkspaceSource: { project_id: number; base_ref: string } | null =
+      currentRow.workspace_source
+        ? JSON.parse(currentRow.workspace_source) as { project_id: number; base_ref: string }
+        : null;
+    const currentReadOnlyMounts: Array<{ host_path: string; container_path: string; label: string }> =
+      currentRow.read_only_mounts
+        ? JSON.parse(currentRow.read_only_mounts) as Array<{ host_path: string; container_path: string; label: string }>
+        : [];
+    const currentExtraSkills: string[] = currentRow.extra_skills
+      ? JSON.parse(currentRow.extra_skills) as string[]
+      : [];
+    const currentModelOverride = currentRow.model_override ?? null;
+
+    // Effective post-PATCH values:
+    const nextRecipeSlug: string | null = patchProvided('recipe_slug')
+      ? ((body.recipe_slug as string | null | undefined) ?? null)
+      : currentRecipeSlug;
+    const nextWorkspaceSource: { project_id: number; base_ref: string } | null =
+      patchProvided('workspace_source')
+        ? ((body.workspace_source as { project_id: number; base_ref: string } | null | undefined) ?? null)
+        : currentWorkspaceSource;
+    const nextReadOnlyMounts: Array<{ host_path: string; container_path: string; label: string }> =
+      patchProvided('read_only_mounts')
+        ? ((body.read_only_mounts as Array<{ host_path: string; container_path: string; label: string }> | null | undefined) ?? [])
+        : currentReadOnlyMounts;
+    const nextExtraSkills: string[] = patchProvided('extra_skills')
+      ? ((body.extra_skills as string[] | null | undefined) ?? [])
+      : currentExtraSkills;
+
+    // --- 1. recipe_slug pre-dispatch mutability gate ---
+    // Identity PATCH (same value as current) is allowed through any status.
+    if (patchProvided('recipe_slug') && (body.recipe_slug ?? null) !== currentRecipeSlug) {
+      if (!RECIPE_SLUG_MUTABLE_STATUSES.has(currentTask.status as string)) {
+        runtimeIssues.push({
+          field: 'recipe_slug',
+          code: TASK_RUNTIME_ERROR_CODES.RECIPE_LOCKED,
+          message: `recipe_slug is immutable once a task leaves pre-dispatch status; current status is '${currentTask.status}'`,
+          hint: "recipe_slug can only be changed while status is 'backlog' or 'inbox'. Cancel the task and recreate if you need a different recipe on a dispatched task.",
+        });
+      }
+    }
+
+    // --- 2. Recipe existence + workspace_source gap for the EFFECTIVE slug ---
+    let resolvedRecipe: ReturnType<typeof getIndexedRecipeBySlug> = null;
+    if (nextRecipeSlug) {
+      resolvedRecipe = getIndexedRecipeBySlug(nextRecipeSlug);
+      if (resolvedRecipe === null) {
+        runtimeIssues.push({
+          field: 'recipe_slug',
+          code: TASK_RUNTIME_ERROR_CODES.RECIPE_NOT_FOUND,
+          message: `recipe_slug '${nextRecipeSlug}' does not reference an indexed recipe`,
+          hint: 'Verify the slug via GET /api/recipes/:slug or POST /api/recipes/resync.',
+        });
+      } else if ('error_message' in resolvedRecipe && resolvedRecipe.error_message !== null) {
+        runtimeIssues.push({
+          field: 'recipe_slug',
+          code: TASK_RUNTIME_ERROR_CODES.RECIPE_BROKEN,
+          message: `recipe_slug '${nextRecipeSlug}' references a broken recipe: ${resolvedRecipe.error_message}`,
+          hint: 'Fix the recipe under recipes/<slug>/ and wait for the watcher to re-index, or call POST /api/recipes/resync.',
+        });
+        resolvedRecipe = null;
+      } else {
+        // resolvedRecipe is RecipeRow
+        if (resolvedRecipe.workspace_mode === 'worktree' && nextWorkspaceSource === null) {
+          runtimeIssues.push({
+            field: 'workspace_source',
+            code: TASK_RUNTIME_ERROR_CODES.REQUIRED_BY_RECIPE,
+            message: `recipe '${nextRecipeSlug}' declares workspace: worktree — task must carry workspace_source`,
+            hint: 'Supply workspace_source: { project_id, base_ref } in the same PATCH.',
+          });
+        }
+      }
+    }
+
+    // --- 3. Cap enforcement against EFFECTIVE arrays ---
+    const mountsCap = getMountsCap();
+    if (nextReadOnlyMounts.length > mountsCap) {
+      runtimeIssues.push({
+        field: 'read_only_mounts',
+        code: TASK_RUNTIME_ERROR_CODES.CAP_EXCEEDED,
+        message: `read_only_mounts has ${nextReadOnlyMounts.length} entries; the configured cap is ${mountsCap}`,
+        hint: `Reduce the list to at most ${mountsCap} entries, or ask an admin to raise 'runtime.read_only_mounts_cap'.`,
+      });
+    }
+    const skillsCap = getExtraSkillsCap();
+    if (nextExtraSkills.length > skillsCap) {
+      runtimeIssues.push({
+        field: 'extra_skills',
+        code: TASK_RUNTIME_ERROR_CODES.CAP_EXCEEDED,
+        message: `extra_skills has ${nextExtraSkills.length} entries; the configured cap is ${skillsCap}`,
+        hint: `Reduce the list to at most ${skillsCap} entries, or ask an admin to raise 'runtime.extra_skills_cap'.`,
+      });
+    }
+
+    // --- 4. Allowlist checks against EFFECTIVE arrays (preserve-and-revalidate) ---
+    for (let i = 0; i < nextReadOnlyMounts.length; i++) {
+      const mount = nextReadOnlyMounts[i];
+      const result = await validateHostPathAgainstAllowlist(mount.host_path);
+      if (!result.ok) {
+        runtimeIssues.push({
+          field: `read_only_mounts.${i}.host_path`,
+          code: result.code,
+          message: result.message,
+          hint: result.hint,
+        });
+      }
+    }
+    for (let i = 0; i < nextExtraSkills.length; i++) {
+      const result = await validateHostPathAgainstAllowlist(nextExtraSkills[i]);
+      if (!result.ok) {
+        runtimeIssues.push({
+          field: `extra_skills.${i}`,
+          code: result.code,
+          message: result.message,
+          hint: result.hint,
+        });
+      }
+    }
+
+    // --- 5. Preserve-and-revalidate model_override ---
+    // Body-shape layer already enforces model_override when PROVIDED (via the
+    // Zod refine on updateTaskSchema). But when the PATCH omits model_override
+    // and the EXISTING value is invalid under the current registry, we must
+    // still catch it per "preserve-and-revalidate" semantics.
+    if (!patchProvided('model_override') && currentModelOverride !== null) {
+      if (!isKnownModel(currentModelOverride)) {
+        runtimeIssues.push({
+          field: 'model_override',
+          code: TASK_RUNTIME_ERROR_CODES.UNKNOWN_MODEL,
+          message: `task's existing model_override '${currentModelOverride}' is no longer in the model registry. Known models: ${MODEL_IDS.join(', ')}`,
+          hint: 'Supply a valid model_override in this PATCH, or set it to null to unset.',
+        });
+      }
+    }
+
+    if (runtimeIssues.length > 0) {
+      return buildAggregatedValidationResponse(runtimeIssues);
+    }
+
     // Build dynamic update query
     const fieldsToUpdate = [];
     const updateParams: any[] = [];
@@ -294,7 +524,33 @@ export async function PUT(
       fieldsToUpdate.push('metadata = ?');
       updateParams.push(JSON.stringify(metadata));
     }
-    
+
+    // Phase 13 — runtime-context fields. Each column is dynamically added to
+    // the UPDATE only when the caller explicitly sent the key. patchProvided
+    // distinguishes omission from explicit null: omitted = keep current,
+    // explicit null = clear. JSON columns are serialized here; arrays/objects
+    // become JSON strings, null stays null.
+    if (patchProvided('recipe_slug')) {
+      fieldsToUpdate.push('recipe_slug = ?');
+      updateParams.push(body.recipe_slug ?? null);
+    }
+    if (patchProvided('workspace_source')) {
+      fieldsToUpdate.push('workspace_source = ?');
+      updateParams.push(body.workspace_source ? JSON.stringify(body.workspace_source) : null);
+    }
+    if (patchProvided('read_only_mounts')) {
+      fieldsToUpdate.push('read_only_mounts = ?');
+      updateParams.push(body.read_only_mounts ? JSON.stringify(body.read_only_mounts) : null);
+    }
+    if (patchProvided('extra_skills')) {
+      fieldsToUpdate.push('extra_skills = ?');
+      updateParams.push(body.extra_skills ? JSON.stringify(body.extra_skills) : null);
+    }
+    if (patchProvided('model_override')) {
+      fieldsToUpdate.push('model_override = ?');
+      updateParams.push(body.model_override ?? null);
+    }
+
     fieldsToUpdate.push('updated_at = ?');
     updateParams.push(now);
     updateParams.push(taskId, workspaceId);
