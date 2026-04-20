@@ -307,7 +307,7 @@ Plans:
   4. `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox → assigned` without running agent-affinity scoring; `dispatchAssignedTasks()` skips tasks with `recipe_slug` so legacy behavior is preserved for non-recipe tasks; `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to legacy logic
   5. A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when the runner has been unreachable beyond the threshold, so reconcile-on-reconnect works cleanly
   6. `task.runner_requested` fires from all three emission points (`autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` on direct-assigned creation with `recipe_slug`, the runner-exit retry path on `in_progress → assigned`), and `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` are broadcast on SSE for UI reactivity
-**Plans:** 7 plans
+**Plans:** 2/7 plans executed
 Plans:
 - [ ] 15-01-PLAN.md — Extend EventType union + RUNNER_TOKEN_ALLOWLIST for POST /api/tasks/:id/checkpoints (CP-01 foundation, SCHED-06 foundation)
 - [ ] 15-02-PLAN.md — Scheduler refactor (TICK_MS 60→30s, reconcileRunnerHeartbeat) + task-dispatch recipe branches + POST /api/tasks emission (SCHED-01..06)
@@ -375,6 +375,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 12. Recipe System *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 12/12 | Complete    | 2026-04-20 |
-| 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |
+| 15. Checkpoints & Scheduler Integration *(v1.2)* | 2/7 | In Progress|  |
 | 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |

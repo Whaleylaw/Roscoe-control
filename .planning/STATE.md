@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-20T19:54:44.280Z"
+last_updated: "2026-04-20T22:32:39.369Z"
 progress:
-  total_phases: 14
+  total_phases: 15
   completed_phases: 11
-  total_plans: 52
-  completed_plans: 58
+  total_plans: 59
+  completed_plans: 60
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 14 (Runner & Container v1.2) — CLOSED (12/12 plans complete). Ready to begin Phase 15 (Checkpoints & Scheduler Integration).
-Plans: 14-01 ✓, 14-02 ✓, 14-03 ✓, 14-04 ✓, 14-05 ✓, 14-06 ✓, 14-07 ✓, 14-08a ✓, 14-08b ✓, 14-09 ✓, 14-10 ✓, 14-11 ✓
-Status: Plan 14-10 complete. recipes/hello-world/recipe.yaml + recipes/hello-world/SOUL.md + scripts/mc-runner-smoke.sh shipped (c6da0c9, d2174f3, 45372da, 34c4df8). Human-verify checkpoint resolved 2026-04-20 via operator `approved` response after the server-restart remediation. Continuation agent scanned for smoke artifacts (.planning/phases/…/14-10-smoke.log, .data/runner/worktrees/task-*/HELLO.md, .data/runner/worktrees/task-*/.mc/checkpoints.jsonl, .data/runner/smoke-daemon.err) — all absent at resolution time; .data/runner/ does not exist in working tree. VERIFICATION.md ## Completed Run block records the honest artifact-scan outcome; no fabricated tails. SUMMARY.md flipped to Self-Check PASSED with Human-verify resolution block. Full behavioral E2E re-exercised in the Phase 17 integration suite (planned).
-Last activity: 2026-04-20 — Plan 14-10 checkpoint resolved. 5 commits total on main for 14-10 (recipe, harness, log-format fix, autonomous-portion metadata, resolution). Phase 14 closed. Decisions logged (14-10): canonical model ID is claude-haiku-4-5-20251001; SOUL.md deliberately short; smoke harness creates dedicated `mc-runner-smoke` project; POLL_BUDGET_SEC=180 gives 60s headroom over recipe timeout; EXIT trap critical because harness launches daemon in background; printf '%()T' format is fragile and replaced with `date '+%H:%M:%S'` across /scripts; dev-server cwd matters for recipe indexing (getRecipesRoot() defaults to <cwd>/recipes).
-Next: Run `/gsd:plan-phase 15` for Checkpoints & Scheduler Integration — CP-01..06 + SCHED-01..06. Phase 15 depends only on Phase 14 (closed) and delivers the agent-facing checkpoint HTTP endpoint + scheduler hooks. After Phase 15, Phase 16 (UI surfaces) and Phase 17 (integration testing) close the v1.2 milestone.
+Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 in flight.
+Plans: 15-01 (in progress, 2 commits landed), 15-02 (in progress, 2 commits landed), 15-03 ✓ (seedMcDir resume_marker extension complete), 15-04..15-07 pending.
+Status: Plan 15-03 complete — seedMcDir extended with optional resume_marker for CP-04 blocker-resume flow. SeedMcDirInput interface exported; marker format LOCKED per 15-CONTEXT.md: `<iso-ts> | <<< RESUMED AFTER BLOCKER: <blocker_reason> >>>`. First-attempt behavior unchanged (marker ignored); resume-preservation + defensive-fallback both unchanged with marker stacking on top. Phase 14 regression suite (runner-worktree-seed.test.ts 10/10) still passes; new 8-case unit suite (runner-worktree-resume-marker.test.ts) covers all (is_resuming × resume_marker × pre-existing progress.md × defensive fallback) combinations. Commits 2409141 (Task 1 impl) + 85af186 (Task 2 tests). Source-compatible signature change means Phase 14 callers compile unchanged. Plan 15-05 (Wave 2) now has the full filesystem contract it needs for blocker resume — dispatch payload will carry resume_marker from `SELECT blocker_reason FROM task_checkpoints WHERE task_id=? AND status='blocked' ORDER BY id DESC LIMIT 1`.
+Last activity: 2026-04-20 — Plan 15-03 complete. 2 task commits. Wave 1 parallel execution continues (15-01 + 15-02 in flight). Decisions logged (15-03): SeedMcDirInput source-compatible with Phase 14; resume_marker on first-attempt is silent no-op; marker emitted verbatim (agent is trusted principal); fs.appendFileSync preserves checkpoints.jsonl across the full marker path.
+Next: Await remaining Wave 1 plans (15-01, 15-02, 15-04, 15-06) to complete before Wave 2 (15-05 — blocker flow that consumes seedMcDir's resume_marker contract).
 
 ## Performance Metrics
 
@@ -114,6 +114,8 @@ Next: Run `/gsd:plan-phase 15` for Checkpoints & Scheduler Integration — CP-01
 | Phase 14-runner-container-v1-2 P08b | 7min | 2 tasks | 3 files |
 | Phase 14-runner-container-v1-2 P09 | 2min | 2 tasks | 5 files |
 | Phase 14-runner-container-v1-2 P10 | 12min | 2 tasks | 4 files |
+| Phase 15-checkpoints-scheduler-v1-2 P03 | 4min | 2 tasks tasks | 2 files files |
+| Phase 15-checkpoints-scheduler-v1-2 P01 | 4min | 2 tasks tasks | 5 files files |
 
 ## Accumulated Context
 
@@ -229,6 +231,13 @@ Recent decisions affecting current work:
 - [Phase 14-runner-container-v1-2]: [Phase 14-10]: EXIT trap in smoke harness kills lingering runner PID. Critical because the daemon is launched with `&` — a script crash without trap would leak a live runner. SIGTERM first, 5s grace, SIGKILL fallback.
 - [Phase 14-runner-container-v1-2]: [Phase 14-10]: printf '%()T' format specifier is fragile in bash log helpers — it re-interprets any literal `%` in the message. Replaced with `printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*"` across the harness. Convention to apply to any future bash tooling authored in /scripts.
 - [Phase 14-runner-container-v1-2]: [Phase 14-10]: Dev-server cwd matters for recipe indexing. `getRecipesRoot()` defaults to `<process.cwd()>/recipes`; standalone builds run from `.next/standalone/` which doesn't contain the authored recipes tree. Operators running the standalone server for prod-parity testing MUST set MISSION_CONTROL_RECIPES_DIR. The smoke harness detects this condition and halts with a remediation message rather than continuing to a confusing task-create error.
+- [Phase 15-03]: [Phase 15-03]: SeedMcDirInput extension is SOURCE-COMPATIBLE with Phase 14 callers — { task } is assignable to { task, resume_marker? } so no Phase 14 call site needs modification; resume_marker default (absent/null) preserves byte-for-byte Phase 14 progress.md behavior
+- [Phase 15-03]: [Phase 15-03]: resume_marker on first-attempt seeds (is_resuming=false) is a SILENT NO-OP, not a throw — Plan 15-05 can pass the same payload uniformly across first-attempt and resume dispatches without gating on is_resuming
+- [Phase 15-03]: [Phase 15-03]: Marker format emitted VERBATIM with no escaping — blocker_reason is agent-authored and agent is trusted principal per 15-CONTEXT.md; content sanitisation (newlines, path-safety) deferred to a future phase
+- [Phase 15-03]: [Phase 15-03]: Marker append uses fs.appendFileSync AFTER the defensive-fallback header write, so wiped-worktree + marker stacks cleanly (header first, then marker line). Never touches checkpoints.jsonl — that preservation invariant holds across Phase 14 + Phase 15.
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-01]: EventType union extended by 6 additive members at tail (after gsd.conflict.detected); append pattern preserves union integrity and scans as single diff block
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-01]: RUNNER_TOKEN_ALLOWLIST gets exactly ONE new entry (POST /api/tasks/:id/checkpoints) with digit-only id regex; preamble comment rewritten to replace Phase 11-era 'DO NOT add' lock with explicit CP-01 exception + pointer to 15-CONTEXT.md lock
+- [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-01]: auth.ts runner-TOKEN prefix filter extended via narrow OR (isRunnerPath || isCheckpointsTaskPath) — NOT by broadening startsWith('/api/runner/'); runner-SECRET gate at line 472 unchanged because runner-secret is not valid on /api/tasks/:id/checkpoints
 
 ### Pending Todos
 
@@ -251,6 +260,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T22:00:00Z
-Stopped at: Phase 14 closed (12/12 plans). Plan 14-10 human-verify checkpoint resolved via operator `approved`. Continuation agent honestly recorded the absence of on-disk smoke artifacts in VERIFICATION.md "Completed Run" + SUMMARY.md "Human-verify resolution" — positive signal is operator response, not forensics; Phase 17 re-exercises the behavior automatically.
-Resume file: Ready to start Phase 15 planning — run `/gsd:plan-phase 15` (Checkpoints & Scheduler Integration). See .planning/ROADMAP.md "Phase 15: Checkpoints & Scheduler Integration" for dependencies + requirements + success criteria.
+Last session: 2026-04-20T22:30:00Z
+Stopped at: Phase 15 Wave 1 in flight — Plan 15-03 complete (seedMcDir resume_marker extension, commits 2409141 + 85af186). Phase 14 regression-free; 8/8 new tests pass. Plans 15-01 and 15-02 concurrently landing commits. Plan 15-05 (Wave 2) unblocked on the filesystem side — awaits 15-01..15-04 completion before the blocker-flow state machine integrates.
+Resume file: Continue `/gsd:execute-phase 15` to pick up remaining Wave 1 plans. See .planning/phases/15-checkpoints-scheduler-v1-2/15-03-SUMMARY.md for the resume_marker contract handoff to Plan 15-05.

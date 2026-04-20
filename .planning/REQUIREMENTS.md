@@ -171,10 +171,10 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Checkpoints
 
-- [ ] **CP-01**: Agent can post a checkpoint via `POST /api/tasks/:id/checkpoints` with `step`, `summary`, `status` (`completed` | `in_progress` | `blocked`), plus optional `artifacts`, `next_step`, `blocker_reason`, `tokens_used`, `duration_ms`
-- [ ] **CP-02**: Each checkpoint is stored both as a `task_checkpoints` row and as one JSON line appended to `<worktree>/.mc/checkpoints.jsonl` with identical field names
+- [x] **CP-01**: Agent can post a checkpoint via `POST /api/tasks/:id/checkpoints` with `step`, `summary`, `status` (`completed` | `in_progress` | `blocked`), plus optional `artifacts`, `next_step`, `blocker_reason`, `tokens_used`, `duration_ms`
+- [x] **CP-02**: Each checkpoint is stored both as a `task_checkpoints` row and as one JSON line appended to `<worktree>/.mc/checkpoints.jsonl` with identical field names
 - [ ] **CP-03**: `status: blocked` checkpoints transition the task `in_progress → awaiting_owner`, post an automatic comment with the blocker reason, and gracefully stop the container
-- [ ] **CP-04**: When the blocker is resolved (task back to `assigned`), runner relaunches with the resume flow
+- [x] **CP-04**: When the blocker is resolved (task back to `assigned`), runner relaunches with the resume flow
 - [ ] **CP-05**: Checkpoint artifact entries are typed (`kind: file | url | diff | test_result | comment | other`) with optional `path`, `url`, `ref`, `summary`
 - [ ] **CP-06**: Viewer can fetch the full checkpoint timeline for a task via `GET /api/tasks/:id/checkpoints`, filterable by `attempt`
 
@@ -210,7 +210,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **SCHED-03**: `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to existing legacy logic
 - [ ] **SCHED-04**: A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when runner is unreachable, so reconcile-on-reconnect works cleanly
 - [ ] **SCHED-05**: `task.runner_requested` event is emitted from three points: `autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` when a task is created directly as `assigned` with `recipe_slug`, and the runner-exit retry path on `in_progress → assigned`
-- [ ] **SCHED-06**: `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` events are broadcast on SSE for UI reactivity
+- [x] **SCHED-06**: `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` events are broadcast on SSE for UI reactivity
 
 ### Integration & Testing
 
@@ -350,10 +350,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORK-05 | Phase 14 | Complete |
 | WORK-06 | Phase 14 | Complete |
 | WORK-07 | Phase 14 | Complete |
-| CP-01 | Phase 15 | Pending |
-| CP-02 | Phase 15 | Pending |
+| CP-01 | Phase 15 | Complete |
+| CP-02 | Phase 15 | Complete |
 | CP-03 | Phase 15 | Pending |
-| CP-04 | Phase 15 | Pending |
+| CP-04 | Phase 15 | Complete |
 | CP-05 | Phase 15 | Pending |
 | CP-06 | Phase 15 | Pending |
 | RAUTH-01 | Phase 11 | Complete |
@@ -377,7 +377,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHED-03 | Phase 15 | Pending |
 | SCHED-04 | Phase 15 | Pending |
 | SCHED-05 | Phase 15 | Pending |
-| SCHED-06 | Phase 15 | Pending |
+| SCHED-06 | Phase 15 | Complete |
 | RTEST-01 | Phase 17 | Pending |
 | RTEST-02 | Phase 17 | Pending |
 | RTEST-03 | Phase 17 | Pending |
