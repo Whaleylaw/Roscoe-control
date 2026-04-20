@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { z } from 'zod'
 
 const requireRoleMock = vi.fn(() => ({ user: { username: 'tester', workspace_id: 1, role: 'operator' } }))
 const mutationLimiterMock = vi.fn(() => null)
@@ -9,10 +10,21 @@ const prepareMock = vi.fn()
 
 vi.mock('@/lib/auth', () => ({ requireRole: requireRoleMock }))
 vi.mock('@/lib/rate-limit', () => ({ mutationLimiter: mutationLimiterMock }))
-vi.mock('@/lib/validation', () => ({
-  validateBody: validateBodyMock,
-  updateTaskSchema: {},
-}))
+// Phase 13 — the route now calls updateTaskSchema.safeParse(json) directly
+// (manual safeParse swapped in for validateBody). To preserve this test's
+// original intent ("no-op PATCH body → 200 unchanged=true"), we substitute a
+// no-default permissive schema so Zod does NOT materialise default values
+// (priority='medium', tags=[], metadata={}) on an empty {} input. The real
+// schema's defaults would otherwise populate three fieldsToUpdate entries and
+// convert this test into an UPDATE-that-happens test instead of a no-op test.
+vi.mock('@/lib/validation', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/validation')>('@/lib/validation')
+  return {
+    ...actual,
+    validateBody: validateBodyMock,
+    updateTaskSchema: z.object({}).passthrough(),
+  }
+})
 vi.mock('@/lib/task-status', () => ({ normalizeTaskUpdateStatus: normalizeTaskUpdateStatusMock }))
 vi.mock('@/lib/mentions', () => ({ resolveMentionRecipients: vi.fn(() => ({ recipients: [], unresolved: [] })) }))
 vi.mock('@/lib/event-bus', () => ({ eventBus: { broadcast: vi.fn() } }))
@@ -60,6 +72,13 @@ describe('PUT /api/tasks/[id] no-op updates', () => {
     prepareMock.mockImplementation((sql: string) => {
       if (sql.includes('SELECT * FROM tasks WHERE id = ? AND workspace_id = ?')) {
         return { get: getMock }
+      }
+      if (/FROM\s+settings\s+WHERE\s+key/i.test(sql)) {
+        // Phase 13 — runtime-settings lookups (mount_allowlist / caps). The no-op
+        // PATCH body supplies no runtime-context fields, so the handler falls
+        // through to defaults (empty allowlist, default caps) and the query
+        // returns undefined. `as unknown as ...` keeps getMock typed loosely.
+        return { get: vi.fn(() => undefined) as unknown as typeof getMock }
       }
       throw new Error(`Unexpected SQL in test: ${sql}`)
     })
