@@ -45,6 +45,15 @@ vi.mock('@/lib/logger', () => ({
   },
 }))
 
+const broadcastMock = vi.fn()
+vi.mock('@/lib/event-bus', () => ({
+  eventBus: {
+    broadcast: (...args: unknown[]) => broadcastMock(...args),
+    on: vi.fn(),
+    emit: vi.fn(),
+  },
+}))
+
 // Imports AFTER mocks so the route picks them up.
 import { POST } from '@/app/api/runner/tasks/[task_id]/runner-exit/route'
 import { mutationLimiter } from '@/lib/rate-limit'
@@ -199,6 +208,7 @@ beforeEach(async () => {
   vi.mocked(mutationLimiter).mockReset()
   vi.mocked(mutationLimiter).mockReturnValue(null)
   loggerWarnSpy.mockReset()
+  broadcastMock.mockReset()
   recipesRoot = null
   delete process.env.MISSION_CONTROL_RECIPES_DIR
 })
@@ -536,5 +546,244 @@ describe('POST /api/runner/tasks/:task_id/runner-exit', () => {
     const [payload, message] = loggerWarnSpy.mock.calls[0]
     expect(payload).toMatchObject({ task_id: taskId, attempt: 1 })
     expect(message).toMatch(/task_runner_attempts UPDATE affected 0 rows/i)
+  })
+
+  // --------------------------------------------------------------------------
+  // 9. Plan 15-05 SCHED-06: task.container_exited broadcasts on retry path
+  //    AND Plan 15-05 SCHED-05 (3rd emission): task.runner_requested fires
+  //    when retry flips the task back to assigned.
+  // --------------------------------------------------------------------------
+  it('SCHED-05/06: retry path emits task.container_exited (reason=exit) AND task.runner_requested', async () => {
+    const taskId = seedTask({
+      status: 'in_progress',
+      runner_attempts: 1,
+      runner_max_attempts: 3,
+      recipe_slug: 'hello-world',
+      container_id: 'pending:1:1',
+      runner_started_at: 1_699_999_000,
+    })
+    seedAttempt(taskId, 1)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: 1,
+      reason: 'exit',
+      attempt: 1,
+    })
+    const res = await POST(req, { params })
+
+    expect(res.status).toBe(204)
+    expect(getTask(taskId).status).toBe('assigned')
+
+    // Both broadcasts fire — order: container_exited then runner_requested.
+    const types = broadcastMock.mock.calls.map((c) => c[0])
+    expect(types).toContain('task.container_exited')
+    expect(types).toContain('task.runner_requested')
+
+    const exitCall = broadcastMock.mock.calls.find(
+      (c) => c[0] === 'task.container_exited',
+    )
+    expect(exitCall![1]).toMatchObject({
+      task_id: taskId,
+      attempt: 1,
+      reason: 'exit',
+      exit_code: 1,
+      container_id: 'pending:1:1',
+      workspace_id: 1,
+    })
+
+    const requestedCall = broadcastMock.mock.calls.find(
+      (c) => c[0] === 'task.runner_requested',
+    )
+    expect(requestedCall![1]).toMatchObject({
+      task_id: taskId,
+      recipe_slug: 'hello-world',
+      workspace_id: 1,
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // 10. Terminal fail emits task.container_exited but NOT task.runner_requested.
+  // --------------------------------------------------------------------------
+  it('SCHED-06: terminal fail (attempts >= max) emits task.container_exited (reason=exit); no task.runner_requested', async () => {
+    const taskId = seedTask({
+      status: 'in_progress',
+      runner_attempts: 3,
+      runner_max_attempts: 3,
+      container_id: 'pending:1:3',
+    })
+    seedAttempt(taskId, 3)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: 1,
+      reason: 'exit',
+      attempt: 3,
+    })
+    const res = await POST(req, { params })
+
+    expect(res.status).toBe(204)
+    expect(getTask(taskId).status).toBe('failed')
+
+    const types = broadcastMock.mock.calls.map((c) => c[0])
+    expect(types).toContain('task.container_exited')
+    expect(types).not.toContain('task.runner_requested')
+
+    const exitCall = broadcastMock.mock.calls.find(
+      (c) => c[0] === 'task.container_exited',
+    )
+    expect(exitCall![1]).toMatchObject({
+      task_id: taskId,
+      reason: 'exit',
+      exit_code: 1,
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // 11. Blocker pre-flip override: task already in awaiting_owner →
+  //     task.container_exited reason='blocked' (override), no status change.
+  // --------------------------------------------------------------------------
+  it('SCHED-06: task pre-flipped to awaiting_owner (blocker) → reason=blocked override; no status change; no runner_requested', async () => {
+    // Seed a task already in `awaiting_owner` simulating the blocker
+    // checkpoint flow (Plan 15-05 Task 1) running BEFORE the runner-exit
+    // POST arrives.
+    const taskId = seedTask({
+      status: 'awaiting_owner',
+      runner_attempts: 1,
+      runner_max_attempts: 3,
+      container_id: 'pending:1:1',
+    })
+    seedAttempt(taskId, 1)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: 0,
+      reason: 'exit',
+      attempt: 1,
+    })
+    const res = await POST(req, { params })
+
+    // The handler treats `awaiting_owner` as a NON-terminal status (not in
+    // {done, failed, cancelled}) so the 409 idempotency guard does NOT fire.
+    // The handler proceeds, but isSuccessfulExit=true short-circuits the
+    // status transition — task stays in awaiting_owner.
+    expect(res.status).toBe(204)
+    expect(getTask(taskId).status).toBe('awaiting_owner')
+
+    const exitCall = broadcastMock.mock.calls.find(
+      (c) => c[0] === 'task.container_exited',
+    )
+    expect(exitCall).toBeDefined()
+    // Override applied — runner reported reason='exit' but task is in
+    // awaiting_owner so we broadcast 'blocked' instead.
+    expect(exitCall![1]).toMatchObject({
+      task_id: taskId,
+      reason: 'blocked',
+      exit_code: 0,
+    })
+
+    const types = broadcastMock.mock.calls.map((c) => c[0])
+    expect(types).not.toContain('task.runner_requested')
+  })
+
+  // --------------------------------------------------------------------------
+  // 12. timeout reason → task.container_exited reason='timeout'.
+  // --------------------------------------------------------------------------
+  it('SCHED-06: timeout reason surfaces verbatim in broadcast', async () => {
+    const taskId = seedTask({
+      status: 'in_progress',
+      runner_attempts: 1,
+      runner_max_attempts: 3,
+      container_id: 'pending:1:1',
+    })
+    seedAttempt(taskId, 1)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: null,
+      reason: 'timeout',
+      attempt: 1,
+    })
+    const res = await POST(req, { params })
+
+    expect(res.status).toBe(204)
+
+    const exitCall = broadcastMock.mock.calls.find(
+      (c) => c[0] === 'task.container_exited',
+    )
+    expect(exitCall![1]).toMatchObject({
+      task_id: taskId,
+      reason: 'timeout',
+      exit_code: null,
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // 13. worktree_create_failed forces terminal fail; emits container_exited
+  //     reason='worktree_create_failed'; NO runner_requested.
+  // --------------------------------------------------------------------------
+  it('SCHED-06: worktree_create_failed → reason=worktree_create_failed, status=failed, no runner_requested', async () => {
+    const taskId = seedTask({
+      status: 'in_progress',
+      runner_attempts: 1,
+      runner_max_attempts: 5,
+      container_id: 'pending:1:1',
+      recipe_slug: 'hello-world',
+    })
+    seedAttempt(taskId, 1)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: null,
+      reason: 'worktree_create_failed',
+      attempt: 1,
+    })
+    const res = await POST(req, { params })
+
+    expect(res.status).toBe(204)
+    expect(getTask(taskId).status).toBe('failed')
+
+    const exitCall = broadcastMock.mock.calls.find(
+      (c) => c[0] === 'task.container_exited',
+    )
+    expect(exitCall![1]).toMatchObject({
+      task_id: taskId,
+      reason: 'worktree_create_failed',
+    })
+
+    const types = broadcastMock.mock.calls.map((c) => c[0])
+    expect(types).not.toContain('task.runner_requested')
+  })
+
+  // --------------------------------------------------------------------------
+  // 14. Non-recipe task (recipe_slug IS NULL) on retry path → no
+  //     task.runner_requested even though status flips to assigned.
+  // --------------------------------------------------------------------------
+  it('SCHED-05: non-recipe task on retry → status=assigned but NO task.runner_requested (recipe_slug gate)', async () => {
+    const taskId = seedTask({
+      status: 'in_progress',
+      runner_attempts: 1,
+      runner_max_attempts: 3,
+      container_id: 'pending:1:1',
+      recipe_slug: null,
+    })
+    seedAttempt(taskId, 1)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: 1,
+      reason: 'exit',
+      attempt: 1,
+    })
+    const res = await POST(req, { params })
+
+    expect(res.status).toBe(204)
+    expect(getTask(taskId).status).toBe('assigned')
+
+    // container_exited still fires (every exit emits one).
+    const types = broadcastMock.mock.calls.map((c) => c[0])
+    expect(types).toContain('task.container_exited')
+    // But runner_requested does NOT fire — gated on recipe_slug.
+    expect(types).not.toContain('task.runner_requested')
   })
 })

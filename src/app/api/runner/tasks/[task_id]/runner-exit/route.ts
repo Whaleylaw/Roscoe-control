@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth'
 import { getDatabase } from '@/lib/db'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
+import { eventBus } from '@/lib/event-bus'
 import { revokeTokensForTask } from '@/lib/runner-tokens'
 import { resolveRecipeMaxAttempts } from '@/lib/runner-claim'
 
@@ -73,6 +74,7 @@ interface TaskRow {
   runner_max_attempts: number | null
   container_id: string | null
   runner_started_at: number | null
+  workspace_id: number
 }
 
 /**
@@ -140,7 +142,7 @@ export async function POST(
   const task = db
     .prepare(
       `SELECT id, status, recipe_slug, runner_attempts, runner_max_attempts,
-              container_id, runner_started_at
+              container_id, runner_started_at, workspace_id
        FROM tasks
        WHERE id = ?`,
     )
@@ -178,6 +180,12 @@ export async function POST(
   const shouldFail =
     !isSuccessfulExit &&
     (runnerAttempts >= resolvedMaxAttempts || reason === 'worktree_create_failed')
+
+  // Snapshot the container_id BEFORE the transaction — the retry / fail
+  // branches NULL it out as part of the state transition, but the
+  // task.container_exited broadcast wants the container the runner just
+  // reported on (Plan 15-06 task.container_started uses the same convention).
+  const exitedContainerId = task.container_id
 
   try {
     db.transaction(() => {
@@ -267,6 +275,62 @@ export async function POST(
       { error: 'Failed to persist runner exit' },
       { status: 500 },
     )
+  }
+
+  // Phase 15 SCHED-06: broadcast task.container_exited for every exit so
+  // observers (Phase 16 UI, integration tests) see the container go down.
+  // Blocker-override rule: when the task is in `awaiting_owner` status post-
+  // transaction, the blocker checkpoint flow flipped it before the runner-
+  // exit arrived. Override the reported reason to 'blocked' so the UI sees
+  // a coherent story (the docker stop was triggered by the blocker, not by
+  // the agent's own exit code).
+  let exitReasonForBroadcast: string = reason
+  try {
+    const fresh = db
+      .prepare(`SELECT status FROM tasks WHERE id = ?`)
+      .get(taskId) as { status: string } | undefined
+    if (fresh?.status === 'awaiting_owner') {
+      exitReasonForBroadcast = 'blocked'
+    }
+  } catch (err) {
+    // Defensive — broadcast falls back to the runner-reported reason. The
+    // primary state transition already committed; failing the SELECT here
+    // must not 500 the response.
+    logger.warn(
+      { err, task_id: taskId },
+      'runner-exit: post-transaction status SELECT failed; using runner-reported reason',
+    )
+  }
+
+  eventBus.broadcast('task.container_exited', {
+    task_id: taskId,
+    attempt,
+    reason: exitReasonForBroadcast,
+    exit_code: exit_code ?? null,
+    container_id: exitedContainerId,
+    workspace_id: task.workspace_id,
+  })
+
+  // Phase 15 SCHED-05 (third emission point): when the retry branch flipped
+  // the task back to `assigned` and the task carries a recipe_slug, re-emit
+  // task.runner_requested so the daemon knows to claim. The daemon's claim
+  // path is idempotent (runner-token mint by task_id+attempt), so duplicates
+  // from poll/SSE overlap are safe.
+  //
+  // Gate: only fires when (a) the post-transaction status is `assigned` AND
+  // (b) the task carries a recipe_slug. The gate is intentionally tight —
+  // we only re-emit on the retry path's actual transition to assigned.
+  if (!isSuccessfulExit && !shouldFail && task.recipe_slug) {
+    const retryTask = db
+      .prepare(`SELECT status FROM tasks WHERE id = ?`)
+      .get(taskId) as { status: string } | undefined
+    if (retryTask?.status === 'assigned') {
+      eventBus.broadcast('task.runner_requested', {
+        task_id: taskId,
+        recipe_slug: task.recipe_slug,
+        workspace_id: task.workspace_id,
+      })
+    }
   }
 
   return new NextResponse(null, { status: 204 })
