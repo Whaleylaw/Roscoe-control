@@ -282,9 +282,9 @@ Plans:
   9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
 **Plans:** 12 plans
 Plans:
-- [ ] 14-01-PLAN.md — Migrations 060 (runner_heartbeats) + 061 (task_runner_attempts) + tests (RUNNER-05, WORK-02)
+- [x] 14-01-PLAN.md — Migrations 060 (runner_heartbeats) + 061 (task_runner_attempts) + tests (RUNNER-05, WORK-02)
 - [ ] 14-02-PLAN.md — 5 runtime.* settings + recipe-schema max_attempts + typed getters + tests (RUNNER-08, WORK-06, RUNNER-09)
-- [ ] 14-03-PLAN.md — Wave 0 test scaffolds (11 files, ≥60 it.todo stubs)
+- [x] 14-03-PLAN.md — Wave 0 test scaffolds (11 files, ≥60 it.todo stubs)
 - [ ] 14-04-PLAN.md — heartbeat + ready-tasks + pending-containers + terminal-tasks routes (RUNNER-04, RUNNER-05, RUNNER-13, WORK-07)
 - [ ] 14-05-PLAN.md — POST /api/runner/claim/[task_id] atomic claim with allowlist + caps + token mint + dispatch payload (RUNNER-06..08, MODEL-04)
 - [ ] 14-06-PLAN.md — POST /api/runner/tasks/[task_id]/runner-exit retry/fail driver (RUNNER-11, WORK-06)
