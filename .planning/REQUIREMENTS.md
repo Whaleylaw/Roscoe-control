@@ -148,15 +148,15 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [x] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
 - [ ] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
 - [ ] **RUNNER-11**: Runner waits for container exit, posts `runner-exit` with exit code and stderr tail, and triggers Mission Control retry/fail logic
-- [ ] **RUNNER-12**: Runner gracefully stops the container when a `blocked` checkpoint arrives, preserving the worktree so the next attempt can resume
-- [ ] **RUNNER-13**: On startup after a crash, runner reconciles orphaned containers against the DB via `GET /api/runner/pending-containers` and adopts or cleans them up
-- [ ] **RUNNER-14**: On terminal task status, runner revokes the task token and destroys the worktree (preserving it for a GC window on failure)
+- [x] **RUNNER-12**: Runner gracefully stops the container when a `blocked` checkpoint arrives, preserving the worktree so the next attempt can resume
+- [x] **RUNNER-13**: On startup after a crash, runner reconciles orphaned containers against the DB via `GET /api/runner/pending-containers` and adopts or cleans them up
+- [x] **RUNNER-14**: On terminal task status, runner revokes the task token and destroys the worktree (preserving it for a GC window on failure)
 
 ### Container Execution
 
 - [ ] **CONTAINER-01**: Container receives task context as env vars (`MC_API_URL`, `MC_TASK_ID`, `MC_API_TOKEN`, `MC_WORKSPACE`, `MC_RECIPE_PATH`, `MC_MODEL_*`) and recipe-declared secrets (e.g., `ANTHROPIC_API_KEY`) injected from the runner's secret store
 - [ ] **CONTAINER-02**: Container sees the worktree at `/workspace` (rw when recipe is worktree-mode), the recipe at `/recipe` (ro), read-only mounts at `/refs/<label-slug>/` (ro), and extra skills at `/skills/<name>` (ro)
-- [ ] **CONTAINER-03**: Container is hard-killed at `recipe.timeout_seconds`; runner reports the timeout as the failure reason
+- [x] **CONTAINER-03**: Container is hard-killed at `recipe.timeout_seconds`; runner reports the timeout as the failure reason
 - [ ] **CONTAINER-04**: One reference image (`mc-hello-world-agent`) exercises the full checkpoint → submit flow for integration testing
 
 ### Worktree & Crash Recovery
@@ -167,7 +167,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [ ] **WORK-04**: On a resume attempt, runner injects an agent preamble above SOUL.md instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
 - [ ] **WORK-05**: On first attempt, runner injects a shorter preamble instructing the agent to write notes to `.mc/progress.md` as it works
 - [x] **WORK-06**: Retry cap enforced via `runner_max_attempts` (default 3, recipe-overridable); exceeding the cap marks task `failed` with a clear reason
-- [ ] **WORK-07**: Scheduled garbage-collection job prunes worktrees for tasks terminal longer than N days (configurable, default 7)
+- [x] **WORK-07**: Scheduled garbage-collection job prunes worktrees for tasks terminal longer than N days (configurable, default 7)
 
 ### Checkpoints
 
@@ -336,12 +336,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNNER-09 | Phase 14 | Complete |
 | RUNNER-10 | Phase 14 | Pending |
 | RUNNER-11 | Phase 14 | Pending |
-| RUNNER-12 | Phase 14 | Pending |
-| RUNNER-13 | Phase 14 | Pending |
-| RUNNER-14 | Phase 14 | Pending |
+| RUNNER-12 | Phase 14 | Complete |
+| RUNNER-13 | Phase 14 | Complete |
+| RUNNER-14 | Phase 14 | Complete |
 | CONTAINER-01 | Phase 14 | Pending |
 | CONTAINER-02 | Phase 14 | Pending |
-| CONTAINER-03 | Phase 14 | Pending |
+| CONTAINER-03 | Phase 14 | Complete |
 | CONTAINER-04 | Phase 14 | Pending |
 | WORK-01 | Phase 14 | Pending |
 | WORK-02 | Phase 14 | Complete |
@@ -349,7 +349,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORK-04 | Phase 14 | Pending |
 | WORK-05 | Phase 14 | Pending |
 | WORK-06 | Phase 14 | Complete |
-| WORK-07 | Phase 14 | Pending |
+| WORK-07 | Phase 14 | Complete |
 | CP-01 | Phase 15 | Pending |
 | CP-02 | Phase 15 | Pending |
 | CP-03 | Phase 15 | Pending |

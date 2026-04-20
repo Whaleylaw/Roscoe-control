@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-20T18:09:30.878Z"
+last_updated: "2026-04-20T18:19:03.523Z"
 progress:
   total_phases: 14
   completed_phases: 10
-  total_plans: 52
-  completed_plans: 49
+  total_plans: 53
+  completed_plans: 50
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 14 (Runner & Container v1.2) — IN PROGRESS (3/11 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds)
-Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-04..14-11 ⏳
-Status: Wave 0 complete. Plan 14-02 shipped runtime.max_concurrent_containers / project_repo_map / max_memory_per_container / max_cpu_per_container / failed_gc_window_days with typed getters (getMaxConcurrentContainers, getProjectRepoMap, getMaxMemoryPerContainer, getMaxCpuPerContainer, getFailedGcWindowDays) and the optional `max_attempts` field on `recipeYamlSchema`. DEFAULT_* constants + TASK_RUNTIME_SETTING_KEYS entries exported for downstream plans. 17 Vitest cases in src/lib/__tests__/runtime-settings-phase14.test.ts, all passing. typecheck + lint clean (0 errors).
-Last activity: 2026-04-20 — Plan 14-02 executed. Task 1 commit 0bd4575 (settingDefinitions extension, 5 new runtime.* keys). Task 2 commit 4121dbe (5 getters in task-runtime-settings.ts + max_attempts on recipe-schema.ts). Task 3 commit 8437747 (runtime-settings-phase14.test.ts — 17 tests / 17 pass). Plan locked decision: `max_attempts` NOT round-tripped through recipes DB row; Plans 14-05 / 14-06 re-parse recipe.yaml from filesystem at claim / exit time (resolution: task.runner_max_attempts ?? recipe.max_attempts ?? 3).
-Next: Plan 14-04 (read-side runner API) — replace the 14 it.todo stubs under heartbeat/ + ready-tasks/ + pending-containers/ + terminal-tasks/ with real it() bodies and implement the corresponding route.ts handlers. Per CONTEXT.md the claim route (14-05) MUST import validateHostPathAgainstAllowlist from @/lib/task-runtime-validation for claim-time re-validation (symlink-at-create + symlink-at-claim defense-in-depth); it MUST also import getMaxConcurrentContainers / getProjectRepoMap / getMaxMemoryPerContainer / getMaxCpuPerContainer from @/lib/task-runtime-settings (landed this plan).
+Phase: 14 (Runner & Container v1.2) — IN PROGRESS (4/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-08a runner daemon primitives)
+Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-08a ✓ (runner-gc + runner-reconcile + runner-timeout + runner-log-layout — 4 pure-logic helpers + 26 unit tests), 14-04..14-07, 14-08b, 14-09..14-11 ⏳
+Status: Plan 14-08a shipped the pure-logic primitives the runner daemon (Plan 14-08b) needs: GC decision tree (gcShouldDestroy + planDestroy), reconciliation diff (reconcileContainers → {adopt, kill, orphaned}), timeout arithmetic (computeRemainingTimeoutMs with defensive clamping), and log-layout manager (resolveLogPaths + ensureAttemptDir + updateLatestSymlink + finalizeMeta). 26 Vitest cases across 4 new test files, all pass. Lint clean on the new surface; typecheck clean on the new files (pre-existing heartbeat test TS2345 error from 14-04 remains tracked in deferred-items.md).
+Last activity: 2026-04-20 — Plan 14-08a executed. Task 1 commit c7e84fd (runner-gc.ts + runner-reconcile.ts + runner-timeout.ts + 3 test files — 18 tests). Task 2 commit e1cdaff (runner-log-layout.ts + 1 test file — 8 tests). Decisions: latest symlink target RELATIVE for portability; exited containers ignored by reconcile; computeRemainingTimeoutMs resync-safe (re-derives from mc.runner_started_at label, never local timer); Plan 14-08b daemon either imports these modules or inline-duplicates — either way this plan is the contract + source of truth.
+Next: Plan 14-08b (runner daemon `scripts/mc-runner.mjs`) — wires Plan 14-08a primitives together with `docker run`/`docker ps`/`docker kill`/`docker logs -f` + HTTP (SSE subscribe + poll fallback + claim/exit/checkpoint calls). Import or inline: gcShouldDestroy/planDestroy, reconcileContainers, computeRemainingTimeoutMs, resolveLogPaths/ensureAttemptDir/updateLatestSymlink/finalizeMeta from src/lib/runner-{gc,reconcile,timeout,log-layout}.ts.
 
 ## Performance Metrics
 
@@ -105,6 +105,7 @@ Next: Plan 14-04 (read-side runner API) — replace the 14 it.todo stubs under h
 | Phase 14-runner-container-v1-2 P03 | 4min | 2 tasks | 11 files |
 | Phase 14-runner-container-v1-2 P02 | 4min | 3 tasks tasks | 4 files files |
 | Phase 14-runner-container-v1-2 P01 | 7 | 2 tasks | 2 files |
+| Phase 14-runner-container-v1-2 P08a | 4 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,10 @@ Recent decisions affecting current work:
 - [Phase 14-01]: Migration target was main migrations[] array, not extraMigrations[] — precedent pattern from 054-059. extraMigrations[] is plugin-hook-populated only.
 - [Phase 14-01]: runner_heartbeats UPSERT preserves registered_at by omitting it from the SET clause — first-registration timestamp is never overwritten across heartbeats.
 - [Phase 14-01]: task_runner_attempts UNIQUE(task_id, attempt) enables Plan 14-05 claim route INSERT ON CONFLICT DO NOTHING without SELECT-then-INSERT round-trip; FK CASCADE matches task_runner_tokens (migration 055) precedent.
+- [Phase 14-08a]: Pure-logic runner helpers (gc/reconcile/timeout/log-layout) live in src/lib/ as the canonical contract + test surface; Plan 14-08b daemon either imports or inline-duplicates but these modules are source of truth (26 unit tests)
+- [Phase 14-08a]: latest symlink target is RELATIVE (attempt-<n>, not absolute) so .data/runner/logs/ stays portable if moved; readlinkSync(latest) === 'attempt-<n>'
+- [Phase 14-08a]: reconcileContainers ignores exited containers entirely — docker --rm removes them, treating transient exited rows as kill targets would docker-kill an already-removed container
+- [Phase 14-08a]: computeRemainingTimeoutMs is resync-safe: daemon re-derives remaining time from mc.runner_started_at label on every tick, never starts local timer — restart does NOT extend deadline (Pitfall 9)
 
 ### Pending Todos
 
@@ -189,6 +194,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T18:05:22Z
-Stopped at: Plan 14-02 complete. 5 new runtime.* setting definitions added to settingDefinitions (route.ts), 5 typed getters added to task-runtime-settings.ts (defensive-default pattern, DEFAULT_* constants exported), optional `max_attempts` field added to recipeYamlSchema (NOT round-tripped through recipes DB row — Plans 14-05 / 14-06 re-parse recipe.yaml from disk). 17 Vitest cases in runtime-settings-phase14.test.ts all pass; typecheck + lint clean. Commits 0bd4575 / 4121dbe / 8437747. Next plan: 14-04 (read-side runner API).
-Resume file: .planning/phases/14-runner-container-v1-2/14-02-SUMMARY.md
+Last session: 2026-04-20T18:20:00Z
+Stopped at: Plan 14-08a complete. 4 new pure-logic helpers in src/lib/: runner-gc.ts (gcShouldDestroy + planDestroy), runner-reconcile.ts (reconcileContainers → adopt/kill/orphaned partition), runner-timeout.ts (computeRemainingTimeoutMs, defensively clamped, resync-safe), runner-log-layout.ts (resolveLogPaths + ensureAttemptDir + updateLatestSymlink + finalizeMeta). 26 Vitest cases across 4 new test files all pass; lint clean on new surface; typecheck clean on new files (pre-existing heartbeat TS2345 from 14-04 remains tracked). Commits c7e84fd (Task 1) / e1cdaff (Task 2). Next plan: 14-08b — runner daemon scripts/mc-runner.mjs that wires these four helpers to docker + HTTP.
+Resume file: .planning/phases/14-runner-container-v1-2/14-08a-SUMMARY.md
