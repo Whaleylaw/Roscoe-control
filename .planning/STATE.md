@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-20T18:06:57.064Z"
+last_updated: "2026-04-20T18:09:30.878Z"
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 52
-  completed_plans: 50
+  completed_plans: 49
 ---
 
 # Project State
@@ -104,6 +104,7 @@ Next: Plan 14-04 (read-side runner API) — replace the 14 it.todo stubs under h
 | Phase 13-task-runtime-context-v1-2 P03 | 10min | 2 tasks | 5 files |
 | Phase 14-runner-container-v1-2 P03 | 4min | 2 tasks | 11 files |
 | Phase 14-runner-container-v1-2 P02 | 4min | 3 tasks tasks | 4 files files |
+| Phase 14-runner-container-v1-2 P01 | 7 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,9 @@ Recent decisions affecting current work:
 - [Phase 14-02]: max_attempts NOT persisted to recipes DB row; Plan 14-05 / 14-06 re-parse recipe.yaml from disk. Resolution rule: task.runner_max_attempts ?? recipe.max_attempts ?? 3
 - [Phase 14-02]: Five Phase 14 runtime.* getters use Phase 13 defensive-default pattern; missing row / junk value falls back to documented default — corrupt settings row cannot brick claim or GC
 - [Phase 14-02]: getProjectRepoMap filters non-string / empty values at read time so claim code gets a guaranteed Record<string,string> and dispatches MISSING_PROJECT_REPO purely on key membership
+- [Phase 14-01]: Migration target was main migrations[] array, not extraMigrations[] — precedent pattern from 054-059. extraMigrations[] is plugin-hook-populated only.
+- [Phase 14-01]: runner_heartbeats UPSERT preserves registered_at by omitting it from the SET clause — first-registration timestamp is never overwritten across heartbeats.
+- [Phase 14-01]: task_runner_attempts UNIQUE(task_id, attempt) enables Plan 14-05 claim route INSERT ON CONFLICT DO NOTHING without SELECT-then-INSERT round-trip; FK CASCADE matches task_runner_tokens (migration 055) precedent.
 
 ### Pending Todos
 
