@@ -176,6 +176,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T16:00:00.000Z
-Stopped at: Phase 13 COMPLETE — wave-2 parallel execution (13-02 POST + 13-03 PATCH) landed; 41 new route tests; 1892 pass / 0 fail. TCTX-01..06 fully closed at both create + update surfaces. Manual safeParse + zodErrorToIssues + buildAggregatedValidationResponse pattern now consistent across POST /api/tasks and PUT /api/tasks/[id]. Ready for `/gsd:verify-work 13` or Phase 14 planning.
-Resume file: None
+Last session: 2026-04-20T17:00:00.000Z
+Stopped at: Phase 14 context gathered — 4 areas discussed (agent preambles, reference image, on-disk layout & retention, container lifecycle). CONTEXT.md captures 16+ locked decisions including tool-agnostic preamble (verbose-with-examples, injected via MC_PREAMBLE_PATH env var pointing at /recipe/PREAMBLE.md), mc-hello-world-agent layout at docker/hello-world-agent/, worktree-per-task reuse model, runner-side 10-minute GC tick with 7-day failed-task retention, `mc-task-<id>-a<n>` container naming + mc.* label schema, bridge network with host.docker.internal, Docker-down → exit 2 + LaunchAgent throttle. Next: /gsd:plan-phase 14.
+Resume file: .planning/phases/14-runner-container-v1-2/14-CONTEXT.md
