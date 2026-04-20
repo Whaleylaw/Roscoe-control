@@ -1724,6 +1724,53 @@ const migrations: Migration[] = [
         WHERE id NOT IN (SELECT rowid FROM recipes_fts)
       `)
     }
+  },
+  {
+    id: '060_runner_heartbeats',
+    up(db: Database.Database) {
+      // Phase 14: runner heartbeat persistence.
+      // One row per runner_id; last_heartbeat_at is refreshed via UPSERT on every heartbeat
+      // tick. Freshness consumed by Phase 15 reconcileRunnerHeartbeat and Phase 16 offline
+      // banner. Dedicated table (rather than settings/JSON) so multi-runner scales without
+      // schema change and freshness queries stay relational.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS runner_heartbeats (
+          runner_id TEXT PRIMARY KEY,
+          last_heartbeat_at INTEGER NOT NULL,
+          registered_at INTEGER NOT NULL,
+          metadata_json TEXT
+        )
+      `)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_runner_heartbeats_last ON runner_heartbeats(last_heartbeat_at DESC)`)
+    }
+  },
+  {
+    id: '061_task_runner_attempts',
+    up(db: Database.Database) {
+      // Phase 14: per-attempt history for tasks executed by a runner.
+      // One row per (task_id, attempt). Row is INSERTed at attempt start with started_at
+      // (claim route — Plan 14-05, INSERT ON CONFLICT DO NOTHING makes retries idempotent
+      // thanks to UNIQUE (task_id, attempt)); exited_at / exit_code / failure_reason /
+      // stderr_tail are UPDATEd at runner-exit (Plan 14-06). Chronological ordering via the
+      // attempt column feeds .mc/task.json.prior_attempts[] (WORK-02). FK CASCADE matches
+      // the task_runner_tokens precedent from migration 055.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_runner_attempts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          attempt INTEGER NOT NULL,
+          started_at INTEGER NOT NULL,
+          exited_at INTEGER,
+          exit_code INTEGER,
+          failure_reason TEXT,
+          stderr_tail TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+          UNIQUE (task_id, attempt)
+        )
+      `)
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_runner_attempts_task ON task_runner_attempts(task_id, attempt DESC)`)
+    }
   }
 ]
 
