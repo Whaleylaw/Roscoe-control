@@ -361,7 +361,13 @@ describe('POST /api/tasks/:id/checkpoints', () => {
     const line = JSON.parse(fs.readFileSync(jsonlPath, 'utf8').trim())
     expect(line.blocker_reason).toBe('missing API key')
 
-    const [, payload] = broadcastMock.mock.calls[0]
+    // Plan 15-05 wires a pre-checkpoint `task.status_changed` broadcast on
+    // the blocker path — find the task.checkpoint_added frame by type.
+    const checkpointCall = broadcastMock.mock.calls.find(
+      ([type]) => type === 'task.checkpoint_added',
+    )
+    expect(checkpointCall).toBeDefined()
+    const [, payload] = checkpointCall!
     expect(payload.status).toBe('blocked')
     expect(payload.blocker_reason).toBe('missing API key')
   })

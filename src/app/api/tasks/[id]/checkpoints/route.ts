@@ -147,9 +147,57 @@ export async function POST(
 
   const attempt = task.runner_attempts
 
+  // Plan 15-05 CP-03: blocker branch. When the agent POSTs status='blocked',
+  // atomically flip tasks.status='in_progress' → 'awaiting_owner' AND write a
+  // system-authored comment referencing the blocker_reason and attempt number.
+  // The Zod refine in CheckpointBodySchema guarantees blocker_reason is
+  // non-empty when status==='blocked' — we can dereference it safely.
+  const systemCommentContent =
+    body.status === 'blocked'
+      ? `Task blocked at attempt ${attempt}.\n\nReason: ${body.blocker_reason}\n\nMove the task back to \`assigned\` to resume execution. The runner will preserve the worktree and resume from the last checkpoint.`
+      : null
+
   let inserted: { id: number; attempt: number; ts: string; nowUnix: number }
   try {
-    inserted = writeCheckpoint(db, taskId, attempt, task.worktree_path, body)
+    inserted = writeCheckpoint(db, taskId, attempt, task.worktree_path, body, {
+      onInsert: (txDb, _insertedId, nowUnix) => {
+        if (body.status !== 'blocked') return
+
+        // Flip task.status in the SAME transaction. The WHERE guards against
+        // a concurrent transition (e.g., owner cancelled the task while the
+        // agent was posting). A 0-rows UPDATE throws so the outer transaction
+        // rolls back every op — the checkpoint INSERT, the JSONL append, and
+        // any prior onInsert side effects.
+        const upd = txDb
+          .prepare(
+            `UPDATE tasks
+               SET status = 'awaiting_owner',
+                   runner_last_failure_reason = ?,
+                   updated_at = ?
+             WHERE id = ? AND status = 'in_progress'`,
+          )
+          .run(
+            `blocked:${body.blocker_reason!.slice(0, 200)}`,
+            nowUnix,
+            taskId,
+          )
+        if (upd.changes === 0) {
+          throw new Error(
+            'Task status changed during checkpoint transaction; aborting atomic blocker flip',
+          )
+        }
+
+        // Auto-comment authored by the `system` principal (CONTEXT.md LOCK).
+        // Uses the existing comments table + workspace_id column (added to
+        // the comments table by the workspace-id migration).
+        txDb
+          .prepare(
+            `INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+             VALUES (?, 'system', ?, ?, ?)`,
+          )
+          .run(taskId, systemCommentContent!, nowUnix, task.workspace_id)
+      },
+    })
   } catch (err) {
     // Atomic rollback: DB transaction already rolled back by the throw in
     // writeCheckpoint's db.transaction wrapper. If the JSONL append landed
@@ -179,8 +227,22 @@ export async function POST(
 
   // Broadcast AFTER the transaction commits so SSE subscribers only see
   // committed state. Plan 15-05 extends this payload with blocker_reason
-  // when status='blocked' (already done below — keeps the daemon SSE
-  // handler wired for self-initiated docker stop when blocker hits).
+  // when status='blocked' (keeps the daemon SSE handler wired for
+  // self-initiated `docker stop --time=15` via Option D from RESEARCH.md
+  // Focus Area 11 — no new SSE event type needed).
+  //
+  // Ordering: fire `task.status_changed` FIRST when the blocker flip
+  // committed, so any UI subscriber that listens for both event types sees
+  // the status change before the checkpoint that triggered it.
+  if (body.status === 'blocked') {
+    eventBus.broadcast('task.status_changed', {
+      id: taskId,
+      status: 'awaiting_owner',
+      previous_status: 'in_progress',
+      reason: 'blocked_checkpoint',
+      workspace_id: task.workspace_id,
+    })
+  }
   eventBus.broadcast('task.checkpoint_added', {
     checkpoint_id: inserted.id,
     task_id: taskId,

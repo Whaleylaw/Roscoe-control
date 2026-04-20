@@ -140,6 +140,37 @@ export interface CheckpointInsertResult {
 }
 
 /**
+ * Options for extending the writeCheckpoint atomic transaction.
+ *
+ * Plan 15-05 CP-03: the blocker branch needs to run additional DB ops
+ * (tasks status flip + system comment INSERT) INSIDE the same db.transaction
+ * that wrote the task_checkpoints row and appended the JSONL line — if any
+ * of these operations fail, the entire atomic unit rolls back together.
+ */
+export interface WriteCheckpointOptions {
+  /**
+   * Callback invoked inside the atomic db.transaction AFTER the task_checkpoints
+   * INSERT and JSONL append. Throwing rolls back the entire transaction (both
+   * the INSERT and any DB ops performed in the callback). Used by the blocker
+   * branch to add tasks UPDATE + comment INSERT within the same atomic
+   * boundary.
+   *
+   * MUST be synchronous — async callbacks break better-sqlite3 transaction
+   * semantics (see Pitfall 2 in 15-RESEARCH.md).
+   *
+   * Receives the same `db` handle (so callers can re-prepare statements) plus
+   * the inserted row id and the unix timestamp used for the INSERT. Callers
+   * that need the timestamp to match the checkpoint row's `created_at` should
+   * use `nowUnix` rather than calling Date.now() again.
+   */
+  onInsert?: (
+    db: Database.Database,
+    insertedId: number,
+    nowUnix: number,
+  ) => void
+}
+
+/**
  * Atomic DB + JSONL write. Throws on any failure.
  *
  * Caller MUST:
@@ -158,6 +189,7 @@ export function writeCheckpoint(
   attempt: number,
   worktreePath: string | null,
   body: CheckpointBody,
+  options: WriteCheckpointOptions = {},
 ): CheckpointInsertResult {
   const nowUnix = Math.floor(Date.now() / 1000)
   const ts = new Date(nowUnix * 1000).toISOString()
@@ -206,6 +238,13 @@ export function writeCheckpoint(
         }) + '\n'
       fs.mkdirSync(path.dirname(jsonlPath), { recursive: true })
       fs.appendFileSync(jsonlPath, line, { mode: 0o600 })
+    }
+
+    // Plan 15-05 CP-03 extension: run caller-supplied additional DB ops
+    // inside the atomic transaction. A throw here rolls back the INSERT
+    // above (and the outer caller truncates the JSONL).
+    if (options.onInsert) {
+      options.onInsert(db, id, nowUnix)
     }
 
     return { id, attempt, ts, nowUnix } satisfies CheckpointInsertResult
