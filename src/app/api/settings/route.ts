@@ -72,6 +72,31 @@ const settingDefinitions: Record<string, { category: string; description: string
     description: 'Maximum number of extra_skills entries allowed per task.',
     default: '20',
   },
+  'runtime.max_concurrent_containers': {
+    category: 'runtime',
+    description: 'Global maximum concurrent containers the runner will launch. Over-cap claims return 409 CAP_EXCEEDED.',
+    default: '4',
+  },
+  'runtime.project_repo_map': {
+    category: 'runtime',
+    description: 'JSON object mapping project_id (as string) to the absolute local git repo path the runner should `git worktree add` from. Example: {"1":"/Users/me/repos/myapp"}. Entries omitted here cause claim to reject with MISSING_PROJECT_REPO.',
+    default: '{}',
+  },
+  'runtime.max_memory_per_container': {
+    category: 'runtime',
+    description: 'Admin ceiling for container memory (docker --memory format, e.g. "8g"). Claim-time rejection if recipe.memory_limit exceeds.',
+    default: '8g',
+  },
+  'runtime.max_cpu_per_container': {
+    category: 'runtime',
+    description: 'Admin ceiling for container CPU (docker --cpus format, decimal). Claim-time rejection if recipe.cpu_limit exceeds.',
+    default: '4.0',
+  },
+  'runtime.failed_gc_window_days': {
+    category: 'runtime',
+    description: 'Days to preserve worktree + logs for tasks that reached `failed` before the runner GC tick destroys them. `done` and `cancelled` are destroyed immediately.',
+    default: '7',
+  },
 }
 
 /**
