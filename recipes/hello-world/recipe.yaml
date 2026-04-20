@@ -1,0 +1,17 @@
+slug: hello-world
+name: Hello World Agent
+description: Reference agent proving the Mission Control container contract. Emits a checkpoint, commits HELLO.md, and marks the task done.
+when_to_use: Smoke-testing the Phase 14 runner pipeline. Do NOT use for real work.
+image: mc-hello-world-agent:latest
+workspace_mode: worktree
+timeout_seconds: 120
+max_concurrent: 1
+max_attempts: 2
+tags:
+  - smoke
+  - reference
+model:
+  primary: claude-haiku-4-5-20251001
+  provider: anthropic
+  params:
+    temperature: 0
