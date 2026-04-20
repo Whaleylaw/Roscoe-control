@@ -278,6 +278,24 @@ describe('POST /api/runner/claim/:task_id', () => {
     expect(body.container_name_prefix).toBe(`mc-task-${taskId}-a1`)
   })
 
+  it('RUNNER-09: persists tasks.worktree_path to the deterministic .data/runner/worktrees/task-<id>/ path for workspace_mode=worktree recipes', async () => {
+    asRunner()
+    const taskId = seedTask({})
+
+    const { req, ctx } = claimReq(taskId)
+    const res = await POST(req, ctx)
+    expect(res.status).toBe(200)
+
+    const { config } = await import('@/lib/config')
+    const { join } = await import('node:path')
+    const expected = join(config.dataDir, 'runner', 'worktrees', `task-${taskId}`)
+
+    const row = testDb
+      .prepare(`SELECT worktree_path FROM tasks WHERE id = ?`)
+      .get(taskId) as { worktree_path: string | null }
+    expect(row.worktree_path).toBe(expected)
+  })
+
   it('RUNNER-06: returns 409 when a second claim attempts on an already-claimed task', async () => {
     asRunner()
     asRunner() // queued for second call

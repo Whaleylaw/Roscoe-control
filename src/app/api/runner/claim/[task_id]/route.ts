@@ -15,8 +15,11 @@
  *   6. Resolve resource limits vs admin ceilings (CAP_EXCEEDED on overshoot).
  *   7. Single db.transaction:
  *      - `UPDATE tasks SET status='in_progress', container_id='pending:<id>:<n>',
- *        runner_started_at=?, runner_attempts=runner_attempts+1` with a WHERE
- *        clause that requires status='assigned' AND container_id IS NULL.
+ *        runner_started_at=?, runner_attempts=runner_attempts+1,
+ *        worktree_path=?` (worktree_path set to the deterministic
+ *        .data/runner/worktrees/task-<id>/ path when recipe.workspace_mode
+ *        is 'worktree', null otherwise — RUNNER-09 / SC3). WHERE clause
+ *        requires status='assigned' AND container_id IS NULL.
  *        result.changes === 0 → 409 (double-claim lost the race).
  *      - `INSERT INTO task_runner_attempts (task_id, attempt, started_at)
  *        ... ON CONFLICT DO NOTHING`.
@@ -39,8 +42,10 @@
  * `mc.task_id` label.
  */
 
+import path from 'node:path'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
+import { config } from '@/lib/config'
 import { getDatabase } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import {
@@ -254,6 +259,13 @@ export async function POST(
   const nowUnix = Math.floor(Date.now() / 1000)
   const nextAttempt = (task.runner_attempts ?? 0) + 1
   const placeholder = `pending:${taskId}:${nextAttempt}`
+  // worktree_path is deterministic from task_id for workspace_mode='worktree'
+  // recipes; the runner daemon creates the directory at this exact path before
+  // `git worktree add`. RUNNER-09 / SC3.
+  const worktreePath =
+    recipe.workspace_mode === 'worktree'
+      ? path.join(config.dataDir, 'runner', 'worktrees', `task-${taskId}`)
+      : null
 
   let outcome: { claimed: false } | { claimed: true; token: { token: string; expiresAt: number } }
   try {
@@ -265,13 +277,14 @@ export async function POST(
                container_id = ?,
                runner_started_at = ?,
                runner_attempts = runner_attempts + 1,
+               worktree_path = ?,
                updated_at = ?
            WHERE id = ?
              AND status = 'assigned'
              AND container_id IS NULL
              AND recipe_slug IS NOT NULL`,
         )
-        .run(placeholder, nowUnix, nowUnix, taskId)
+        .run(placeholder, nowUnix, worktreePath, nowUnix, taskId)
       if (result.changes === 0) {
         return { claimed: false as const }
       }
