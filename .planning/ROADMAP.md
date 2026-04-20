@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Runtime Foundation** - DB migrations (recipes, task_runner_tokens, task_checkpoints, task column additions), model registry module, runner + runner-token auth principals (completed 2026-04-19)
 - [x] **Phase 12: Recipe System** - `recipes/<slug>/` filesystem layout, chokidar indexer with dir_sha dedup, recipe CRUD + search API, admin resync, model-registry validation at index time (completed 2026-04-19)
 - [x] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
-- [ ] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image
+- [ ] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image *(11 plans + 14-10 autonomous portion committed; human-verify smoke run pending operator 2026-04-20)*
 - [ ] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast
 - [ ] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n
 - [ ] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage
@@ -280,7 +280,7 @@ Plans:
   7. Worktrees are preserved across container crashes and retries and destroyed only when a task reaches `done`, `cancelled`, or (after a GC window of N days, default 7) `failed`; a scheduled GC job prunes worktrees for long-terminal tasks
   8. After a runner crash, starting the runner reconciles live Docker containers (`mc-task-*`) against `GET /api/runner/pending-containers` and either adopts or cleans them up; when a task reaches terminal status, the runner revokes its token and destroys the worktree (subject to the failure GC window)
   9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
-**Plans:** 11/12 plans executed
+**Plans:** 11 plans + 14-10 autonomous portion complete (SUMMARY.md partial); human-verify smoke pending operator — see 14-10-VERIFICATION.md "Operator Action Required"
 Plans:
 - [x] 14-01-PLAN.md — Migrations 060 (runner_heartbeats) + 061 (task_runner_attempts) + tests (RUNNER-05, WORK-02)
 - [x] 14-02-PLAN.md — 5 runtime.* settings + recipe-schema max_attempts + typed getters + tests (RUNNER-08, WORK-06, RUNNER-09)
@@ -371,7 +371,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 11. Runtime Foundation *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 12. Recipe System *(v1.2)* | 4/4 | Complete    | 2026-04-19 |
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
-| 14. Runner Daemon & Container Execution *(v1.2)* | 11/12 | In Progress|  |
+| 14. Runner Daemon & Container Execution *(v1.2)* | 11/12 + partial | Checkpoint pending | 2026-04-20 |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 0/— | Not started | - |
 | 16. Runtime UI Surfaces *(v1.2)* | 0/— | Not started | - |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |
