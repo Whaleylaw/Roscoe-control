@@ -20,6 +20,7 @@ import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
+import { eventBus } from '@/lib/event-bus'
 
 const Body = z.object({
   // Docker container ids are 64-char hex; short form is 12. Constrain [12,128]
@@ -65,9 +66,23 @@ export async function POST(
 
   try {
     const db = getDatabase()
+    // Phase 15-06: also select workspace_id + runner_attempts so the
+    // successful-swap path can carry them in the task.container_started
+    // broadcast. workspace_id scopes the SSE delivery (see 15-CONTEXT.md
+    // § Event Emission: task-scoped events MUST carry workspace_id).
     const task = db
-      .prepare('SELECT id, status, container_id FROM tasks WHERE id = ?')
-      .get(taskId) as { id: number; status: string; container_id: string | null } | undefined
+      .prepare(
+        'SELECT id, status, container_id, workspace_id, runner_attempts FROM tasks WHERE id = ?',
+      )
+      .get(taskId) as
+      | {
+          id: number
+          status: string
+          container_id: string | null
+          workspace_id: number
+          runner_attempts: number | null
+        }
+      | undefined
 
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
@@ -76,11 +91,13 @@ export async function POST(
     const current = task.container_id
 
     // Idempotent retry: same id already persisted → 204.
+    // No broadcast — no state change.
     if (current === body.container_id) {
       return new NextResponse(null, { status: 204 })
     }
 
     // Already has a real (non-placeholder) container_id that differs → 409.
+    // No broadcast — rejected, no state change.
     if (current !== null && !current.startsWith('pending:')) {
       return NextResponse.json(
         { error: 'task already has a real container_id' },
@@ -107,6 +124,19 @@ export async function POST(
         { status: 409 },
       )
     }
+
+    // SCHED-06: broadcast task.container_started only on the committed swap.
+    // The idempotent (204 same-id) and conflict (409) branches deliberately
+    // emit nothing — no state change to announce. workspace_id scopes the SSE
+    // fan-out to the owning workspace; attempt carries the runner_attempts
+    // counter (NULL → 1 as a safe default; claim-route Plan 14-05 sets this
+    // to at least 1 before this route can ever be reached).
+    eventBus.broadcast('task.container_started', {
+      task_id: taskId,
+      container_id: body.container_id,
+      attempt: task.runner_attempts ?? 1,
+      workspace_id: task.workspace_id,
+    })
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {

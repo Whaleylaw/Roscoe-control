@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 import { issueRunnerToken } from '@/lib/runner-tokens'
+import { eventBus } from '@/lib/event-bus'
 
 let testDb: Database.Database
 
@@ -89,6 +90,7 @@ beforeEach(() => {
   seedTask(testDb, 5)
   process.env.API_KEY = ''
   process.env.MC_PROXY_AUTH_HEADER = ''
+  vi.mocked(eventBus.broadcast).mockClear()
 })
 
 afterEach(() => {
@@ -102,6 +104,32 @@ describe('POST /api/runner/tasks/:task_id/container-started', () => {
 
     const row = testDb.prepare(`SELECT container_id FROM tasks WHERE id = 5`).get() as { container_id: string }
     expect(row.container_id).toBe(REAL_ID)
+  })
+
+  it('SCHED-06: successful placeholder swap broadcasts task.container_started exactly once', async () => {
+    // Seed task 7 with a known runner_attempts value so the broadcast payload
+    // is deterministic. workspace_id=1 comes from seedWorkspace().
+    testDb
+      .prepare(
+        `INSERT INTO tasks (id, title, status, priority, workspace_id, container_id, runner_attempts)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(7, 'task 7', 'in_progress', 'medium', 1, 'pending:7:2', 2)
+
+    const res = await containerStarted(7, KNOWN_RUNNER_SECRET, { container_id: REAL_ID })
+    expect(res.status).toBe(204)
+
+    const broadcastCalls = vi
+      .mocked(eventBus.broadcast)
+      .mock.calls.filter((c) => c[0] === 'task.container_started')
+
+    expect(broadcastCalls).toHaveLength(1)
+    expect(broadcastCalls[0][1]).toEqual({
+      task_id: 7,
+      container_id: REAL_ID,
+      attempt: 2,
+      workspace_id: 1,
+    })
   })
 
   it('RUNNER-13: idempotent — POST with same container_id twice → 204 both times; DB unchanged', async () => {
@@ -128,12 +156,43 @@ describe('POST /api/runner/tasks/:task_id/container-started', () => {
     expect(row2.updated_at).toBe(row1.updated_at)
   })
 
+  it('SCHED-06: idempotent same-id re-POST does NOT broadcast a second event', async () => {
+    // First call: real swap → one broadcast.
+    const first = await containerStarted(5, KNOWN_RUNNER_SECRET, { container_id: REAL_ID })
+    expect(first.status).toBe(204)
+
+    const afterFirst = vi
+      .mocked(eventBus.broadcast)
+      .mock.calls.filter((c) => c[0] === 'task.container_started').length
+    expect(afterFirst).toBe(1)
+
+    // Second call with the same id → 204 via idempotent early-return; NO broadcast.
+    const second = await containerStarted(5, KNOWN_RUNNER_SECRET, { container_id: REAL_ID })
+    expect(second.status).toBe(204)
+
+    const afterSecond = vi
+      .mocked(eventBus.broadcast)
+      .mock.calls.filter((c) => c[0] === 'task.container_started').length
+    expect(afterSecond).toBe(1) // unchanged — only the first call emitted
+  })
+
   it('RUNNER-13: conflict — POST with DIFFERENT id when task already has a real id → 409', async () => {
     seedTask(testDb, 10, 'in_progress', REAL_ID)
     const res = await containerStarted(10, KNOWN_RUNNER_SECRET, { container_id: OTHER_ID })
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toContain('already has a real container_id')
+  })
+
+  it('SCHED-06: 409 conflict branch does NOT broadcast task.container_started', async () => {
+    seedTask(testDb, 11, 'in_progress', REAL_ID)
+    const res = await containerStarted(11, KNOWN_RUNNER_SECRET, { container_id: OTHER_ID })
+    expect(res.status).toBe(409)
+
+    const broadcastCalls = vi
+      .mocked(eventBus.broadcast)
+      .mock.calls.filter((c) => c[0] === 'task.container_started')
+    expect(broadcastCalls).toHaveLength(0)
   })
 
   it('RUNNER-13: rejects non-runner-secret bearer with 403 (runner-token principal)', async () => {
