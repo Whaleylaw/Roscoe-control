@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Mission Control Runner LaunchAgent template (Phase 14 Plan 14-08b).
+
+  __MC_ROOT__ is a sed placeholder. Operators (or a future install script)
+  search-replace __MC_ROOT__ with the absolute path to the Mission Control
+  repository on the host (e.g. /Users/me/Code/mission-control) before loading
+  the plist.
+
+  KeepAlive + ThrottleInterval 30 give a clean "crash loop if docker is down"
+  backoff: the runner exits 2 when `docker info` fails, launchd restarts it
+  after 30s, and MC sees a clean offline window rather than a degraded state.
+
+  Logs land under __MC_ROOT__/.data/runner/daemon.log (stdout, JSON lines
+  from the runner's own logger) and daemon.err (stderr, bootstrap-failure
+  messages only — exit 1 / exit 2 diagnostics).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.missioncontrol.runner</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>__MC_ROOT__/scripts/mc-runner.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__MC_ROOT__</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>MC_URL</key>
+    <string>http://127.0.0.1:3000</string>
+    <key>MISSION_CONTROL_DATA_DIR</key>
+    <string>__MC_ROOT__/.data</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>StandardOutPath</key>
+  <string>__MC_ROOT__/.data/runner/daemon.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>__MC_ROOT__/.data/runner/daemon.err</string>
+</dict>
+</plist>
