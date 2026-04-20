@@ -575,9 +575,19 @@ await reconcileAtBoot()
 async function heartbeatTick() {
   const start = Date.now()
   try {
+    // Phase 15-06 (SCHED-03): expose the daemon's in-memory activeTasks Map
+    // as metadata.active_task_ids so requeueStaleTasks (Plan 15-02) can
+    // decide whether MC's in_progress recipe-tasks are actually still being
+    // tracked by this runner. Empty array is meaningful (runner alive, no
+    // containers); an omitted field would be ambiguous.
+    const active_task_ids = Array.from(activeTasks.keys())
     await mcFetch('/api/runner/heartbeat', {
       method: 'POST',
-      body: JSON.stringify({ runner_id: RUNNER_ID, ts: start }),
+      body: JSON.stringify({
+        runner_id: RUNNER_ID,
+        ts: start,
+        metadata: { active_task_ids },
+      }),
     })
   } catch (err) {
     log('warn', 'heartbeat failed', { err: String(err) })

@@ -25,13 +25,26 @@ import { logger } from '@/lib/logger'
  * heartbeats — the SET clause omits it, matching migration 060's locked
  * semantic.
  *
+ * Phase 15-06 (SCHED-03): `metadata.active_task_ids` is now explicitly typed
+ * as `number[]` (optional). `passthrough()` preserves any other metadata
+ * keys the daemon may send in the future. requeueStaleTasks (Plan 15-02)
+ * reads this field from runner_heartbeats.metadata_json to decide which
+ * in_progress recipe-tasks to flip back to `assigned` when the owning runner
+ * has NOT reported them as active.
+ *
  * Response: 204 No Content on success, 400 on invalid body, 401/403 via auth.
  */
+
+const HeartbeatMetadataSchema = z
+  .object({
+    active_task_ids: z.array(z.number().int().positive()).optional(),
+  })
+  .passthrough()
 
 const HeartbeatBodySchema = z.object({
   runner_id: z.string().min(1).max(64),
   ts: z.number().int().nonnegative(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  metadata: HeartbeatMetadataSchema.optional(),
 })
 
 export async function POST(request: NextRequest) {
