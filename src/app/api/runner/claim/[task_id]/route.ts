@@ -70,6 +70,7 @@ import {
   checkPerRecipeCap,
   readPriorAttempts,
   resolveRecipeMaxAttempts,
+  resolveResumeMarker,
   buildDispatchPayload,
 } from '@/lib/runner-claim'
 
@@ -356,6 +357,13 @@ export async function POST(
   })
 
   // 12. Build dispatch payload.
+  // Phase 15 CP-04: query the most-recent blocked checkpoint and attach the
+  // marker so the daemon can pass it to seedMcDir on the resumed attempt.
+  // resolveResumeMarker returns null when the latest checkpoint is non-blocker
+  // or no checkpoints exist (first attempt) — the dispatch payload field is
+  // typed as `ResumeMarker | null` either way.
+  const resumeMarker = resolveResumeMarker(db, taskId)
+
   const taskPayload = buildDispatchPayload({
     taskId,
     recipeSlug: task.recipe_slug,
@@ -365,6 +373,7 @@ export async function POST(
     newAttempt: nextAttempt,
     priorAttempts,
     runnerMaxAttempts: resolvedMaxAttempts,
+    resumeMarker,
   })
 
   return NextResponse.json({

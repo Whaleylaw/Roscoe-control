@@ -394,6 +394,13 @@ export interface DispatchTaskPayload {
   is_resuming: boolean
   prior_attempts: PriorAttempt[]
   runner_max_attempts: number
+  /**
+   * Phase 15 CP-04: present on resume attempts whose latest checkpoint is
+   * status='blocked'; null otherwise (first attempts + non-blocker resumes).
+   * Daemon forwards into seedMcDir which appends the LOCKED marker line to
+   * progress.md.
+   */
+  resume_marker: ResumeMarker | null
 }
 
 export interface BuildDispatchPayloadParams {
@@ -405,6 +412,8 @@ export interface BuildDispatchPayloadParams {
   newAttempt: number
   priorAttempts: PriorAttempt[]
   runnerMaxAttempts: number
+  /** Phase 15 CP-04 — resolved via resolveResumeMarker(db, taskId). */
+  resumeMarker?: ResumeMarker | null
 }
 
 /**
@@ -415,6 +424,11 @@ export interface BuildDispatchPayloadParams {
  * `priorAttempts` is assumed to have ALREADY been filtered to exclude the
  * row for `newAttempt` (the caller holds the transaction and inserted it just
  * before reading). This helper does not re-filter.
+ *
+ * Phase 15 CP-04 extension: the optional `resumeMarker` field is included in
+ * the response so the runner daemon can pass it to seedMcDir on the next
+ * attempt. The claim route resolves the marker via `resolveResumeMarker(db,
+ * taskId)` and passes it through here.
  */
 export function buildDispatchPayload(
   params: BuildDispatchPayloadParams,
@@ -429,5 +443,72 @@ export function buildDispatchPayload(
     is_resuming: params.newAttempt > 1,
     prior_attempts: params.priorAttempts,
     runner_max_attempts: params.runnerMaxAttempts,
+    resume_marker: params.resumeMarker ?? null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Resume marker resolution (Phase 15 CP-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Phase 15 CP-04 — payload that surfaces the most-recent blocker reason on a
+ * resume attempt. The runner daemon receives this via the claim dispatch
+ * payload and forwards it into `seedMcDir`, which appends a single LOCKED
+ * marker line to `<worktree>/.mc/progress.md`. The agent's preamble reads
+ * progress.md at startup, so the blocker reason surfaces naturally without
+ * expanding the runtime env surface.
+ */
+export interface ResumeMarker {
+  blocker_reason: string
+  /** ISO-8601 timestamp of the blocker checkpoint (created_at). */
+  at_iso: string
+}
+
+/**
+ * Query the most recent checkpoint for a task and, when it is a blocked
+ * checkpoint, return the marker payload to inject into progress.md on resume.
+ *
+ * Rule: inject ONLY when the LATEST checkpoint (ORDER BY id DESC LIMIT 1) is
+ * status='blocked'. Returns null when:
+ *   - Task has no checkpoints.
+ *   - Latest checkpoint is non-blocker (the blocker was resolved and a later
+ *     checkpoint landed; injecting the stale marker would mislead the agent).
+ *   - Latest checkpoint is blocked but blocker_reason IS NULL (defensive — the
+ *     CP-01 Zod refine prevents this combination, but guard anyway).
+ *
+ * The `id DESC` ordering is the SAME row that the blocker flow flipped the
+ * task on. If the agent continued posting checkpoints after an owner flipped
+ * the task back AND before the daemon re-claimed, the follow-up checkpoints
+ * are still legitimate progress context — the rule is "latest must be the
+ * blocker" rather than "any blocker exists in history".
+ */
+export function resolveResumeMarker(
+  db: Database.Database,
+  taskId: number,
+): ResumeMarker | null {
+  const row = db
+    .prepare(
+      `SELECT status, blocker_reason, created_at
+       FROM task_checkpoints
+       WHERE task_id = ?
+       ORDER BY id DESC
+       LIMIT 1`,
+    )
+    .get(taskId) as
+    | {
+        status: string
+        blocker_reason: string | null
+        created_at: number
+      }
+    | undefined
+
+  if (!row) return null
+  if (row.status !== 'blocked') return null
+  if (!row.blocker_reason) return null
+
+  return {
+    blocker_reason: row.blocker_reason,
+    at_iso: new Date(row.created_at * 1000).toISOString(),
   }
 }
