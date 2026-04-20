@@ -137,9 +137,9 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Runner Daemon
 
-- [ ] **RUNNER-01**: Operator can run the runner as a standalone Node process (`scripts/mc-runner.mjs`) with its own LaunchAgent template, separate from the Mission Control web server
-- [ ] **RUNNER-02**: Runner registers with Mission Control on startup using a long-lived shared secret (auto-generated on first run, stored in `.data/runner.secret`)
-- [ ] **RUNNER-03**: Runner subscribes to `task.runner_requested` SSE events to claim work as soon as tasks become ready
+- [x] **RUNNER-01**: Operator can run the runner as a standalone Node process (`scripts/mc-runner.mjs`) with its own LaunchAgent template, separate from the Mission Control web server
+- [x] **RUNNER-02**: Runner registers with Mission Control on startup using a long-lived shared secret (auto-generated on first run, stored in `.data/runner.secret`)
+- [x] **RUNNER-03**: Runner subscribes to `task.runner_requested` SSE events to claim work as soon as tasks become ready
 - [x] **RUNNER-04**: Runner polls `/api/runner/ready-tasks` every 15 seconds as a fallback when SSE drops
 - [x] **RUNNER-05**: Runner sends heartbeats every 10 seconds; Mission Control marks the runner offline and surfaces a UI banner when no heartbeat arrives for 60 seconds
 - [x] **RUNNER-06**: Runner claims a task atomically via `POST /api/runner/claim/:task_id`, receiving a full dispatch payload (recipe content, task, mounts, fresh task-scoped token) or a 409 if already claimed
@@ -163,7 +163,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 - [x] **WORK-01**: On first launch, runner seeds `.mc/task.json`, `.mc/progress.md` (empty), `.mc/checkpoints.jsonl` (empty), and `.mc/.gitignore` in the worktree
 - [x] **WORK-02**: `.mc/task.json` contains `task_id`, `recipe_slug`, `attempt`, `is_resuming`, and `prior_attempts[]` (each with started_at, exit_code, failure_reason)
-- [ ] **WORK-03**: Worktree is preserved across container crashes and retries; destroyed only when task reaches `done`, `failed`, or `cancelled` (failed tasks get a GC delay of N days)
+- [x] **WORK-03**: Worktree is preserved across container crashes and retries; destroyed only when task reaches `done`, `failed`, or `cancelled` (failed tasks get a GC delay of N days)
 - [x] **WORK-04**: On a resume attempt, runner injects an agent preamble above SOUL.md instructing the agent to read `.mc/progress.md` + `.mc/checkpoints.jsonl`, inspect git state, and continue without redoing work
 - [x] **WORK-05**: On first attempt, runner injects a shorter preamble instructing the agent to write notes to `.mc/progress.md` as it works
 - [x] **WORK-06**: Retry cap enforced via `runner_max_attempts` (default 3, recipe-overridable); exceeding the cap marks task `failed` with a clear reason
@@ -325,9 +325,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TCTX-05 | Phase 13 | Complete |
 | TCTX-06 | Phase 13 | Complete |
 | TCTX-07 | Phase 11 | Complete |
-| RUNNER-01 | Phase 14 | Pending |
-| RUNNER-02 | Phase 14 | Pending |
-| RUNNER-03 | Phase 14 | Pending |
+| RUNNER-01 | Phase 14 | Complete |
+| RUNNER-02 | Phase 14 | Complete |
+| RUNNER-03 | Phase 14 | Complete |
 | RUNNER-04 | Phase 14 | Complete |
 | RUNNER-05 | Phase 14 | Complete |
 | RUNNER-06 | Phase 14 | Complete |
@@ -345,7 +345,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONTAINER-04 | Phase 14 | Pending |
 | WORK-01 | Phase 14 | Complete |
 | WORK-02 | Phase 14 | Complete |
-| WORK-03 | Phase 14 | Pending |
+| WORK-03 | Phase 14 | Complete |
 | WORK-04 | Phase 14 | Complete |
 | WORK-05 | Phase 14 | Complete |
 | WORK-06 | Phase 14 | Complete |

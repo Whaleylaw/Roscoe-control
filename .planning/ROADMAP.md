@@ -280,7 +280,7 @@ Plans:
   7. Worktrees are preserved across container crashes and retries and destroyed only when a task reaches `done`, `cancelled`, or (after a GC window of N days, default 7) `failed`; a scheduled GC job prunes worktrees for long-terminal tasks
   8. After a runner crash, starting the runner reconciles live Docker containers (`mc-task-*`) against `GET /api/runner/pending-containers` and either adopts or cleans them up; when a task reaches terminal status, the runner revokes its token and destroys the worktree (subject to the failure GC window)
   9. The bundled `mc-hello-world-agent` reference image exercises the full container flow — reads `/recipe`, emits checkpoints, submits a resolution — proving the runtime is end-to-end wired
-**Plans:** 10/12 plans executed
+**Plans:** 11/12 plans executed
 Plans:
 - [x] 14-01-PLAN.md — Migrations 060 (runner_heartbeats) + 061 (task_runner_attempts) + tests (RUNNER-05, WORK-02)
 - [x] 14-02-PLAN.md — 5 runtime.* settings + recipe-schema max_attempts + typed getters + tests (RUNNER-08, WORK-06, RUNNER-09)
@@ -290,7 +290,7 @@ Plans:
 - [x] 14-06-PLAN.md — POST /api/runner/tasks/[task_id]/runner-exit retry/fail driver (RUNNER-11, WORK-06)
 - [x] 14-07-PLAN.md — runner-preamble + runner-worktree + runner-docker pure-logic lib modules + tests (WORK-01, 02, 04, 05; CONTAINER-01, 02; RUNNER-09, 10)
 - [x] 14-08a-PLAN.md — runner-gc + runner-reconcile + runner-timeout + runner-log-layout pure-logic helpers + tests (RUNNER-12, 13, 14, CONTAINER-03, WORK-07)
-- [ ] 14-08b-PLAN.md — scripts/mc-runner.mjs daemon + LaunchAgent + README (RUNNER-01..14, CONTAINER-03, WORK-03, 06, 07, MODEL-04)
+- [x] 14-08b-PLAN.md — scripts/mc-runner.mjs daemon + LaunchAgent + README (RUNNER-01..14, CONTAINER-03, WORK-03, 06, 07, MODEL-04)
 - [ ] 14-09-PLAN.md — docker/hello-world-agent reference image calling /submit endpoint (CONTAINER-04)
 - [ ] 14-10-PLAN.md — recipes/hello-world/ + smoke harness + human-verify end-to-end checkpoint (CONTAINER-04, RUNNER-09..11, WORK-01..03, MODEL-04)
 - [x] 14-11-PLAN.md — submit + container-started + /api/runner/config routes (RUNNER-06, 11, 13, WORK-06)

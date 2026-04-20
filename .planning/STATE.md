@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: completed
-stopped_at: "Plan 14-05 complete. POST /api/runner/claim/:task_id atomic claim + dispatch route shipped. Extends src/lib/runner-claim.ts with 8 new pure helpers (resolveEffectiveModel, composeEnvMap, resolveResourceLimits, parseMemoryBytes, checkGlobalCap, checkPerRecipeCap, readPriorAttempts, buildDispatchPayload) atop the minimal resolveRecipeMaxAttempts shipped during 14-06. Route performs runner-secret auth (id===-1000) → task lookup → getIndexedRecipeBySlug → per-mount+skill validateHostPathAgainstAllowlist → global + per-recipe cap checks → admin-ceiling resource-limits → atomic db.transaction (UPDATE tasks status='in_progress'+container_id='pending:<id>:<n>', INSERT task_runner_attempts ON CONFLICT DO NOTHING, issueRunnerToken) → readPriorAttempts → runner_max_attempts precedence (task col ?? filesystem recipe.yaml ?? 3) → composeEnvMap → respond with {task, recipe, env, runner_token_expires_at, resource_limits, container_name_prefix}. 40 tests pass (26 unit + 14 route-integration) in ~1.5s. Commits 1e549bb / 995e18b / da9b78f."
-last_updated: "2026-04-20T18:30:00Z"
-last_activity: "2026-04-20 — Plan 14-05 executed. Task 1 commit 1e549bb (runner-claim.ts helpers + 26 unit tests). Task 2 commit 995e18b (POST claim route). Task 3 commit da9b78f (14 route-integration tests replacing 10 it.todo scaffold stubs, +2 docs-added tests for resume + filesystem max_attempts, +2 extras for 403/404). Decisions: placeholder container_id='pending:<id>:<n>' counted toward concurrency caps inside the transaction (prevents double-claim race); runner_max_attempts resolved from filesystem recipe.yaml (LOCKED — NOT from getIndexedRecipeBySlug which does not round-trip the field); recipe.secrets is list of ENV NAMES only — values resolved by Plan 14-08b runner daemon from .data/runner/secrets/<NAME>, never on the server; resource_limits + container_name_prefix are NEW response fields consumed by Plan 14-08b (not in the 14-03 scaffold)."
+stopped_at: "Plan 14-08b complete. scripts/mc-runner.mjs standalone Node ESM runner daemon shipped (1114 lines) + scripts/com.missioncontrol.runner.plist macOS LaunchAgent template + scripts/README.runner.md operator install guide. Daemon implements the LOCKED 7-step boot sequence (runner.secret → docker info → /api/runner/config → reconcile → heartbeat → SSE+poll → GC tick), inlines minimal mirrors of src/lib/runner-*.ts primitives with pointer comments back to the .ts source of truth, wires claim → stage → docker run → container-started → watchContainerExit → runner-exit as the core flow. Per-task recipe secrets loaded from .data/runner/secrets/<NAME> at claim and merged into --env-file (never argv, CONTAINER-01). SIGHUP re-fetches /api/runner/config. Verified via `node --check` + bootstrap-without-secret exit 1. Commits 8a74425 / 8cea6d4."
+last_updated: "2026-04-20T18:46:50Z"
+last_activity: "2026-04-20 — Plan 14-08b executed. Task 1 commit 8a74425 (scripts/mc-runner.mjs — 1114-line daemon with inlined primitives, SSE Pattern 2, drift-resistant heartbeat, 10-min GC tick). Task 2 commit 8cea6d4 (plist + README with troubleshooting keyed off actual exit codes + log messages). Decisions: boot sequence LOCKED per 14-CONTEXT.md; project_repo_map resolved EXCLUSIVELY via /api/runner/config (no env-var fallback); recipe secrets ENV NAMES → loaded from disk at claim, merged into --env-file; adopted containers use 3600s fallback timeout; SIGINT/SIGTERM don't post runner-exit (next boot reconciles); SSE boot log flags Phase 15 emission gap. 10/12 of Phase 14 plans now shipped; 14-09 (hello-world image) + 14-10 (smoke harness) remain."
 progress:
   total_phases: 14
   completed_phases: 10
   total_plans: 52
-  completed_plans: 56
+  completed_plans: 57
   percent: 100
 ---
 
@@ -25,19 +25,19 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 14 (Runner & Container v1.2) — IN PROGRESS (9/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-04 read-side runner API, 14-05 claim route, 14-06 runner-exit, 14-07 pure-logic lib primitives, 14-08a runner daemon primitives, 14-11 submit+container-started+config endpoints)
-Plans: 14-01 ✓ (migrations 060/061), 14-02 ✓ (5 runtime.* settings + 5 getters + recipe.max_attempts + 17 tests), 14-03 ✓ (Wave-0 test scaffolds — 11 files / 60 it.todos), 14-04 ✓ (heartbeat + ready-tasks + pending-containers + terminal-tasks — 4 routes + 15 tests), 14-05 ✓ (POST /api/runner/claim/:task_id + runner-claim.ts helper suite — 1 route + 40 tests), 14-06 ✓ (runner-exit retry/fail driver), 14-07 ✓ (runner-preamble + runner-worktree + runner-docker — 3 pure-logic lib modules + 36 unit tests), 14-08a ✓ (runner-gc + runner-reconcile + runner-timeout + runner-log-layout — 4 pure-logic helpers + 26 unit tests), 14-11 ✓ (POST /api/runner/tasks/:id/submit + POST /api/runner/tasks/:id/container-started + GET /api/runner/config — 3 routes + 17 tests), 14-08b, 14-09..14-10 ⏳
-Status: Plan 14-05 shipped the critical-section endpoint that composes Phase 11/12/13/14 substrate into one atomic claim. src/lib/runner-claim.ts now exports 9 helpers (resolveEffectiveModel, composeEnvMap, resolveResourceLimits, parseMemoryBytes, checkGlobalCap, checkPerRecipeCap, readPriorAttempts, resolveRecipeMaxAttempts, buildDispatchPayload). Route file at src/app/api/runner/claim/[task_id]/route.ts performs a single db.transaction containing the status-flip UPDATE (WHERE status='assigned' AND container_id IS NULL — result.changes===0 → 409), the task_runner_attempts INSERT (ON CONFLICT DO NOTHING), and issueRunnerToken mint. Response shape LOCKED for Plan 14-08b: {task, recipe, env, runner_token_expires_at, resource_limits, container_name_prefix}. 40 tests (26 unit + 14 route-integration) pass in ~1.5s.
-Last activity: 2026-04-20 — Plan 14-05 executed. Task 1 commit 1e549bb (runner-claim.ts helpers + 26 unit tests — model precedence, MC_MODEL_FALLBACK omission, Docker memory parsing b/k/m/g, CAP_EXCEEDED ceilings, cap queries include pending placeholders, ASC prior-attempts, filesystem max_attempts re-parse). Task 2 commit 995e18b (POST route wiring validateHostPathAgainstAllowlist + getIndexedRecipeBySlug + issueRunnerToken + 3-write atomic transaction; NEW response fields resource_limits + container_name_prefix for 14-08b). Task 3 commit da9b78f (14 route-integration tests replacing all 10 it.todo scaffolds — happy path, double-claim 409, wrong-status 409, allowlist 400, global+per-recipe cap 409, MODEL-04 precedence, token expiry, full dispatch shape, resume is_resuming=true, filesystem max_attempts=5, plus 403/404 extras).
-Next: Plan 14-08b (runner daemon scripts/mc-runner.mjs) — wires together SSE subscribe, claim fetch, docker run, exit-reporter, heartbeats, reconciliation; consumes the claim response shape LOCKED by this plan.
+Phase: 14 (Runner & Container v1.2) — IN PROGRESS (10/12 plans shipped: 14-01 migrations, 14-02 runtime settings + recipe max_attempts, 14-03 test scaffolds, 14-04 read-side runner API, 14-05 claim route, 14-06 runner-exit, 14-07 pure-logic lib primitives, 14-08a runner daemon primitives, 14-08b runner daemon script + LaunchAgent + README, 14-11 submit+container-started+config endpoints)
+Plans: 14-01 ✓, 14-02 ✓, 14-03 ✓, 14-04 ✓, 14-05 ✓, 14-06 ✓, 14-07 ✓, 14-08a ✓, 14-08b ✓ (scripts/mc-runner.mjs 1114-line daemon + com.missioncontrol.runner.plist + README.runner.md), 14-11 ✓, 14-09..14-10 ⏳
+Status: Plan 14-08b shipped the orchestration layer. scripts/mc-runner.mjs is a standalone Node ESM daemon that composes every Phase 14 endpoint (heartbeat, ready-tasks, pending-containers, terminal-tasks, claim, runner-exit, container-started, config) with every pure-logic primitive (runner-preamble, runner-worktree, runner-docker, runner-gc, runner-reconcile, runner-timeout, runner-log-layout) into one process. Inline-duplication pattern: each helper block prefixed with `// NOTE: mirrors src/lib/runner-<name>.ts. Keep in sync.` Boot LOCKED: secret→docker info→/api/runner/config→reconcile→heartbeat→SSE+poll→GC tick. com.missioncontrol.runner.plist uses KeepAlive+ThrottleInterval 30 for clean Docker-down backoff. README covers install, secrets, log tailing via latest symlink, troubleshooting keyed off daemon exit codes.
+Last activity: 2026-04-20 — Plan 14-08b executed in ~7min. Task 1 commit 8a74425 (scripts/mc-runner.mjs with 7-step boot sequence, SSE Pattern 2 subscriber, drift-resistant heartbeat, 10-min GC tick, claim→run→exit flow posting to container-started + runner-exit). Task 2 commit 8cea6d4 (LaunchAgent plist template with __MC_ROOT__ sed placeholder + operator README with troubleshooting matrix). Decisions logged: project_repo_map is EXCLUSIVELY via /api/runner/config (no env-var fallback); recipe secrets loaded at claim from .data/runner/secrets/<NAME> and merged into --env-file (never argv); SIGINT/SIGTERM don't post runner-exit (next boot reconciles); adopted containers get conservative 3600s fallback timeout because pending-containers doesn't carry recipe.timeout_seconds; SSE subscriber logs explicit boot message flagging Phase 15 emission gap.
+Next: Plan 14-09 (docker/hello-world-agent reference image) or 14-10 (recipes/hello-world + smoke harness + human-verify end-to-end checkpoint). Daemon is ready to be smoke-tested the moment the reference image lands.
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 35
+- Total plans completed: 36
 - Average duration: 7.2 min
-- Total execution time: 4.2 hours
+- Total execution time: 4.3 hours
 
 **By Phase:**
 
@@ -114,6 +114,7 @@ Next: Plan 14-08b (runner daemon scripts/mc-runner.mjs) — wires together SSE s
 | Phase 14-runner-container-v1-2 P07 | 10min | 3 tasks | 8 files |
 | Phase 14-runner-container-v1-2 P06 | 9min | 2 tasks + 1 pre-req | 3 files |
 | Phase 14-runner-container-v1-2 P05 | 15min | 3 tasks | 4 files |
+| Phase 14-runner-container-v1-2 P08b | 7min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -210,6 +211,13 @@ Recent decisions affecting current work:
 - [Phase 14-05]: Resource-limits helper (resolveResourceLimits) always consults admin ceilings (getMaxMemoryPerContainer + getMaxCpuPerContainer) and calls parseMemoryBytes on both sides before comparing. v1.2 recipe.yaml has no memory_limit / cpu_limit fields — runner defaults 2g + 1.0 always applied. Helper is forward-compat for a later phase that adds recipe-declared overrides without changing claim-route code.
 - [Phase 14-05]: recipe.secrets is a list of ENV VAR NAMES ONLY at the HTTP surface — values are resolved by the runner daemon from .data/runner/secrets/<NAME> (Plan 14-08b). Keeping value-resolution out of the server preserves the 'secrets never touch HTTP' property; the claim route's composeEnvMap receives recipeSecrets=undefined.
 - [Phase 14-05]: MC_API_URL in composed env uses `http://host.docker.internal:${PORT || 3000}` — the URL the container will use (not the browser's localhost URL). Matches the CONTEXT.md Docker networking decision (`--add-host host.docker.internal:host-gateway`).
+- [Phase 14-08b]: scripts/mc-runner.mjs inline-duplicates a minimal subset of src/lib/runner-*.ts primitives with `// NOTE: mirrors src/lib/runner-<name>.ts. Keep in sync.` pointer comments. Future bundle step may unify via esbuild; for now the .ts files are canonical contract + test surface, .mjs is thin runtime shim.
+- [Phase 14-08b]: Boot sequence LOCKED per 14-CONTEXT.md 7-step order: runner.secret (exit 1) → docker info (exit 2) → /api/runner/config (exit 1) → reconcile → heartbeat → SSE+poll → GC tick. project_repo_map resolution is EXCLUSIVELY via /api/runner/config; SIGHUP re-fetches. No env-var fallback — a misconfigured /api/runner/config must fail loud at boot rather than silently ship wrong repo paths.
+- [Phase 14-08b]: Recipe-declared secrets (recipe.secrets is ENV NAMES only) are read from .data/runner/secrets/<NAME> at claim time and merged into the docker `--env-file`. Missing files log a warning and are omitted — intentional graceful degradation. Never passed on argv (CONTAINER-01 invariant).
+- [Phase 14-08b]: SIGINT/SIGTERM don't post runner-exit for active tasks. Next boot reconciles orphaned containers and posts runner-exit reason='crash'. Intentional tradeoff — the daemon can crash unexpectedly anyway, so the graceful path reuses the same recovery mechanism via reconcile. Simpler + tested-once-covers-both.
+- [Phase 14-08b]: Adopted containers use 3600s conservative fallback timeout because pending-containers doesn't return recipe.timeout_seconds. Refetching the recipe per adopted task is a Phase 17+ refinement. In practice containers exit naturally or the watchdog stops them; only matters for "daemon died mid-run, container still alive past its original timeout" window.
+- [Phase 14-08b]: SSE subscriber is already wired via Pattern 2 (fetch + ReadableStream + newline splitter) + exponential backoff reconnect, but emits an explicit info log at boot: 'SSE subscribed; task.runner_requested emission starts in Phase 15 — relying on 15s poll until then'. Operator diagnostic so the absence of SSE frames in Phase 14 isn't alarming.
+- [Phase 14-08b]: LaunchAgent KeepAlive + ThrottleInterval 30 → Docker-down backoff is clean (runner exits 2, launchd restarts after 30s — MC sees clean offline window rather than degraded state). No "up but Docker unavailable" signalling per CONTEXT.md "degraded runner state" deferred item.
 
 ### Pending Todos
 
@@ -232,6 +240,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T18:30:00Z
-Stopped at: Plan 14-05 complete. POST /api/runner/claim/:task_id atomic-claim + dispatch route shipped with 9-helper src/lib/runner-claim.ts module (resolveEffectiveModel, composeEnvMap, resolveResourceLimits, parseMemoryBytes, checkGlobalCap, checkPerRecipeCap, readPriorAttempts, resolveRecipeMaxAttempts, buildDispatchPayload). Atomic db.transaction encloses UPDATE tasks status='assigned'→'in_progress' + placeholder container_id + runner_attempts+=1, INSERT task_runner_attempts ON CONFLICT DO NOTHING, issueRunnerToken. Response LOCKED for 14-08b: {task, recipe, env, runner_token_expires_at, resource_limits, container_name_prefix}. 40 tests pass in ~1.5s (26 unit + 14 route-integration). Commits 1e549bb / 995e18b / da9b78f.
-Resume file: .planning/phases/14-runner-container-v1-2/14-05-SUMMARY.md
+Last session: 2026-04-20T18:46:50Z
+Stopped at: Plan 14-08b complete. scripts/mc-runner.mjs standalone Node ESM runner daemon (1114 lines) + scripts/com.missioncontrol.runner.plist macOS LaunchAgent template + scripts/README.runner.md operator install guide. Daemon implements locked 7-step boot (.data/runner.secret → docker info → GET /api/runner/config → reconcile → heartbeat → SSE+poll → GC tick), inlines minimal mirrors of src/lib/runner-*.ts primitives with pointer comments, claim→stage→docker run→container-started→watchContainerExit→runner-exit is the core flow. Recipe secrets loaded from .data/runner/secrets/<NAME> at claim time and merged into --env-file (never argv). Commits 8a74425 / 8cea6d4. Next: Plan 14-09 (docker/hello-world-agent reference image) or 14-10 (recipes/hello-world + smoke harness + end-to-end human-verify).
+Resume file: .planning/phases/14-runner-container-v1-2/14-08b-SUMMARY.md
