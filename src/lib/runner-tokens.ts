@@ -4,8 +4,16 @@ import type Database from 'better-sqlite3'
 /**
  * RAUTH-06 allowlist — the ONLY endpoints reachable via a runner-token bearer.
  * Pattern: `${METHOD} ${path-template}` where `:id` is the task_id placeholder.
- * Locked by .planning/phases/11-runtime-foundation-v1-2/11-CONTEXT.md — DO NOT add entries in this phase.
- * Additions must route to the phase that needs them (Phase 14 / 15), not here.
+ *
+ * Originally locked by .planning/phases/11-runtime-foundation-v1-2/11-CONTEXT.md to
+ * the six `/api/runner/tasks/:id/*` entries below.
+ *
+ * Phase 15 (CP-01) adds EXACTLY ONE entry: POST /api/tasks/:id/checkpoints. This
+ * honors the v1.2 roadmap's literal checkpoint path (see
+ * .planning/phases/15-checkpoints-scheduler-v1-2/15-CONTEXT.md
+ * § "Checkpoint Endpoint Auth Path (added 2026-04-20 after research)"). DO NOT
+ * broaden the scope further — subsequent additions must be justified by a
+ * specific phase-level CONTEXT.md decision and land in the phase that owns them.
  */
 export const RUNNER_TOKEN_ALLOWLIST: ReadonlyArray<{ method: string; pathPattern: RegExp }> = [
   { method: 'POST', pathPattern: /^\/api\/runner\/tasks\/(\d+)\/checkpoints\/?$/ },
@@ -14,6 +22,8 @@ export const RUNNER_TOKEN_ALLOWLIST: ReadonlyArray<{ method: string; pathPattern
   { method: 'GET',  pathPattern: /^\/api\/runner\/tasks\/(\d+)\/status\/?$/ },
   { method: 'GET',  pathPattern: /^\/api\/runner\/tasks\/(\d+)\/?$/ },
   { method: 'GET',  pathPattern: /^\/api\/runner\/tasks\/(\d+)\/comments\/?$/ },
+  // Phase 15 CP-01: literal roadmap path for agent-authored checkpoints.
+  { method: 'POST', pathPattern: /^\/api\/tasks\/(\d+)\/checkpoints\/?$/ },
 ]
 
 export function hashRunnerToken(rawToken: string): string {

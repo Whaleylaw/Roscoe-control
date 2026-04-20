@@ -523,10 +523,19 @@ export function getUserFromRequest(request: Request): User | null {
   // Cross-task 403 is enforced in requireRunnerToken(), NOT here — getUserFromRequest returns
   // null for "no valid principal for this request", and the 401-vs-403 decision is concentrated
   // in the wrapper below so route handlers have a single source of truth.
-  if (url.pathname.startsWith('/api/runner/')) {
+  //
+  // Phase 15 (CP-01): runner-token principals MAY authenticate on
+  //   POST /api/tasks/:id/checkpoints
+  // in addition to the standard /api/runner/* scope. The allowlist in
+  // runner-tokens.ts is the single source of truth for method+path pairs;
+  // this gate is just the cheap prefix filter that decides whether to run
+  // the allowlist matcher at all. DO NOT broaden — see 15-CONTEXT.md § post-research lock.
+  const isRunnerPath = url.pathname.startsWith('/api/runner/')
+  const isCheckpointsTaskPath = /^\/api\/tasks\/\d+\/checkpoints\/?$/.test(url.pathname)
+  if (isRunnerPath || isCheckpointsTaskPath) {
     const bearer = extractApiKeyFromHeaders(request.headers)
     if (bearer) {
-      // (a) Path must match one of the six allowlisted patterns AND method.
+      // (a) Path must match one of the allowlisted patterns AND method.
       const match = RUNNER_TOKEN_ALLOWLIST.find(
         (rule) => rule.method === request.method && rule.pathPattern.test(url.pathname),
       )
@@ -566,8 +575,8 @@ export function getUserFromRequest(request: Request): User | null {
           }
         }
       }
-      // Path under /api/runner/ but NOT on allowlist: fall through (non-matching paths go to
-      // session / api-key auth below).
+      // Path matched the prefix filter but NOT the allowlist (wrong method, stray query,
+      // or /api/runner/<non-task> subpath): fall through to session / api-key auth below.
     }
   }
 
