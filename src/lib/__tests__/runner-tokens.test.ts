@@ -190,8 +190,8 @@ describe('runner-tokens module', () => {
   })
 
   describe('RUNNER_TOKEN_ALLOWLIST', () => {
-    it('contains exactly the six RAUTH-06 entries', () => {
-      expect(RUNNER_TOKEN_ALLOWLIST.length).toBe(6)
+    it('contains exactly the seven allowlist entries (six RAUTH-06 + Phase 15 checkpoints)', () => {
+      expect(RUNNER_TOKEN_ALLOWLIST.length).toBe(7)
     })
 
     it('each entry has method and pathPattern', () => {
