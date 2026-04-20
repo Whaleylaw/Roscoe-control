@@ -239,7 +239,7 @@ function cleanupEnvFile(filePath) {
 }
 
 // NOTE: mirrors src/lib/runner-worktree.ts seedMcDir. Keep in sync.
-function seedMcDir(worktreePath, task) {
+function seedMcDir(worktreePath, task, resumeMarker = null) {
   const mcDir = path.join(worktreePath, '.mc')
   fs.mkdirSync(mcDir, { recursive: true })
 
@@ -255,6 +255,8 @@ function seedMcDir(worktreePath, task) {
   if (!task.is_resuming) {
     fs.writeFileSync(progressPath, `# Progress — Task ${task.task_id}\n\n`)
     fs.writeFileSync(checkpointsPath, '')
+    // resume_marker is IGNORED on first attempts (symmetric with
+    // src/lib/runner-worktree.ts seedMcDir behavior per Plan 15-03).
   } else {
     if (!fs.existsSync(progressPath)) {
       fs.writeFileSync(progressPath, `# Progress — Task ${task.task_id}\n\n`)
@@ -262,10 +264,23 @@ function seedMcDir(worktreePath, task) {
     if (!fs.existsSync(checkpointsPath)) {
       fs.writeFileSync(checkpointsPath, '')
     }
+    // Phase 15 CP-04 — blocker-resume marker line (LOCKED format from
+    // 15-CONTEXT.md). Appended AFTER the defensive-fallback header write
+    // so wiped-worktree + marker stacks cleanly (header first, then marker).
+    if (resumeMarker && resumeMarker.blocker_reason && resumeMarker.at_iso) {
+      const line = `${resumeMarker.at_iso} | <<< RESUMED AFTER BLOCKER: ${resumeMarker.blocker_reason} >>>\n`
+      fs.appendFileSync(progressPath, line)
+    }
   }
 
   fs.writeFileSync(gitignorePath, '*\n')
 }
+
+// NOTE: mirrors src/lib/runner-worktree.ts seedMcDir + Phase 15-03
+// `resume_marker` extension. Keep in sync.
+// (Definition above; the `resume_marker` branch is the Phase 15 CP-04
+// extension — on resume attempts the LOCKED marker line is appended to
+// progress.md so the agent's preamble reads the blocker reason.)
 
 // NOTE: mirrors src/lib/runner-preamble.ts generatePreamble. Keep in sync.
 // Minimal two-variant text — full byte-stable version is the .ts module.
@@ -669,6 +684,37 @@ async function subscribeSSE() {
             const evt = JSON.parse(payload)
             if (evt && evt.type === 'task.runner_requested' && evt.data && evt.data.task_id) {
               handleRunnerRequested(Number(evt.data.task_id))
+            } else if (evt && evt.type === 'task.checkpoint_added') {
+              // Phase 15 CP-03: blocker checkpoints flip the task to
+              // awaiting_owner server-side AND the daemon must gracefully
+              // stop the running container so the worktree + .mc/ are
+              // preserved. Option D from RESEARCH.md Focus Area 11 — the
+              // existing checkpoint_added SSE event carries the blocker
+              // metadata; no new control channel.
+              const taskId = Number(evt.data?.task_id)
+              const status = evt.data?.status
+              if (status === 'blocked' && Number.isFinite(taskId) && activeTasks.has(taskId)) {
+                const tracked = activeTasks.get(taskId)
+                log('info', 'blocker checkpoint received — initiating docker stop', {
+                  task_id: taskId,
+                  container_id: tracked.containerId,
+                })
+                try {
+                  // Same invocation pattern as the timeout watchdog — SIGTERM
+                  // first, 15s grace, then SIGKILL. watchContainerExit will
+                  // still fire and post runner-exit; the runner-exit handler
+                  // detects the awaiting_owner status and overrides reason
+                  // to 'blocked'.
+                  spawnSync('docker', ['stop', '--time=15', tracked.containerId], { stdio: 'inherit' })
+                } catch (err) {
+                  log('warn', 'docker stop failed for blocker checkpoint', {
+                    task_id: taskId,
+                    err: String(err),
+                  })
+                  // Non-fatal — watchContainerExit will still fire when the
+                  // container eventually exits (timeout watchdog or natural exit).
+                }
+              }
             }
           } catch {
             // ignore malformed frames / comments / heartbeats
@@ -960,14 +1006,22 @@ async function runContainer(dispatch) {
   }
 
   // Step 4: seed .mc/.
+  // Phase 15 CP-04: pass resume_marker from the dispatch payload. The claim
+  // route's `buildDispatchPayload` queries the most-recent blocked checkpoint
+  // and attaches `task.resume_marker: { blocker_reason, at_iso } | null`;
+  // first attempts and resumes-without-prior-blocker arrive as null.
   try {
-    seedMcDir(worktreePath, {
-      task_id: String(taskId),
-      recipe_slug: task.recipe_slug,
-      attempt,
-      is_resuming: Boolean(task.is_resuming),
-      prior_attempts: task.prior_attempts || [],
-    })
+    seedMcDir(
+      worktreePath,
+      {
+        task_id: String(taskId),
+        recipe_slug: task.recipe_slug,
+        attempt,
+        is_resuming: Boolean(task.is_resuming),
+        prior_attempts: task.prior_attempts || [],
+      },
+      task.resume_marker ?? null,
+    )
   } catch (err) {
     await postRunnerExit(taskId, attempt, null, 'worktree_create_failed', `seedMcDir failed: ${String(err)}`)
     return
