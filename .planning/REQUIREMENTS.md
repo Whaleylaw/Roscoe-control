@@ -143,7 +143,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [x] **RUNNER-04**: Runner polls `/api/runner/ready-tasks` every 15 seconds as a fallback when SSE drops
 - [x] **RUNNER-05**: Runner sends heartbeats every 10 seconds; Mission Control marks the runner offline and surfaces a UI banner when no heartbeat arrives for 60 seconds
 - [x] **RUNNER-06**: Runner claims a task atomically via `POST /api/runner/claim/:task_id`, receiving a full dispatch payload (recipe content, task, mounts, fresh task-scoped token) or a 409 if already claimed
-- [ ] **RUNNER-07**: Runner validates every mount path against the allowlist at claim time as defense in depth, resolving symlinks and rejecting paths that escape
+- [x] **RUNNER-07**: Runner validates every mount path against the allowlist at claim time as defense in depth, resolving symlinks and rejecting paths that escape
 - [x] **RUNNER-08**: Runner enforces global (`MAX_CONCURRENT_CONTAINERS`) and per-recipe (`max_concurrent`) concurrency caps; over-cap claims return 409 and leave the task for the next cycle
 - [x] **RUNNER-09**: Runner creates or reuses a git worktree at `.data/runner/worktrees/task-<id>/` for worktree-mode recipes, seeds the `.mc/` directory, and records the path on the task
 - [x] **RUNNER-10**: Runner launches the container via `docker run --rm -d` with the documented mounts, env, and resource flags, streaming stdout/stderr to `.data/runner/logs/task-<id>/attempt-<n>/`
@@ -192,7 +192,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 - [x] **MODEL-01**: A new `src/lib/model-registry.ts` module exports a typed map of model identifiers to `{provider, context_window, output_tokens_max, supports_tools, supports_thinking}` — seeded with Opus 4.7, Sonnet 4.6, and Haiku 4.5
 - [x] **MODEL-02**: Recipe indexer rejects recipes whose `model.primary` is not in the registry, surfacing a human-readable error in the UI and indexer logs
 - [x] **MODEL-03**: Task creation rejects `model_override` values not in the registry with a clear error
-- [ ] **MODEL-04**: Effective model is resolved at claim time as `task.model_override ?? recipe.model.primary` and passed to the container via env (`MC_MODEL_PRIMARY`, `MC_MODEL_PROVIDER`, `MC_MODEL_PARAMS_JSON`, optional `MC_MODEL_FALLBACK`)
+- [x] **MODEL-04**: Effective model is resolved at claim time as `task.model_override ?? recipe.model.primary` and passed to the container via env (`MC_MODEL_PRIMARY`, `MC_MODEL_PROVIDER`, `MC_MODEL_PARAMS_JSON`, optional `MC_MODEL_FALLBACK`)
 
 ### UI Surfaces
 
@@ -331,7 +331,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNNER-04 | Phase 14 | Complete |
 | RUNNER-05 | Phase 14 | Complete |
 | RUNNER-06 | Phase 14 | Complete |
-| RUNNER-07 | Phase 14 | Pending |
+| RUNNER-07 | Phase 14 | Complete |
 | RUNNER-08 | Phase 14 | Complete |
 | RUNNER-09 | Phase 14 | Complete |
 | RUNNER-10 | Phase 14 | Complete |
@@ -365,7 +365,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MODEL-01 | Phase 11 | Complete |
 | MODEL-02 | Phase 12 | Complete |
 | MODEL-03 | Phase 11 | Complete |
-| MODEL-04 | Phase 14 | Pending |
+| MODEL-04 | Phase 14 | Complete |
 | RUI-01 | Phase 16 | Pending |
 | RUI-02 | Phase 16 | Pending |
 | RUI-03 | Phase 16 | Pending |
