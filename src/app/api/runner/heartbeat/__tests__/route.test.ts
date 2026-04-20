@@ -190,13 +190,9 @@ describe('POST /api/runner/heartbeat', () => {
     expect(mutationLimiter).toHaveBeenCalledTimes(1)
 
     // (b) When limiter returns a 429 response, route short-circuits and does NOT write.
-    const rateLimited = new Response(JSON.stringify({ error: 'Too many requests' }), {
-      status: 429,
-      headers: { 'content-type': 'application/json' },
-    })
-    vi.mocked(mutationLimiter).mockReturnValueOnce(rateLimited as unknown as Response & {
-      // satisfy NextResponse union without pulling in next/server here
-    })
+    const { NextResponse: NR } = await import('next/server')
+    const rateLimited = NR.json({ error: 'Too many requests' }, { status: 429 })
+    vi.mocked(mutationLimiter).mockReturnValueOnce(rateLimited)
     asRunner()
     const blockedRes = await POST(
       makePost({ runner_id: 'runner-limit-blocked', ts: 1_700_000_000_000 }),
