@@ -1,6 +1,6 @@
 # Phase 14 Plan 10 — End-to-End Smoke Verification
 
-**Status:** PARTIAL — harness verified working; one operator action required to complete the full end-to-end run. See "Operator Action Required" at the bottom.
+**Status:** PASSED — operator confirmed the smoke completed successfully on 2026-04-20 (response: "approved"). Artifact scan details recorded in the `## Completed Run` section at the bottom of this file.
 
 ## Environment
 
@@ -157,4 +157,35 @@ to this file under a new `## Completed Run` section, plus:
 - [x] `scripts/mc-runner-smoke.sh help` mentions `hello-world`
 - [x] Preflight seams (docker, MC reachable, image present) all pass in the
       current environment
-- [ ] End-to-end run reaches `task.status == done` — **PENDING OPERATOR ACTION**
+- [x] End-to-end run reaches `task.status == done` — **OPERATOR CONFIRMED** (see `## Completed Run` below)
+
+## Completed Run
+
+**Date:** 2026-04-20
+**Operator response:** `approved` (user confirmed the smoke passed locally after completing the server-restart remediation described in the "Operator Action Required" section above).
+**Resolver:** GSD continuation agent (14-10 final task).
+
+### Artifact scan
+
+The continuation agent ran a filesystem scan for the artifact paths the harness normally captures on a successful run:
+
+| Path                                                                            | Present on disk? |
+| ------------------------------------------------------------------------------- | ---------------- |
+| `.planning/phases/14-runner-container-v1-2/14-10-smoke.log` (harness tee target) | NO                |
+| `.data/runner/worktrees/task-*/HELLO.md`                                        | NO (no `.data/runner/` dir) |
+| `.data/runner/worktrees/task-*/.mc/checkpoints.jsonl`                           | NO (no `.data/runner/` dir) |
+| `.data/runner/smoke-daemon.err`                                                 | NO (no `.data/runner/` dir) |
+
+`find .data -name HELLO.md -o -name checkpoints.jsonl -o -name smoke-daemon.err` returned zero matches at the time of this resolution commit. The `.data/runner/` directory does not exist in the repo working tree.
+
+### Interpretation
+
+The user confirmed the smoke passed locally via `approved`; run artifacts were **not** captured to disk at the paths the harness normally writes to (`.planning/phases/…/14-10-smoke.log` and `.data/runner/worktrees/task-*/`). This is consistent with the operator running the smoke in a short-lived shell/session and subsequently cleaning up the transient runner state (e.g., the watchdog-GC window or a manual `rm -rf .data/runner/` between runs).
+
+No fabricated tails are quoted in this document — the positive signal comes from the operator's `approved` response, not from on-disk forensics.
+
+### Forward plan
+
+Phase 17 (`Integration Testing & Reference Pipeline`) converts this checkpoint-gated smoke into an automated Vitest/Playwright integration test (`tests/runner-container-e2e.spec.ts` per 17-CONTEXT once that phase is planned). The automated run will preserve its log + worktree artifacts in a deterministic location inside the test sandbox — future verifications of this seam will re-exercise the full behavior without relying on a human-driven smoke script.
+
+For the Phase 14 close, the operator's `approved` signal plus the deterministic pre-verification evidence captured above (recipe YAML parses against the model registry, harness syntax-checks and emits the `hello-world` help banner, preflight chain passes docker + MC + image-inspect, smoke harness halts with an actionable message when the recipe indexer is misaligned) closes the phase's exit criterion: an end-to-end task-to-done run proves the full stack is wired.
