@@ -205,11 +205,11 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Scheduler Integration
 
-- [ ] **SCHED-01**: `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox` to `assigned` without running agent-affinity scoring
-- [ ] **SCHED-02**: `dispatchAssignedTasks()` skips tasks with `recipe_slug` (legacy behavior preserved for non-recipe tasks)
-- [ ] **SCHED-03**: `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to existing legacy logic
-- [ ] **SCHED-04**: A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when runner is unreachable, so reconcile-on-reconnect works cleanly
-- [ ] **SCHED-05**: `task.runner_requested` event is emitted from three points: `autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` when a task is created directly as `assigned` with `recipe_slug`, and the runner-exit retry path on `in_progress → assigned`
+- [x] **SCHED-01**: `autoRouteInboxTasks()` moves recipe-tagged tasks from `inbox` to `assigned` without running agent-affinity scoring
+- [x] **SCHED-02**: `dispatchAssignedTasks()` skips tasks with `recipe_slug` (legacy behavior preserved for non-recipe tasks)
+- [x] **SCHED-03**: `requeueStaleTasks()` detects stuck recipe-tagged tasks by checking runner heartbeat and container liveness in addition to existing legacy logic
+- [x] **SCHED-04**: A new `reconcileRunnerHeartbeat()` scheduler task (every 30s) marks `in_progress` recipe-tasks stale when runner is unreachable, so reconcile-on-reconnect works cleanly
+- [x] **SCHED-05**: `task.runner_requested` event is emitted from three points: `autoRouteInboxTasks` on `inbox → assigned`, `POST /api/tasks` when a task is created directly as `assigned` with `recipe_slug`, and the runner-exit retry path on `in_progress → assigned`
 - [x] **SCHED-06**: `recipe.indexed`, `recipe.removed`, `task.container_started`, `task.container_exited`, and `task.checkpoint_added` events are broadcast on SSE for UI reactivity
 
 ### Integration & Testing
@@ -372,11 +372,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUI-04 | Phase 16 | Pending |
 | RUI-05 | Phase 16 | Pending |
 | RUI-06 | Phase 16 | Pending |
-| SCHED-01 | Phase 15 | Pending |
-| SCHED-02 | Phase 15 | Pending |
-| SCHED-03 | Phase 15 | Pending |
-| SCHED-04 | Phase 15 | Pending |
-| SCHED-05 | Phase 15 | Pending |
+| SCHED-01 | Phase 15 | Complete |
+| SCHED-02 | Phase 15 | Complete |
+| SCHED-03 | Phase 15 | Complete |
+| SCHED-04 | Phase 15 | Complete |
+| SCHED-05 | Phase 15 | Complete |
 | SCHED-06 | Phase 15 | Complete |
 | RTEST-01 | Phase 17 | Pending |
 | RTEST-02 | Phase 17 | Pending |

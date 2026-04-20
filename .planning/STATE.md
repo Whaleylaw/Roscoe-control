@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-20T22:32:39.369Z"
+last_updated: "2026-04-20T22:41:02.394Z"
 progress:
   total_phases: 15
   completed_phases: 11
   total_plans: 59
-  completed_plans: 60
+  completed_plans: 61
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 15 (Checkpoints & Scheduler Integration) — IN PROGRESS. Wave 1 in flight.
-Plans: 15-01 ✓ (EventType union + runner-token allowlist foundations complete), 15-02 (in progress, 2 commits landed), 15-03 ✓ (seedMcDir resume_marker extension complete), 15-04..15-07 pending.
-Status: Plan 15-01 complete — EventType union extended by 6 additive members (task.runner_requested, task.container_started, task.container_exited, task.checkpoint_added, recipe.indexed, recipe.removed) at tail after gsd.conflict.detected; RUNNER_TOKEN_ALLOWLIST gains 7th entry (POST /api/tasks/:id/checkpoints) with digit-only id regex; auth.ts runner-TOKEN prefix filter at line 526 extended via narrow OR (isRunnerPath || isCheckpointsTaskPath). Runner-SECRET gate at line 472 UNCHANGED. 28 new unit tests (8 event-bus + 20 allowlist) pass; 50 adjacent auth tests (auth-runner-token-principal, auth-runner-principal, auth) still pass with zero regressions. Commits 765aace (Task 1 event-bus) + e0e30e8 (Task 2 allowlist + auth.ts gate). Wave 2 plans (15-04/15-05/15-06/15-07) can now compile `eventBus.broadcast('task.runner_requested', ...)` without TS errors, and a runner-token bearer on POST /api/tasks/:id/checkpoints now reaches the route-handler layer.
-Last activity: 2026-04-20 — Plan 15-01 complete. 2 task commits. Decisions logged (15-01): tail-append EventType pattern; allowlist preamble rewritten to document CP-01 exception with pointer to 15-CONTEXT.md; narrow-OR auth gate extension preserves runner-SECRET scope. Wave 1 parallel execution continues (15-02 in flight; 15-04/15-06 pending).
-Next: Await remaining Wave 1 plans (15-02, 15-04, 15-06) to complete before Wave 2 (15-05 — blocker flow that consumes seedMcDir's resume_marker contract).
+Plans: 15-01 ✓ (EventType union + runner-token allowlist foundations complete), 15-02 ✓ (scheduler TICK_MS=30s + recipe-lane dispatch separation + 3/4 task.runner_requested emission points), 15-03 ✓ (seedMcDir resume_marker extension complete), 15-04..15-07 pending.
+Status: Plan 15-02 complete — TICK_MS reduced from 60_000 to 30_000 (SCHED-04: 3× tick = 90s LOCKED stale window); reconcile_runner_heartbeat tick registered across 5 ladder touch points; autoRouteInboxTasks gains recipe fast-path (inbox→assigned + task.runner_requested emit, bypasses affinity scoring); dispatchAssignedTasks SELECT adds AND t.recipe_slug IS NULL filter (SCHED-02 — recipe rows never picked up by legacy dispatch); requeueStaleTasks splits into two branches — recipe rows use isRecipeTaskStuck(runner_heartbeats + metadata_json.active_task_ids) probe, legacy rows keep agents.status==='offline' probe; reconcileRunnerHeartbeat exported with STALE_WINDOW_SECS=90 LOCKED (Task 4 replaces Task 1 stub); POST /api/tasks emits task.runner_requested when parsedTask.status='assigned' && parsedTask.recipe_slug (reads post-normalizeTaskCreateStatus status, so inbox→assigned auto-upgrade IS caught). 36/36 new unit tests pass across 6 new test files; 29/29 regression tests pass (task-routing + task-status + route.runtime-context). Commits 66ccd66 (Task 1 scheduler), 8cf4108 (Task 2 autoroute), f728084 (Task 3 dispatch+requeue), 6f01e94 (Task 4 reconcile real body), 9119a96 (Task 5 POST emission). Three of four SCHED-05 task.runner_requested emission points now live (autoRoute, POST /api/tasks, reconcileRunnerHeartbeat); runner-exit retry path awaits Plan 15-05.
+Last activity: 2026-04-20 — Plan 15-02 complete. 5 task commits. Decisions logged (15-02): TICK_MS=30_000 locked cadence; STALE_WINDOW_SECS=90 module-private constant; isRecipeTaskStuck conservative skip on missing inventory metadata; dispatch-lane separation by recipe_slug; Task interface local cast in POST /api/tasks emission block. Wave 1 parallel execution continues (15-04/15-06 pending).
+Next: Await remaining Wave 1 plans (15-04, 15-06) to complete before Wave 2 (15-05 — blocker flow + runner-exit retry emission path).
 
 ## Performance Metrics
 
@@ -116,6 +116,7 @@ Next: Await remaining Wave 1 plans (15-02, 15-04, 15-06) to complete before Wave
 | Phase 14-runner-container-v1-2 P10 | 12min | 2 tasks | 4 files |
 | Phase 15-checkpoints-scheduler-v1-2 P03 | 4min | 2 tasks tasks | 2 files files |
 | Phase 15-checkpoints-scheduler-v1-2 P01 | 4min | 2 tasks tasks | 5 files files |
+| Phase 15-checkpoints-scheduler-v1-2 P02 | 11min | 5 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -238,6 +239,11 @@ Recent decisions affecting current work:
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-01]: EventType union extended by 6 additive members at tail (after gsd.conflict.detected); append pattern preserves union integrity and scans as single diff block
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-01]: RUNNER_TOKEN_ALLOWLIST gets exactly ONE new entry (POST /api/tasks/:id/checkpoints) with digit-only id regex; preamble comment rewritten to replace Phase 11-era 'DO NOT add' lock with explicit CP-01 exception + pointer to 15-CONTEXT.md lock
 - [Phase 15-checkpoints-scheduler-v1-2]: [Phase 15-01]: auth.ts runner-TOKEN prefix filter extended via narrow OR (isRunnerPath || isCheckpointsTaskPath) — NOT by broadening startsWith('/api/runner/'); runner-SECRET gate at line 472 unchanged because runner-secret is not valid on /api/tasks/:id/checkpoints
+- [Phase 15-02]: TICK_MS=30_000 LOCKED (was 60_000) — 3× 30s tick = 90s LOCKED stale window. All TICK_MS-driven scheduled tasks now tick at 30s; nextRun gating prevents single-task over-fire.
+- [Phase 15-02]: STALE_WINDOW_SECS=90 is module-private (not a runtime setting). v1.2 deferred the configurable stale window to v1.3 per 15-CONTEXT.md.
+- [Phase 15-02]: isRecipeTaskStuck returns false when fresh heartbeat has no active_task_ids metadata — conservative skip. reconcileRunnerHeartbeat covers the 'no heartbeat at all' case unambiguously.
+- [Phase 15-02]: Dispatch-lane separation by recipe_slug: autoRouteInbox recipe fast-path + dispatchAssignedTasks 'recipe_slug IS NULL' filter + requeueStale two-branch. Recipe rows and legacy rows never cross lanes.
+- [Phase 15-02]: Task interface in db.ts doesn't yet have recipe_slug/workspace_id — Plan 15-02 Task 5 uses a scoped local cast in the POST /api/tasks emission block; widening Task belongs to a separate refactor.
 
 ### Pending Todos
 
