@@ -98,30 +98,37 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QUEUE-01 | TBD | Pending |
-| QUEUE-02 | TBD | Pending |
-| ROUTE-01 | TBD | Pending |
-| ROUTE-02 | TBD | Pending |
-| MCP-01 | TBD | Pending |
-| MCP-02 | TBD | Pending |
-| MCP-03 | TBD | Pending |
-| DOCS-01 | TBD | Pending |
-| DOCS-02 | TBD | Pending |
-| TESTS-01 | TBD | Pending |
-| TESTS-02 | TBD | Pending |
-| TESTS-03 | TBD | Pending |
-| ACCEPT-01 | TBD | Pending |
-| COMPAT-01 | TBD | Pending |
-| COMPAT-02 | TBD | Pending |
-| COMPAT-03 | TBD | Pending |
-| COMPAT-04 | TBD | Pending |
+| QUEUE-01 | Phase 19 | Pending |
+| QUEUE-02 | Phase 19 | Pending |
+| ROUTE-01 | Phase 20 | Pending |
+| ROUTE-02 | Phase 20 | Pending |
+| MCP-01 | Phase 21 | Pending |
+| MCP-02 | Phase 21 | Pending |
+| MCP-03 | Phase 21 | Pending |
+| DOCS-01 | Phase 22 | Pending |
+| DOCS-02 | Phase 22 | Pending |
+| TESTS-01 | Phase 22 | Pending |
+| TESTS-02 | Phase 22 | Pending |
+| TESTS-03 | Phase 22 | Pending |
+| ACCEPT-01 | Phase 23 | Pending |
+| COMPAT-01 | Phase 19 | Pending |
+| COMPAT-02 | Phase 20 | Pending |
+| COMPAT-03 | Phase 20 | Pending |
+| COMPAT-04 | Phase 21 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️ (will be resolved by roadmapper)
+- Mapped to phases: 17
+- Unmapped: 0 ✓
+
+**Distribution:**
+- Phase 19 (Project-Scoped Queue & Plan Activation): QUEUE-01, QUEUE-02, COMPAT-01 — 3 reqs
+- Phase 20 (Lane-Aware Routing & Unified Blocker Contract): ROUTE-01, ROUTE-02, COMPAT-02, COMPAT-03 — 4 reqs
+- Phase 21 (MCP Routing-Field Parity): MCP-01, MCP-02, MCP-03, COMPAT-04 — 4 reqs
+- Phase 22 (Doc Reconciliation & Test Debt Burn-Down): DOCS-01, DOCS-02, TESTS-01, TESTS-02, TESTS-03 — 5 reqs
+- Phase 23 (End-to-End Acceptance Validation): ACCEPT-01 — 1 req
 
 ---
 
 *Requirements defined: 2026-04-21*
-*Last updated: 2026-04-21 after v1.3 milestone kickoff via /gsd:new-milestone*
+*Last updated: 2026-04-21 — v1.3 roadmap landed; all 17 requirements mapped to Phases 19–23 via /gsd:roadmapper.*
