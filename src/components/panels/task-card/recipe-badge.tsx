@@ -23,6 +23,9 @@ type TaskLike = { recipe_slug?: string | null }
  * `refreshRecipes()`, React re-renders and the friendly name + correct tier
  * color take over automatically. See `.planning/phases/16-runtime-ui-surfaces/16-RESEARCH.md`
  * Pitfall 10 for the flicker-tradeoff discussion.
+ *
+ * Test locator: the root span carries data-testid="recipe-badge" (Phase 18-02 /
+ * audit-td-2) so Playwright can target it without coupling to recipe name text.
  */
 export function RecipeBadge({ task }: { task: TaskLike }) {
   const t = useTranslations('taskBoard.recipeBadge')
@@ -34,6 +37,7 @@ export function RecipeBadge({ task }: { task: TaskLike }) {
   const label = recipe?.name ?? task.recipe_slug
   return (
     <span
+      data-testid="recipe-badge"
       className={`text-[10px] px-1.5 py-0.5 rounded border font-mono truncate max-w-[10rem] ${classes}`}
       title={label}
       aria-label={t('ariaLabel', { slug: task.recipe_slug })}

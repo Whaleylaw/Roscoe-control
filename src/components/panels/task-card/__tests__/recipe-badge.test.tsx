@@ -141,4 +141,13 @@ describe('RecipeBadge (RUI-01)', () => {
     // The ariaLabel template is `Recipe: {slug}` in en.json.
     expect(el).toHaveAttribute('aria-label', 'Recipe: hello-world')
   })
+
+  it('renders data-testid="recipe-badge" on the root element (Phase 18-02 / audit-td-2)', () => {
+    recipesMock = [
+      { slug: 'hello-world', name: 'Hello World', model: { primary: 'claude-haiku-4-5' } },
+    ]
+    renderWithIntl(<RecipeBadge task={{ recipe_slug: 'hello-world' }} />)
+    const badge = screen.getByTestId('recipe-badge')
+    expect(badge).toBeInTheDocument()
+  })
 })

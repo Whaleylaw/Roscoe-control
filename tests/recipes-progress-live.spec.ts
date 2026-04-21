@@ -250,13 +250,15 @@ test.describe('Phase 17: Recipe badge + Progress tab live update (RTEST-04)', ()
     })
 
     // ── Step 7: assert recipe badge (RUI-01) ──
-    // RecipeBadge (src/components/panels/task-card/recipe-badge.tsx) does NOT
-    // ship a data-testid attribute today; Phase 16-02 shipped it with
-    // aria-label only. We assert on the friendly name text from
-    // recipes/hello-world/recipe.yaml (name: "Hello World Agent") which is
-    // rendered inside a <span title=...>. Fallback to raw slug if cache miss.
+    // Primary locator: data-testid="recipe-badge" (Phase 18-02 hardening —
+    // recipe-name-agnostic). Fallback: text regex from recipes/hello-world/
+    // recipe.yaml (name: "Hello World Agent") — kept as a safety net for
+    // pre-18-02 builds, stale deployments, or future recipe renames.
     // Scoped to the card so we never match badges on other tasks.
-    const recipeLabel = taskCard.locator('text=/hello.world/i').first()
+    const recipeLabel = taskCard
+      .locator('[data-testid="recipe-badge"]')
+      .or(taskCard.locator('text=/hello.world/i'))
+      .first()
     await expect(recipeLabel, 'recipe badge should render').toBeVisible({
       timeout: 15_000,
     })
