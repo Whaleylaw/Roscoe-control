@@ -4,6 +4,14 @@
 **Date:** 2026-04-18
 **Author:** Aaron Whaley (brainstormed with Claude)
 
+> ⚠️ **This is a DESIGN-ERA spec.** Several claims here do NOT match shipped v1.2 behavior:
+>
+> - **Task lifecycle:** this spec says agent-submit flips the task to `done`; shipped behavior flips to `review` first and Aegis then approves to `done` — the two-hop **submit → review → done** terminal transition (Phase 17-01 RTEST-02, commit `e9e5fc1`).
+> - **Workspace modes:** this spec discusses `ro-overlay`; only `worktree | readonly | none` are shipped (see [`src/lib/recipe-schema.ts`](../../../src/lib/recipe-schema.ts)).
+> - **Recipe search:** this spec discusses embedded embeddings; shipped search ranks via [`src/app/api/recipes/search/route.ts`](../../../src/app/api/recipes/search/route.ts) (literal match + tag + name prefix).
+>
+> For shipped behavior, read [`docs/runtime/`](../../runtime/INDEX.md) — the operator-facing documentation set for the v1.2 ephemeral agent runtime. This document is kept as a historical record of the original design intent; do not cite it as authoritative when answering operator questions.
+
 ## Summary
 
 Build a Kanban-driven workflow system in which tasks are executed by **ephemeral containerized agents** configured from **recipe cards** — markdown + YAML bundles that describe an agent's persona, tools, skills, container image, and model. When a task is claimed, the runner spins up a container from the recipe, executes the task inside a task-specific git worktree, and tears down the container on exit. Work state is preserved in the worktree across crashes so a second attempt can resume without redoing work.

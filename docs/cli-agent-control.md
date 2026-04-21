@@ -201,6 +201,16 @@ Baseline policy in this repo:
 - When you fix a mismatch, remove its line from ignore file in the same PR.
 - Goal is monotonic burn-down to an empty ignore file.
 
+### See also — Runtime documentation
+
+For operators running the **v1.2 recipe-based ephemeral agent runtime** (recipe-tagged tasks, `scripts/mc-runner.mjs`, per-task containers), see the `docs/runtime/` documentation set. The CLI configures runtime admin settings via `pnpm mc settings set runtime.*` — the full catalog of settings keys and their defaults lives in the admin-config reference below.
+
+- [Runtime overview](./runtime/INDEX.md) — entry point for the v1.2 ephemeral agent runtime docs (architecture + cross-links)
+- [Getting started (recipes)](./runtime/getting-started.md) — end-to-end tutorial from a fresh install to a first recipe agent completing
+- [Admin config](./runtime/admin-config.md) — `runtime.*` settings catalog (`runtime.mount_allowlist`, `runtime.project_repo_map`, `runtime.max_concurrent_containers`, etc.) + secrets store + auth tiers
+- [Runner daemon](./runtime/runner-daemon.md) — operator guide for `scripts/mc-runner.mjs` (boot, LaunchAgent, exit codes, logs)
+- [Agent contract](./runtime/agent-contract.md) — what a recipe container image must do (env vars, mounts, preamble, submit endpoint)
+
 ## Next steps
 
 - Promote script to package.json bin entry (`mc`).
