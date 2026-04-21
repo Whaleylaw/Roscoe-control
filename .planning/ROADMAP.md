@@ -378,5 +378,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 12/12 | Complete    | 2026-04-20 |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete    | 2026-04-20 |
-| 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete   | 2026-04-21 |
+| 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |
