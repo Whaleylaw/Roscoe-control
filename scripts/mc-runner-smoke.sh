@@ -10,12 +10,12 @@
 # server + Docker daemon. Authoritative human-verify harness for Plan 14-10
 # (end-to-end checkpoint).
 #
-# Subcommands (v1):
-#   hello-world   - Full happy-path smoke against the mc-hello-world-agent image
-#   help          - Show this banner
+# Subcommands:
+#   hello-world      - Full happy-path smoke against the mc-hello-world-agent image
+#   preserve-on-stop - (Phase 17-04) Verify worktree + .mc/ persist across daemon SIGTERM
+#   help             - Show this banner
 #
-# Planned future subcommands (Phase 15 / 17 - NOT yet implemented):
-#   preserve-on-stop      - Verify worktree persists when runner is SIGTERMed mid-run
+# Planned future subcommands (NOT yet implemented):
 #   preserve-across-crash - Verify worktree + attempt-counter persist across daemon restart
 #
 # Prereqs for `hello-world`:
@@ -56,8 +56,9 @@ Mission Control Runner Smoke Harness
 Usage: bash scripts/mc-runner-smoke.sh <subcommand>
 
 Subcommands:
-  hello-world   Run the full Phase 14 end-to-end smoke against mc-hello-world-agent.
-  help          Show this message.
+  hello-world       Run the full Phase 14 end-to-end smoke against mc-hello-world-agent.
+  preserve-on-stop  Verify worktree + .mc/ persist when the daemon is SIGTERMed mid-task (Phase 17-04).
+  help              Show this message.
 
 Env overrides:
   MC_URL            Mission Control base URL (default: http://127.0.0.1:3000)
@@ -533,14 +534,189 @@ run_hello_world() {
 }
 
 # ----------------------------------------------------------------------------
+# Phase 17-04 — preserve-on-stop flow
+# ----------------------------------------------------------------------------
+# Verifies that the worktree + .mc/ directory are PRESERVED on host disk when
+# the runner daemon is SIGTERMed mid-task. Mirrors run_hello_world's preflight
+# + seed + spawn pattern, then:
+#   1. Waits for task to reach 'in_progress' (claim committed)
+#   2. Waits for first checkpoint (.mc/checkpoints.jsonl has >= 1 line)
+#   3. SIGTERMs the runner daemon
+#   4. Gracefully stops the running container (docker stop --time=15)
+#   5. Asserts worktree_path + .mc/task.json + .mc/progress.md + .mc/checkpoints.jsonl
+#      are ALL still present on disk
+#
+# Does NOT exercise the resume-from-marker flow — that belongs to Plan 17-05
+# (preserve-across-crash) which remains a reserved stub here.
+poll_task_in_progress() {
+  local task_id="$1"
+  local budget=60
+  info "Polling GET /api/tasks/$task_id for 'in_progress' (budget: ${budget}s)"
+  local elapsed=0
+  local last_status=""
+  while (( elapsed < budget )); do
+    local resp
+    resp=$(curl -s -H "Authorization: Bearer $MC_API_KEY" \
+      "$MC_URL/api/tasks/$task_id" 2>/dev/null || echo '{}')
+    local status
+    if command -v jq >/dev/null 2>&1; then
+      status=$(echo "$resp" | jq -r '.task.status // .status // empty')
+    else
+      status=$(node -e "
+        const j=JSON.parse(process.argv[1]||'{}')||{};
+        process.stdout.write((j.task&&j.task.status)||j.status||'');" "$resp")
+    fi
+    if [[ "$status" != "$last_status" ]]; then
+      info "  t=${elapsed}s status=$status"
+      last_status="$status"
+    fi
+    case "$status" in
+      in_progress|review|done) return 0 ;;
+      failed|cancelled)
+        err "Task $task_id reached terminal non-in_progress status: $status"
+        return 1
+        ;;
+    esac
+    sleep "$POLL_INTERVAL_SEC"
+    elapsed=$(( elapsed + POLL_INTERVAL_SEC ))
+  done
+  err "Task $task_id did not reach 'in_progress' within ${budget}s"
+  return 1
+}
+
+poll_first_checkpoint() {
+  local task_id="$1"
+  local budget=30
+  info "Polling GET /api/tasks/$task_id/checkpoints for >= 1 row (budget: ${budget}s)"
+  local elapsed=0
+  while (( elapsed < budget )); do
+    local resp
+    resp=$(curl -s -H "Authorization: Bearer $MC_API_KEY" \
+      "$MC_URL/api/tasks/$task_id/checkpoints" 2>/dev/null || echo '{}')
+    local count
+    if command -v jq >/dev/null 2>&1; then
+      count=$(echo "$resp" | jq -r '.checkpoints | length' 2>/dev/null || echo "0")
+    else
+      count=$(node -e "
+        const j=JSON.parse(process.argv[1]||'{}')||{};
+        const a=j.checkpoints||[];
+        process.stdout.write(String(Array.isArray(a)?a.length:0));" "$resp")
+    fi
+    if [[ "$count" =~ ^[0-9]+$ ]] && (( count >= 1 )); then
+      info "  t=${elapsed}s checkpoints=$count"
+      return 0
+    fi
+    sleep "$POLL_INTERVAL_SEC"
+    elapsed=$(( elapsed + POLL_INTERVAL_SEC ))
+  done
+  err "Task $task_id did not accrue a checkpoint within ${budget}s"
+  return 1
+}
+
+run_preserve_on_stop() {
+  info "=== Phase 17 preserve-on-stop: verifying worktree + .mc/ survive daemon SIGTERM ==="
+  info "repo root: $REPO_ROOT"
+  info "mc url:    $MC_URL"
+
+  resolve_api_key
+  preflight_docker
+  preflight_mc
+  preflight_image
+
+  ensure_recipe_indexed
+  local project_id
+  project_id=$(ensure_smoke_project | tail -1)
+  [[ -n "$project_id" ]] || die "could not resolve smoke project id"
+  configure_runtime_settings "$project_id"
+
+  TASK_ID=$(create_smoke_task "$project_id" | tail -1)
+  [[ -n "$TASK_ID" ]] || die "could not resolve smoke task id"
+
+  start_runner
+
+  # Wait for claim + first checkpoint before SIGTERM so there's real state to
+  # preserve. If we SIGTERM before the container writes .mc/checkpoints.jsonl,
+  # the assertion below would trivially fail (empty file is still a file).
+  if ! poll_task_in_progress "$TASK_ID"; then
+    err "preserve-on-stop: task never reached in_progress; aborting"
+    return 1
+  fi
+
+  # Best-effort — the hello-world agent writes exactly one checkpoint locally
+  # and exits. On a healthy host this may already be complete by now; the poll
+  # then returns immediately. If it never accrues, the daemon never launched
+  # the container, which is a real failure.
+  if ! poll_first_checkpoint "$TASK_ID"; then
+    warn "preserve-on-stop: no checkpoint recorded in DB; may have only been written to JSONL. Continuing."
+  fi
+
+  info "SIGTERM runner daemon (PID $RUNNER_PID)"
+  kill -TERM "$RUNNER_PID" 2>/dev/null || true
+  local waited=0
+  while (( waited < 10 )); do
+    kill -0 "$RUNNER_PID" 2>/dev/null || break
+    sleep 1
+    waited=$(( waited + 1 ))
+  done
+  if kill -0 "$RUNNER_PID" 2>/dev/null; then
+    warn "Runner did not exit within 10s of SIGTERM; escalating to SIGKILL"
+    kill -KILL "$RUNNER_PID" 2>/dev/null || true
+  fi
+  RUNNER_PID=""
+
+  # Gracefully stop the container if still running so the worktree + .mc/ are
+  # not captive to a live container at assertion time.
+  local running_id
+  running_id=$(docker ps -q --filter "label=mc.task_id=$TASK_ID" | head -n1 || true)
+  if [[ -n "$running_id" ]]; then
+    info "docker stop --time=15 $running_id"
+    docker stop --time=15 "$running_id" >/dev/null 2>&1 || true
+  fi
+
+  # Resolve the worktree_path the daemon/claim route populated on the task row.
+  local task_resp
+  task_resp=$(curl -s -H "Authorization: Bearer $MC_API_KEY" \
+    "$MC_URL/api/tasks/$TASK_ID")
+  local worktree
+  if command -v jq >/dev/null 2>&1; then
+    worktree=$(echo "$task_resp" | jq -r '.task.worktree_path // .worktree_path // empty')
+  else
+    worktree=$(node -e "
+      const j=JSON.parse(process.argv[1]||'{}')||{};
+      const wt=(j.task&&j.task.worktree_path)||j.worktree_path||'';
+      process.stdout.write(wt);" "$task_resp")
+  fi
+
+  [[ -n "$worktree" ]] || die "Worktree path missing from GET /api/tasks/$TASK_ID"
+
+  info "Asserting preserved state at $worktree"
+  test -d "$worktree" || die "Worktree $worktree missing after daemon stop"
+  test -f "$worktree/.mc/task.json" || die "task.json missing at $worktree/.mc/task.json"
+  test -f "$worktree/.mc/progress.md" || die "progress.md missing at $worktree/.mc/progress.md"
+  test -f "$worktree/.mc/checkpoints.jsonl" || die "checkpoints.jsonl missing at $worktree/.mc/checkpoints.jsonl"
+  test -s "$worktree/.mc/checkpoints.jsonl" || die "checkpoints.jsonl is empty — expected at least 1 line"
+
+  info "OK: daemon stopped gracefully; worktree at $worktree preserved with .mc/ intact"
+  info "========================================="
+  info "  PRESERVE-ON-STOP PASSED"
+  info "  task id = $TASK_ID"
+  info "  worktree = $worktree"
+  info "========================================="
+  return 0
+}
+
+# ----------------------------------------------------------------------------
 # Entrypoint
 # ----------------------------------------------------------------------------
 case "${1:-help}" in
   hello-world)
     run_hello_world
     ;;
-  preserve-on-stop|preserve-across-crash)
-    die "Subcommand '$1' is reserved for Phase 15/17; not yet implemented."
+  preserve-on-stop)
+    run_preserve_on_stop
+    ;;
+  preserve-across-crash)
+    die "Subcommand 'preserve-across-crash' is reserved for Phase 17; not yet implemented."
     ;;
   help|--help|-h)
     usage
