@@ -387,6 +387,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T13:58:25Z
-Stopped at: Completed 18-03-PLAN.md (Phase 14 submit → done doc drift corrected — audit-td-3 closed)
+Last session: 2026-04-21T15:05:54Z
+Stopped at: Completed 18.1-03-PLAN.md (DOC-AGT — docs/runtime/agent-contract.md, 439-line tool-agnostic substrate contract for recipe image authors)
 Resume file: None
