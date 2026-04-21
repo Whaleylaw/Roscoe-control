@@ -1910,6 +1910,12 @@ function TaskDetailModal({
               />
             </div>
           )}
+
+          {activeTab === 'progress' && task.recipe_slug && (
+            <div id="tabpanel-progress" className="mt-4">
+              <ProgressTab taskId={task.id} />
+            </div>
+          )}
         </div>
       </div>
     </div>
