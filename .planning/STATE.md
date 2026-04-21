@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T15:48:06.832Z"
+last_updated: "2026-04-21T21:26:38.019Z"
 progress:
   total_phases: 19
   completed_phases: 16
@@ -15,10 +15,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
+See: .planning/PROJECT.md (updated 2026-04-21 after v1.2 milestone shipped)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle, and autonomous agents pick up assigned work, execute it in isolated containers, and move it through the Kanban.
-**Current focus:** v1.2 milestone — recipe-based ephemeral agent runtime. Design spec committed at `docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`. Roadmap drafted (Phases 11–17). Next: `/gsd:plan-phase 11` for Runtime Foundation (DB migrations + model registry + auth principals).
+**Current focus:** v1.2 shipped 2026-04-21 (9 phases, 53 plans, 72/72 REQ-IDs, tag `v1.2`). Planning for v1.3 is not yet scoped. Next: `/gsd:new-milestone` to define the next milestone, or resume ad-hoc work on `main`.
 
 ## Current Position
 

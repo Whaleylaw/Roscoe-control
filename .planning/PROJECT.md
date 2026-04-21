@@ -12,32 +12,17 @@ v1.2 adds an agent execution layer: Kanban tasks can declare a **recipe card** (
 
 When I click into a project, I see everything about that project — what it is, what's happening, what's next — and I can manage all its work from one place, including driving it through its GSD lifecycle, and autonomous agents pick up assigned work, execute it in isolated containers, and move it through the Kanban for me.
 
-## Current Milestone: v1.2 Recipe-Based Ephemeral Agent Runtime
+## Current State
 
-**Goal:** Ship a complete recipe-card + runner system that lets Kanban tasks be executed by short-lived containerized agents, configured from filesystem-authored recipe cards, with crash-safe progress checkpoints and per-task-scoped authentication.
+**Shipped through v1.2** (2026-04-21) — v1.0 Project Workspace & Dashboard, v1.1 Native GSD Integration, and v1.2 Recipe-Based Ephemeral Agent Runtime all complete. The app is a full-featured project workspace with native GSD lifecycle tracking and a shippable recipe-based container runtime; operators can author recipe cards, land Kanban tasks into a runner daemon, watch them execute in short-lived containers with crash-safe checkpointing, and review them through the existing Aegis loop. Operator manual lives at `docs/runtime/INDEX.md`; drift harness at `scripts/verify-runtime-docs.mjs`.
 
-**Target features:**
-- Filesystem-first recipe cards at `recipes/<slug>/` (SOUL.md, recipe.yaml, tools/, skills/) indexed to a `recipes` DB table via chokidar watcher
-- Recipe schema covering: container image, workspace mode (`none`/`worktree`), timeout, concurrency cap, env vars, secret keys, tags, model (primary + optional fallback + provider + params)
-- Task schema extensions: `recipe_slug`, task-level `workspace_source`, `read_only_mounts`, `extra_skills`, `model_override`, runner execution state, retry counters
-- `task_runner_tokens` table with per-task, per-attempt ephemeral bearer tokens
-- `task_checkpoints` table + matching `.mc/checkpoints.jsonl` in each worktree
-- Dedicated `scripts/mc-runner.mjs` daemon with its own LaunchAgent: claim-based dispatch, `docker run` with allowlisted mounts, heartbeat, exit handling, on-restart reconciliation
-- `.mc/` worktree convention (task.json, progress.md, checkpoints.jsonl) with agent preambles that differ for first vs resuming attempts
-- Mount allowlist enforced at task creation and at runner claim
-- New auth principals: `runner` (daemon-scoped) and `runner-token` (task-scoped, explicit opt-in)
-- Recipe CRUD + SQL-LIKE search API; task lifecycle API for runner-tokens; runner protocol API
-- Model registry (`src/lib/model-registry.ts`) validates recipes at index time
-- UI: recipe badge + model tier on task cards, runner-status banner on the task board, Progress tab on task detail with per-attempt checkpoint timeline, Recipe dropdown + Advanced (mounts/skills/model override) in task form
-- One reference image (`mc-hello-world-agent`) wired through the full flow for integration testing
-- Integration with existing scheduler (`autoRouteInboxTasks`, `requeueStaleTasks`) and Aegis review loop
-
-**Design doc:** `docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`
+**Next milestone:** Not yet scoped. Run `/gsd:new-milestone` to define v1.3.
 
 ## Requirements
 
 ### Validated
 
+**Pre-v1.0 baseline:**
 - ✓ Projects exist as an entity with name, description, status — existing
 - ✓ Tasks can be assigned to projects — existing
 - ✓ Task board and task management UI — existing
@@ -46,6 +31,25 @@ When I click into a project, I see everything about that project — what it is,
 - ✓ Panel-based navigation with Zustand state — existing
 - ✓ SSE real-time updates for data changes — existing
 - ✓ REST API for all CRUD operations — existing
+
+**v1.2 — Recipe-Based Ephemeral Agent Runtime (shipped 2026-04-21):**
+- ✓ Filesystem-first recipe cards at `recipes/<slug>/` indexed via chokidar watcher — v1.2 Phase 12
+- ✓ Recipe schema (container image, workspace mode, timeout, concurrency, env, secrets, tags, model) with Zod validation — v1.2 Phase 12
+- ✓ Task schema extensions (`recipe_slug`, `workspace_source`, `read_only_mounts`, `extra_skills`, `model_override`) — v1.2 Phase 13
+- ✓ `task_runner_tokens` per-task per-attempt ephemeral bearer tokens — v1.2 Phase 11
+- ✓ `task_checkpoints` table + dual-write to `.mc/checkpoints.jsonl` — v1.2 Phase 15
+- ✓ `scripts/mc-runner.mjs` daemon with LaunchAgent, claim-based dispatch, docker run, heartbeat, crash recovery — v1.2 Phase 14
+- ✓ `.mc/` worktree convention (task.json, progress.md, checkpoints.jsonl) with resume preamble — v1.2 Phase 14
+- ✓ Mount allowlist enforced at task creation + at runner claim — v1.2 Phases 13, 14
+- ✓ `runner` + `runner-token` auth principals — v1.2 Phase 11
+- ✓ Recipe CRUD + SQL-LIKE search API; runner protocol API — v1.2 Phase 12, Phase 14
+- ✓ Model registry (`src/lib/model-registry.ts`) validates recipes at index time — v1.2 Phase 11
+- ✓ Recipe badge + model tier + RunnerStatusBanner + Progress tab + Recipe/Advanced dropdowns + Recipes panel — v1.2 Phase 16
+- ✓ Reference `mc-hello-world-agent` image wired through full flow — v1.2 Phase 14
+- ✓ Scheduler integration (`autoRouteInboxTasks`, `dispatchAssignedTasks` bypass, `requeueStaleTasks`, `reconcileRunnerHeartbeat`) — v1.2 Phase 15
+- ✓ Submit→review two-hop lifecycle (agent submits → review → Aegis flips → done) — v1.2 Phase 17-01
+- ✓ Integration pipeline: unit + daemon-subprocess integration + crash-recovery + Playwright E2E — v1.2 Phase 17
+- ✓ Operator manual under `docs/runtime/` (6 surface docs + INDEX + drift harness) — v1.2 Phase 18.1
 
 ### Active
 
@@ -84,6 +88,15 @@ When I click into a project, I see everything about that project — what it is,
 - [x] CLI wrappers exist for Phase 10 workstreams, milestones, phases, plans, and lifecycle-graph reads — Implemented in Phase 10
 - [x] Same-wave conflicts are counted in `rollups.wave_conflicts` and can block `plan -> in_progress` transitions — Implemented in Phase 10
 
+**v1.3 candidates (not yet scoped — run `/gsd:new-milestone` to triage):**
+
+- [ ] Project-level progress/completion indicators (carried over from v1.0 Active — never landed)
+- [ ] Multi-recipe scheduling (currently one recipe_slug per task; multi-step workflows would need a new primitive)
+- [ ] Docker-host health integration (runner banner heartbeat is 90s; doesn't probe Docker — Pitfall #9 in Phase 18.1)
+- [ ] Recipe versioning policy (currently recipe_slug is identity; no migration story across versions)
+- [ ] Agent-image marketplace / signed-image verification (runtime trusts the operator-configured image allowlist)
+- [ ] Observability surfaces for long-running agents (checkpoint timeline is per-task; no project-level aggregation)
+
 ### Out of Scope
 
 - Project templates or cloning — complexity not needed for v1
@@ -94,11 +107,13 @@ When I click into a project, I see everything about that project — what it is,
 
 ## Context
 
-- Mission Control uses a single catch-all route (`src/app/[[...panel]]/page.tsx`) with Zustand state driving which panel renders. The project workspace will need to integrate with this routing pattern or extend it.
-- Projects already exist in the database with basic fields. The data model may need expansion for dashboard metadata (progress tracking, activity aggregation).
-- The existing panel system (`src/components/panels/`) has 35+ panels. The project workspace is a new panel that itself contains sub-views (dashboard, tasks, sessions, agents, settings).
-- Real-time updates via SSE (`eventBus`) already push task and agent changes — the project dashboard can subscribe to project-scoped events.
-- i18n support via `next-intl` means new UI strings need message file entries.
+- Mission Control uses a single catch-all route (`src/app/[[...panel]]/page.tsx`) with Zustand state driving which panel renders. The project workspace integrates with this routing pattern.
+- Projects live in SQLite via `better-sqlite3`. Migrations are additive only; schema has grown through v1.2 to include `recipes`, `task_runner_tokens`, `task_checkpoints`, and 11 new task columns.
+- 33+ panels in `src/components/panels/`. The project workspace is itself a panel that contains sub-views (dashboard, tasks, sessions, agents, settings, Lifecycle).
+- Real-time updates via SSE (`eventBus`) push task, agent, GSD lifecycle, and v1.2 runtime events (`task.runner_requested`, `task.container_started/exited`, `task.checkpoint_added`, `recipe.indexed/removed`) to the client.
+- i18n support via `next-intl` — 10-locale coverage for all v1.2 UI surfaces.
+- Agent runtime: `scripts/mc-runner.mjs` daemon runs on a LaunchAgent; spawns short-lived containers from recipe cards in `recipes/<slug>/`. Reference image: `mc-hello-world-agent`. Operator manual: `docs/runtime/INDEX.md`. Drift harness: `scripts/verify-runtime-docs.mjs` (pnpm script `docs:verify-runtime`).
+- Auth stack: session cookies + `API_KEY` bearer + v1.2-added `runner` / `runner-token` principals (negative-sentinel user ids `-1000` / `-2000`).
 
 ## Constraints
 
@@ -123,6 +138,17 @@ When I click into a project, I see everything about that project — what it is,
 | Phase 10: REST-first hierarchy surface before CLI parity | Keeps delivery moving while contracts stabilize; UI can ship immediately on top of canonical routes | Landed in Phase 10 (hierarchy routes + Lifecycle tab shipped first; CLI wrappers followed once contracts settled) |
 | Phase 10: Optimistic locking on hierarchy mutations | Prevents silent overwrite races in the interactive Lifecycle tab | Landed in Phase 10 (`expected_updated_at` on PATCH/complete/transition routes) |
 | Phase 10: No MCP parity in this phase | Operator explicitly chose CLI + REST plus conflict analysis, not a matching MCP tool surface | Landed in Phase 10 (CLI wrappers shipped; MCP parity intentionally deferred) |
+| v1.2: Phase 11 scoped to substrate only (migrations + registry + auth) | Every later phase depends on it; keeps foundation shippable as pure additive migration | ✓ Good — landed clean, zero rollback needed |
+| v1.2: Model-registry validation split across 3 phases (11, 12, 14) | Each validation lands where its consumer code lives | ✓ Good — validation boundaries match usage sites; no duplication |
+| v1.2: Runner + container + worktree + reference image all ship together in Phase 14 | Mutually dependent — daemon is useless without worktree layout | ✓ Good — Phase 17 integration tests confirmed the bundle works end-to-end |
+| v1.2: submit → review two-hop lifecycle (agent submits → review → Aegis → done) | Decouples agent "done" claim from human/reviewer approval; preserves Aegis review loop | ✓ Good — locked in Phase 17-01 RTEST-02; Phase 18-03 corrected earlier Phase 14 narrative drift |
+| v1.2: Dual-write checkpoints (DB + .mc/checkpoints.jsonl) | DB for query/UI; JSONL for crash recovery (agent can re-read after container restart) | ✓ Good — Phase 17-05 crash-recovery test proved resume works byte-for-byte |
+| v1.2: `runtime.project_repo_map` is the exclusive project→repo resolution path | No env-var fallback — forces operators to use settings API; prevents silent misconfiguration | ✓ Good — locked in Phase 14-08b; documented as Pitfall #4 in operator manual |
+| v1.2: CONTAINER-01 — secrets injected via `--env-file`, never on docker argv | Docker argv is world-readable on the host; env files are 0600 | ✓ Good — Phase 14 runner-docker.ts uses writeEnvFile; Phase 17 argv-scan test prevents regression |
+| v1.2: RUNNER_TOKEN_ALLOWLIST has 7 entries (not 6) | Added Phase 15 checkpoint endpoint post-design; allowlist is source-of-truth | ✓ Good — harness count-check prevents future off-by-one drift |
+| v1.2: Phase 18 tech-debt cleanup as dedicated closure phase | Initial v1.2 audit found 4 non-critical items; batching them avoided derailing Phase 17 | ✓ Good — all 4 closed in <1 day; milestone re-audit flipped tech_debt → passed |
+| v1.2: Phase 18.1 Runtime Documentation as inserted urgent phase | Operator manual was a gate for `/gsd:complete-milestone v1.2`; kept separate from Phase 18 tech-debt closure | ✓ Good — 7 plans shipped in 3 waves; drift harness prevents future regression |
+| v1.2: Agent contract is tool-agnostic (no Claude Code assumption) | Runtime accepts any HTTP+file agent; reference image is Node but contract works for any language/framework | ✓ Good — locked in Phase 18.1-03 doc + user memory |
 
 ## Evolution
 
@@ -142,4 +168,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-18 — Milestone v1.2 Recipe-Based Ephemeral Agent Runtime initialized (design spec committed, requirements and roadmap next)*
+*Last updated: 2026-04-21 after v1.2 milestone (Recipe-Based Ephemeral Agent Runtime) shipped — 9 phases, 53 plans, 72/72 requirements satisfied*
