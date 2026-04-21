@@ -20,6 +20,8 @@ import { renderHook } from '@testing-library/react'
 
 // Mock the Zustand store so the hook's setters don't reach into the real store.
 // Every setter is a vi.fn() so the hook's useEffect dependency array can resolve.
+// `refreshRecipes` added in Phase 16 Plan 16-02 — the hook destructures it to
+// seed the recipes cache on mount + refresh on `mc:recipe-indexed/removed`.
 vi.mock('@/store', () => ({
   useMissionControl: () => ({
     setConnection: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock('@/store', () => ({
     addChatMessage: vi.fn(),
     addNotification: vi.fn(),
     addActivity: vi.fn(),
+    refreshRecipes: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 

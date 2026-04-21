@@ -38,6 +38,7 @@ export function useServerEvents() {
     addChatMessage,
     addNotification,
     addActivity,
+    refreshRecipes,
   } = useMissionControl()
 
   useEffect(() => {
@@ -261,4 +262,26 @@ export function useServerEvents() {
     addNotification,
     addActivity,
   ])
+
+  // Phase 16 Wave-1 (RUI-01) — Recipes cache lifecycle.
+  // Seed on mount + refresh on `mc:recipe-indexed` / `mc:recipe-removed` DOM events
+  // (relayed by the SSE dispatcher above from `recipe.indexed` / `recipe.removed`).
+  // Kept in a dedicated effect to decouple from the SSE reconnect loop — the cache
+  // should seed whether or not SSE is currently connected.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    void refreshRecipes()
+
+    const onRecipeChange = () => {
+      void refreshRecipes()
+    }
+    window.addEventListener('mc:recipe-indexed', onRecipeChange)
+    window.addEventListener('mc:recipe-removed', onRecipeChange)
+
+    return () => {
+      window.removeEventListener('mc:recipe-indexed', onRecipeChange)
+      window.removeEventListener('mc:recipe-removed', onRecipeChange)
+    }
+  }, [refreshRecipes])
 }

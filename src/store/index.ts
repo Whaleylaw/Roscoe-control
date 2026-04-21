@@ -153,6 +153,24 @@ export interface Task {
   runner_last_failure_reason?: string | null
 }
 
+/**
+ * Phase 16 Wave-1 — IndexedRecipe is the client-side shape of an indexed recipe row
+ * returned by GET /api/recipes. Mirrors the `mapRow` projection in
+ * `src/app/api/recipes/route.ts` (Phase 12 Plan 12-04). Used by the recipe-badge,
+ * recipes-panel, and task-create combobox consumers; fields beyond `slug`/`name`
+ * are optional because the recipe-tier lookup only needs `model.primary`.
+ */
+export interface IndexedRecipe {
+  slug: string
+  name: string
+  description?: string | null
+  model?: { primary?: string; fallback?: string; provider?: string }
+  tags?: string[]
+  timeout_seconds?: number
+  max_concurrent?: number
+  dir_sha?: string
+}
+
 export interface Agent {
   id: number
   name: string
@@ -447,6 +465,17 @@ interface MissionControlStore {
   addTask: (task: Task) => void
   updateTask: (taskId: number, updates: Partial<Task>) => void
   deleteTask: (taskId: number) => void
+
+  // Phase 16 Wave-1 (RUI-01) — Recipes cache.
+  // Amortises /api/recipes across card/modal/combobox consumers so the recipe badge
+  // can render friendly names + tier colors without per-card network chatter.
+  // Refreshed on boot and on `mc:recipe-indexed` / `mc:recipe-removed` DOM events
+  // (relayed by `src/lib/use-server-events.ts` Plan 16-01 dispatcher).
+  recipes: IndexedRecipe[]
+  recipesLoading: boolean
+  recipesLoadError: string | null
+  refreshRecipes: () => Promise<void>
+  getRecipeBySlug: (slug: string | null | undefined) => IndexedRecipe | null
 
   // Mission Control Phase 2 - Agents
   agents: Agent[]
@@ -1062,6 +1091,37 @@ export const useMissionControl = create<MissionControlStore>()(
         tasks: state.tasks.filter((task) => task.id !== taskId),
         selectedTask: state.selectedTask?.id === taskId ? null : state.selectedTask
       })),
+
+    // Phase 16 Wave-1 (RUI-01) — Recipes slice.
+    // Initial state: empty cache. Populated by refreshRecipes() on boot and on SSE
+    // `recipe.indexed` / `recipe.removed` DOM-relay events (wired in use-server-events).
+    recipes: [],
+    recipesLoading: false,
+    recipesLoadError: null,
+    refreshRecipes: async () => {
+      set({ recipesLoading: true })
+      try {
+        const res = await fetch('/api/recipes', { cache: 'no-store' })
+        if (!res.ok) {
+          set({ recipesLoading: false, recipesLoadError: `HTTP ${res.status}` })
+          return
+        }
+        const data = await res.json()
+        const list = Array.isArray(data?.recipes) ? (data.recipes as IndexedRecipe[]) : []
+        set({ recipes: list, recipesLoading: false, recipesLoadError: null })
+      } catch (err) {
+        // Anti-pattern: do NOT throw — resolve and surface the error via recipesLoadError.
+        set({
+          recipesLoading: false,
+          recipesLoadError: (err as Error)?.message ?? 'Failed to load recipes',
+        })
+      }
+    },
+    getRecipeBySlug: (slug) => {
+      if (!slug) return null
+      const list = get().recipes
+      return list.find((r) => r.slug === slug) ?? null
+    },
 
     // Mission Control Phase 2 - Agents
     agents: [],
