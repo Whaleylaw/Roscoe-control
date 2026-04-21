@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T15:17:13Z"
+last_updated: "2026-04-21T15:27:19.464Z"
 progress:
   total_phases: 19
   completed_phases: 15
   total_plans: 82
-  completed_plans: 86
+  completed_plans: 87
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18.1
-Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05 ✓ • 18.1-06, 18.1-07 (pending)
+Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05 ✓ • 18.1-06 ✓ • 18.1-07 (pending)
 Status: Executing
-Last activity: 2026-04-21 — Phase 18.1 Plan 05 (DOC-TUT — docs/runtime/getting-started.md) complete
-Next: Plans 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-05 shipped docs/runtime/getting-started.md (272 lines) — the copy-paste 9-step end-to-end operator tutorial adapting scripts/mc-runner-smoke.sh into narrative form. Lands operators on the Progress tab watching the full `assigned → in_progress → review → done` lifecycle with the two-hop submit→review→done transition explicitly called out so `review` is never read as "broken." Neutralizes all 5 targeted pitfalls: #1 two-hop lifecycle via inline ⚠️ callout + UI-bullet + troubleshooting row (three reinforcing surfaces); #4 `runtime.project_repo_map` exclusive path via inline ⚠️ at Step 3 stating BOTH the positive (`pnpm mc settings set`) AND negative (never `RUNNER_PROJECT_REPO_MAP` env var) — no env-var fallback paths anywhere in the doc; #5 host.docker.internal via troubleshooting cross-link to agent-contract.md#container-env-vars; #7 `MISSION_CONTROL_RECIPES_DIR` standalone caveat as Step 1 `> Note`; #9 90s stale-window via troubleshooting row. Three observation channels in Step 7 (UI Progress tab / CLI `pnpm mc events watch` / `tail -f` stderr) cover every operator workflow. Cross-links to all 5 Wave-1 reference docs (`recipes.md`, `runner-daemon.md`, `agent-contract.md`, `admin-config.md`, `task-board-surfaces.md`) with all 15+ H2-slug anchors verified against target files. All 7 plan-verify assertions pass; drift-guard "submit → done" anti-pattern grep clean. Zero src/test/schema/config touches — docs-only as scoped. Commit 86ce0e5.
+Last activity: 2026-04-21 — Phase 18.1 Plan 06 (DOC-INDEX + README + design-era banner + cli-agent-control link-back) complete
+Next: Plan 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-06 created docs/runtime/INDEX.md (93 lines, Mermaid claim→submit→review→done sequence diagram + 6 sibling-doc cross-links + external refs + quick-links table + scope disclaimer) and surfaced the full docs/runtime/*.md set from repo root: README.md gets 7 new rows in the Documentation table + new "Ephemeral Agent Runtime (v1.2)" feature block placed between Task Board and Memory Knowledge Graph, plus the "32 panels" → "33+ panels" drift fix in 2 places (header card + architecture-tree comment). docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md receives a DESIGN-ERA ⚠️ banner after H1 naming 3 spec-to-shipped drifts (submit→done spec vs submit→review shipped with Phase 17-01 e9e5fc1 citation, ro-overlay spec vs worktree|readonly|none shipped, embedding search spec vs literal/tag/prefix shipped) with source-file citations pointing readers at docs/runtime/. docs/cli-agent-control.md gets a "See also — Runtime documentation" section before "Next steps" linking to INDEX + getting-started + admin-config + runner-daemon + agent-contract. Commits 01b807f, c588a1c, 1102ff0. Exactly the 4 files from files_modified — zero scope creep. Duration 3min. Operator-manual discoverability surface is now reachable from repo root; /gsd:complete-milestone v1.2 has no unblocked documentation dependencies remaining after Plan 18.1-07 ships the drift-guard harness.
 
 ## Performance Metrics
 
@@ -143,6 +143,7 @@ Next: Plans 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/ve
 | Phase 18.1-v1-2-runtime-documentation P03 | 4min | 1 tasks | 1 files |
 | Phase 18.1-v1-2-runtime-documentation P02 | 5min | 2 tasks | 2 files |
 | Phase 18.1-v1-2-runtime-documentation P05 | 3min | 1 tasks | 1 files |
+| Phase 18.1-v1-2-runtime-documentation P06 | 3min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -370,6 +371,7 @@ Recent decisions affecting current work:
 - [Phase 18.1-03]: PUT /api/tasks/:id is explicitly enumerated in the drift-guards checklist as a "do not use" example — cite preserved from Phase 14-07 LOCK ("Preamble HTTP skeleton forward-references POST /api/runner/tasks/$MC_TASK_ID/submit, NOT PUT /api/tasks/:id"). Phase 18.1-07 drift-guard must allow PUT mentions inside the "do not" checklist while failing on any positive usage elsewhere.
 - [Phase 18.1-03]: Append-only Pitfall-10 neutralized with BOTH correct (fs.appendFileSync) AND wrong (fs.writeFileSync) JavaScript examples side-by-side — plan's must-have #5 required appendFileSync in every progress/checkpoints code example; the wrong-example is explicitly marked as a drift-guard, not a runnable alternative.
 - [Phase 18.1-03]: Agent-contract-doc structure (7-step overview → env vars → mount layout → reading order → append-only pitfall → checkpoint HTTP → submit HTTP two-hop → allowlist → lifetime → exit codes → resume → blocker → drift-guards → reference image → related docs) sets the template for any future substrate-contract doc in Mission Control (recipe-level, runner-level, container-level). Reuse pattern: ⚠️ pitfall callouts placed at the location where drift would occur, not in a catch-all warnings section.
+- [Phase 18.1-v1-2-runtime-documentation]: Plan 18.1-06 (DOC-INDEX+README): docs/runtime/INDEX.md created (93 lines) with Mermaid claim→submit→review→done sequence diagram + 6 cross-links; README.md gets 7 new Documentation-table rows + new 'Ephemeral Agent Runtime (v1.2)' feature block; '32 panels' drift fixed to '33+ panels' in 2 places (header card + architecture-tree comment); design-era ⚠️ banner inserted after H1 of 2026-04-18 design spec naming 3 drifts (submit→review, workspace_mode enum, recipe search); docs/cli-agent-control.md gets 'See also — Runtime documentation' section with 5 cross-links. Commits 01b807f, c588a1c, 1102ff0. Zero scope creep — exactly the 4 files from files_modified. Duration 3min.
 
 ### Pending Todos
 
