@@ -1,3 +1,19 @@
+/**
+ * Plan 17-02 GAP AUDIT (RTEST-01 sharp-edge checklist):
+ *   - exact-moment expiry rejection (nowUnix === expires_at) → PRE-EXISTING (line 129-133,
+ *     "returns null at exact expiry moment (strict <= rejection)")
+ *   - just-before-expiry acceptance                          → PRE-EXISTING (line 135-138)
+ *   - one-second-past-expiry rejection                       → PRE-EXISTING (line 124-127)
+ *   - revocation idempotency                                 → PRE-EXISTING (line 170-176)
+ *   - cross-task revocation isolation                        → PRE-EXISTING (line 178-184)
+ *   - plaintext-never-in-DB                                  → PRE-EXISTING (line 69-78)
+ *
+ * No new tests added by 17-02: all six gap candidates for runner-tokens
+ * are already exercised. Line 194 (allowlist-length assertion) NOT touched
+ * per Pitfall 8 / Phase 15-04 deferred-items discipline.
+ * See .planning/phases/17-integration-testing-reference-pipeline/17-02-SUMMARY.md.
+ */
+
 import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { runMigrations } from '../migrations'

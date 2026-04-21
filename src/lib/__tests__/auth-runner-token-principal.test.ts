@@ -1,3 +1,21 @@
+/**
+ * Plan 17-02 GAP AUDIT (RTEST-01 sharp-edge checklist):
+ *   - cross-task 403 via requireRunnerToken (path mismatch)   → PRE-EXISTING (line 248-260)
+ *   - cross-task 403 via requireRunnerToken (caller param)    → PRE-EXISTING (line 262-272)
+ *   - happy-path returns `user` with runner_token_task_id     → PRE-EXISTING (line 234-246)
+ *   - no-bearer → 401                                         → PRE-EXISTING (line 274-283)
+ *   - invalid-bearer → 401                                    → PRE-EXISTING (line 285-294)
+ *   - expired-bearer → 401                                    → PRE-EXISTING (line 296-307)
+ *   - revoked-bearer → 401                                    → PRE-EXISTING (line 309-320)
+ *   - non-allowlisted path → 401 (not 403)                    → PRE-EXISTING (line 322-332)
+ *   - discriminated-union return shape                        → PRE-EXISTING (line 346-363)
+ *
+ * No new tests added by 17-02: all RTEST-01 gap candidates for the
+ * requireRunnerToken wrapper are already exercised, and the 401-vs-403
+ * discrimination (Phase 11-04 locked invariant) is pinned in three places.
+ * See .planning/phases/17-integration-testing-reference-pipeline/17-02-SUMMARY.md.
+ */
+
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
