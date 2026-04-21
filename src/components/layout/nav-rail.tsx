@@ -32,6 +32,7 @@ const navGroups: NavGroup[] = [
       { id: 'agents', label: 'Agents', icon: <AgentsIcon />, priority: true, essential: true },
       { id: 'projects', label: 'Projects', icon: <ProjectsIcon />, priority: true, essential: true },
       { id: 'tasks', label: 'Tasks', icon: <TasksIcon />, priority: true, essential: true },
+      { id: 'recipes', label: 'Recipes', icon: <RecipesIcon />, priority: false, essential: false },
       { id: 'chat', label: 'Chat', icon: <ChatIcon />, priority: false, essential: true },
       { id: 'channels', label: 'Channels', icon: <ChannelsIcon />, priority: false },
       { id: 'skills', label: 'Skills', icon: <SkillsIcon />, priority: false },
@@ -88,6 +89,7 @@ const navItemTranslationKeys: Record<string, string> = {
   agents: 'agents',
   projects: 'projects',
   tasks: 'tasks',
+  recipes: 'recipes',
   chat: 'chat',
   channels: 'channels',
   skills: 'skills',
@@ -1245,6 +1247,19 @@ function TasksIcon() {
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="1" width="12" height="14" rx="1.5" />
       <path d="M5 5h6M5 8h6M5 11h3" />
+    </svg>
+  )
+}
+
+// Phase 16 RUI-06 — recipe inventory entry point. Raw SVG per CLAUDE.md
+// "No icon libraries -- use raw text/emoji in components" rule. Clipboard-ish
+// glyph matches the existing TasksIcon visual family so the two neighbours in
+// the nav rail read as a group.
+function RecipesIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="2" width="9" height="12" rx="1.5" />
+      <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
     </svg>
   )
 }

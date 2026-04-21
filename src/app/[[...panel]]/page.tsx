@@ -11,6 +11,7 @@ import { CronManagementPanel } from '@/components/panels/cron-management-panel'
 import { MemoryBrowserPanel } from '@/components/panels/memory-browser-panel'
 import { CostTrackerPanel } from '@/components/panels/cost-tracker-panel'
 import { TaskBoardPanel } from '@/components/panels/task-board-panel'
+import { RecipesPanel } from '@/components/panels/recipes-panel'
 import { ProjectsPanel } from '@/components/panels/projects-panel'
 import { ActivityFeedPanel } from '@/components/panels/activity-feed-panel'
 import { AgentSquadPanelPhase3 } from '@/components/panels/agent-squad-panel-phase3'
@@ -535,6 +536,8 @@ function ContentRouter({ tab }: { tab: string }) {
       return <ProjectsPanel />
     case 'tasks':
       return <TaskBoardPanel />
+    case 'recipes':
+      return <RecipesPanel />
     case 'agents':
       return (
         <>
