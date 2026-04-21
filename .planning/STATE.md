@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T14:05:22.742Z"
+last_updated: "2026-04-21T15:04:02.966Z"
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 15
-  total_plans: 75
-  completed_plans: 81
+  total_plans: 82
+  completed_plans: 82
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 18
-Plans: 18-01 ✓ • 18-02 ✓ • 18-03 ✓ • 18-04 ✓ (ALL Phase 18 plans complete; phase closeout pending verification sweep).
+Phase: 18.1
+Plans: 18.1-01 ✓ • 18.1-02 … 18.1-07 (pending)
 Status: Executing
-Last activity: 2026-04-21 -- Phase 18 Plan 03 (audit-td-3 — Phase 14 submit → done doc drift correction) complete
-Next: All Phase 18 plans executed (4/4). Plan 18-03 closed v1.2-MILESTONE-AUDIT.md tech_debt item #3 by correcting narrative drift in seven Phase 14 markdown files (14-06/09/10/11-PLAN.md + 14-09/11-SUMMARY.md + 14-VERIFICATION.md). Each corrected file now carries a doc-drift correction header-note citing Phase 17-01 RTEST-02 as the design authority for the review-flip; narrative "submit → done" and "terminal-flip to done" prose rewritten to "submit → review (Aegis approval then flips review → done)". Code blocks documenting Phase-14-era SQL (UPDATE status='done') preserved with surrounding italic annotations rather than rewritten. Zero code/test/schema/config files touched — shipped submit endpoint at src/app/api/runner/tasks/[task_id]/submit/route.ts already correctly flips in_progress → review per Phase 17-01's implementation. Remaining work: `/gsd:verify-phase 18` to close out the phase.
+Last activity: 2026-04-21 — Phase 18.1 Plan 01 (DOC-REC — docs/runtime/recipes.md) complete
+Next: Plan 18.1-02 (Bundle B — docs/runtime/runner-daemon.md + admin-config.md, DOC-RUN + DOC-CFG). Plan 18.1-01 shipped docs/runtime/recipes.md (266 lines) — first concrete doc of the new docs/runtime/ subdirectory. Recipe.yaml Zod schema quoted verbatim from src/lib/recipe-schema.ts:37-71 (byte-exact diff confirmed); 14-field reference table with per-field source links; 4-endpoint REST table (list/detail/search/resync with auth tiers); 3-model registry table; all three required drift-pitfall callouts landed (#3 max_attempts filesystem-only, #7 MISSION_CONTROL_RECIPES_DIR for standalone, #8 recipe.secrets is ENV VAR NAMES). Plan's full verify block (wc -l ≥ 180 + 5 presence greps + 1 absence grep for the legacy column name) passes. Zero src/schema/migration/test touches — docs-only as scoped.
 
 ## Performance Metrics
 
@@ -138,14 +138,22 @@ Next: All Phase 18 plans executed (4/4). Plan 18-03 closed v1.2-MILESTONE-AUDIT.
 | Phase 18-v1-2-tech-debt-cleanup P02 | 6min | 3 tasks | 3 files |
 | Phase 18-v1-2-tech-debt-cleanup P01 | 2min | 2 tasks | 1 files |
 | Phase 18-v1-2-tech-debt-cleanup P03 | 6min | 3 tasks | 7 files |
+| Phase 18.1 P01 | 3min | 1 tasks | 1 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 18.1 inserted after Phase 18: v1.2 Runtime Documentation (URGENT — operator-facing docs for recipes, runner daemon, agent contract, admin config, and task-board surfaces; must land before `/gsd:complete-milestone v1.2` archives phase directories)
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [Phase 18.1-01]: docs/runtime/recipes.md quotes src/lib/recipe-schema.ts:37-71 verbatim inside a ```typescript fence — diff against source is empty (byte-exact). Paraphrase was rejected as drift-inviting per 18.1-RESEARCH.md Pattern 3 "paired prose + canonical code block."
+- [Phase 18.1-01]: error_message drift-guard callout in docs/runtime/recipes.md references the pre-d42983a legacy column name only via commit hash + phase number, NOT as a literal string — the plan's verify block asserts `! grep -q "indexed_error"` so quoting the stale name would fail the gate. Pattern: future drift-guards that reference a renamed identifier should cite the rename by commit hash, not by the stale string.
+- [Phase 18.1-01]: Forward-links to sibling docs/runtime/*.md files that do not yet exist are written as plain markdown links with "(to be written in Plan 18.1-XX)" parentheticals. Plan 18.1-07's verify-runtime-docs.mjs harness will promote these from best-effort to hard assertions once all sibling docs ship.
 - [v1.2 roadmap]: Derived 7 phases (11–17) from 72 v1.2 REQ-IDs using dependency boundaries — Foundation (schema + registry + auth) → Recipe System → Task Runtime Context → Runner & Container → Checkpoints & Scheduler → UI Surfaces → Integration Testing
 - [v1.2 roadmap]: Phase 11 deliberately scoped to substrate only (migrations + model registry + auth principals) because every later phase depends on it; no runtime code in Phase 11 to keep the foundation shippable as a pure additive migration
 - [v1.2 roadmap]: Model-registry validation split across three phases — registry module + task-override validation land in Phase 11 (MODEL-01, MODEL-03), recipe-index-time validation in Phase 12 (MODEL-02), claim-time model resolution (`task.model_override ?? recipe.model.primary`) in Phase 14 (MODEL-04) — each lands where its consumer code lives
