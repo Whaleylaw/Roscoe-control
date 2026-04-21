@@ -8,7 +8,7 @@ Transform projects from a task-grouping label into a first-class destination. v1
 
 **v1.0 — Project Workspace & Dashboard** (Phases 1–8): ✓ Complete
 **v1.1 — Native GSD Integration** (Phases 9–10): ✓ Complete
-**v1.2 — Recipe-Based Ephemeral Agent Runtime** (Phases 11–17): In progress — roadmap drafted, planning next
+**v1.2 — Recipe-Based Ephemeral Agent Runtime** (Phases 11–18): In progress — tech-debt cleanup next
 
 ## Phases
 
@@ -40,6 +40,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast (completed 2026-04-20)
 - [x] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n (completed 2026-04-21)
 - [x] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage (completed 2026-04-21)
+- [ ] **Phase 18: v1.2 Tech-Debt Cleanup** - Backfill Phase 13 VERIFICATION.md, add `data-testid="recipe-badge"` to harden Playwright locator, correct Phase 14 plan/SUMMARY drift (submit→done vs submit→review), align Plan 17-02 `indexed_error`→`error` drift
 
 ## Phase Details
 
@@ -358,10 +359,24 @@ Plans:
 - [x] 17-06-PLAN.md — RTEST-04 Playwright E2E with real runner daemon + real container: recipe badge on cards + live Progress tab SSE updates (RTEST-04)
 **UI hint**: no (test coverage only — no new UI surface)
 
+### Phase 18: v1.2 Tech-Debt Cleanup  *(v1.2)*
+**Goal**: Close the four tech-debt items flagged by `.planning/v1.2-MILESTONE-AUDIT.md` so v1.2 can archive clean — no new requirements, no behavior change, doc + test-locator hardening only
+**Depends on**: Phase 17
+**Requirements**: (no new REQ-IDs — tech-debt cleanup against existing satisfied TCTX-01..06, RUI-01, RTEST-04 artifacts)
+**Gap Closure**: Closes the four tech-debt items from `.planning/v1.2-MILESTONE-AUDIT.md` (Phase 13 VERIFICATION.md missing; RecipeBadge data-testid absent; Phase 14 plan doc drift re: submit→review; Plan 17-02 `indexed_error` vs `error` drift)
+**Success Criteria** (what must be TRUE):
+  1. `.planning/phases/13-task-runtime-context-v1-2/VERIFICATION.md` exists with status block confirming TCTX-01..06 satisfied, evidence cross-referencing Phase 17 integration tests (phase-17-pipeline-integration.test.ts + phase-17-daemon-pipeline.test.ts) and the three 13-0N-SUMMARY.md requirements_completed frontmatter arrays
+  2. `RecipeBadge` component renders `data-testid="recipe-badge"` on its root element; Phase 17-06 Playwright spec is updated to prefer the data-testid locator with the existing text fallback retained as a safety net
+  3. Phase 14 plan + SUMMARY documents that describe `submit → done` are corrected to `submit → review` (per Phase 17-01 RTEST-02 design), without altering behavior or test expectations
+  4. Plan 17-02 frontmatter and any inline references to `indexed_error` are aligned with the actual `error` status string used by the recipe-indexer constant, without changing runtime behavior
+  5. A full re-run of `/gsd:audit-milestone v1.2` reports `status: passed` (no `tech_debt`) with all four items resolved
+**Plans:** TBD (created by `/gsd:plan-phase 18`)
+**UI hint**: no (doc cleanup + one-line test-id addition; no new UI surface)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -382,3 +397,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete    | 2026-04-20 |
 | 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
+| 18. v1.2 Tech-Debt Cleanup *(v1.2)* | 0/TBD | Pending | — |
