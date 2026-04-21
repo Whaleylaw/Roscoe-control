@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: executing
-stopped_at: Completed 17-06-PLAN.md
-last_updated: "2026-04-21T03:17:15.003Z"
+stopped_at: Completed 17-04-PLAN.md
+last_updated: "2026-04-21T03:27:11.763Z"
 last_activity: 2026-04-21 -- Phase 17 Plan 06 (RTEST-04 Playwright E2E) complete
 progress:
   total_phases: 17
   completed_phases: 13
   total_plans: 71
-  completed_plans: 74
+  completed_plans: 76
   percent: 100
 ---
 
@@ -134,6 +134,7 @@ Next: Remaining Phase 17 wave 2 plans (17-03 RTEST-02 direct-helpers, 17-04 RTES
 | Phase 17-integration-testing-reference-pipeline P02 | 4 min | 2 tasks | 5 files |
 | Phase 17-integration-testing-reference-pipeline P01 | 6min | 2 tasks | 2 files |
 | Phase 17-integration-testing-reference-pipeline P06 | 4min | 2 tasks | 2 files |
+| Phase 17-integration-testing-reference-pipeline P04 | 14min | 2 tasks tasks | 2 files files |
 
 ## Accumulated Context
 
@@ -320,6 +321,8 @@ Recent decisions affecting current work:
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-06]: Recipe badge asserted via text-based locator (text=/hello.world/i scoped to card), not data-testid — RecipeBadge has no data-testid today; plan permitted fallback. Progress tab rows asserted via existing data-checkpoint-id (Plan 16-04 LOCKED). Task card anchored via getByRole('button', {name: /^<title>,/}) since task-board-panel has no data-task-id.
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-06]: E2E harness extends scripts/e2e-openclaw/start-e2e-server.mjs with PHASE17_SPAWN_RUNNER=1 gate — readiness probe (GET /api/status, 30s budget) before spawning scripts/mc-runner.mjs; shutdown kills runner FIRST with 5s SIGKILL escalation so heartbeat loop never races a tearing-down server.
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-06]: Playwright HIGH-FIDELITY path per D-03 LOCKED — 90s first-checkpoint timeout (2x-4x expected wall-clock 20-40s), 60s second-row poll. Auto-skips when Docker unavailable, mc-hello-world-agent:latest missing, or PHASE17_SPAWN_RUNNER unset. D-07 honored: no new npm deps; spawnSync('docker',...) only.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-04]: D-06 Aegis seam stubbed via vi.mock('@/lib/task-dispatch'); stub flips review → done with completed_at — grep-verified exactly 1 mock call. 17-03 should mirror this choice.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-04]: Daemon-subprocess pipeline test pattern: http.createServer wrapping Next.js route handlers + spawn('node', ['scripts/mc-runner.mjs']) + process.env.PORT for container MC_API_URL resolution + git clone with detached HEAD for worktree compatibility — reusable template for future daemon-fidelity integration tests.
 
 ### Pending Todos
 
@@ -342,6 +345,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:17:01.870Z
-Stopped at: Completed 17-06-PLAN.md
+Last session: 2026-04-21T03:27:06.188Z
+Stopped at: Completed 17-04-PLAN.md
 Resume file: None
