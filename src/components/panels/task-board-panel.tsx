@@ -17,6 +17,10 @@ import { ProjectManagerModal } from '@/components/modals/project-manager-modal'
 import { SessionMessage, shouldShowTimestamp, type SessionTranscriptMessage } from '@/components/chat/session-message'
 import { PhaseBadge } from '@/components/panels/task-card/phase-badge'
 import { GateBadge } from '@/components/panels/task-card/gate-badge'
+import { RunnerStatusBanner } from './runner-status-banner'
+import { ProgressTab } from './task-detail/progress-tab'
+import { RecipeCombobox } from './task-form/recipe-combobox'
+import { AdvancedSection } from './task-form/advanced-section'
 
 const log = createClientLogger('TaskBoard')
 
@@ -996,6 +1000,9 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
         </div>
       )}
 
+      {/* Runner Status Banner (Phase 16 / RUI-02) — sticky above the Kanban columns. */}
+      <RunnerStatusBanner />
+
       {/* Kanban Board */}
       <div className="flex-1 min-h-0 flex gap-4 p-4 overflow-x-auto" role="region" aria-label={t('taskBoard')}>
         {statusColumns.map(column => (
@@ -1301,7 +1308,8 @@ function TaskDetailModal({
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewError, setReviewError] = useState<string | null>(null)
   const mentionTargets = useMentionTargets()
-  const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'quality' | 'session'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'quality' | 'session' | 'progress'>('details')
+  const progressT = useTranslations('taskBoard.progressTab')
   const [reviewer, setReviewer] = useState('aegis')
 
   const fetchReviews = useCallback(async () => {
@@ -1630,6 +1638,23 @@ function TaskDetailModal({
                 {task.status === 'in_progress' && (
                   <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
                 )}
+              </button>
+            )}
+            {task.recipe_slug && (
+              <button
+                key="progress"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'progress'}
+                aria-controls="tabpanel-progress"
+                onClick={() => setActiveTab('progress')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'progress'
+                    ? 'bg-secondary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                }`}
+              >
+                {progressT('tabLabel')}
               </button>
             )}
           </div>
