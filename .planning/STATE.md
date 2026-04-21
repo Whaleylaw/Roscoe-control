@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: executing
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-21T03:08:27.441Z"
-last_activity: 2026-04-21 -- Phase 17 planning complete
+stopped_at: Completed 17-06-PLAN.md
+last_updated: "2026-04-21T03:17:15.003Z"
+last_activity: 2026-04-21 -- Phase 17 Plan 06 (RTEST-04 Playwright E2E) complete
 progress:
   total_phases: 17
   completed_phases: 13
   total_plans: 71
-  completed_plans: 73
+  completed_plans: 74
   percent: 100
 ---
 
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 16
-Plans: 16-01 ✓ • 16-03 ✓ • 16-04 ✓ • 16-06 ✓ • (16-02, 16-05 in flight).
-Status: Ready to execute
-Last activity: 2026-04-21 -- Phase 17 planning complete
-Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan reads `task.recipe_slug` directly (typed), imports MODEL_TIER_COLORS from `@/lib/model-tier-colors`, `addEventListener` for one of the 6 `mc:*` CustomEvents, polls `/api/runtime/runner-status` (banner) or consumes existing `/api/recipes/search` / `/api/tasks/:id/checkpoints` / `/api/recipes/resync`. No further foundation changes anticipated.
+Phase: 17
+Plans: 17-01 ✓ • 17-02 ✓ • 17-06 ✓ • (17-03, 17-04, 17-05 pending per wave ordering).
+Status: Executing
+Last activity: 2026-04-21 -- Phase 17 Plan 06 (RTEST-04 Playwright E2E) complete
+Next: Remaining Phase 17 wave 2 plans (17-03 RTEST-02 direct-helpers, 17-04 RTEST-03 crash-recovery, 17-05 CI quality-gate.yml Docker pre-build). Plan 17-06 shipped the final E2E assertion: Playwright spec asserts RUI-01 recipe badge + RUI-03 live Progress tab update driven by a real runner daemon + real reference container; auto-skips when Docker/image/PHASE17_SPAWN_RUNNER gates are unmet.
 
 ## Performance Metrics
 
@@ -133,6 +133,7 @@ Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan read
 | Phase 16-runtime-ui-surfaces P05 | 13min | 2 tasks | 9 files |
 | Phase 17-integration-testing-reference-pipeline P02 | 4 min | 2 tasks | 5 files |
 | Phase 17-integration-testing-reference-pipeline P01 | 6min | 2 tasks | 2 files |
+| Phase 17-integration-testing-reference-pipeline P06 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -316,6 +317,9 @@ Recent decisions affecting current work:
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: Runner-token revoked atomically at review-flip (not deferred to Aegis-done). Runner's attempt is done at submit; revision requests mint a new token per Phase 11-04 token-per-attempt model.
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: ALREADY_SETTLED set extends former TERMINAL_STATUSES with 'review' so network-retries after successful 204 submit return 409 without double-broadcasting or double-revoking.
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: task.status_changed broadcast fires AFTER the db.transaction commits (not inside) — matches runner-exit precedent so SSE observers never see transitions that later roll back.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-06]: Recipe badge asserted via text-based locator (text=/hello.world/i scoped to card), not data-testid — RecipeBadge has no data-testid today; plan permitted fallback. Progress tab rows asserted via existing data-checkpoint-id (Plan 16-04 LOCKED). Task card anchored via getByRole('button', {name: /^<title>,/}) since task-board-panel has no data-task-id.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-06]: E2E harness extends scripts/e2e-openclaw/start-e2e-server.mjs with PHASE17_SPAWN_RUNNER=1 gate — readiness probe (GET /api/status, 30s budget) before spawning scripts/mc-runner.mjs; shutdown kills runner FIRST with 5s SIGKILL escalation so heartbeat loop never races a tearing-down server.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-06]: Playwright HIGH-FIDELITY path per D-03 LOCKED — 90s first-checkpoint timeout (2x-4x expected wall-clock 20-40s), 60s second-row poll. Auto-skips when Docker unavailable, mc-hello-world-agent:latest missing, or PHASE17_SPAWN_RUNNER unset. D-07 honored: no new npm deps; spawnSync('docker',...) only.
 
 ### Pending Todos
 
@@ -338,6 +342,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:08:27.433Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-04-21T03:17:01.870Z
+Stopped at: Completed 17-06-PLAN.md
 Resume file: None
