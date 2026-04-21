@@ -63,8 +63,8 @@ These files live **outside** `docs/runtime/` and remain the canonical deep refer
 
 ## Related milestone docs
 
-- [`.planning/v1.2-MILESTONE-AUDIT.md`](../../.planning/v1.2-MILESTONE-AUDIT.md) — 72/72 requirements audit report for the v1.2 milestone (the runtime feature set this directory documents).
-- [`.planning/REQUIREMENTS.md`](../../.planning/REQUIREMENTS.md) — requirement-to-plan traceability table, including the DOC-* pseudo-requirements satisfied by this documentation set.
+- [`.planning/milestones/v1.2-MILESTONE-AUDIT.md`](../../.planning/milestones/v1.2-MILESTONE-AUDIT.md) — 72/72 requirements audit report for the v1.2 milestone (the runtime feature set this directory documents).
+- [`.planning/milestones/v1.2-REQUIREMENTS.md`](../../.planning/milestones/v1.2-REQUIREMENTS.md) — archived requirement-to-plan traceability table, including the DOC-* pseudo-requirements satisfied by this documentation set.
 
 ## Conventions used across these docs
 
