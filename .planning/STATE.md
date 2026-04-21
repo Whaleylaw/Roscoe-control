@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: planning
-stopped_at: Completed 16-06-PLAN.md (Recipes Panel RUI-06)
-last_updated: "2026-04-21T01:37:59.324Z"
-last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation)."
+status: in_progress
+stopped_at: Plan 16-04 complete — Progress tab (RUI-03) on TaskDetailModal; Plan 16-06 complete in same wave. See 16-04-SUMMARY.md and 16-06-SUMMARY.md.
+last_updated: "2026-04-21T01:38:00Z"
+last_activity: "2026-04-21 — Plan 16-04 complete alongside 16-03/16-06 wave. 16-04 commits: edde713 (ProgressTab + CheckpointRow + 21 unit tests), e2159c8 (Progress tab panel wire-up). 6 decisions logged. 3 auto-fixes: Rule 1 bug (jsdom scrollTo guard + data-checkpoint-id test attr), Rule 4 scope-boundary (parallel-wave 16-05 in-flight recipeSlug ReferenceError documented in deferred-items.md)."
 progress:
-  total_phases: 16
-  completed_phases: 12
-  total_plans: 65
-  completed_plans: 69
-  percent: 100
+  total_phases: 17
+  completed_phases: 15
+  total_plans: 86
+  completed_plans: 72
+  percent: 84
 ---
 
 # Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 16 (Runtime UI Surfaces) — IN PROGRESS. Wave-0 done + 16-03 + 16-04 complete.
-Plans: 16-01 ✓ • 16-03 ✓ • 16-04 ✓.
+Phase: 16 (Runtime UI Surfaces) — IN PROGRESS. Wave-1 plans 16-03/16-04/16-06 complete.
+Plans: 16-01 ✓ • 16-03 ✓ • 16-04 ✓ • 16-06 ✓ • (16-02, 16-05 in flight).
 Status: Plan 16-01 complete — Wave-0 foundation shipped: `src/lib/model-tier-colors.ts` exports `MODEL_TIER_COLORS` + `modelToTier()` + `modelTierClassName()` (3 helpers, 16 unit tests); Task interface widened with 12 v1.2 runtime fields in both `src/store/index.ts` AND `src/components/panels/task-board-panel.tsx` local decl (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_attempts, runner_max_attempts, runner_last_failure_reason); `use-server-events.ts` gained 6 new case branches relaying task.checkpoint_added/task.container_started/task.container_exited/task.runner_requested/recipe.indexed/recipe.removed as DOM CustomEvents (mc:checkpoint-added / mc:task-container-started / mc:task-container-exited / mc:task-runner-requested / mc:recipe-indexed / mc:recipe-removed) — follows chat.message precedent with typeof window SSR guard; `GET /api/runtime/runner-status` live at viewer auth returning `{online, last_heartbeat_at, tasks_waiting}` over runner_heartbeats (90s module-local stale window) + tasks WHERE recipe_slug IS NOT NULL AND status IN ('inbox','assigned') workspace-scoped; 54 new Phase 16 i18n keys seeded atomically across all 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) via idempotent Node script under `.planning/phases/16-runtime-ui-surfaces/seed-i18n.mjs` (refuses key clobbers, hard-fails on drift); targeted jq verification confirms 56 Phase 16 paths × 10 locales identical. 30 new unit tests pass; `pnpm typecheck` exits 0; `pnpm lint` exits 0.
 Last activity: 2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation).
 Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan reads `task.recipe_slug` directly (typed), imports MODEL_TIER_COLORS from `@/lib/model-tier-colors`, `addEventListener` for one of the 6 `mc:*` CustomEvents, polls `/api/runtime/runner-status` (banner) or consumes existing `/api/recipes/search` / `/api/tasks/:id/checkpoints` / `/api/recipes/resync`. No further foundation changes anticipated.
