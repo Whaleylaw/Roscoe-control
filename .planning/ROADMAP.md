@@ -410,7 +410,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 **Goal:** Ship operator-facing documentation for v1.2's recipe-based ephemeral agent runtime — recipes, runner daemon, agent contract, admin config, and task-board surfaces — so v1.2 can archive with a complete operator manual, plus a verification harness that prevents doc-drift from recurring.
 **Requirements**: DOC-REC, DOC-RUN, DOC-AGT, DOC-CFG, DOC-UI, DOC-TUT, DOC-HARNESS (7 local pseudo-requirements — see .planning/phases/18.1-v1-2-runtime-documentation/18.1-RESEARCH.md § Phase Requirements)
 **Depends on:** Phase 18
-**Plans:** 7/7 plans executed — Phase 18.1 COMPLETE
+**Plans:** 7/7 plans complete
 
 Plans:
 - [x] 18.1-01-PLAN.md — Bundle A: docs/runtime/recipes.md (DOC-REC)
