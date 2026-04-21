@@ -90,6 +90,15 @@ When I click into a project, I see everything about that project — what it is,
 
 **v1.3 candidates (not yet scoped — run `/gsd:new-milestone` to triage):**
 
+**Autonomous-routing parity** (from `.planning/GSD_PARITY_DIFF_vs_gsd-lawyerinc_2026-04-21.md`; v1.2 shipped ~75–80% of baseline autonomous-routing intent — the items below close that gap):
+
+- [ ] **M1: Lane-aware scheduler by default** — `autoRouteInboxTasks()` in `src/lib/task-dispatch.ts` currently routes globally from `status='inbox'`. Restrict candidate set to lifecycle-ready rows, prefer `gsd_plan_id` in active `in_progress` plans, group by project/plan lane first, fall back to unscoped inbox only when no lane-scoped work is eligible. Emit route-reason metadata (`auto_route_lane_scoped` / `auto_route_legacy_fallback`). Preserve recipe fast-path.
+- [ ] **M2: Unified blocker transition contract across recipe + legacy dispatch paths** — legacy dispatch is retry/fail-oriented (`assigned ↔ in_progress → failed/review`); recipe path has owner-wait semantics (`blocked → awaiting_owner`). Add structured `in_progress → awaiting_owner` transition on legacy path with `blocker_reason`, `blocker_kind`, `resume_hint`; add deterministic owner-resume transition. Emit common events for both paths. Files: `src/lib/task-dispatch.ts`, `src/lib/task-checkpoints.ts`.
+- [ ] **M3: MCP create/update parity for routing fields** — `mc_poll_task_queue` already supports `project_id` / `gsd_plan_id` (✓). Expand `mc_create_task` and `mc_update_task` (`scripts/mc-mcp-server.cjs`) to accept `project_id`, `metadata`, `gsd_workstream_id`, `gsd_milestone_id`, `gsd_phase_id`, `gsd_plan_id`, `gate_required`, `gate_status` where API permits. Agents should be able to create/update fully lane-scoped lifecycle-linked tasks via MCP alone (no raw REST fallback).
+- [ ] **M4: Normalize approval/blocker semantics as a single deterministic "automatic unless blocker" loop** — gate enforcement + `awaiting_owner` + `review` exist but split across paths. Unify so lifecycle-to-queue-to-owner-intervention flow is consistent for every task type. (Largely follows from M1+M2 landing cleanly.)
+
+**Other v1.3 candidates:**
+
 - [ ] Project-level progress/completion indicators (carried over from v1.0 Active — never landed)
 - [ ] Multi-recipe scheduling (currently one recipe_slug per task; multi-step workflows would need a new primitive)
 - [ ] Docker-host health integration (runner banner heartbeat is 90s; doesn't probe Docker — Pitfall #9 in Phase 18.1)
@@ -149,6 +158,7 @@ When I click into a project, I see everything about that project — what it is,
 | v1.2: Phase 18 tech-debt cleanup as dedicated closure phase | Initial v1.2 audit found 4 non-critical items; batching them avoided derailing Phase 17 | ✓ Good — all 4 closed in <1 day; milestone re-audit flipped tech_debt → passed |
 | v1.2: Phase 18.1 Runtime Documentation as inserted urgent phase | Operator manual was a gate for `/gsd:complete-milestone v1.2`; kept separate from Phase 18 tech-debt closure | ✓ Good — 7 plans shipped in 3 waves; drift harness prevents future regression |
 | v1.2: Agent contract is tool-agnostic (no Claude Code assumption) | Runtime accepts any HTTP+file agent; reference image is Node but contract works for any language/framework | ✓ Good — locked in Phase 18.1-03 doc + user memory |
+| v1.2: Closed at 75–80% of baseline autonomous-routing intent (4 M-items deferred to v1.3) | Baseline `gsd-lawyerinc` implies lane-aware scheduler + unified blocker contract + full MCP routing parity; those were never in v1.2's 72 REQ-IDs and would have been scope creep. Captured as v1.3 candidates per `.planning/GSD_PARITY_DIFF_vs_gsd-lawyerinc_2026-04-21.md` | ⚠️ Revisit in v1.3 — deterministic routing is the next missing primitive |
 
 ## Evolution
 
