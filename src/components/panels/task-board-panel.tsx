@@ -17,6 +17,7 @@ import { ProjectManagerModal } from '@/components/modals/project-manager-modal'
 import { SessionMessage, shouldShowTimestamp, type SessionTranscriptMessage } from '@/components/chat/session-message'
 import { PhaseBadge } from '@/components/panels/task-card/phase-badge'
 import { GateBadge } from '@/components/panels/task-card/gate-badge'
+import { RecipeBadge } from '@/components/panels/task-card/recipe-badge'
 import { RunnerStatusBanner } from './runner-status-banner'
 import { ProgressTab } from './task-detail/progress-tab'
 import { RecipeCombobox } from './task-form/recipe-combobox'
@@ -1082,6 +1083,8 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
                           <PhaseBadge task={task} />
                           {/* Phase 09 GSD-25: gate badge — renders only when task.gate_required === 1 */}
                           <GateBadge task={task} />
+                          {/* Phase 16 RUI-01: recipe badge — renders only when task.recipe_slug is set */}
+                          <RecipeBadge task={task} />
                           {task.github_issue_number && task.github_repo && (
                             <a
                               href={`https://github.com/${task.github_repo}/issues/${task.github_issue_number}`}
@@ -1522,6 +1525,8 @@ function TaskDetailModal({
                 <PhaseBadge task={task} />
                 {/* Phase 09 GSD-25: gate badge — renders only when task.gate_required === 1 */}
                 <GateBadge task={task} />
+                {/* Phase 16 RUI-01: recipe badge — renders only when task.recipe_slug is set */}
+                <RecipeBadge task={task} />
                 <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusColors[task.status] || statusColors.inbox}`}>
                   {task.status.replace(/_/g, ' ')}
                 </span>
@@ -2470,18 +2475,57 @@ function EditTaskModal({
   const mentionTargets = useMentionTargets()
   const agentSessions = useAgentSessions(formData.assigned_to || undefined)
 
+  // Phase 16 Plan 05 (RUI-04) — v1.2 runtime-context fields on EditTaskModal.
+  // RECIPE_LOCKED gate: recipe_slug and Advanced fields are mutable ONLY while
+  // task.status IS 'inbox' OR 'assigned' (Phase 13). Past dispatch, PATCH returns
+  // 409 RECIPE_LOCKED; disable the controls client-side so users never issue a
+  // request that will fail.
+  const isDispatched = task.status !== 'inbox' && task.status !== 'assigned'
+  const [recipeSlug, setRecipeSlug] = useState<string | null>(task.recipe_slug ?? null)
+  const [mounts, setMounts] = useState<Array<{ host_path: string; container_path: string; label: string }>>(
+    Array.isArray(task.read_only_mounts) ? task.read_only_mounts : [],
+  )
+  const [extraSkills, setExtraSkills] = useState<string[]>(
+    Array.isArray(task.extra_skills) ? task.extra_skills : [],
+  )
+  const [modelOverride, setModelOverride] = useState<string>(task.model_override ?? '')
+  const [mountErrors, setMountErrors] = useState<Record<number, string>>({})
+  const [formError, setFormError] = useState<string | null>(null)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!formData.title.trim()) return
 
     try {
+      setFormError(null)
+      setMountErrors({})
       const existingMeta = task.metadata || {}
       const updatedMeta = { ...existingMeta }
       if (formData.target_session) {
         updatedMeta.target_session = formData.target_session
       } else {
         delete updatedMeta.target_session
+      }
+
+      // Phase 16 Plan 05 (RUI-04) — only send v1.2 runtime-context fields the
+      // user actually changed, preserving the existing "partial update" semantic.
+      // isDispatched guard prevents sending these at all past dispatch (they'd
+      // 409 RECIPE_LOCKED anyway).
+      const runtimeBody: Record<string, unknown> = {}
+      if (!isDispatched) {
+        if ((task.recipe_slug ?? null) !== recipeSlug) runtimeBody.recipe_slug = recipeSlug
+        if (JSON.stringify(task.read_only_mounts ?? []) !== JSON.stringify(mounts)) {
+          runtimeBody.read_only_mounts = mounts
+        }
+        if (JSON.stringify(task.extra_skills ?? []) !== JSON.stringify(extraSkills)) {
+          runtimeBody.extra_skills = extraSkills
+        }
+        const nextOverride = modelOverride.trim()
+        const currentOverride = task.model_override ?? ''
+        if (currentOverride !== nextOverride) {
+          runtimeBody.model_override = nextOverride === '' ? null : nextOverride
+        }
       }
 
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -2493,11 +2537,33 @@ function EditTaskModal({
           tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
           assigned_to: formData.assigned_to || undefined,
           metadata: updatedMeta,
+          ...runtimeBody,
         })
       })
 
       if (!response.ok) {
         const errorData = await response.json()
+        // Phase 13 aggregated validation response: { error, issues: [...] }.
+        if (Array.isArray(errorData.issues)) {
+          const nextMountErrors: Record<number, string> = {}
+          const topLevel: string[] = []
+          for (const issue of errorData.issues) {
+            const m = /^read_only_mounts\.(\d+)\./.exec(String(issue.field ?? ''))
+            if (m) {
+              nextMountErrors[Number(m[1])] = issue.message ?? issue.code
+              continue
+            }
+            topLevel.push(`${issue.field ?? '(root)'}: ${issue.message ?? issue.code}`)
+          }
+          setMountErrors(nextMountErrors)
+          if (topLevel.length > 0) setFormError(topLevel.join('\n'))
+          return
+        }
+        // 409 RECIPE_LOCKED path: surface a localized hint.
+        if (response.status === 409 && errorData.code === 'RECIPE_LOCKED') {
+          setFormError(t('recipeField.lockedHint'))
+          return
+        }
         const errorMsg = errorData.details ? errorData.details.join(', ') : errorData.error
         throw new Error(errorMsg)
       }
@@ -2505,6 +2571,7 @@ function EditTaskModal({
       onUpdated()
     } catch (error) {
       log.error('Error updating task:', error)
+      setFormError((error as Error).message ?? 'Error updating task')
     }
   }
 
@@ -2640,6 +2707,32 @@ function EditTaskModal({
                 placeholder="frontend, urgent, bug"
               />
             </div>
+
+            {/* Phase 16 Plan 05 (RUI-04) — Recipe combobox + Advanced section.
+                Disabled past dispatch per Phase 13 RECIPE_LOCKED contract. */}
+            <div className="space-y-2">
+              <RecipeCombobox
+                value={recipeSlug}
+                onChange={setRecipeSlug}
+                disabled={isDispatched}
+                lockedHint={t('recipeField.lockedHint')}
+              />
+            </div>
+            <AdvancedSection
+              mounts={mounts}
+              onMountsChange={setMounts}
+              skills={extraSkills}
+              onSkillsChange={setExtraSkills}
+              modelOverride={modelOverride}
+              onModelOverrideChange={setModelOverride}
+              disabled={isDispatched}
+              lockedHint={t('advancedSection.lockedHint')}
+              mountErrors={mountErrors}
+            />
+
+            {formError && (
+              <p role="alert" className="text-xs text-red-400 whitespace-pre-line">{formError}</p>
+            )}
           </div>
 
           <div className="flex gap-3 mt-6">
