@@ -43,7 +43,7 @@ Manage AI agent fleets, dispatch tasks, track costs, and coordinate multi-agent 
 - [License](#license)
 
 <table>
-<tr><td><b>32 panels</b></td><td>Tasks, agents, skills, logs, tokens, memory, security, cron, alerts, webhooks, pipelines, and more — all from a single SPA shell.</td></tr>
+<tr><td><b>33+ panels</b></td><td>Tasks, agents, skills, logs, tokens, memory, security, cron, alerts, webhooks, pipelines, recipes, and more — all from a single SPA shell.</td></tr>
 <tr><td><b>Real-time everything</b></td><td>WebSocket + SSE push updates with smart polling that pauses when you're away. Zero stale data.</td></tr>
 <tr><td><b>Zero external deps</b></td><td>SQLite database, single <code>pnpm start</code> to run. No Redis, no Postgres, no Docker required.</td></tr>
 <tr><td><b>Role-based access</b></td><td>Viewer, operator, and admin roles with session + API key auth. Google Sign-In with admin approval workflow.</td></tr>
@@ -181,6 +181,13 @@ For the full walkthrough, see the **[Quickstart Guide](docs/quickstart.md)**.
 | [Security Hardening](docs/SECURITY-HARDENING.md) | Docker hardening, CSP, network isolation |
 | [Release Process](RELEASE.md) | SemVer policy, branch strategy, tag/release checklist |
 | [API Reference](openapi.json) | OpenAPI 3.1 spec — 101 REST endpoints with Scalar UI at `/api-docs` |
+| [Runtime overview](docs/runtime/INDEX.md) | Entry point for the v1.2 ephemeral agent runtime documentation set |
+| [Getting started (recipes)](docs/runtime/getting-started.md) | End-to-end tutorial — first recipe-agent task from zero in ~10 minutes |
+| [Recipes](docs/runtime/recipes.md) | Recipe authoring, indexing, SOUL.md convention, model registry, admin resync |
+| [Runner daemon](docs/runtime/runner-daemon.md) | Operator guide for `scripts/mc-runner.mjs` — boot, LaunchAgent, exit codes, logs |
+| [Agent contract](docs/runtime/agent-contract.md) | What a recipe container image must do — env vars, mounts, submit, checkpoints |
+| [Admin config](docs/runtime/admin-config.md) | `runtime.*` settings, secrets store, mount allowlist, auth tiers |
+| [Task-board surfaces](docs/runtime/task-board-surfaces.md) | RecipeBadge, RunnerStatusBanner, Progress tab, RecipeCombobox |
 
 ### Gateway Optional Mode
 
@@ -216,6 +223,17 @@ Monitor agent status, configure models, view heartbeats, and manage the full age
 Kanban board with six columns (inbox → assigned → in progress → review → quality review → done), drag-and-drop, priority levels, assignments, threaded comments, and inline sub-agent spawning. Multi-project support with per-project ticket prefixes.
 
 ![Mission Control Tasks Panel](docs/mission-control-tasks.png)
+
+### Ephemeral Agent Runtime (v1.2)
+
+Mission Control ships a **recipe-based ephemeral agent runtime**. A recipe authored under `recipes/<slug>/` declares a Docker image, mount layout, model, and timeouts. The `scripts/mc-runner.mjs` daemon claims recipe-tagged tasks, launches per-task containers against a git worktree, and surfaces live checkpoint progress in the UI.
+
+- **Tool-agnostic agent contract** — any container that honors the HTTP + filesystem contract (env vars, preamble, submit endpoint) works; not coupled to any specific agent SDK.
+- **Per-task git worktrees** — each task runs in isolation; worktrees preserve `.mc/progress.md` + `.mc/checkpoints.jsonl` across crashes for seamless resume on the next attempt.
+- **Live Progress tab** — checkpoints stream via SSE; attempts grouped per task so operators can replay a full agent run.
+- **Two-hop lifecycle** — agent `POST /api/runner/tasks/:id/submit` → task enters `review` → Aegis approves → task flips to `done`.
+
+See [Runtime overview](docs/runtime/INDEX.md) to get started, or jump to the [Getting Started tutorial](docs/runtime/getting-started.md) for an end-to-end walkthrough.
 
 ### Memory Knowledge Graph
 
@@ -290,7 +308,7 @@ mission-control/
 │   ├── components/
 │   │   ├── layout/            # NavRail, HeaderBar, LiveFeed
 │   │   ├── dashboard/         # Overview dashboard
-│   │   ├── panels/            # 32 feature panels
+│   │   ├── panels/            # 33+ feature panels (including Recipes panel for v1.2 runtime)
 │   │   └── chat/              # Agent chat UI
 │   ├── lib/
 │   │   ├── db.ts              # SQLite (better-sqlite3, WAL mode)
