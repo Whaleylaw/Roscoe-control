@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T13:55:46.224Z"
+last_updated: "2026-04-21T13:59:37.519Z"
 progress:
   total_phases: 18
   completed_phases: 14
   total_plans: 75
-  completed_plans: 78
+  completed_plans: 80
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18
-Plans: 18-01 ☐ • 18-02 ☐ • 18-03 ☐ • 18-04 ✓ (Plan 18-04 doc-drift closure complete; Plans 18-01/02/03 remain for subsequent execution).
+Plans: 18-01 ✓ • 18-02 ✓ • 18-03 ☐ • 18-04 ✓ (Plans 18-01, 18-02, and 18-04 complete; Plan 18-03 remains for subsequent execution).
 Status: Executing
-Last activity: 2026-04-21 -- Phase 18 Plan 04 (audit-td-4 / RTEST-01 plan-text drift closure — 17-02-PLAN indexed_error → error) complete
-Next: Remaining Phase 18 plans (18-01, 18-02, 18-03) pending. Plan 18-04 closed v1.2-MILESTONE-AUDIT.md tech_debt item #4 with a single-file text edit in 17-02-PLAN.md (four `indexed_error` → `error` replacements + doc-drift correction note citing audit-td-4 and the 17-02-SUMMARY / 17-VERIFICATION deviation records). Zero code, test, or schema files touched — shipped constant in src/lib/recipe-indexer.ts was always `error` and existing tests already assert the real value.
+Last activity: 2026-04-21 -- Phase 18 Plan 01 (audit-td-1 — retroactive Phase 13 VERIFICATION.md backfill) complete
+Next: Remaining Phase 18 plan (18-03) pending. Plan 18-01 closed v1.2-MILESTONE-AUDIT.md tech_debt item #1 with a single doc-only commit: created `.planning/phases/13-task-runtime-context-v1-2/13-VERIFICATION.md` (20,485 bytes, 130 lines, 6/6 TCTX-01..06 Observable Truths) matching the gsd-verifier shape (Phase 11/14/15/16/17). Every truth row cites evidence from the three 13-0N-SUMMARY.md `requirements_completed` frontmatter arrays AND from the Phase 17 integration tests (phase-17-pipeline-integration.test.ts + phase-17-daemon-pipeline.test.ts). Frontmatter carries `backfilled: true` + `backfill_reason` to distinguish retroactive closure from ship-time verification. No code or behavior change. Commit: `dc63f96`.
 
 ## Performance Metrics
 
@@ -135,6 +135,8 @@ Next: Remaining Phase 18 plans (18-01, 18-02, 18-03) pending. Plan 18-04 closed 
 | Phase 17 P03 | 14min | 2 tasks | 2 files |
 | Phase 17-integration-testing-reference-pipeline P05 | 23min | 1 task | 1 file |
 | Phase 18-v1-2-tech-debt-cleanup P04 | 2min | 2 tasks | 1 files |
+| Phase 18-v1-2-tech-debt-cleanup P02 | 6min | 3 tasks | 3 files |
+| Phase 18-v1-2-tech-debt-cleanup P01 | 2min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -332,6 +334,9 @@ Recent decisions affecting current work:
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-05]: Label-scoped docker cleanup uses `mc.test.phase17crash=1` (distinct from 17-03/17-04's labels) so parallel runs never cross-contaminate.
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-04]: Doc-drift closure pattern — when audit identifies a PLAN.md string that doesn't match shipped code, PLAN.md is corrected (not code) when code is source of truth; inline correction note preserves audit trail (cites original deviation records in 17-02-SUMMARY.md and 17-VERIFICATION.md)
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-04]: Rule 3 auto-fix: reworded doc-drift correction note using split form (indexed + _ + error) to satisfy plan's own strict grep verify (! grep -q 'indexed_error') while preserving human-readable rename documentation — the plan's Step 4 note + Step verify were mutually incompatible as written
+- [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-02]: Playwright locator hardening pattern — `locator('[data-testid="X"]').or(locator('text=/…/i'))` prefers the testid while retaining the original text fallback as a safety net (handles pre-testid builds, stale deployments, recipe renames). Do NOT hard-replace text locators when switching to testid; use `.or()` chain to preserve backwards compatibility.
+- [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-02]: When adding a data-testid to an existing component, also extend its unit test with a `screen.getByTestId(...)` assertion in a new `it()` block — pins the attribute so future refactors can't silently drop it (the attribute has no visual signal, only test-harness consumers see it).
+- [Phase 18-v1-2-tech-debt-cleanup]: Phase 13 VERIFICATION.md backfilled retroactively (audit-td-1) — frontmatter uses backfilled: true + backfill_reason to distinguish ship-time verification from retroactive closure; pattern reusable for any future tech-debt verification backfill.
 
 ### Pending Todos
 
@@ -354,6 +359,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:33:14Z
-Stopped at: Completed 17-05-PLAN.md
+Last session: 2026-04-21T13:57:39Z
+Stopped at: Completed 18-01-PLAN.md (Phase 13 VERIFICATION.md backfill — audit-td-1 closed)
 Resume file: None
