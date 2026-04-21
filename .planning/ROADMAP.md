@@ -409,12 +409,12 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 **Goal:** Ship operator-facing documentation for v1.2's recipe-based ephemeral agent runtime — recipes, runner daemon, agent contract, admin config, and task-board surfaces — so v1.2 can archive with a complete operator manual, plus a verification harness that prevents doc-drift from recurring.
 **Requirements**: DOC-REC, DOC-RUN, DOC-AGT, DOC-CFG, DOC-UI, DOC-TUT, DOC-HARNESS (7 local pseudo-requirements — see .planning/phases/18.1-v1-2-runtime-documentation/18.1-RESEARCH.md § Phase Requirements)
 **Depends on:** Phase 18
-**Plans:** 1/7 plans executed
+**Plans:** 4/7 plans executed
 
 Plans:
 - [x] 18.1-01-PLAN.md — Bundle A: docs/runtime/recipes.md (DOC-REC)
-- [ ] 18.1-02-PLAN.md — Bundle B: docs/runtime/runner-daemon.md + admin-config.md (DOC-RUN + DOC-CFG)
-- [ ] 18.1-03-PLAN.md — Bundle C: docs/runtime/agent-contract.md (DOC-AGT)
+- [x] 18.1-02-PLAN.md — Bundle B: docs/runtime/runner-daemon.md + admin-config.md (DOC-RUN + DOC-CFG)
+- [x] 18.1-03-PLAN.md — Bundle C: docs/runtime/agent-contract.md (DOC-AGT)
 - [x] 18.1-04-PLAN.md — Bundle D: docs/runtime/task-board-surfaces.md (DOC-UI)
 - [ ] 18.1-05-PLAN.md — Bundle E: docs/runtime/getting-started.md (DOC-TUT) [Wave 2]
 - [ ] 18.1-06-PLAN.md — Bundle F: docs/runtime/INDEX.md + README.md + design-spec banner + cli-agent-control link-back [Wave 2]

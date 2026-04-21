@@ -8,7 +8,7 @@ progress:
   total_phases: 19
   completed_phases: 15
   total_plans: 82
-  completed_plans: 84
+  completed_plans: 85
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18.1
-Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-04 ✓ • 18.1-03, 18.1-05, 18.1-06, 18.1-07 (pending)
+Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05, 18.1-06, 18.1-07 (pending)
 Status: Executing
-Last activity: 2026-04-21 — Phase 18.1 Plan 04 (DOC-UI — docs/runtime/task-board-surfaces.md) complete
-Next: Plans 18.1-03 (DOC-AGT — agent-contract.md), 18.1-05 (DOC-TUT — getting-started.md), 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-04 shipped docs/runtime/task-board-surfaces.md (349 lines) — operator-facing reference for all six Phase 16 UI surfaces (RecipeBadge, RunnerStatusBanner, Progress tab, RecipeCombobox, Advanced section, Recipes panel) with uniform four-part subsection layout (What it is / Visible states / Data source / Operator signals). Pitfall-9 (90s stale window — 🟢 Runner online is a heartbeat-freshness probe, NOT Docker-health) neutralized with an explicit ⚠️ blockquote + operator-resolution steps. RECIPE_LOCKED formula (isDispatched = task.status !== 'inbox' && task.status !== 'assigned') documented with all five gate-active statuses enumerated. Submit→review two-hop cross-linked from Progress-tab section to forthcoming agent-contract.md. All nine plan-verify greps + three frontmatter key-link patterns pass. Zero src/test/schema/i18n touches — docs-only as scoped.
+Last activity: 2026-04-21 — Phase 18.1 Plan 03 (DOC-AGT — docs/runtime/agent-contract.md) complete
+Next: Plans 18.1-05 (DOC-TUT — getting-started.md), 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-03 shipped docs/runtime/agent-contract.md (439 lines) — the MOST load-bearing operator doc in Phase 18.1 because it is the tool-agnostic substrate contract every recipe-image author implements against. Consolidates 5-6 source files (runner-preamble.ts, submit/route.ts, runner-tokens.ts, runner-docker.ts, agent.mjs, task-dispatch.ts) into one reference anchored on docker/hello-world-agent/. Neutralizes all 5 targeted pitfalls: #1 submit→review two-hop (agent POST {status:'done'} → server flips in_progress→review; runAegisReviews() flips review→done — NEVER "submit flips to done"); #2 7-entry allowlist (explicit callout revoking the "DO NOT add entries" lock for Phase 15 CP-01 only; full 7-row table + verbatim TypeScript block from runner-tokens.ts:18-27); #5 host.docker.internal NOT localhost (⚠️ callout + --add-host citation); #6 CONTAINER-01 secrets off argv (⚠️ callout + --env-file pattern); #10 append-only progress.md/checkpoints.jsonl (⚠️ callout with BOTH correct fs.appendFileSync AND wrong fs.writeFileSync examples + Phase 17-05 byte-assert citation). All 8 plan-verify greps pass (including ! grep -iq "Claude Code" — tool-agnostic guard). Zero src/test/schema/config touches — docs-only as scoped.
 
 ## Performance Metrics
 
@@ -140,6 +140,8 @@ Next: Plans 18.1-03 (DOC-AGT — agent-contract.md), 18.1-05 (DOC-TUT — gettin
 | Phase 18-v1-2-tech-debt-cleanup P03 | 6min | 3 tasks | 7 files |
 | Phase 18.1 P01 | 3min | 1 tasks | 1 files |
 | Phase 18.1-v1-2-runtime-documentation P04 | 4min | 1 tasks | 1 files |
+| Phase 18.1-v1-2-runtime-documentation P03 | 4min | 1 tasks | 1 files |
+| Phase 18.1-v1-2-runtime-documentation P02 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -152,6 +154,11 @@ Next: Plans 18.1-03 (DOC-AGT — agent-contract.md), 18.1-05 (DOC-TUT — gettin
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [Phase 18.1-02]: docs/runtime/runner-daemon.md deliberately thin (184 lines) — LINKS to the 154-line scripts/README.runner.md for deep content rather than duplicating it; Don't-Hand-Roll #1 from RESEARCH.md. Preserves scripts/README.runner.md as the single authoritative runner reference; docs/runtime/runner-daemon.md is the operator's front-door orientation layer.
+- [Phase 18.1-02]: All four drift-sensitive pitfalls rendered as blockquote `> **Warning — ...`  callouts (not plain prose paragraphs) — makes them visually prominent, section-anchor-linkable, and grep-discoverable by pattern. Plans that neutralize multiple locked pitfalls should adopt this structure so Plan 18.1-07 harness can grep-assert each warning independently.
+- [Phase 18.1-02]: docs/runtime/admin-config.md cites each of the 8 runtime.* settings with a per-key line-range (e.g. src/app/api/settings/route.ts:60-64 for mount_allowlist, :80-84 for project_repo_map) rather than a single file-wide citation. Harness Plan 18.1-07 can grep each key + line range as a separate pass; pattern is "one citation per documented entity, scoped to its definition lines."
+- [Phase 18.1-02]: Auth tiers table in admin-config.md enumerates the negative-sentinel principal ids (runner=-1000, runner-token=-2000) in the "Principal" column rather than hiding them in prose; operators reading logs containing negative user_id values need to recognize these immediately.
+- [Phase 18.1-02]: runner-daemon.md uses a Mermaid sequence diagram (claim → run → checkpoint → submit → review → Aegis → done) rather than ASCII art — text-reviewable and Git-diffable. Convention for sibling docs/runtime/*.md that need a flow diagram.
 - [Phase 18.1-01]: docs/runtime/recipes.md quotes src/lib/recipe-schema.ts:37-71 verbatim inside a ```typescript fence — diff against source is empty (byte-exact). Paraphrase was rejected as drift-inviting per 18.1-RESEARCH.md Pattern 3 "paired prose + canonical code block."
 - [Phase 18.1-01]: error_message drift-guard callout in docs/runtime/recipes.md references the pre-d42983a legacy column name only via commit hash + phase number, NOT as a literal string — the plan's verify block asserts `! grep -q "indexed_error"` so quoting the stale name would fail the gate. Pattern: future drift-guards that reference a renamed identifier should cite the rename by commit hash, not by the stale string.
 - [Phase 18.1-01]: Forward-links to sibling docs/runtime/*.md files that do not yet exist are written as plain markdown links with "(to be written in Plan 18.1-XX)" parentheticals. Plan 18.1-07's verify-runtime-docs.mjs harness will promote these from best-effort to hard assertions once all sibling docs ship.
@@ -352,6 +359,12 @@ Recent decisions affecting current work:
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Scope discipline when correcting doc-drift — only edit files explicitly listed in the plan's `files_modified` frontmatter; out-of-scope mentions discovered during grep (e.g., 14-06-SUMMARY.md line 133, 14-07-PLAN.md line 145) are logged as future audit concerns, not silently corrected. Prevents scope creep and keeps commit diffs focused on the audit item being closed.
 - [Phase 18.1-v1-2-runtime-documentation]: Phase 18.1 runtime docs adopt uniform four-part UI subsection template (What it is / Visible states / Data source / Operator signals) — established by Plan 18.1-04 docs/runtime/task-board-surfaces.md; remaining Phase 18.1 docs mirror this structure
 - [Phase 18.1-v1-2-runtime-documentation]: Pitfall-9 (90s stale window — runner-status banner green dot is a heartbeat-freshness probe, NOT Docker-health) neutralized in docs/runtime/task-board-surfaces.md with an explicit ⚠️ blockquote + operator resolution steps (tail .data/runner/daemon.err → exit code 2 → cross-reference scripts/README.runner.md#troubleshooting)
+- [Phase 18.1-03]: Agent-contract doc (docs/runtime/agent-contract.md) is tool-agnostic — zero "Claude Code" mentions and treats the recipe-image contract as HTTP + filesystem + env-vars only. Server-side `runAegisReviews()` IS cited (it's Mission Control's own review scheduler, not an agent SDK the recipe author depends on) — the plan's key_links entry explicitly required this citation for the two-hop submit→review description.
+- [Phase 18.1-03]: Submit→review two-hop documented with BOTH flipper citation (src/app/api/runner/tasks/[task_id]/submit/route.ts) AND reviewer citation (src/lib/task-dispatch.ts:414 runAegisReviews) in every mention of review→done; pattern: never describe the review-flip without also naming the component that drives the final hop.
+- [Phase 18.1-03]: 7-entry runner-token allowlist rendered as BOTH verbatim TypeScript fence (from src/lib/runner-tokens.ts:18-27) AND a 7-row table — the TypeScript block is the byte-exact source of truth; the table is the operator-readable view. Phase 18.1-07 harness will assert row-count == allowlist-entry-count.
+- [Phase 18.1-03]: PUT /api/tasks/:id is explicitly enumerated in the drift-guards checklist as a "do not use" example — cite preserved from Phase 14-07 LOCK ("Preamble HTTP skeleton forward-references POST /api/runner/tasks/$MC_TASK_ID/submit, NOT PUT /api/tasks/:id"). Phase 18.1-07 drift-guard must allow PUT mentions inside the "do not" checklist while failing on any positive usage elsewhere.
+- [Phase 18.1-03]: Append-only Pitfall-10 neutralized with BOTH correct (fs.appendFileSync) AND wrong (fs.writeFileSync) JavaScript examples side-by-side — plan's must-have #5 required appendFileSync in every progress/checkpoints code example; the wrong-example is explicitly marked as a drift-guard, not a runnable alternative.
+- [Phase 18.1-03]: Agent-contract-doc structure (7-step overview → env vars → mount layout → reading order → append-only pitfall → checkpoint HTTP → submit HTTP two-hop → allowlist → lifetime → exit codes → resume → blocker → drift-guards → reference image → related docs) sets the template for any future substrate-contract doc in Mission Control (recipe-level, runner-level, container-level). Reuse pattern: ⚠️ pitfall callouts placed at the location where drift would occur, not in a catch-all warnings section.
 
 ### Pending Todos
 
