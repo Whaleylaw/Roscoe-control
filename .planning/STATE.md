@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T15:27:19.464Z"
+last_updated: "2026-04-21T15:37:51Z"
 progress:
   total_phases: 19
   completed_phases: 15
   total_plans: 82
-  completed_plans: 87
+  completed_plans: 88
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18.1
-Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05 ✓ • 18.1-06 ✓ • 18.1-07 (pending)
-Status: Executing
-Last activity: 2026-04-21 — Phase 18.1 Plan 06 (DOC-INDEX + README + design-era banner + cli-agent-control link-back) complete
-Next: Plan 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-06 created docs/runtime/INDEX.md (93 lines, Mermaid claim→submit→review→done sequence diagram + 6 sibling-doc cross-links + external refs + quick-links table + scope disclaimer) and surfaced the full docs/runtime/*.md set from repo root: README.md gets 7 new rows in the Documentation table + new "Ephemeral Agent Runtime (v1.2)" feature block placed between Task Board and Memory Knowledge Graph, plus the "32 panels" → "33+ panels" drift fix in 2 places (header card + architecture-tree comment). docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md receives a DESIGN-ERA ⚠️ banner after H1 naming 3 spec-to-shipped drifts (submit→done spec vs submit→review shipped with Phase 17-01 e9e5fc1 citation, ro-overlay spec vs worktree|readonly|none shipped, embedding search spec vs literal/tag/prefix shipped) with source-file citations pointing readers at docs/runtime/. docs/cli-agent-control.md gets a "See also — Runtime documentation" section before "Next steps" linking to INDEX + getting-started + admin-config + runner-daemon + agent-contract. Commits 01b807f, c588a1c, 1102ff0. Exactly the 4 files from files_modified — zero scope creep. Duration 3min. Operator-manual discoverability surface is now reachable from repo root; /gsd:complete-milestone v1.2 has no unblocked documentation dependencies remaining after Plan 18.1-07 ships the drift-guard harness.
+Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05 ✓ • 18.1-06 ✓ • 18.1-07 ✓
+Status: Phase 18.1 complete — all 7 plans landed
+Last activity: 2026-04-21 — Phase 18.1 Plan 07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs + vitest unit tests + package.json scripts) complete
+Next: `/gsd:verify-work 18.1` (optional phase gate) then `/gsd:complete-milestone v1.2`. Plan 18.1-07 shipped scripts/verify-runtime-docs.mjs (908 lines, Node 22 ESM, zero new deps; 10 cross-reference checks across docs/runtime/*.md → source-of-truth files; runs in ~190ms; exits 0 against the completed doc set with all 10 checks passing), scripts/__tests__/verify-runtime-docs.test.mjs (416 lines, 37 vitest unit tests, all passing in 237ms on hermetic fixture inputs), and vitest.docs.config.mjs (dedicated config so the harness tests don't collide with the product vitest.config.ts include pattern). package.json gets `pnpm docs:verify-runtime` + `pnpm test:docs`. Harness first-run surfaced 3 real drift hits — broken link to runner-docker.test.ts (actual file: runner-docker-args.test.ts) in both runner-daemon.md and admin-config.md, plus a literal "submit→done" legacy-phrasing hit in INDEX.md's design-era warning; all 3 fixed per the plan's "harness is authority" directive. Commits 55130ab (harness), 913d188 (doc drift fix), 69872d4 (tests + vitest.docs.config.mjs), 172eb9f (package.json). Deviation: Plan's preferred Option B.b (package.json-only) was mechanically impossible — vitest 2.1 rejects --include as a CLI flag and the default include pattern ignores scripts/__tests__/; chose minimal-blast-radius alternative (standalone vitest.docs.config.mjs) rather than edit vitest.config.ts. /gsd:complete-milestone v1.2 has zero unblocked documentation dependencies remaining.
 
 ## Performance Metrics
 
@@ -144,6 +144,7 @@ Next: Plan 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-
 | Phase 18.1-v1-2-runtime-documentation P02 | 5min | 2 tasks | 2 files |
 | Phase 18.1-v1-2-runtime-documentation P05 | 3min | 1 tasks | 1 files |
 | Phase 18.1-v1-2-runtime-documentation P06 | 3min | 3 tasks | 4 files |
+| Phase 18.1-v1-2-runtime-documentation P07 | 7min | 3 tasks | 4 files (3 new + 1 mod) + 3 drift-fix |
 
 ## Accumulated Context
 
@@ -168,6 +169,13 @@ Recent decisions affecting current work:
 - [Phase 18.1-05]: Pitfalls are surfaced at the decision point where the operator would otherwise make the wrong choice — the ⚠️ callout for `runtime.project_repo_map` exclusivity lands at Step 3 (before the `pnpm mc settings set` commands), and the ⚠️ for the two-hop submit→review lifecycle lands at Step 7 (before the observation flow). Callouts placed in a separate "Gotchas" appendix were rejected as drift-inviting — operators read linearly and will have made the wrong choice before reaching a later section.
 - [Phase 18.1-05]: Three-observation-channel pattern (UI Progress tab / CLI `pnpm mc events watch` / `tail -f` stderr log) for runtime-visibility sections because different operators trust different surfaces. Future runtime tutorials that need a "watch the system work" step should offer all three rather than picking one.
 - [Phase 18.1-05]: Terminal Troubleshooting table as six-row symptom/cause/remediation-cross-link triples — no free-form prose troubleshooting. Row count capped at six (the highest-frequency first-run failures from Phase 14-17 SUMMARY.md analyses) so operators can scan a table, not read prose.
+- [Phase 18.1-07]: scripts/verify-runtime-docs.mjs is a single ESM file that exports every helper AND gates main() via `import.meta.url === resolve(process.argv[1])`, so the same file serves as CLI (`pnpm docs:verify-runtime`) and importable test target. No lib/cli split; single source of truth. Applies to future single-file ESM tools that need both CLI + unit-test surfaces.
+- [Phase 18.1-07]: Vitest 2.1 rejects `--include` as a CLI flag, and the default vitest.config.ts `include` pattern (`src/**/*.test.ts`) does not match `scripts/__tests__/**/*.test.mjs`. The plan's preferred "package.json script alone" approach was therefore mechanically impossible; chose minimal-blast-radius alternative: a 14-line dedicated `vitest.docs.config.mjs` that the new `test:docs` script references via `-c`. Primary vitest.config.ts is untouched; product-test surface area (`pnpm test`) is preserved. Applies to any future tooling-tests that need to live outside `src/`.
+- [Phase 18.1-07]: JSON code-fence check accepts BOTH single JSON documents AND JSONL (one JSON value per non-blank line). `getting-started.md` has a multi-line boot-log fence that is legitimately JSONL; rather than loosen the check to skip, `tryParseJsonOrJsonl()` validates each JSONL line. This preserves drift detection for truly-malformed fences while accommodating a legitimate doc pattern.
+- [Phase 18.1-07]: Slugify preserves consecutive dashes from punctuation removal. Heading `## Reading order (preamble → soul → .mc)` slugs to `reading-order-preamble--soul--mc` (two dashes at each arrow) to match GitHub's actual slug algorithm. Simpler strip-and-collapse schemes fabricate broken anchors; the dashboard of internal links depends on this exact shape.
+- [Phase 18.1-07]: drift-guard `http://localhost` / `http://127.0.0.1` patterns are bash-fence-scoped to `agent-contract.md` only. Prose that mentions localhost as a concept (e.g. "development server listens on localhost") stays legal. Context-aware rather than blanket-deny avoids forcing stilted prose elsewhere in the doc set.
+- [Phase 18.1-07]: RUNNER_TOKEN_ALLOWLIST count-equality is asserted via regex on `{ method: ..., pathPattern: /` entry openers (not by importing the TypeScript module). Keeps the harness Node-plain with zero ts-node / tsx dependency while still catching divergence between the 7-row doc table and the 7-entry source array.
+- [Phase 18.1-07]: Harness first-run surfaced 3 real doc drift hits against the completed Phase 18.1 doc set — all 3 fixed inline per the plan's "harness is authority" directive rather than loosening assertions. Drift fixes committed separately (913d188) so the audit trail distinguishes "harness authored" from "drift discovered and resolved". Pattern for future gate-harnesses: commit the harness first, then the fixes it surfaces, in two atomic commits.
 - [v1.2 roadmap]: Derived 7 phases (11–17) from 72 v1.2 REQ-IDs using dependency boundaries — Foundation (schema + registry + auth) → Recipe System → Task Runtime Context → Runner & Container → Checkpoints & Scheduler → UI Surfaces → Integration Testing
 - [v1.2 roadmap]: Phase 11 deliberately scoped to substrate only (migrations + model registry + auth principals) because every later phase depends on it; no runtime code in Phase 11 to keep the foundation shippable as a pure additive migration
 - [v1.2 roadmap]: Model-registry validation split across three phases — registry module + task-override validation land in Phase 11 (MODEL-01, MODEL-03), recipe-index-time validation in Phase 12 (MODEL-02), claim-time model resolution (`task.model_override ?? recipe.model.primary`) in Phase 14 (MODEL-04) — each lands where its consumer code lives
