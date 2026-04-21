@@ -10,7 +10,7 @@ requires:
     provides: 14-08b (runner daemon — will launch this image), 14-11 (POST /api/runner/tasks/:id/submit — agent's terminal call), 14-07 (runner-authored PREAMBLE.md — what agent reads), 14-05 (claim-route env-file composition — what agent receives)
 provides:
   - mc-hello-world-agent:latest reference Docker image (node:22-alpine, 249 MB)
-  - Runnable proof of the Phase 14 container contract end-to-end (env vars, mounts, preamble/SOUL read, progress.md, checkpoints.jsonl, git-commit, runner-token submit-to-done, exit 0)
+  - Runnable proof of the Phase 14 container contract end-to-end (env vars, mounts, preamble/SOUL read, progress.md, checkpoints.jsonl, git-commit, runner-token submit flips in_progress → review per Phase 17-01 RTEST-02; Aegis approval then flips review → done, exit 0)
   - Build script + pnpm alias for local image construction without a registry
 affects: [14-10 smoke harness (launches this image), Phase 15 checkpoint endpoint (will insert POST /api/runner/checkpoint call into step 4-5), Phase 17 integration testing (MC_HELLO_MODE variants)]
 
@@ -56,9 +56,11 @@ duration: 2min
 completed: 2026-04-20
 ---
 
+> **Doc-drift correction (Phase 18-03 / audit-td-3):** Original SUMMARY prose described the agent `/submit` endpoint as flipping the task to `done`. Per Phase 17-01 RTEST-02 the shipped implementation flips `in_progress → review`; Aegis quality approval then flips `review → done`. Prose below has been corrected; code, tests, commits, and file contents are unchanged by this correction.
+
 # Phase 14 Plan 09: Hello-World Reference Agent Image Summary
 
-**Minimal `mc-hello-world-agent:latest` Docker image (node:22-alpine, 249 MB) shipping a 105-line Node ESM agent that exercises the full Phase-14 container contract — env-var read, preamble/SOUL read, .mc/ append, HELLO.md git-commit, and runner-token POST /api/runner/tasks/:id/submit to flip the task to done.**
+**Minimal `mc-hello-world-agent:latest` Docker image (node:22-alpine, 249 MB) shipping a 105-line Node ESM agent that exercises the full Phase-14 container contract — env-var read, preamble/SOUL read, .mc/ append, HELLO.md git-commit, and runner-token POST /api/runner/tasks/:id/submit to flip the task to review (Aegis approval then flips review → done per Phase 17-01 RTEST-02).**
 
 ## Performance
 
@@ -72,9 +74,9 @@ completed: 2026-04-20
 ## Accomplishments
 
 - Image builds locally via `bash docker/hello-world-agent/build.sh` OR `pnpm mc:build-hello-world` — verified with a live `docker build` that produced `mc-hello-world-agent:latest` at 249 MB.
-- Agent implements all 7 Phase-14 contract steps per CONTEXT.md § Reference Image (agent behavior): env snapshot, preamble/SOUL read, progress.md append, checkpoints.jsonl append, HELLO.md git-commit, `POST /api/runner/tasks/:id/submit {status:'done'}`, `exit 0`.
+- Agent implements all 7 Phase-14 contract steps per CONTEXT.md § Reference Image (agent behavior): env snapshot, preamble/SOUL read, progress.md append, checkpoints.jsonl append, HELLO.md git-commit, `POST /api/runner/tasks/:id/submit {status:'done'}` (Phase-14-era body shape; shipped server flips in_progress → review per Phase 17-01 RTEST-02), `exit 0`.
 - README documents the 7 steps, all 10 expected MC_* env vars, a standalone debug recipe with synthetic mounts, and the Phase-17 `MC_HELLO_MODE` TODO note.
-- CONTAINER-04 requirement satisfied: runnable proof of the runner's dispatch payload + mount layout + env-file + runner-token + submit-to-done round-trip against a live container.
+- CONTAINER-04 requirement satisfied: runnable proof of the runner's dispatch payload + mount layout + env-file + runner-token + submit round-trip (in_progress → review per Phase 17-01 RTEST-02; Aegis approval then flips review → done) against a live container.
 
 ## Task Commits
 
@@ -93,7 +95,7 @@ _Plan metadata commit will be added by the final commit step._
 4. **checkpoints.jsonl append** — one JSON object `{step, summary, status:'completed', ts, task_id, model}` + `\n`. NO HTTP checkpoint call (Phase 15 concern).
 5. **HELLO.md commit** — write `/workspace/HELLO.md` with task id + timestamp, `git -C /workspace add HELLO.md`, `git -C /workspace commit -m "hello-world: task <id>"`. Git identity defaulted by Dockerfile ENV.
 6. **Submit** — `POST {MC_API_URL}/api/runner/tasks/{MC_TASK_ID}/submit` with `Authorization: Bearer {MC_API_TOKEN}` and JSON body `{"status":"done"}`. Non-2xx → exit 3. Fetch throw → exit 4.
-7. **Exit 0** — clean terminal. Runner's runner-exit handler logs success-only; terminal flip to `done` already happened server-side inside the submit transaction.
+7. **Exit 0** — clean terminal. Runner's runner-exit handler logs success-only; status flip to `review` already happened server-side inside the submit transaction (Aegis approval then flips `review → done` per Phase 17-01 RTEST-02).
 
 ## Files Created/Modified
 

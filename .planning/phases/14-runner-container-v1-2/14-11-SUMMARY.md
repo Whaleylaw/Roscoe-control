@@ -16,7 +16,7 @@ requires:
     plan: 02
     provides: Five runtime.* getters (getMaxConcurrentContainers, getProjectRepoMap, getMaxMemoryPerContainer, getMaxCpuPerContainer, getFailedGcWindowDays) + DEFAULT_* constants
 provides:
-  - "POST /api/runner/tasks/:task_id/submit — runner-token scoped terminal-flip to done + atomic revoke (Phase 14 only supports status='done')"
+  - "POST /api/runner/tasks/:task_id/submit — runner-token scoped flip of in_progress → review + atomic revoke (Phase 14 shipped status='done' terminal semantics; Phase 17-01 RTEST-02 re-homed the endpoint to status='review' so Aegis can gate the final done flip; the docs below describe the Phase-14-era done behavior but the shipped code now flips to review)"
   - "POST /api/runner/tasks/:task_id/container-started — runner-secret scoped placeholder-swap (replaces pending:<task>:<attempt> with real docker container_id)"
   - "GET /api/runner/config — runner-secret scoped 5-key runtime config snapshot for daemon startup + SIGHUP reload"
   - "17 Vitest cases (7 + 6 + 4) pinning auth discrimination, idempotency, conflict, input validation"
@@ -62,6 +62,8 @@ duration: 5min
 completed: 2026-04-20
 ---
 
+> **Doc-drift correction (Phase 18-03 / audit-td-3):** Original SUMMARY prose described the `/submit` endpoint as a "terminal-flip to done" that sets `task.status='done'` inside the transaction. Per Phase 17-01 RTEST-02 the shipped implementation flips `in_progress → review` (NOT `done`); Aegis quality approval then flips `review → done` in a separate transaction. SQL and Zod-body code blocks below are preserved as Phase-14-era snapshots — the shipped server transaction (rewritten by Phase 17-01) uses `SET status='review', ...` with `revokeTokensForTask` + status-change broadcast. Prose below has been corrected; commits, route files, tests, and migrations are unchanged by this correction.
+
 # Phase 14 Plan 11: Submit + Container-Started + Config Runner Endpoints Summary
 
 **Three runner-scoped endpoints the Phase 14 daemon and reference agent need to drive a task from claim to terminal: submit (agent terminal-flip), container-started (daemon placeholder-swap), config (daemon startup snapshot).**
@@ -87,8 +89,11 @@ completed: 2026-04-20
 
 ### submit
 
-- **Body:** Zod `{ status: z.literal('done'), resolution?: z.string().max(10_000) }`. Phase 14 only supports `'done'`; `'cancelled'` and `'failed'` are OUT of scope for this route (the daemon handles `failed` via runner-exit).
-- **Atomic transaction:** `UPDATE tasks SET status='done', container_id=NULL, completed_at, updated_at` + `revokeTokensForTask(db, taskId)` in a single `db.transaction(() => { ... })()`.
+- **Body:** Zod `{ status: z.literal('done'), resolution?: z.string().max(10_000) }`. Phase 14 only supports `'done'` as a body value; the shipped server flips in_progress → review per Phase 17-01 RTEST-02 regardless of the body value; `'cancelled'` and `'failed'` are OUT of scope for this route (the daemon handles `failed` via runner-exit).
+- **Atomic transaction:**
+  > _Note (Phase 18-03 correction): Phase 17-01 RTEST-02 rewrote this UPDATE to `SET status='review', ...` with `revokeTokensForTask` + status-change broadcast. The SQL shown reflects the Phase-14-era implementation, not the current shipped behavior._
+
+  `UPDATE tasks SET status='done', container_id=NULL, completed_at, updated_at` + `revokeTokensForTask(db, taskId)` in a single `db.transaction(() => { ... })()`.
 - **Cross-task defense:** `auth.user.runner_token_task_id === taskId` must hold (403 otherwise). The auth layer already enforces this, but the route re-verifies as defense-in-depth.
 - **Idempotency:** 409 if task is already in `{done, failed, cancelled}`.
 

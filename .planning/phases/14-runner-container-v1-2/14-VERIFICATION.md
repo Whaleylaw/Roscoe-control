@@ -17,10 +17,12 @@ gaps:
       - path: "src/lib/scheduler.ts"
         issue: "reconcileRunnerHeartbeat job lands in Phase 15 per roadmap"
 human_verification:
-  - test: "End-to-end smoke: launch runner, create recipe-tagged task, observe task reaches done"
-    expected: "docker image mc-hello-world-agent:latest launches, emits checkpoint, commits HELLO.md, posts /submit → task.status=done"
+  - test: "End-to-end smoke: launch runner, create recipe-tagged task, observe task reaches review (Aegis approval then flips review → done; Phase 17-01 RTEST-02)"
+    expected: "docker image mc-hello-world-agent:latest launches, emits checkpoint, commits HELLO.md, posts /submit → task.status=review (Aegis approval then flips review → done; Phase 17-01 RTEST-02)"
     why_human: "Operator confirmed 'approved' on 2026-04-20; smoke log not captured to disk (server cwd mismatch). Full automated coverage deferred to Phase 17 integration suite."
 ---
+
+> **Doc-drift correction (Phase 18-03 / audit-td-3):** Original VERIFICATION prose described the agent `/submit` endpoint as flipping `task.status=done` and the end-to-end smoke as ending with `assigned → in_progress → done`. Per Phase 17-01 RTEST-02 the shipped implementation flips `in_progress → review`; Aegis quality approval then flips `review → done`. The full transition sequence is now `assigned → in_progress → review → done` (Aegis approves `review → done`). Evidence rows below have been corrected; commits, routes, tests, and observed artifacts are unchanged by this correction.
 
 # Phase 14: Runner Daemon & Container Execution — Verification Report
 
@@ -45,7 +47,7 @@ human_verification:
 | 6   | Container hard-killed at timeout_seconds; logs streamed; runner posts runner-exit; retry cap enforced | VERIFIED | `scripts/mc-runner.mjs` lines 1057–1072: `setTimeout(() => docker stop --time=15)`. Log streaming via `docker logs -f` (lines 842–843). `runner-exit` route (273 lines): `resolvedMaxAttempts = task.runner_max_attempts ?? recipeMaxAttempts ?? 3`; exceeding cap transitions to `failed`. |
 | 7   | Worktrees preserved across crashes/retries; GC destroys on done/cancelled/aged-failed            | VERIFIED    | `src/lib/runner-gc.ts`: `gcShouldDestroy()` — done/cancelled immediate, failed after window, unknown never. Runner GC tick (lines 708–758): `git worktree remove --force` + `rm -rf`. 10-min interval + boot sweep. |
 | 8   | Post-crash reconcile: runner adopts or kills orphaned containers; token revoked + worktree destroyed on terminal | VERIFIED | `src/lib/runner-reconcile.ts` + runner script `reconcileAtBoot()` (lines 448–568). Token revocation: `revokeTokensForTask` called at terminal exit (runner-exit route line 240). |
-| 9   | `mc-hello-world-agent` reference image exercises full checkpoint → submit flow                   | HUMAN       | `docker/hello-world-agent/agent.mjs` (109 lines): reads /recipe, writes checkpoints.jsonl, commits HELLO.md, POSTs /api/runner/tasks/:id/submit → done. Operator confirmed run passed 2026-04-20 (no disk artifacts). |
+| 9   | `mc-hello-world-agent` reference image exercises full checkpoint → submit flow                   | HUMAN       | `docker/hello-world-agent/agent.mjs` (109 lines): reads /recipe, writes checkpoints.jsonl, commits HELLO.md, POSTs /api/runner/tasks/:id/submit → review (Aegis approval then flips review → done; Phase 17-01 RTEST-02). Operator confirmed run passed 2026-04-20 (no disk artifacts). |
 
 **Score:** 7/9 truths fully verified (2 partial, 1 human-dependent)
 
@@ -76,7 +78,7 @@ human_verification:
 | `src/app/api/runner/config/route.ts`                            | GET config endpoint                  | VERIFIED   | 50 lines                                           |
 | `src/app/api/runner/tasks/[task_id]/runner-exit/route.ts`       | POST exit + retry/fail driver        | VERIFIED   | 273 lines; revokeTokensForTask on terminal         |
 | `src/app/api/runner/tasks/[task_id]/container-started/route.ts` | POST container_id swap               | VERIFIED   | 116 lines                                          |
-| `src/app/api/runner/tasks/[task_id]/submit/route.ts`            | POST agent submit → done             | VERIFIED   | 137 lines                                          |
+| `src/app/api/runner/tasks/[task_id]/submit/route.ts`            | POST agent submit → review (Phase 17-01 RTEST-02) | VERIFIED   | 137 lines                                          |
 | `recipes/hello-world/recipe.yaml`                               | Reference recipe                     | VERIFIED   | 17 lines; parses against model registry            |
 | `recipes/hello-world/SOUL.md`                                   | Agent instructions                   | VERIFIED   | 14 lines                                           |
 | `docker/hello-world-agent/Dockerfile`                           | Reference container image            | VERIFIED   | 18 lines; FROM node:22-alpine                      |
@@ -164,7 +166,7 @@ No blocker or warning-level anti-patterns found. All `return null` occurrences a
 
 #### 1. End-to-End Smoke Run
 
-**Test:** With MC server running from repo root (cwd has `recipes/`), run `bash scripts/mc-runner-smoke.sh hello-world`. Observe task transitions through `assigned → in_progress → done` with worktree artifacts.
+**Test:** With MC server running from repo root (cwd has `recipes/`), run `bash scripts/mc-runner-smoke.sh hello-world`. Observe task transitions through `assigned → in_progress → review → done` (Aegis approves `review → done` per Phase 17-01 RTEST-02) with worktree artifacts.
 **Expected:** `HELLO.md` committed in worktree; `.mc/checkpoints.jsonl` has one entry; `docker ps` shows no lingering container; smoke script prints "SMOKE PASSED".
 **Why human:** Operator confirmed "approved" on 2026-04-20 but log was not captured to disk. Phase 17 integration suite (`tests/runner-container-e2e.spec.ts`) automates this with deterministic artifact paths.
 
