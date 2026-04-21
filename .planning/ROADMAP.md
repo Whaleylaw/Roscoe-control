@@ -39,7 +39,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image (completed 2026-04-20)
 - [x] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast (completed 2026-04-20)
 - [x] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n (completed 2026-04-21)
-- [ ] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage
+- [x] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage (completed 2026-04-21)
 
 ## Phase Details
 
@@ -348,7 +348,7 @@ Plans:
   2. An integration test drives the full pipeline with the `mc-hello-world-agent` reference image end to end: create a task with `recipe_slug`, runner claims, container starts, emits checkpoints, submits, task enters `review`, Aegis approves, task reaches `done`
   3. A crash-recovery integration test deliberately kills the container mid-task, asserts the worktree and `.mc/` state are preserved, then confirms the retry attempt reads `.mc/progress.md` + `.mc/checkpoints.jsonl` and completes without redoing prior work
   4. An E2E Playwright test verifies the recipe badge renders on task cards and the Progress tab updates live when a checkpoint event fires
-**Plans:** 6/6 plans executed
+**Plans:** 6/6 plans complete
 Plans:
 - [x] 17-01-PLAN.md — Submit-route review-flip (D-01 scope expansion): in_progress → review with atomic token revocation + status_changed broadcast (RTEST-02)
 - [x] 17-02-PLAN.md — RTEST-01 unit-test gap fill across recipe-indexer, task-runtime-validation, runner-tokens, auth-runner-token-principal, task-checkpoints (RTEST-01)
@@ -381,4 +381,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 14. Runner Daemon & Container Execution *(v1.2)* | 12/12 | Complete    | 2026-04-20 |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete    | 2026-04-20 |
 | 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
-| 17. Integration Testing & Reference Pipeline *(v1.2)* | 6/6 | In Progress|  |
+| 17. Integration Testing & Reference Pipeline *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
