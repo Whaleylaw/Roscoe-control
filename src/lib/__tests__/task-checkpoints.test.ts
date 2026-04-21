@@ -5,6 +5,12 @@
  *   - Zod schemas (CheckpointBodySchema + ArtifactSchema discriminated union).
  *   - writeCheckpoint atomic DB+JSONL contract.
  *   - readCheckpoints filter + ordering (CP-06).
+ *
+ * Plan 17-02 GAP AUDIT (RTEST-01 sharp-edge checklist):
+ *   - blocked-without-reason rejection     → PRE-EXISTING (line 78-89)
+ *   - blocked-with-reason acceptance       → PRE-EXISTING (line 101-109)
+ *   - blocked-with-whitespace-only reason  → PRE-EXISTING (line 91-99)
+ *   - blocked-with-empty-string reason     → NEWLY ADDED by 17-02 (below)
  */
 
 import Database from 'better-sqlite3'
@@ -96,6 +102,24 @@ describe('CheckpointBodySchema', () => {
       blocker_reason: '   ',
     })
     expect(parsed.success).toBe(false)
+  })
+
+  // Plan 17-02 gap-fill: empty-string variant distinct from whitespace-only.
+  // The schema declares blocker_reason as z.string().max(2000).optional() with
+  // a refine that calls .trim().length > 0 — an empty string must fail the
+  // refine the same way whitespace-only does. Pins that contract.
+  it('rejects status=blocked when blocker_reason is an empty string', () => {
+    const parsed = CheckpointBodySchema.safeParse({
+      step: 'work',
+      summary: 'halted',
+      status: 'blocked',
+      blocker_reason: '',
+    })
+    expect(parsed.success).toBe(false)
+    if (!parsed.success) {
+      const msg = parsed.error.issues.map((i) => i.message).join(' | ')
+      expect(msg).toContain('status=blocked requires non-empty blocker_reason')
+    }
   })
 
   it('accepts status=blocked with a non-empty blocker_reason', () => {

@@ -1,3 +1,15 @@
+/**
+ * Plan 17-02 GAP AUDIT (RTEST-01 sharp-edge checklist):
+ *   - symlink escape via fs.realpath → OUT_OF_ALLOWLIST → PRE-EXISTING (line 306-316)
+ *   - trailing-sep semantics (/foo vs /foo-other)       → PRE-EXISTING (line 318-334)
+ *   - ENOENT parent-walk acceptance                     → PRE-EXISTING (line 270-280)
+ *   - symlink pointing INTO allowlist accepted          → PRE-EXISTING (line 295-304)
+ *   - empty allowlist rejection                         → PRE-EXISTING (line 248-258)
+ *
+ * No new tests added by 17-02: symlink-escape coverage already exists.
+ * See .planning/phases/17-integration-testing-reference-pipeline/17-02-SUMMARY.md.
+ */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

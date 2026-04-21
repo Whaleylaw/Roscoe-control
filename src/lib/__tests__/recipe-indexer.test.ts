@@ -1,3 +1,16 @@
+/**
+ * Plan 17-02 GAP AUDIT (RTEST-01 sharp-edge checklist):
+ *   - malformed YAML → error_message row    → PRE-EXISTING (line 82-94, tags: [unterminated)
+ *   - Zod schema failure → error_message    → PRE-EXISTING (line 96-109)
+ *   - unknown model.primary rejection       → PRE-EXISTING (line 111-128, MODEL-02)
+ *   - slug mismatch → error_message         → PRE-EXISTING (line 130-139)
+ *   - status=indexed_error                  → n/a — shipped API uses status='error' (plan 17-02 text
+ *                                             referenced 'indexed_error'; the actual result type is 'error')
+ *
+ * No new tests added by 17-02: all six gap candidates for recipe-indexer
+ * are already exercised. See .planning/phases/17-integration-testing-reference-pipeline/17-02-SUMMARY.md.
+ */
+
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs'
