@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: executing
-stopped_at: Completed 17-03-PLAN.md
-last_updated: "2026-04-21T03:23:57Z"
-last_activity: 2026-04-21 -- Phase 17 Plan 03 (RTEST-02 direct-helpers) complete
+stopped_at: Completed 17-05-PLAN.md
+last_updated: "2026-04-21T03:33:14Z"
+last_activity: 2026-04-21 -- Phase 17 Plan 05 (RTEST-03 crash-recovery integration test) complete
 progress:
   total_phases: 17
   completed_phases: 13
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 17
-Plans: 17-01 ✓ • 17-02 ✓ • 17-03 ✓ • 17-06 ✓ • (17-04, 17-05 pending per wave ordering).
+Plans: 17-01 ✓ • 17-02 ✓ • 17-03 ✓ • 17-04 ✓ • 17-05 ✓ • 17-06 ✓ (all Phase 17 plans complete; phase closeout pending verification sweep).
 Status: Executing
-Last activity: 2026-04-21 -- Phase 17 Plan 03 (RTEST-02 direct-helpers + CI Docker wiring) complete
-Next: Remaining Phase 17 wave 2 plans (17-04 RTEST-03 crash-recovery, 17-05 CI quality-gate.yml Docker pre-build). Plan 17-03 shipped the direct-helpers RTEST-02 integration test driving full pipeline end-to-end against real mc-hello-world-agent:latest; CI pre-builds the image before pnpm test so the test runs (not silently skips) on every PR. The PHASE17_SPAWN_RUNNER=1 env var is now wired on the E2E step per D-03/D-04 so RTEST-04 runs in CI.
+Last activity: 2026-04-21 -- Phase 17 Plan 05 (RTEST-03 crash-recovery integration test) complete
+Next: Phase 17 plans all executed (6/6). Remaining work: `/gsd:verify-phase 17` to close out the phase and mark it Complete in ROADMAP.md. Plan 17-05 delivered `src/lib/__tests__/phase-17-crash-recovery.test.ts` (1054 lines) — docker-gated SIGKILL-mid-task → runner-exit 137/crash → flip to assigned → re-claim with is_resuming=true + prior_attempts=[1] → seedMcDir LOCKED marker byte-assertion → second container run EXTENDS (not replaces) .mc/progress.md + .mc/checkpoints.jsonl. Byte-window append-only invariant proven end-to-end against the real mc-hello-world-agent:latest image.
 
 ## Performance Metrics
 
@@ -135,6 +135,7 @@ Next: Remaining Phase 17 wave 2 plans (17-04 RTEST-03 crash-recovery, 17-05 CI q
 | Phase 17-integration-testing-reference-pipeline P06 | 4min | 2 tasks | 2 files |
 | Phase 17-integration-testing-reference-pipeline P04 | 14min | 2 tasks tasks | 2 files files |
 | Phase 17 P03 | 14min | 2 tasks | 2 files |
+| Phase 17-integration-testing-reference-pipeline P05 | 23min | 1 task | 1 file |
 
 ## Accumulated Context
 
@@ -325,6 +326,11 @@ Recent decisions affecting current work:
 - [Phase 17-integration-testing-reference-pipeline]: [Phase 17-04]: Daemon-subprocess pipeline test pattern: http.createServer wrapping Next.js route handlers + spawn('node', ['scripts/mc-runner.mjs']) + process.env.PORT for container MC_API_URL resolution + git clone with detached HEAD for worktree compatibility — reusable template for future daemon-fidelity integration tests.
 - [Phase 17]: [Phase 17-03]: Direct-helpers RTEST-02 integration test passes in <1s on docker-equipped host; harness must bind 0.0.0.0 and use async spawn() so the container can reach back through host.docker.internal during docker run
 - [Phase 17]: [Phase 17-03]: D-06 Aegis seam path STUBBED via vi.mock('@/lib/task-dispatch', ...) — real runAegisReviews needs gateway or ANTHROPIC_API_KEY; stub flips review->done in testDb
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-05]: RTEST-03 kill-window strategy LOCKED — in-process synchronous seeding of .mc/progress.md + .mc/checkpoints.jsonl with attempt-1 content, then SIGKILL a sleep-only container. The hello-world agent's 6-step body completes in ~1-2s which is too fast to race reliably against docker kill; the plan-sketched `node /app/agent.mjs & sleep 30` approach consistently left the task in 'review' before SIGKILL arrived. Synthesising attempt-1 side-effects produces a byte-identical observable .mc/ state without the flake surface; attempt-2 (Phase H) still runs the real agent end-to-end.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-05]: Attempt-2 docker run MUST use async spawn() not spawnSync — spawnSync blocks Node's event loop so the in-process HTTP harness cannot respond to the container's POST /submit. Mirrors 17-03's LOCKED discovery. Documented inline at the spawn site.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-05]: LOCKED marker byte-asserted via `.toBe(progressAfterKill + expectedMarker)` (not regex) where expectedMarker = `${resumeIso} | <<< RESUMED AFTER BLOCKER: ${resumeReason} >>>\\n` — Phase 15-07 LOCKED precedent. Any format drift breaks Phase 16 Progress tab consumers + RTEST-03 on the next CI run.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-05]: Byte-window append-only assertion on .mc/checkpoints.jsonl — `expect(jsonlAfterResume.slice(0, jsonlAfterKill.length)).toBe(jsonlAfterKill)` + strictly-more-lines check. Proves the file is append-only across BOTH the seedMcDir boundary AND the attempt boundary.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-05]: Label-scoped docker cleanup uses `mc.test.phase17crash=1` (distinct from 17-03/17-04's labels) so parallel runs never cross-contaminate.
 
 ### Pending Todos
 
@@ -347,6 +353,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:27:06.188Z
-Stopped at: Completed 17-04-PLAN.md
+Last session: 2026-04-21T03:33:14Z
+Stopped at: Completed 17-05-PLAN.md
 Resume file: None
