@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: planning
 stopped_at: Completed 16-05-PLAN.md
-last_updated: "2026-04-21T01:40:09.918Z"
+last_updated: "2026-04-21T01:40:17.331Z"
 last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation)."
 progress:
   total_phases: 16
@@ -305,6 +305,8 @@ Recent decisions affecting current work:
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-02]: Parallel-wave commit race — Task 1 (store slice) landed under sibling 16-06 commit c2fc1ba, Task 2 Step 3 (composition sites) landed under sibling 16-05 commit af4b20f, only Task 2 Step 1-2 (RecipeBadge component + tests) got its own feat(16-02) commit 4f03226. All plan artifacts are shipped and verified; attribution is imperfect but git blame traces correctly
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: RecipeCombobox is READ-ONLY consumer of Zustand recipes slice (owned by Plan 16-02). Uses defensive selector pattern (s as { recipes?: Recipe[] }).recipes with slug-literal fallback on pre-hydration so it's robust against 16-02 landing before or after 16-05.
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: RECIPE_LOCKED client-side gate formula LOCKED — isDispatched = task.status !== 'inbox' && task.status !== 'assigned'. EditTaskModal disables RecipeCombobox + AdvancedSection and skips runtime-field delta on the PATCH payload when isDispatched.
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: /api/recipes/search autocomplete uses 300ms debounce + AbortController cleanup tied to the useEffect cleanup; rapid-typing aborts the in-flight request via controller.abort(). No client-side result caching — always debounced fetch per CONTEXT.md anti-pattern rule.
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: 400 issues[] from Phase 13 aggregated validation response mapped via regex /^read_only_mounts\.(\d+)\./ — per-row errors land in MountsEditor's errors prop; non-mount issues render in a top-level role=alert banner below the Advanced section. No toast library; partial-path UX parity with Phase 13's server-side aggregation.
 
 ### Pending Todos
 
