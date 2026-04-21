@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T15:04:02.966Z"
+last_updated: "2026-04-21T15:06:00.312Z"
 progress:
   total_phases: 19
   completed_phases: 15
   total_plans: 82
-  completed_plans: 82
+  completed_plans: 84
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18.1
-Plans: 18.1-01 ✓ • 18.1-02 … 18.1-07 (pending)
+Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-04 ✓ • 18.1-03, 18.1-05, 18.1-06, 18.1-07 (pending)
 Status: Executing
-Last activity: 2026-04-21 — Phase 18.1 Plan 01 (DOC-REC — docs/runtime/recipes.md) complete
-Next: Plan 18.1-02 (Bundle B — docs/runtime/runner-daemon.md + admin-config.md, DOC-RUN + DOC-CFG). Plan 18.1-01 shipped docs/runtime/recipes.md (266 lines) — first concrete doc of the new docs/runtime/ subdirectory. Recipe.yaml Zod schema quoted verbatim from src/lib/recipe-schema.ts:37-71 (byte-exact diff confirmed); 14-field reference table with per-field source links; 4-endpoint REST table (list/detail/search/resync with auth tiers); 3-model registry table; all three required drift-pitfall callouts landed (#3 max_attempts filesystem-only, #7 MISSION_CONTROL_RECIPES_DIR for standalone, #8 recipe.secrets is ENV VAR NAMES). Plan's full verify block (wc -l ≥ 180 + 5 presence greps + 1 absence grep for the legacy column name) passes. Zero src/schema/migration/test touches — docs-only as scoped.
+Last activity: 2026-04-21 — Phase 18.1 Plan 04 (DOC-UI — docs/runtime/task-board-surfaces.md) complete
+Next: Plans 18.1-03 (DOC-AGT — agent-contract.md), 18.1-05 (DOC-TUT — getting-started.md), 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-04 shipped docs/runtime/task-board-surfaces.md (349 lines) — operator-facing reference for all six Phase 16 UI surfaces (RecipeBadge, RunnerStatusBanner, Progress tab, RecipeCombobox, Advanced section, Recipes panel) with uniform four-part subsection layout (What it is / Visible states / Data source / Operator signals). Pitfall-9 (90s stale window — 🟢 Runner online is a heartbeat-freshness probe, NOT Docker-health) neutralized with an explicit ⚠️ blockquote + operator-resolution steps. RECIPE_LOCKED formula (isDispatched = task.status !== 'inbox' && task.status !== 'assigned') documented with all five gate-active statuses enumerated. Submit→review two-hop cross-linked from Progress-tab section to forthcoming agent-contract.md. All nine plan-verify greps + three frontmatter key-link patterns pass. Zero src/test/schema/i18n touches — docs-only as scoped.
 
 ## Performance Metrics
 
@@ -139,6 +139,7 @@ Next: Plan 18.1-02 (Bundle B — docs/runtime/runner-daemon.md + admin-config.md
 | Phase 18-v1-2-tech-debt-cleanup P01 | 2min | 2 tasks | 1 files |
 | Phase 18-v1-2-tech-debt-cleanup P03 | 6min | 3 tasks | 7 files |
 | Phase 18.1 P01 | 3min | 1 tasks | 1 files |
+| Phase 18.1-v1-2-runtime-documentation P04 | 4min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -349,6 +350,8 @@ Recent decisions affecting current work:
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Doc-drift correction header-note pattern — italic blockquote placed AFTER frontmatter `---` closer, BEFORE first H1/objective, citing authoritative phase + requirement ID (e.g., Phase 17-01 RTEST-02) as design authority for the correction; serves as single-source-of-truth for all subsequent in-file corrected mentions so each line doesn't need to repeat the full citation.
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Non-destructive code-block annotation — when a historical code block documents Phase-N-era behavior that a later phase rewrote (e.g., Phase-14-era SQL `SET status='done'` that Phase 17-01 rewrote to `SET status='review'`), add an italic note BEFORE/AROUND the code block explaining the later rewrite rather than editing the code block itself. Preserves both historical accuracy and forward guidance; reviewers can see what shipped and what it became.
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Scope discipline when correcting doc-drift — only edit files explicitly listed in the plan's `files_modified` frontmatter; out-of-scope mentions discovered during grep (e.g., 14-06-SUMMARY.md line 133, 14-07-PLAN.md line 145) are logged as future audit concerns, not silently corrected. Prevents scope creep and keeps commit diffs focused on the audit item being closed.
+- [Phase 18.1-v1-2-runtime-documentation]: Phase 18.1 runtime docs adopt uniform four-part UI subsection template (What it is / Visible states / Data source / Operator signals) — established by Plan 18.1-04 docs/runtime/task-board-surfaces.md; remaining Phase 18.1 docs mirror this structure
+- [Phase 18.1-v1-2-runtime-documentation]: Pitfall-9 (90s stale window — runner-status banner green dot is a heartbeat-freshness probe, NOT Docker-health) neutralized in docs/runtime/task-board-surfaces.md with an explicit ⚠️ blockquote + operator resolution steps (tail .data/runner/daemon.err → exit code 2 → cross-reference scripts/README.runner.md#troubleshooting)
 
 ### Pending Todos
 

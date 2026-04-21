@@ -415,7 +415,7 @@ Plans:
 - [x] 18.1-01-PLAN.md — Bundle A: docs/runtime/recipes.md (DOC-REC)
 - [ ] 18.1-02-PLAN.md — Bundle B: docs/runtime/runner-daemon.md + admin-config.md (DOC-RUN + DOC-CFG)
 - [ ] 18.1-03-PLAN.md — Bundle C: docs/runtime/agent-contract.md (DOC-AGT)
-- [ ] 18.1-04-PLAN.md — Bundle D: docs/runtime/task-board-surfaces.md (DOC-UI)
+- [x] 18.1-04-PLAN.md — Bundle D: docs/runtime/task-board-surfaces.md (DOC-UI)
 - [ ] 18.1-05-PLAN.md — Bundle E: docs/runtime/getting-started.md (DOC-TUT) [Wave 2]
 - [ ] 18.1-06-PLAN.md — Bundle F: docs/runtime/INDEX.md + README.md + design-spec banner + cli-agent-control link-back [Wave 2]
 - [ ] 18.1-07-PLAN.md — Bundle G: scripts/verify-runtime-docs.mjs + tests + package.json script (DOC-HARNESS) [Wave 3]
