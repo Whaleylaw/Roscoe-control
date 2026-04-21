@@ -402,4 +402,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete    | 2026-04-20 |
 | 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
-| 18. v1.2 Tech-Debt Cleanup *(v1.2)* | 4/4 | Complete   | 2026-04-21 |
+| 18. v1.2 Tech-Debt Cleanup *(v1.2)* | 4/4 | Complete    | 2026-04-21 |
