@@ -348,12 +348,14 @@ Plans:
   2. An integration test drives the full pipeline with the `mc-hello-world-agent` reference image end to end: create a task with `recipe_slug`, runner claims, container starts, emits checkpoints, submits, task enters `review`, Aegis approves, task reaches `done`
   3. A crash-recovery integration test deliberately kills the container mid-task, asserts the worktree and `.mc/` state are preserved, then confirms the retry attempt reads `.mc/progress.md` + `.mc/checkpoints.jsonl` and completes without redoing prior work
   4. An E2E Playwright test verifies the recipe badge renders on task cards and the Progress tab updates live when a checkpoint event fires
-**Plans:** 4 plans
+**Plans:** 6 plans
 Plans:
-- [ ] 11-01-PLAN.md — Model registry module (MODEL-01) + task model_override validation (MODEL-03)
-- [x] 11-02-PLAN.md — Auto-generated .data/runner.secret + runner principal in auth.ts scoped to /api/runner/* (RAUTH-01)
-- [ ] 11-03-PLAN.md — Additive v1.2 migrations (recipes, task_runner_tokens, task_checkpoints, 11 new task columns) (TCTX-07)
-- [ ] 11-04-PLAN.md — Runner-token principal with RAUTH-06 allowlist + cross-task guard + atomic terminal-status revocation (RAUTH-02..06)
+- [ ] 17-01-PLAN.md — Submit-route review-flip (D-01 scope expansion): in_progress → review with atomic token revocation + status_changed broadcast (RTEST-02)
+- [ ] 17-02-PLAN.md — RTEST-01 unit-test gap fill across recipe-indexer, task-runtime-validation, runner-tokens, auth-runner-token-principal, task-checkpoints (RTEST-01)
+- [ ] 17-03-PLAN.md — RTEST-02 direct-helpers pipeline integration test + CI Docker preflight + mc-hello-world-agent pre-build step in quality-gate.yml (RTEST-02)
+- [ ] 17-04-PLAN.md — RTEST-02 daemon-subprocess integration test spawning real scripts/mc-runner.mjs + preserve-on-stop smoke subcommand (RTEST-02)
+- [ ] 17-05-PLAN.md — RTEST-03 crash-recovery integration test: SIGKILL mid-task, .mc/ preservation, re-claim is_resuming, LOCKED marker byte-assertion, both-attempts content verification (RTEST-03)
+- [ ] 17-06-PLAN.md — RTEST-04 Playwright E2E with real runner daemon + real container: recipe badge on cards + live Progress tab SSE updates (RTEST-04)
 **UI hint**: no (test coverage only — no new UI surface)
 
 ## Progress
