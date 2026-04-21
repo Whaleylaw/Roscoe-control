@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: executing
-stopped_at: Completed 17-02-PLAN.md
-last_updated: "2026-04-21T03:06:46.575Z"
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-04-21T03:08:27.441Z"
 last_activity: 2026-04-21 -- Phase 17 planning complete
 progress:
   total_phases: 17
   completed_phases: 13
   total_plans: 71
-  completed_plans: 72
+  completed_plans: 73
   percent: 100
 ---
 
@@ -132,6 +132,7 @@ Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan read
 | Phase 16-runtime-ui-surfaces P02 | 14min | 2 tasks | 6 files |
 | Phase 16-runtime-ui-surfaces P05 | 13min | 2 tasks | 9 files |
 | Phase 17-integration-testing-reference-pipeline P02 | 4 min | 2 tasks | 5 files |
+| Phase 17-integration-testing-reference-pipeline P01 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -311,6 +312,10 @@ Recent decisions affecting current work:
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: 400 issues[] from Phase 13 aggregated validation response mapped via regex /^read_only_mounts\.(\d+)\./ — per-row errors land in MountsEditor's errors prop; non-mount issues render in a top-level role=alert banner below the Advanced section. No toast library; partial-path UX parity with Phase 13's server-side aggregation.
 - [Phase 17-02]: RTEST-01 sharp-edge audit: 5/6 candidates pre-existing in Phase 11-15 test suites, only empty-string blocker_reason case genuinely missing; added as single new it() case
 - [Phase 17-02]: Pitfall 8 discipline honored: runner-tokens.test.ts line-194 allowlist-length assertion not modified (top-of-file comment only); preserves hands-off rule from Phase 15-04 deferred-items.md
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: completed_at NOT set on review-flip — Aegis owns the final done transition via runAegisReviews(). Test case 1 byte-asserts completed_at IS NULL after submit.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: Runner-token revoked atomically at review-flip (not deferred to Aegis-done). Runner's attempt is done at submit; revision requests mint a new token per Phase 11-04 token-per-attempt model.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: ALREADY_SETTLED set extends former TERMINAL_STATUSES with 'review' so network-retries after successful 204 submit return 409 without double-broadcasting or double-revoking.
+- [Phase 17-integration-testing-reference-pipeline]: [Phase 17-01]: task.status_changed broadcast fires AFTER the db.transaction commits (not inside) — matches runner-exit precedent so SSE observers never see transitions that later roll back.
 
 ### Pending Todos
 
@@ -333,6 +338,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T03:06:41.143Z
-Stopped at: Completed 17-02-PLAN.md
+Last session: 2026-04-21T03:08:27.433Z
+Stopped at: Completed 17-01-PLAN.md
 Resume file: None
