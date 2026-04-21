@@ -196,7 +196,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### UI Surfaces
 
-- [ ] **RUI-01**: Each task card on the Kanban displays a recipe badge when `recipe_slug` is set, including recipe name and model tier color
+- [x] **RUI-01**: Each task card on the Kanban displays a recipe badge when `recipe_slug` is set, including recipe name and model tier color
 - [x] **RUI-02**: Task-board shell shows a runner-status banner with live state (`🟢 Runner online` / `🔴 Runner offline — tasks waiting: N`)
 - [x] **RUI-03**: Task detail view has a new "Progress" tab showing a live checkpoint timeline grouped by attempt, updating via SSE
 - [ ] **RUI-04**: Task create/edit form has a Recipe dropdown (autocomplete via `/api/recipes/search`) and a collapsible "Advanced" section exposing `read_only_mounts`, `extra_skills`, and `model_override`
@@ -366,7 +366,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MODEL-02 | Phase 12 | Complete |
 | MODEL-03 | Phase 11 | Complete |
 | MODEL-04 | Phase 14 | Complete |
-| RUI-01 | Phase 16 | Pending |
+| RUI-01 | Phase 16 | Complete |
 | RUI-02 | Phase 16 | Complete |
 | RUI-03 | Phase 16 | Complete |
 | RUI-04 | Phase 16 | Pending |

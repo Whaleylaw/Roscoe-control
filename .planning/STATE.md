@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: in_progress
-stopped_at: Plan 16-04 complete — Progress tab (RUI-03) on TaskDetailModal; Plan 16-06 complete in same wave. See 16-04-SUMMARY.md and 16-06-SUMMARY.md.
-last_updated: "2026-04-21T01:38:00Z"
-last_activity: "2026-04-21 — Plan 16-04 complete alongside 16-03/16-06 wave. 16-04 commits: edde713 (ProgressTab + CheckpointRow + 21 unit tests), e2159c8 (Progress tab panel wire-up). 6 decisions logged. 3 auto-fixes: Rule 1 bug (jsdom scrollTo guard + data-checkpoint-id test attr), Rule 4 scope-boundary (parallel-wave 16-05 in-flight recipeSlug ReferenceError documented in deferred-items.md)."
+status: planning
+stopped_at: Completed 16-05-PLAN.md
+last_updated: "2026-04-21T01:40:09.918Z"
+last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation)."
 progress:
-  total_phases: 17
-  completed_phases: 15
-  total_plans: 86
-  completed_plans: 72
-  percent: 84
+  total_phases: 16
+  completed_phases: 13
+  total_plans: 65
+  completed_plans: 71
+  percent: 100
 ---
 
 # Project State
@@ -128,6 +128,8 @@ Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan read
 | Phase 16-runtime-ui-surfaces P03 | 5min | 2 tasks | 3 files |
 | Phase 16-runtime-ui-surfaces P04 | 11min | 2 tasks tasks | 6 files files |
 | Phase 16-runtime-ui-surfaces P06 | 12min | 2 tasks | 5 files |
+| Phase 16-runtime-ui-surfaces P02 | 14min | 2 tasks | 6 files |
+| Phase 16-runtime-ui-surfaces P05 | 13min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -296,6 +298,13 @@ Recent decisions affecting current work:
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: Per-row View toggle expands soul_md inline via shared MarkdownRenderer (no new route, no modal) — matches research Do-Not-Hand-Roll #8
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: RecipesPanel fetches /api/recipes directly (no Zustand recipes slice dependency) — file-disjoint from sibling RUI-01 badge plan's store slice
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: Nav priority=false, essential=false — Recipes is a full-mode inspection surface; Essential mode stays minimal
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-02]: Recipes slice seeds on useServerEvents mount via dedicated useEffect (not piggy-backed on SSE reconnect loop) — cache seeds whether or not SSE is connected, and refreshRecipes identity doesn't tear down the EventSource on re-render
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-02]: RecipeBadge cache-miss falls back to raw slug literal (not null) — preserves card layout during first-paint + SSE-reconnect windows; friendly name takes over on next render once refreshRecipes populates
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-02]: IndexedRecipe type colocated with Task/Agent/Project interfaces in src/store/index.ts rather than src/types/ — matches existing convention where the Zustand shape and its consumers live together
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-02]: refreshRecipes resolves on fetch error (sets recipesLoadError) rather than throwing — matches the fetchProjects resolve-silently pattern and keeps React error boundaries quiet for transient network blips
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-02]: Parallel-wave commit race — Task 1 (store slice) landed under sibling 16-06 commit c2fc1ba, Task 2 Step 3 (composition sites) landed under sibling 16-05 commit af4b20f, only Task 2 Step 1-2 (RecipeBadge component + tests) got its own feat(16-02) commit 4f03226. All plan artifacts are shipped and verified; attribution is imperfect but git blame traces correctly
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: RecipeCombobox is READ-ONLY consumer of Zustand recipes slice (owned by Plan 16-02). Uses defensive selector pattern (s as { recipes?: Recipe[] }).recipes with slug-literal fallback on pre-hydration so it's robust against 16-02 landing before or after 16-05.
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: RECIPE_LOCKED client-side gate formula LOCKED — isDispatched = task.status !== 'inbox' && task.status !== 'assigned'. EditTaskModal disables RecipeCombobox + AdvancedSection and skips runtime-field delta on the PATCH payload when isDispatched.
 
 ### Pending Todos
 
@@ -318,6 +327,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T01:37:49.498Z
-Stopped at: Completed 16-06-PLAN.md (Recipes Panel RUI-06)
+Last session: 2026-04-21T01:39:57.448Z
+Stopped at: Completed 16-05-PLAN.md
 Resume file: None

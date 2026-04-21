@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 13: Task Runtime Context** - Task-level fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override), mount allowlist validation at task creation, create/update API plumbing
 - [x] **Phase 14: Runner Daemon & Container Execution** - Standalone `scripts/mc-runner.mjs` daemon, register/heartbeat/claim/exit protocol, docker run with mounts + env, git worktree lifecycle with `.mc/` seeding and resume preamble, retry cap, GC, reference `mc-hello-world-agent` image (completed 2026-04-20)
 - [x] **Phase 15: Checkpoints & Scheduler Integration** - Checkpoint API with dual DB + `.mc/checkpoints.jsonl` storage, blocked→awaiting_owner flow, scheduler hooks (autoRouteInboxTasks, dispatchAssignedTasks bypass, requeueStaleTasks, reconcileRunnerHeartbeat), runtime SSE event broadcast (completed 2026-04-20)
-- [ ] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n
+- [x] **Phase 16: Runtime UI Surfaces** - Recipe badge + model tier on task cards, runner-status banner, Progress tab on task detail, Recipe dropdown + Advanced section on task form, minimal recipes list panel, atomic 10-locale i18n (completed 2026-04-21)
 - [ ] **Phase 17: Integration Testing & Reference Pipeline** - Unit tests (indexer, allowlist, tokens, checkpoints), full-pipeline integration test using reference image, crash-recovery integration test, E2E Playwright coverage
 
 ## Phase Details
@@ -329,13 +329,13 @@ Plans:
   4. The task create/edit form exposes a Recipe dropdown backed by `/api/recipes/search` autocomplete and a collapsible "Advanced" section for editing `read_only_mounts`, `extra_skills`, and `model_override`
   5. A minimal Recipes panel (reachable from the main nav) lists indexed recipes with name, description, model, tags, and a "Resync" button — authoring stays filesystem-first
   6. All new UI strings ship atomically across en/es/fr/de/ja/ko/pt/ru/zh/ar
-**Plans:** 4/6 plans executed
+**Plans:** 6/6 plans complete
 Plans:
 - [x] 16-01-PLAN.md — Wave 0 foundation: Task interface widening + MODEL_TIER_COLORS extraction + SSE dispatcher extension + /api/runtime/runner-status viewer endpoint + atomic 10-locale i18n seeding (RUI-01..06) (completed 2026-04-21)
-- [ ] 16-02-PLAN.md — Recipe Badge on task cards + recipes Zustand slice with SSE-driven refresh (RUI-01, RUI-05)
+- [x] 16-02-PLAN.md — Recipe Badge on task cards + recipes Zustand slice with SSE-driven refresh (RUI-01, RUI-05)
 - [x] 16-03-PLAN.md — Runner Status Banner inside task-board-panel with 10s poll + debounced SSE refresh (RUI-02, RUI-05)
 - [x] 16-04-PLAN.md — Progress Tab on TaskDetailModal with subscribe-before-fetch + grouped timeline (RUI-03, RUI-05)
-- [ ] 16-05-PLAN.md — Recipe Combobox + Advanced Section on Create/Edit task forms with RECIPE_LOCKED gate (RUI-04, RUI-05)
+- [x] 16-05-PLAN.md — Recipe Combobox + Advanced Section on Create/Edit task forms with RECIPE_LOCKED gate (RUI-04, RUI-05)
 - [x] 16-06-PLAN.md — Recipes Panel + nav rail entry + ContentRouter case + Playwright happy-path spec (RUI-06, RUI-05)
 **UI hint**: yes
 
@@ -378,5 +378,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 13. Task Runtime Context *(v1.2)* | 3/3 | Complete    | 2026-04-20 |
 | 14. Runner Daemon & Container Execution *(v1.2)* | 12/12 | Complete    | 2026-04-20 |
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete    | 2026-04-20 |
-| 16. Runtime UI Surfaces *(v1.2)* | 4/6 | In Progress|  |
+| 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete   | 2026-04-21 |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 0/— | Not started | - |
