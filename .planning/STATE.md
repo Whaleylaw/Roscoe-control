@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: unknown
-last_updated: "2026-04-21T15:06:00.312Z"
+last_updated: "2026-04-21T15:17:13Z"
 progress:
   total_phases: 19
   completed_phases: 15
   total_plans: 82
-  completed_plans: 85
+  completed_plans: 86
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18.1
-Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05, 18.1-06, 18.1-07 (pending)
+Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05 ✓ • 18.1-06, 18.1-07 (pending)
 Status: Executing
-Last activity: 2026-04-21 — Phase 18.1 Plan 03 (DOC-AGT — docs/runtime/agent-contract.md) complete
-Next: Plans 18.1-05 (DOC-TUT — getting-started.md), 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-03 shipped docs/runtime/agent-contract.md (439 lines) — the MOST load-bearing operator doc in Phase 18.1 because it is the tool-agnostic substrate contract every recipe-image author implements against. Consolidates 5-6 source files (runner-preamble.ts, submit/route.ts, runner-tokens.ts, runner-docker.ts, agent.mjs, task-dispatch.ts) into one reference anchored on docker/hello-world-agent/. Neutralizes all 5 targeted pitfalls: #1 submit→review two-hop (agent POST {status:'done'} → server flips in_progress→review; runAegisReviews() flips review→done — NEVER "submit flips to done"); #2 7-entry allowlist (explicit callout revoking the "DO NOT add entries" lock for Phase 15 CP-01 only; full 7-row table + verbatim TypeScript block from runner-tokens.ts:18-27); #5 host.docker.internal NOT localhost (⚠️ callout + --add-host citation); #6 CONTAINER-01 secrets off argv (⚠️ callout + --env-file pattern); #10 append-only progress.md/checkpoints.jsonl (⚠️ callout with BOTH correct fs.appendFileSync AND wrong fs.writeFileSync examples + Phase 17-05 byte-assert citation). All 8 plan-verify greps pass (including ! grep -iq "Claude Code" — tool-agnostic guard). Zero src/test/schema/config touches — docs-only as scoped.
+Last activity: 2026-04-21 — Phase 18.1 Plan 05 (DOC-TUT — docs/runtime/getting-started.md) complete
+Next: Plans 18.1-06 (INDEX + README banner), 18.1-07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs). Plan 18.1-05 shipped docs/runtime/getting-started.md (272 lines) — the copy-paste 9-step end-to-end operator tutorial adapting scripts/mc-runner-smoke.sh into narrative form. Lands operators on the Progress tab watching the full `assigned → in_progress → review → done` lifecycle with the two-hop submit→review→done transition explicitly called out so `review` is never read as "broken." Neutralizes all 5 targeted pitfalls: #1 two-hop lifecycle via inline ⚠️ callout + UI-bullet + troubleshooting row (three reinforcing surfaces); #4 `runtime.project_repo_map` exclusive path via inline ⚠️ at Step 3 stating BOTH the positive (`pnpm mc settings set`) AND negative (never `RUNNER_PROJECT_REPO_MAP` env var) — no env-var fallback paths anywhere in the doc; #5 host.docker.internal via troubleshooting cross-link to agent-contract.md#container-env-vars; #7 `MISSION_CONTROL_RECIPES_DIR` standalone caveat as Step 1 `> Note`; #9 90s stale-window via troubleshooting row. Three observation channels in Step 7 (UI Progress tab / CLI `pnpm mc events watch` / `tail -f` stderr) cover every operator workflow. Cross-links to all 5 Wave-1 reference docs (`recipes.md`, `runner-daemon.md`, `agent-contract.md`, `admin-config.md`, `task-board-surfaces.md`) with all 15+ H2-slug anchors verified against target files. All 7 plan-verify assertions pass; drift-guard "submit → done" anti-pattern grep clean. Zero src/test/schema/config touches — docs-only as scoped. Commit 86ce0e5.
 
 ## Performance Metrics
 
@@ -142,6 +142,7 @@ Next: Plans 18.1-05 (DOC-TUT — getting-started.md), 18.1-06 (INDEX + README ba
 | Phase 18.1-v1-2-runtime-documentation P04 | 4min | 1 tasks | 1 files |
 | Phase 18.1-v1-2-runtime-documentation P03 | 4min | 1 tasks | 1 files |
 | Phase 18.1-v1-2-runtime-documentation P02 | 5min | 2 tasks | 2 files |
+| Phase 18.1-v1-2-runtime-documentation P05 | 3min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,10 @@ Recent decisions affecting current work:
 - [Phase 18.1-01]: docs/runtime/recipes.md quotes src/lib/recipe-schema.ts:37-71 verbatim inside a ```typescript fence — diff against source is empty (byte-exact). Paraphrase was rejected as drift-inviting per 18.1-RESEARCH.md Pattern 3 "paired prose + canonical code block."
 - [Phase 18.1-01]: error_message drift-guard callout in docs/runtime/recipes.md references the pre-d42983a legacy column name only via commit hash + phase number, NOT as a literal string — the plan's verify block asserts `! grep -q "indexed_error"` so quoting the stale name would fail the gate. Pattern: future drift-guards that reference a renamed identifier should cite the rename by commit hash, not by the stale string.
 - [Phase 18.1-01]: Forward-links to sibling docs/runtime/*.md files that do not yet exist are written as plain markdown links with "(to be written in Plan 18.1-XX)" parentheticals. Plan 18.1-07's verify-runtime-docs.mjs harness will promote these from best-effort to hard assertions once all sibling docs ship.
+- [Phase 18.1-05]: docs/runtime/getting-started.md adopts the numbered-step tutorial template (Pattern 4 from 18.1-RESEARCH.md) not the surface-scoped reference template (Pattern 1). Mirrors docs/quickstart.md's H1 + prereqs + numbered H2 + code fence + expected-output shape so first-time operators follow a familiar template. The five Wave-1 reference docs are the deep references; the tutorial is the ladder up to them. Future recipe-runtime walkthroughs should inherit this shape.
+- [Phase 18.1-05]: Pitfalls are surfaced at the decision point where the operator would otherwise make the wrong choice — the ⚠️ callout for `runtime.project_repo_map` exclusivity lands at Step 3 (before the `pnpm mc settings set` commands), and the ⚠️ for the two-hop submit→review lifecycle lands at Step 7 (before the observation flow). Callouts placed in a separate "Gotchas" appendix were rejected as drift-inviting — operators read linearly and will have made the wrong choice before reaching a later section.
+- [Phase 18.1-05]: Three-observation-channel pattern (UI Progress tab / CLI `pnpm mc events watch` / `tail -f` stderr log) for runtime-visibility sections because different operators trust different surfaces. Future runtime tutorials that need a "watch the system work" step should offer all three rather than picking one.
+- [Phase 18.1-05]: Terminal Troubleshooting table as six-row symptom/cause/remediation-cross-link triples — no free-form prose troubleshooting. Row count capped at six (the highest-frequency first-run failures from Phase 14-17 SUMMARY.md analyses) so operators can scan a table, not read prose.
 - [v1.2 roadmap]: Derived 7 phases (11–17) from 72 v1.2 REQ-IDs using dependency boundaries — Foundation (schema + registry + auth) → Recipe System → Task Runtime Context → Runner & Container → Checkpoints & Scheduler → UI Surfaces → Integration Testing
 - [v1.2 roadmap]: Phase 11 deliberately scoped to substrate only (migrations + model registry + auth principals) because every later phase depends on it; no runtime code in Phase 11 to keep the foundation shippable as a pure additive migration
 - [v1.2 roadmap]: Model-registry validation split across three phases — registry module + task-override validation land in Phase 11 (MODEL-01, MODEL-03), recipe-index-time validation in Phase 12 (MODEL-02), claim-time model resolution (`task.model_override ?? recipe.model.primary`) in Phase 14 (MODEL-04) — each lands where its consumer code lives
