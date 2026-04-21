@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 ## Current Position
 
 Phase: 18
-Plans: 18-01 ✓ • 18-02 ✓ • 18-03 ☐ • 18-04 ✓ (Plans 18-01, 18-02, and 18-04 complete; Plan 18-03 remains for subsequent execution).
+Plans: 18-01 ✓ • 18-02 ✓ • 18-03 ✓ • 18-04 ✓ (ALL Phase 18 plans complete; phase closeout pending verification sweep).
 Status: Executing
-Last activity: 2026-04-21 -- Phase 18 Plan 01 (audit-td-1 — retroactive Phase 13 VERIFICATION.md backfill) complete
-Next: Remaining Phase 18 plan (18-03) pending. Plan 18-01 closed v1.2-MILESTONE-AUDIT.md tech_debt item #1 with a single doc-only commit: created `.planning/phases/13-task-runtime-context-v1-2/13-VERIFICATION.md` (20,485 bytes, 130 lines, 6/6 TCTX-01..06 Observable Truths) matching the gsd-verifier shape (Phase 11/14/15/16/17). Every truth row cites evidence from the three 13-0N-SUMMARY.md `requirements_completed` frontmatter arrays AND from the Phase 17 integration tests (phase-17-pipeline-integration.test.ts + phase-17-daemon-pipeline.test.ts). Frontmatter carries `backfilled: true` + `backfill_reason` to distinguish retroactive closure from ship-time verification. No code or behavior change. Commit: `dc63f96`.
+Last activity: 2026-04-21 -- Phase 18 Plan 03 (audit-td-3 — Phase 14 submit → done doc drift correction) complete
+Next: All Phase 18 plans executed (4/4). Plan 18-03 closed v1.2-MILESTONE-AUDIT.md tech_debt item #3 by correcting narrative drift in seven Phase 14 markdown files (14-06/09/10/11-PLAN.md + 14-09/11-SUMMARY.md + 14-VERIFICATION.md). Each corrected file now carries a doc-drift correction header-note citing Phase 17-01 RTEST-02 as the design authority for the review-flip; narrative "submit → done" and "terminal-flip to done" prose rewritten to "submit → review (Aegis approval then flips review → done)". Code blocks documenting Phase-14-era SQL (UPDATE status='done') preserved with surrounding italic annotations rather than rewritten. Zero code/test/schema/config files touched — shipped submit endpoint at src/app/api/runner/tasks/[task_id]/submit/route.ts already correctly flips in_progress → review per Phase 17-01's implementation. Remaining work: `/gsd:verify-phase 18` to close out the phase.
 
 ## Performance Metrics
 
@@ -137,6 +137,7 @@ Next: Remaining Phase 18 plan (18-03) pending. Plan 18-01 closed v1.2-MILESTONE-
 | Phase 18-v1-2-tech-debt-cleanup P04 | 2min | 2 tasks | 1 files |
 | Phase 18-v1-2-tech-debt-cleanup P02 | 6min | 3 tasks | 3 files |
 | Phase 18-v1-2-tech-debt-cleanup P01 | 2min | 2 tasks | 1 files |
+| Phase 18-v1-2-tech-debt-cleanup P03 | 6min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -337,6 +338,9 @@ Recent decisions affecting current work:
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-02]: Playwright locator hardening pattern — `locator('[data-testid="X"]').or(locator('text=/…/i'))` prefers the testid while retaining the original text fallback as a safety net (handles pre-testid builds, stale deployments, recipe renames). Do NOT hard-replace text locators when switching to testid; use `.or()` chain to preserve backwards compatibility.
 - [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-02]: When adding a data-testid to an existing component, also extend its unit test with a `screen.getByTestId(...)` assertion in a new `it()` block — pins the attribute so future refactors can't silently drop it (the attribute has no visual signal, only test-harness consumers see it).
 - [Phase 18-v1-2-tech-debt-cleanup]: Phase 13 VERIFICATION.md backfilled retroactively (audit-td-1) — frontmatter uses backfilled: true + backfill_reason to distinguish ship-time verification from retroactive closure; pattern reusable for any future tech-debt verification backfill.
+- [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Doc-drift correction header-note pattern — italic blockquote placed AFTER frontmatter `---` closer, BEFORE first H1/objective, citing authoritative phase + requirement ID (e.g., Phase 17-01 RTEST-02) as design authority for the correction; serves as single-source-of-truth for all subsequent in-file corrected mentions so each line doesn't need to repeat the full citation.
+- [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Non-destructive code-block annotation — when a historical code block documents Phase-N-era behavior that a later phase rewrote (e.g., Phase-14-era SQL `SET status='done'` that Phase 17-01 rewrote to `SET status='review'`), add an italic note BEFORE/AROUND the code block explaining the later rewrite rather than editing the code block itself. Preserves both historical accuracy and forward guidance; reviewers can see what shipped and what it became.
+- [Phase 18-v1-2-tech-debt-cleanup]: [Phase 18-03]: Scope discipline when correcting doc-drift — only edit files explicitly listed in the plan's `files_modified` frontmatter; out-of-scope mentions discovered during grep (e.g., 14-06-SUMMARY.md line 133, 14-07-PLAN.md line 145) are logged as future audit concerns, not silently corrected. Prevents scope creep and keeps commit diffs focused on the audit item being closed.
 
 ### Pending Todos
 

@@ -372,7 +372,7 @@ Plans:
   5. A full re-run of `/gsd:audit-milestone v1.2` reports `status: passed` (no `tech_debt`) with all four items resolved
 **Plans:** 4/4 plans complete
 Plans:
-- [ ] 18-01-PLAN.md — Backfill Phase 13 VERIFICATION.md (audit-td-1)
+- [x] 18-01-PLAN.md — Backfill Phase 13 VERIFICATION.md (audit-td-1)
 - [ ] 18-02-PLAN.md — RecipeBadge data-testid + Playwright locator hardening (audit-td-2)
 - [ ] 18-03-PLAN.md — Phase 14 plan/SUMMARY drift fix: submit→done → submit→review (audit-td-3)
 - [ ] 18-04-PLAN.md — Plan 17-02 indexed_error → error alignment (audit-td-4)
