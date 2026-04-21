@@ -44,6 +44,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Docker info (preflight for integration tests)
+        run: docker info
+
+      - name: Build mc-hello-world-agent reference image
+        run: pnpm mc:build-hello-world
+
       - name: Unit tests
         run: pnpm test
 
@@ -58,3 +64,5 @@ jobs:
 
       - name: E2E tests
         run: pnpm test:e2e
+        env:
+          PHASE17_SPAWN_RUNNER: "1"
