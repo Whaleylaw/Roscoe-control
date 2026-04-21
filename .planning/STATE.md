@@ -1,32 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: — Project Workspace & Dashboard
-status: unknown
-last_updated: "2026-04-21T21:26:38.019Z"
+milestone: v1.3
+milestone_name: Autonomous-Routing Parity
+status: defining_requirements
+last_updated: "2026-04-21T22:30:00.000Z"
 progress:
-  total_phases: 19
-  completed_phases: 16
-  total_plans: 82
-  completed_plans: 88
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-21 after v1.2 milestone shipped)
+See: .planning/PROJECT.md (updated 2026-04-21 — v1.3 Autonomous-Routing Parity milestone opened)
 
 **Core value:** When I click into a project, I see everything about that project and can manage all its work from one place, including driving it through its GSD lifecycle, and autonomous agents pick up assigned work, execute it in isolated containers, and move it through the Kanban.
-**Current focus:** v1.2 shipped 2026-04-21 (9 phases, 53 plans, 72/72 REQ-IDs, tag `v1.2`). Planning for v1.3 is not yet scoped. Next: `/gsd:new-milestone` to define the next milestone, or resume ad-hoc work on `main`.
+**Current focus:** v1.3 Autonomous-Routing Parity — closing the ~20–25% autonomous-routing gap vs the `gsd-lawyerinc` baseline. Scope: P0 bridge (queue scoping + plan→queue activation + lane-aware routing + unified blocker contract), P1 (MCP routing-field parity, doc contradictions), P2 (replace high-value `it.todo` placeholders).
 
 ## Current Position
 
-Phase: 18.1
-Plans: 18.1-01 ✓ • 18.1-02 ✓ • 18.1-03 ✓ • 18.1-04 ✓ • 18.1-05 ✓ • 18.1-06 ✓ • 18.1-07 ✓
-Status: Phase 18.1 complete — all 7 plans landed
-Last activity: 2026-04-21 — Phase 18.1 Plan 07 (DOC-HARNESS — scripts/verify-runtime-docs.mjs + vitest unit tests + package.json scripts) complete
-Next: `/gsd:verify-work 18.1` (optional phase gate) then `/gsd:complete-milestone v1.2`. Plan 18.1-07 shipped scripts/verify-runtime-docs.mjs (908 lines, Node 22 ESM, zero new deps; 10 cross-reference checks across docs/runtime/*.md → source-of-truth files; runs in ~190ms; exits 0 against the completed doc set with all 10 checks passing), scripts/__tests__/verify-runtime-docs.test.mjs (416 lines, 37 vitest unit tests, all passing in 237ms on hermetic fixture inputs), and vitest.docs.config.mjs (dedicated config so the harness tests don't collide with the product vitest.config.ts include pattern). package.json gets `pnpm docs:verify-runtime` + `pnpm test:docs`. Harness first-run surfaced 3 real drift hits — broken link to runner-docker.test.ts (actual file: runner-docker-args.test.ts) in both runner-daemon.md and admin-config.md, plus a literal "submit→done" legacy-phrasing hit in INDEX.md's design-era warning; all 3 fixed per the plan's "harness is authority" directive. Commits 55130ab (harness), 913d188 (doc drift fix), 69872d4 (tests + vitest.docs.config.mjs), 172eb9f (package.json). Deviation: Plan's preferred Option B.b (package.json-only) was mechanically impossible — vitest 2.1 rejects --include as a CLI flag and the default include pattern ignores scripts/__tests__/; chose minimal-blast-radius alternative (standalone vitest.docs.config.mjs) rather than edit vitest.config.ts. /gsd:complete-milestone v1.2 has zero unblocked documentation dependencies remaining.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-21 — Milestone v1.3 Autonomous-Routing Parity started; PROJECT.md updated with Current Milestone section; requirements definition pending.
+Next: Define REQUIREMENTS.md → roadmap via gsd-roadmapper (starting phase 19) → `/gsd:discuss-phase 19`.
 
 ## Performance Metrics
 

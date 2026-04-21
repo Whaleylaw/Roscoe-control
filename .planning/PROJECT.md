@@ -16,7 +16,28 @@ When I click into a project, I see everything about that project — what it is,
 
 **Shipped through v1.2** (2026-04-21) — v1.0 Project Workspace & Dashboard, v1.1 Native GSD Integration, and v1.2 Recipe-Based Ephemeral Agent Runtime all complete. The app is a full-featured project workspace with native GSD lifecycle tracking and a shippable recipe-based container runtime; operators can author recipe cards, land Kanban tasks into a runner daemon, watch them execute in short-lived containers with crash-safe checkpointing, and review them through the existing Aegis loop. Operator manual lives at `docs/runtime/INDEX.md`; drift harness at `scripts/verify-runtime-docs.mjs`.
 
-**Next milestone:** Not yet scoped. Run `/gsd:new-milestone` to define v1.3.
+## Current Milestone: v1.3 Autonomous-Routing Parity
+
+**Goal:** Close the autonomous-routing gap identified in `.planning/GSD_PARITY_DIFF_vs_gsd-lawyerinc_2026-04-21.md` — v1.2 shipped ~75–80% of baseline autonomous-routing intent; v1.3 delivers the missing deterministic "automatic unless blocker" loop across every task type.
+
+**Target scope (parity block — P0 + P1 + P2):**
+
+**P0 — the missing `hierarchy transition → queue activation → project-scoped claiming → blocker pause/resume` bridge:**
+- Project-scoped queue filtering (`project_id`, `gsd_plan_id`, `wave`) applied to current-in-progress lookup, capacity checks, and the atomic claim subquery
+- Plan `in_progress` transition activates linked execution tasks (`gsd_plan_id=planId`) into `inbox`/`assigned` based on assignee, emitting `gsd.plan.tasks_activated`
+- Lane-aware default auto-routing — `autoRouteInboxTasks()` prefers inbox tasks linked to active plans; unscoped legacy fallback only when no lane work eligible; recipe fast-path preserved
+- Unified blocker transition contract across legacy + recipe paths — structured `in_progress → awaiting_owner` with `blocker_reason`, `blocker_kind`, `resume_hint`; deterministic owner-resume; common events
+
+**P1 — agent surface + doc drift:**
+- MCP `mc_create_task` / `mc_update_task` parity for routing fields (`project_id`, `gsd_workstream_id`, `gsd_milestone_id`, `gsd_phase_id`, `gsd_plan_id`, `gate_required`, `gate_status`, `status`, `metadata`)
+- Reconcile `docs/GSD-MODEL-COMPARISON.md` internal contradictions (rows 51–52 vs later "closed" claims); keep `node scripts/verify-runtime-docs.mjs` green
+
+**P2 — hardening:**
+- Replace high-value `it.todo` placeholders with executable tests (queue + lifecycle first): `src/components/project/__tests__/dashboard-view.test.tsx`, `src/lib/__tests__/project-{breadcrumb,tabs,workspace}.test.ts`, plus queue + transition integration tests
+
+**M4 umbrella acceptance:** single deterministic "automatic unless blocker" loop across every task type — explicit acceptance test covering hierarchy transition → queue activation → project-scoped claiming → blocker pause/resume round-trip.
+
+**Next:** Run `/gsd:plan-phase 19` once REQUIREMENTS.md and ROADMAP.md are finalized.
 
 ## Requirements
 
@@ -191,4 +212,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-21 after v1.2 milestone (Recipe-Based Ephemeral Agent Runtime) shipped — 9 phases, 53 plans, 72/72 requirements satisfied*
+*Last updated: 2026-04-21 — v1.3 milestone (Autonomous-Routing Parity) started via /gsd:new-milestone. v1.2 shipped 2026-04-21 — 9 phases, 53 plans, 72/72 requirements satisfied.*
