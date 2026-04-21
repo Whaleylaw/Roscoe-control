@@ -112,7 +112,8 @@
     },
     "collapseSidebar": "사이드바 접기",
     "expandSidebar": "사이드바 펼치기",
-    "more": "더 보기"
+    "more": "더 보기",
+    "recipes": "Recipes"
   },
   "settings": {
     "language": "언어",
@@ -841,7 +842,56 @@
     "submit": "제출",
     "loadingTranscript": "기록 로딩 중...",
     "noSessionMessages": "세션 메시지 없음",
-    "dunkIt": "완료"
+    "dunkIt": "완료",
+    "recipeBadge": {
+      "ariaLabel": "Recipe: {slug}"
+    },
+    "runnerBanner": {
+      "online": "🟢 Runner online",
+      "offlineCount": "🔴 Runner offline — tasks waiting: {count}",
+      "statusUnavailable": "Runner status unavailable"
+    },
+    "progressTab": {
+      "tabLabel": "Progress",
+      "empty": "Waiting for first checkpoint…",
+      "attemptLabel": "Attempt {n}",
+      "attemptCheckpointCount": "{count} checkpoints",
+      "blockerPrefix": "Blocked:",
+      "artifactKindFile": "📄 File",
+      "artifactKindUrl": "🔗 URL",
+      "artifactKindDiff": "📝 Diff",
+      "artifactKindTestResult": "✅ Test result",
+      "artifactKindComment": "💬 Comment",
+      "artifactKindOther": "✨ Artifact",
+      "tokensLabel": "{tokens} tokens",
+      "durationLabel": "{ms} ms",
+      "loadError": "Failed to load checkpoints",
+      "collapseAttempt": "Collapse attempt",
+      "expandAttempt": "Expand attempt"
+    },
+    "recipeField": {
+      "label": "Recipe",
+      "placeholder": "Search recipes…",
+      "clear": "Clear recipe",
+      "noResults": "No recipes match",
+      "lockedHint": "Locked — dispatch started",
+      "searching": "Searching…"
+    },
+    "advancedSection": {
+      "heading": "Advanced",
+      "readOnlyMountsLabel": "Read-only mounts",
+      "addMount": "Add mount",
+      "removeMount": "Remove mount",
+      "hostPathPlaceholder": "/host/path",
+      "containerPathPlaceholder": "/container/path",
+      "labelPlaceholder": "Label",
+      "extraSkillsLabel": "Extra skills",
+      "skillPlaceholder": "Type a skill path and press Enter",
+      "removeSkill": "Remove skill",
+      "modelOverrideLabel": "Model override",
+      "modelOverridePlaceholder": "e.g. anthropic/claude-sonnet-4-6",
+      "lockedHint": "Locked — dispatch started"
+    }
   },
   "cronManagement": {
     "title": "크론 관리",
@@ -2387,5 +2437,21 @@
         "waveConflicts": "Wave conflicts"
       }
     }
+  },
+  "recipesPanel": {
+    "title": "Recipes",
+    "subtitle": "Indexed recipes from the filesystem. Edit recipe.yaml files on disk and click Resync.",
+    "resync": "Resync",
+    "resyncing": "Resyncing…",
+    "resyncSuccess": "Indexed {inserted} new, updated {updated}, removed {deleted}",
+    "resyncError": "Resync failed",
+    "emptyHeading": "No recipes indexed",
+    "emptyBody": "Author recipes under the recipes/ directory and click Resync, or restart the server.",
+    "viewRecipe": "View",
+    "hideRecipe": "Hide",
+    "modelLabel": "Model",
+    "tagsLabel": "Tags",
+    "descriptionLabel": "Description",
+    "loadError": "Failed to load recipes"
   }
 }
