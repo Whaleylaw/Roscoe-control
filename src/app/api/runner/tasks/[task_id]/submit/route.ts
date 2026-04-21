@@ -1,13 +1,20 @@
 /**
- * POST /api/runner/tasks/:task_id/submit — runner-token scoped terminal-flip.
+ * POST /api/runner/tasks/:task_id/submit — runner-token scoped status-flip.
  *
- * Plan 14-11. The agent container inside the docker run posts here with its
- * per-task runner-token bearer when it finishes its work. Body specifies the
- * requested terminal status — Phase 14 only supports 'done' (the container
- * failed-path goes through runner-exit, which the daemon drives, not the
- * agent). Handler wraps the status flip and the atomic revokeTokensForTask
- * in a single db.transaction so a crash rolls both back (matches the
- * PUT /api/tasks/:id precedent from Plan 11-04).
+ * Plan 14-11 + Phase 17 D-01 scope expansion. The agent container inside the
+ * docker run posts here with its per-task runner-token bearer when it finishes
+ * its work. Body specifies the agent's declaration of intent — currently only
+ * 'done' is supported. The route translates the agent's 'done' declaration into
+ * a status flip of `in_progress → review`; runAegisReviews() scheduler task
+ * drives the final hop to done/failed/revision per existing
+ * src/lib/task-dispatch.ts:414 pipeline.
+ *
+ * Handler wraps the status flip and the atomic revokeTokensForTask in a single
+ * db.transaction so a crash rolls both back (matches the PUT /api/tasks/:id
+ * precedent from Plan 11-04). After the transaction commits, the route
+ * broadcasts `task.status_changed` with previous_status='in_progress' and
+ * status='review' so SSE subscribers (UI, runner daemon, integration tests)
+ * see the transition.
  *
  * Scope: RUNNER_TOKEN_ALLOWLIST entry already exists (Phase 11-04 lock, see
  * src/lib/runner-tokens.ts line 12). This plan does NOT add it.
@@ -18,6 +25,7 @@ import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { revokeTokensForTask } from '@/lib/runner-tokens'
+import { eventBus } from '@/lib/event-bus'
 import { logger } from '@/lib/logger'
 
 const Body = z.object({
@@ -25,7 +33,10 @@ const Body = z.object({
   resolution: z.string().max(10_000).optional(),
 })
 
-const TERMINAL_STATUSES = new Set(['done', 'failed', 'cancelled'])
+// Re-submits after the review-flip (and already-terminal states) return 409
+// idempotently. 'review' is included so a runner retry after the first submit
+// committed doesn't double-broadcast or re-revoke.
+const ALREADY_SETTLED = new Set(['review', 'done', 'failed', 'cancelled'])
 
 export async function POST(
   request: NextRequest,
@@ -80,26 +91,32 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
-    if (TERMINAL_STATUSES.has(task.status)) {
+    if (ALREADY_SETTLED.has(task.status)) {
       return NextResponse.json({ error: 'task already terminal' }, { status: 409 })
     }
 
     const nowUnix = Math.floor(Date.now() / 1000)
 
-    // Atomic: flip status to done + clear container_id + revoke live runner-tokens.
-    // Guarded on status NOT IN terminal set so a race against PUT /api/tasks/:id
-    // doesn't double-transition. revokeTokensForTask is idempotent, so a re-run
-    // after partial success would be safe even if the transaction boundary were
-    // removed — but we keep the transaction for crash-consistency.
+    // Atomic: flip status to review + clear container_id + revoke live
+    // runner-tokens. Guarded on status NOT IN ('review','done','failed',
+    // 'cancelled') so a race against PUT /api/tasks/:id or a re-submit from a
+    // stale runner-token doesn't double-transition. revokeTokensForTask is
+    // idempotent, so a re-run after partial success would be safe even if the
+    // transaction boundary were removed — but we keep the transaction for
+    // crash-consistency.
+    //
+    // completed_at is intentionally NOT set here: 'review' is not a terminal
+    // status. The Aegis-driven final 'done' hop in runAegisReviews()
+    // (src/lib/task-dispatch.ts:414) is the canonical terminal transition and
+    // owns the completed_at timestamp if/when a dedicated column is added.
     db.transaction(() => {
       db.prepare(`
         UPDATE tasks
-        SET status = 'done',
+        SET status = 'review',
             container_id = NULL,
-            completed_at = ?,
             updated_at = ?
-        WHERE id = ? AND status NOT IN ('done','failed','cancelled')
-      `).run(nowUnix, nowUnix, taskId)
+        WHERE id = ? AND status NOT IN ('review','done','failed','cancelled')
+      `).run(nowUnix, taskId)
 
       // Resolution is advisory in Phase 14: write to task_runner_attempts
       // best-effort for the most-recent attempt that has no resolution yet.
@@ -128,6 +145,21 @@ export async function POST(
 
       revokeTokensForTask(db, taskId, nowUnix)
     })()
+
+    // Broadcast AFTER the transaction commits so SSE subscribers never see a
+    // transition that later got rolled back. Phase 17 D-01: previous_status is
+    // always 'in_progress' because the WHERE clause on the UPDATE rejects any
+    // row not in that state (the 409 ALREADY_SETTLED guard above also enforces
+    // this). workspace_id is emitted as null — the submit route does not carry
+    // it in the cached task SELECT; downstream consumers (UI, runner) derive
+    // scope from task_id.
+    eventBus.broadcast('task.status_changed', {
+      task_id: taskId,
+      status: 'review',
+      previous_status: 'in_progress',
+      workspace_id: null,
+      at: nowUnix,
+    })
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
