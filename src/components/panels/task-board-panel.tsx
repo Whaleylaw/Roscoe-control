@@ -2197,6 +2197,15 @@ export function CreateTaskModal({
   const [scheduleError, setScheduleError] = useState('')
   const mentionTargets = useMentionTargets()
 
+  // Phase 16 Plan 05 (RUI-04) — v1.2 runtime-context fields on CreateTaskModal.
+  // Advanced section is collapsed by default; all four fields are session-local.
+  const [recipeSlug, setRecipeSlug] = useState<string | null>(null)
+  const [mounts, setMounts] = useState<Array<{ host_path: string; container_path: string; label: string }>>([])
+  const [extraSkills, setExtraSkills] = useState<string[]>([])
+  const [modelOverride, setModelOverride] = useState<string>('')
+  const [mountErrors, setMountErrors] = useState<Record<number, string>>({})
+  const [formError, setFormError] = useState<string | null>(null)
+
   const handleScheduleChange = async (value: string) => {
     setScheduleInput(value)
     setScheduleError('')
@@ -2237,6 +2246,8 @@ export function CreateTaskModal({
     }
 
     try {
+      setFormError(null)
+      setMountErrors({})
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2246,11 +2257,33 @@ export function CreateTaskModal({
           tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
           assigned_to: formData.assigned_to || undefined,
           metadata,
+          // Phase 16 Plan 05 (RUI-04) — only include runtime-context fields when non-default.
+          ...(recipeSlug ? { recipe_slug: recipeSlug } : {}),
+          ...(mounts.length > 0 ? { read_only_mounts: mounts } : {}),
+          ...(extraSkills.length > 0 ? { extra_skills: extraSkills } : {}),
+          ...(modelOverride.trim() ? { model_override: modelOverride.trim() } : {}),
         })
       })
 
       if (!response.ok) {
         const errorData = await response.json()
+        // Phase 13 aggregated validation response: { error, issues: [{field, code, message, hint?}] }.
+        // Classic validateBody response: { error, details: [...] }.
+        if (Array.isArray(errorData.issues)) {
+          const nextMountErrors: Record<number, string> = {}
+          const topLevel: string[] = []
+          for (const issue of errorData.issues) {
+            const m = /^read_only_mounts\.(\d+)\./.exec(String(issue.field ?? ''))
+            if (m) {
+              nextMountErrors[Number(m[1])] = issue.message ?? issue.code
+              continue
+            }
+            topLevel.push(`${issue.field ?? '(root)'}: ${issue.message ?? issue.code}`)
+          }
+          setMountErrors(nextMountErrors)
+          if (topLevel.length > 0) setFormError(topLevel.join('\n'))
+          return
+        }
         const errorMsg = errorData.details ? errorData.details.join(', ') : errorData.error
         throw new Error(errorMsg)
       }
@@ -2259,6 +2292,7 @@ export function CreateTaskModal({
       onClose()
     } catch (error) {
       log.error('Error creating task:', error)
+      setFormError((error as Error).message ?? 'Error creating task')
     }
   }
 
@@ -2392,6 +2426,24 @@ export function CreateTaskModal({
                 placeholder="frontend, urgent, bug"
               />
             </div>
+
+            {/* Phase 16 Plan 05 (RUI-04) — Recipe combobox + Advanced section on CreateTaskModal. */}
+            <div className="space-y-2">
+              <RecipeCombobox value={recipeSlug} onChange={setRecipeSlug} />
+            </div>
+            <AdvancedSection
+              mounts={mounts}
+              onMountsChange={setMounts}
+              skills={extraSkills}
+              onSkillsChange={setExtraSkills}
+              modelOverride={modelOverride}
+              onModelOverrideChange={setModelOverride}
+              mountErrors={mountErrors}
+            />
+
+            {formError && (
+              <p role="alert" className="text-xs text-red-400 whitespace-pre-line">{formError}</p>
+            )}
 
             {/* Recurring Schedule */}
             <div className="border border-border rounded-md p-3 space-y-2">
