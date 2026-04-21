@@ -370,7 +370,7 @@ Plans:
   3. Phase 14 plan + SUMMARY documents that describe `submit → done` are corrected to `submit → review` (per Phase 17-01 RTEST-02 design), without altering behavior or test expectations
   4. Plan 17-02 frontmatter and any inline references to `indexed_error` are aligned with the actual `error` status string used by the recipe-indexer constant, without changing runtime behavior
   5. A full re-run of `/gsd:audit-milestone v1.2` reports `status: passed` (no `tech_debt`) with all four items resolved
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 Plans:
 - [ ] 18-01-PLAN.md — Backfill Phase 13 VERIFICATION.md (audit-td-1)
 - [ ] 18-02-PLAN.md — RecipeBadge data-testid + Playwright locator hardening (audit-td-2)
@@ -402,4 +402,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 15. Checkpoints & Scheduler Integration *(v1.2)* | 7/7 | Complete    | 2026-04-20 |
 | 16. Runtime UI Surfaces *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
 | 17. Integration Testing & Reference Pipeline *(v1.2)* | 6/6 | Complete    | 2026-04-21 |
-| 18. v1.2 Tech-Debt Cleanup *(v1.2)* | 0/4 | Pending | — |
+| 18. v1.2 Tech-Debt Cleanup *(v1.2)* | 1/4 | In Progress|  |
