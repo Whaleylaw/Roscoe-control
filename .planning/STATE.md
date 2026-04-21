@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: planning
-stopped_at: Completed 16-03-PLAN.md (RUI-02 RunnerStatusBanner) — 2 task commits (fcc9137 component+tests, 1b6bef8 mount in task-board-panel), 9 unit tests passing, typecheck 0. Wave 1 continuing with 16-02/04/05/06 in parallel.
-last_updated: "2026-04-21T01:33:09.490Z"
+stopped_at: Completed 16-06-PLAN.md (Recipes Panel RUI-06)
+last_updated: "2026-04-21T01:37:59.324Z"
 last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation)."
 progress:
   total_phases: 16
   completed_phases: 12
   total_plans: 65
-  completed_plans: 67
+  completed_plans: 69
   percent: 100
 ---
 
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 16 (Runtime UI Surfaces) — IN PROGRESS. Wave-0 (Plan 16-01) done.
-Plans: 16-01 ✓.
+Phase: 16 (Runtime UI Surfaces) — IN PROGRESS. Wave-0 done + 16-03 + 16-04 complete.
+Plans: 16-01 ✓ • 16-03 ✓ • 16-04 ✓.
 Status: Plan 16-01 complete — Wave-0 foundation shipped: `src/lib/model-tier-colors.ts` exports `MODEL_TIER_COLORS` + `modelToTier()` + `modelTierClassName()` (3 helpers, 16 unit tests); Task interface widened with 12 v1.2 runtime fields in both `src/store/index.ts` AND `src/components/panels/task-board-panel.tsx` local decl (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_attempts, runner_max_attempts, runner_last_failure_reason); `use-server-events.ts` gained 6 new case branches relaying task.checkpoint_added/task.container_started/task.container_exited/task.runner_requested/recipe.indexed/recipe.removed as DOM CustomEvents (mc:checkpoint-added / mc:task-container-started / mc:task-container-exited / mc:task-runner-requested / mc:recipe-indexed / mc:recipe-removed) — follows chat.message precedent with typeof window SSR guard; `GET /api/runtime/runner-status` live at viewer auth returning `{online, last_heartbeat_at, tasks_waiting}` over runner_heartbeats (90s module-local stale window) + tasks WHERE recipe_slug IS NOT NULL AND status IN ('inbox','assigned') workspace-scoped; 54 new Phase 16 i18n keys seeded atomically across all 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) via idempotent Node script under `.planning/phases/16-runtime-ui-surfaces/seed-i18n.mjs` (refuses key clobbers, hard-fails on drift); targeted jq verification confirms 56 Phase 16 paths × 10 locales identical. 30 new unit tests pass; `pnpm typecheck` exits 0; `pnpm lint` exits 0.
 Last activity: 2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation).
 Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan reads `task.recipe_slug` directly (typed), imports MODEL_TIER_COLORS from `@/lib/model-tier-colors`, `addEventListener` for one of the 6 `mc:*` CustomEvents, polls `/api/runtime/runner-status` (banner) or consumes existing `/api/recipes/search` / `/api/tasks/:id/checkpoints` / `/api/recipes/resync`. No further foundation changes anticipated.
@@ -126,6 +126,8 @@ Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan read
 | Phase 15-checkpoints-scheduler-v1-2 P07 | 7min | 3 tasks | 4 files |
 | Phase 16-runtime-ui-surfaces P01 | 10min | 2 tasks | 19 files |
 | Phase 16-runtime-ui-surfaces P03 | 5min | 2 tasks | 3 files |
+| Phase 16-runtime-ui-surfaces P04 | 11min | 2 tasks tasks | 6 files files |
+| Phase 16-runtime-ui-surfaces P06 | 12min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -284,6 +286,16 @@ Recent decisions affecting current work:
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: Banner mounted INSIDE task-board-panel.tsx (line 1001 between error region and Kanban grid) — CONTEXT.md LOCK that ambient UI stays scoped to the task-board view only; NOT in header-bar.tsx / layout / project-workspace; renders regardless of scope prop so project workspaces still see global runner status
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: Three render branches (loading/ok/error) with loading=null-render (no mount flicker) and error=muted 'Runner status unavailable' fallback (never blocks board, never throws); role=status aria-live=polite on wrapper so state transitions announce to screen readers without stealing focus
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: DEFERRED per CONTEXT.md Claude's Discretion — auto-collapse-to-thin-strip-when-online variant. Rationale: 44-line three-branch first-ship at full sticky-banner height prioritises legibility; a follow-up polish plan can add a thin variant if operator feedback calls for it
+- [Phase 16-04]: Map<number, Checkpoint> state shape chosen over array-with-sort for ProgressTab — O(1) id-keyed de-dupe across REST + SSE without sort-on-every-push; id-key also handles SSE-replays with updated summary for a previously-recorded id
+- [Phase 16-04]: Subscribe-before-fetch ordering enforced by useEffect declaration order — the listener-registration useEffect appears above the fetch useEffect so SSE arrivals during in-flight fetch merge cleanly via the Map; no explicit queue needed; Test #6 'SSE-before-fetch' proves the invariant with a deferred fetch resolver
+- [Phase 16-04]: jsdom scrollTo compatibility guard (Rule 1 auto-fix) — typeof el.scrollTo === 'function' with el.scrollTop = 0 fallback; real browsers unchanged; establishes template for future scroll-driven UI components in the repo
+- [Phase 16-04]: Tab label renders via progressT('tabLabel') against 16-01-seeded taskBoard.progressTab.tabLabel — Plan 16-04 adds zero new i18n keys; the pre-seeded 16-key bundle under taskBoard.progressTab.* (empty/loadError/attemptLabel/attemptCheckpointCount/blockerPrefix/tokensLabel/durationLabel/collapseAttempt/expandAttempt/6 artifact kinds) covers everything
+- [Phase 16-04]: Auto-scroll anchoring rule (Open Question 4 LOCKED) — ProgressTab smooth-scrolls to top (newest-first puts latest at top) on every checkpoints.size increase UNLESS userScrolledUpRef.current is true (scrollTop > 16px); anchor re-arms when user returns to top; 16px threshold tolerates sub-pixel jitter
+- [Phase 16-04]: Path-scoped commit pattern for parallel-wave file contention — 'git commit -m msg -- <path>' ensures only Plan 16-04's hunk lands on src/components/panels/task-board-panel.tsx despite 5 sibling plans editing the same file concurrently; three race-recovery patterns documented in 16-04-SUMMARY Process Observations
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: RecipesPanel uses inline feedback banner (github-sync-panel precedent) over a toast library — no toast system introduced
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: Per-row View toggle expands soul_md inline via shared MarkdownRenderer (no new route, no modal) — matches research Do-Not-Hand-Roll #8
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: RecipesPanel fetches /api/recipes directly (no Zustand recipes slice dependency) — file-disjoint from sibling RUI-01 badge plan's store slice
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-06]: Nav priority=false, essential=false — Recipes is a full-mode inspection surface; Essential mode stays minimal
 
 ### Pending Todos
 
@@ -306,6 +318,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T01:33:09.473Z
-Stopped at: Completed 16-03-PLAN.md (RUI-02 RunnerStatusBanner) — 2 task commits (fcc9137 component+tests, 1b6bef8 mount in task-board-panel), 9 unit tests passing, typecheck 0. Wave 1 continuing with 16-02/04/05/06 in parallel.
+Last session: 2026-04-21T01:37:49.498Z
+Stopped at: Completed 16-06-PLAN.md (Recipes Panel RUI-06)
 Resume file: None
