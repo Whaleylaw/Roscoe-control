@@ -331,7 +331,7 @@ Plans:
   6. All new UI strings ship atomically across en/es/fr/de/ja/ko/pt/ru/zh/ar
 **Plans:** 6 plans
 Plans:
-- [ ] 16-01-PLAN.md — Wave 0 foundation: Task interface widening + MODEL_TIER_COLORS extraction + SSE dispatcher extension + /api/runtime/runner-status viewer endpoint + atomic 10-locale i18n seeding (RUI-01..06)
+- [x] 16-01-PLAN.md — Wave 0 foundation: Task interface widening + MODEL_TIER_COLORS extraction + SSE dispatcher extension + /api/runtime/runner-status viewer endpoint + atomic 10-locale i18n seeding (RUI-01..06) (completed 2026-04-21)
 - [ ] 16-02-PLAN.md — Recipe Badge on task cards + recipes Zustand slice with SSE-driven refresh (RUI-01, RUI-05)
 - [ ] 16-03-PLAN.md — Runner Status Banner inside task-board-panel with 10s poll + debounced SSE refresh (RUI-02, RUI-05)
 - [ ] 16-04-PLAN.md — Progress Tab on TaskDetailModal with subscribe-before-fetch + grouped timeline (RUI-03, RUI-05)

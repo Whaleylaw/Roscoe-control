@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: unknown
-last_updated: "2026-04-20T23:44:03.036Z"
+status: in_progress
+stopped_at: Plan 16-01 complete — Wave-0 foundation for Phase 16 UI shipped (shared MODEL_TIER_COLORS, Task interface widened with 12 v1.2 fields, 6 new SSE→DOM CustomEvent relays, viewer-auth /api/runtime/runner-status, 54 i18n keys × 10 locales). Next Wave-1 (Plans 16-02..16-06) can execute in parallel.
+last_updated: "2026-04-21T01:15:34Z"
+last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (Task 1 — shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (Task 2 — atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied (Rule 2 missing-critical, Rule 4 scope-boundary, Rule 3 blocking-note)."
 progress:
-  total_phases: 15
+  total_phases: 16
   completed_phases: 12
-  total_plans: 59
-  completed_plans: 65
+  total_plans: 71
+  completed_plans: 67
+  percent: 94
 ---
 
 # Project State
@@ -22,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 ## Current Position
 
-Phase: 15 (Checkpoints & Scheduler Integration) — COMPLETE. All 7 plans done.
-Plans: 15-01 ✓, 15-02 ✓, 15-03 ✓, 15-04 ✓, 15-05 ✓, 15-06 ✓, 15-07 ✓.
-Status: Plan 15-07 complete — three integration test files delivered (18 new tests, all passing). Zero production code modified. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) now carry BOTH unit test coverage (per-plan via Plans 15-01..06) AND integration test coverage (Plan 15-07). Integration suites: `src/app/api/tasks/[id]/checkpoints/__tests__/integration.test.ts` (9 cases — full completed→in_progress→blocked sequence, CP-05 artifact matrix round-trip, atomic rollback under JSONL throw AND DB INSERT throw injection, Zod refinements, cross-workspace 404 masquerade, attempt filter); `src/lib/__tests__/phase-15-scheduler-integration.test.ts` (8 cases — SCHED-01 autoRoute recipe fast-path, SCHED-02 dispatchAssigned recipe-skip, SCHED-03 heartbeat+active_task_ids three-case inventory probe, SCHED-04 reconcile 90s/just-claimed boundaries with vi.useFakeTimers, scheduler ladder wiring, legacy regression); `src/lib/__tests__/phase-15-blocker-flow-integration.test.ts` (1 cohesive `it(...)` — 5-phase end-to-end: seed → blocker POST → owner flip → resolveResumeMarker → seedMcDir marker append with byte-for-byte LOCKED format assertion). Full `pnpm test --run` shows 2245 passed + 44 todo + 1 pre-existing failure (runner-tokens.test.ts:194 allowlist-length drift — documented in deferred-items.md since 15-04). `pnpm typecheck` exits 0.
-Last activity: 2026-04-20 — Plan 15-07 complete. 3 task commits: 584ed43 (checkpoint POST+GET integration), 3dee4d0 (scheduler orchestration integration), 9ca965b (blocker → resume end-to-end). 4 decisions logged. 1 auto-fix applied (Rule 3 - Blocking): split dynamic `await import()` destructured `type` re-export into static `import type` + runtime-only dynamic import (esbuild rejects `import { ..., type X }` in dynamic imports).
-Next: Phase 16 UI surfaces (RUI-01..06) unblocked. Phase 17 RTEST recommendation: extend with container-driven end-to-end test using `mc-hello-world-agent` reference image + multi-runner scenario; 15-07 covers in-process wiring but not real HTTP transport or concurrent-runner claim paths.
+Phase: 16 (Runtime UI Surfaces) — IN PROGRESS. Wave-0 (Plan 16-01) done.
+Plans: 16-01 ✓.
+Status: Plan 16-01 complete — Wave-0 foundation shipped: `src/lib/model-tier-colors.ts` exports `MODEL_TIER_COLORS` + `modelToTier()` + `modelTierClassName()` (3 helpers, 16 unit tests); Task interface widened with 12 v1.2 runtime fields in both `src/store/index.ts` AND `src/components/panels/task-board-panel.tsx` local decl (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_attempts, runner_max_attempts, runner_last_failure_reason); `use-server-events.ts` gained 6 new case branches relaying task.checkpoint_added/task.container_started/task.container_exited/task.runner_requested/recipe.indexed/recipe.removed as DOM CustomEvents (mc:checkpoint-added / mc:task-container-started / mc:task-container-exited / mc:task-runner-requested / mc:recipe-indexed / mc:recipe-removed) — follows chat.message precedent with typeof window SSR guard; `GET /api/runtime/runner-status` live at viewer auth returning `{online, last_heartbeat_at, tasks_waiting}` over runner_heartbeats (90s module-local stale window) + tasks WHERE recipe_slug IS NOT NULL AND status IN ('inbox','assigned') workspace-scoped; 54 new Phase 16 i18n keys seeded atomically across all 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) via idempotent Node script under `.planning/phases/16-runtime-ui-surfaces/seed-i18n.mjs` (refuses key clobbers, hard-fails on drift); targeted jq verification confirms 56 Phase 16 paths × 10 locales identical. 30 new unit tests pass; `pnpm typecheck` exits 0; `pnpm lint` exits 0.
+Last activity: 2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation).
+Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan reads `task.recipe_slug` directly (typed), imports MODEL_TIER_COLORS from `@/lib/model-tier-colors`, `addEventListener` for one of the 6 `mc:*` CustomEvents, polls `/api/runtime/runner-status` (banner) or consumes existing `/api/recipes/search` / `/api/tasks/:id/checkpoints` / `/api/recipes/resync`. No further foundation changes anticipated.
 
 ## Performance Metrics
 
@@ -121,6 +124,7 @@ Next: Phase 16 UI surfaces (RUI-01..06) unblocked. Phase 17 RTEST recommendation
 | Phase 15-checkpoints-scheduler-v1-2 P04 | 7min | 2 tasks | 4 files |
 | Phase 15-checkpoints-scheduler-v1-2 P05 | 10min | 4 tasks | 8 files |
 | Phase 15-checkpoints-scheduler-v1-2 P07 | 7min | 3 tasks | 4 files |
+| Phase 16-runtime-ui-surfaces P01 | 10min | 2 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -268,6 +272,13 @@ Recent decisions affecting current work:
 - [Phase 15-07]: Dynamic await import() cannot destructure type re-exports — use top-level 'import type { X }' plus runtime-only dynamic 'await import' when a test needs both runtime + type from a mocked module
 - [Phase 15-07]: Fake-timer discipline for scheduler integration: vi.useFakeTimers() + vi.setSystemTime(BASE_TIME_MS); seed future-dated updated_at when the test fast-forwards the clock so arithmetic works regardless of harness wall-clock drift
 - [Phase 15-07]: LOCKED marker format byte-asserted with expect(progress).toBe(initialProgress + expectedMarker) — not regex — so any format drift breaks Phase 16 Progress-tab consumers loudly
+- [Phase 16-01]: DOM CustomEvent relay pattern chosen for Wave-0 SSE dispatcher extension — 6 new event types (task.checkpoint_added/container_started/container_exited/runner_requested, recipe.indexed/removed) fire `window.dispatchEvent(new CustomEvent('mc:<kebab-name>', {detail: event.data}))` with typeof window SSR guard; follows chat.message precedent at use-server-events.ts:152-158. NO new Zustand slice introduced — Wave-1 components addEventListener and fetch directly. Keeps file-disjointness across Wave-1 plans
+- [Phase 16-01]: Runner-status banner goes to Option A (viewer-auth endpoint `/api/runtime/runner-status`) not Option B (SSE runner.heartbeat broadcast). Rationale: avoids 600 events/min churn on idle, matches `/api/status` precedent; banner polls every ~10s. Waiting count is workspace-scoped per auth.user.workspace_id
+- [Phase 16-01]: STALE_WINDOW_SECS=90 in `/api/runtime/runner-status/route.ts` is module-local (fourth duplication after task-dispatch.ts + inventory/route.ts + runner-reconcile.ts) per Plan 15-06 LOCKED pattern — not a shared export. Preserves file-disjoint plan structure and makes the 3× 30s reconcile semantic visible at every read site
+- [Phase 16-01]: MODEL_TIER_COLORS extracted to `src/lib/model-tier-colors.ts` with added `modelTierClassName(tier)` helper that returns neutral muted fallback for 'unknown' — deviation Rule 2 add beyond plan spec. Wave-1 components never have to branch on `tier === 'unknown'` themselves
+- [Phase 16-01]: Task interface widening done in BOTH `src/store/index.ts` AND `src/components/panels/task-board-panel.tsx` (two conceptual declarations of the same shape kept in lockstep) — 12 v1.2 runtime fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_attempts, runner_max_attempts, runner_last_failure_reason) all nullable matching `/api/tasks` mapTaskRow JSON parse surface
+- [Phase 16-01]: i18n seeding via idempotent Node script (`.planning/phases/16-runtime-ui-surfaces/seed-i18n.mjs`) — 54 keys × 10 locales = 540 atomic insertions, refuses to clobber pre-existing keys, hard-fails on value drift. Reusable artifact for future phases
+- [Phase 16-01]: Pre-existing 131-line en.json ↔ other-locale path drift left untouched per deviation Rule 4 (scope boundary). Phase-16-scoped jq filter verifies NEW-key parity (56 paths × 10 locales identical); reconciling inherited drift is a separate chore PR
 
 ### Pending Todos
 
@@ -290,6 +301,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-20T23:14:08Z
-Stopped at: Plan 15-05 complete — blocker flow + resume path + runner-exit emissions delivered. All 12 Phase 15 requirement IDs (CP-01..06 + SCHED-01..06) addressed. Plan 15-07 (integration tests) is the remaining Phase 15 work item.
-Resume file: Continue `/gsd:execute-phase 15` to pick up Plan 15-07. See .planning/phases/15-checkpoints-scheduler-v1-2/15-05-SUMMARY.md for the complete Phase 15 requirement coverage matrix and the known v1.3 optimization target (awaiting_owner → assigned PUT re-emission).
+Last session: 2026-04-21T01:15:34Z
+Stopped at: Plan 16-01 complete — Wave-0 foundation for Phase 16 UI shipped (shared MODEL_TIER_COLORS, Task interface widened with 12 v1.2 fields, 6 new SSE→DOM CustomEvent relays, viewer-auth /api/runtime/runner-status, 54 i18n keys × 10 locales). Next: Wave-1 Plans 16-02..16-06 can execute in parallel.
+Resume file: Continue `/gsd:execute-phase 16` to pick up Wave-1 plans. See .planning/phases/16-runtime-ui-surfaces/16-01-SUMMARY.md for the Task-interface field block (grep-ready), DOM CustomEvent name table, runner-status response contract, and i18n parity verification. All Wave-1 plans can enter in parallel on top of this substrate.
