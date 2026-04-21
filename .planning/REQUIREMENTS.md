@@ -214,7 +214,7 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 
 ### Integration & Testing
 
-- [ ] **RTEST-01**: Unit tests cover recipe indexer parsing, mount-allowlist resolution, runner-token mint/verify/revoke, and checkpoint validation
+- [x] **RTEST-01**: Unit tests cover recipe indexer parsing, mount-allowlist resolution, runner-token mint/verify/revoke, and checkpoint validation
 - [ ] **RTEST-02**: An integration test drives the full pipeline with the reference image: create task → runner claims → container emits checkpoints → container submits → task enters `review` → Aegis approves → `done`
 - [ ] **RTEST-03**: A crash-recovery integration test deliberately kills the container mid-task, verifies worktree and `.mc/` state preservation, then confirms retry reads `.mc/progress.md` and completes
 - [ ] **RTEST-04**: An E2E Playwright test verifies the recipe badge renders on task cards and the Progress tab updates live on checkpoint events
@@ -378,7 +378,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHED-04 | Phase 15 | Complete |
 | SCHED-05 | Phase 15 | Complete |
 | SCHED-06 | Phase 15 | Complete |
-| RTEST-01 | Phase 17 | Pending |
+| RTEST-01 | Phase 17 | Complete |
 | RTEST-02 | Phase 17 | Pending |
 | RTEST-03 | Phase 17 | Pending |
 | RTEST-04 | Phase 17 | Pending |

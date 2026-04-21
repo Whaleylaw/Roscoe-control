@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
 status: executing
-stopped_at: Completed 16-05-PLAN.md
-last_updated: "2026-04-21T02:57:47.417Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-04-21T03:06:46.575Z"
 last_activity: 2026-04-21 -- Phase 17 planning complete
 progress:
   total_phases: 17
   completed_phases: 13
   total_plans: 71
-  completed_plans: 71
+  completed_plans: 72
   percent: 100
 ---
 
@@ -131,6 +131,7 @@ Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan read
 | Phase 16-runtime-ui-surfaces P06 | 12min | 2 tasks | 5 files |
 | Phase 16-runtime-ui-surfaces P02 | 14min | 2 tasks | 6 files |
 | Phase 16-runtime-ui-surfaces P05 | 13min | 2 tasks | 9 files |
+| Phase 17-integration-testing-reference-pipeline P02 | 4 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -308,6 +309,8 @@ Recent decisions affecting current work:
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: RECIPE_LOCKED client-side gate formula LOCKED — isDispatched = task.status !== 'inbox' && task.status !== 'assigned'. EditTaskModal disables RecipeCombobox + AdvancedSection and skips runtime-field delta on the PATCH payload when isDispatched.
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: /api/recipes/search autocomplete uses 300ms debounce + AbortController cleanup tied to the useEffect cleanup; rapid-typing aborts the in-flight request via controller.abort(). No client-side result caching — always debounced fetch per CONTEXT.md anti-pattern rule.
 - [Phase 16-runtime-ui-surfaces]: [Phase 16-05]: 400 issues[] from Phase 13 aggregated validation response mapped via regex /^read_only_mounts\.(\d+)\./ — per-row errors land in MountsEditor's errors prop; non-mount issues render in a top-level role=alert banner below the Advanced section. No toast library; partial-path UX parity with Phase 13's server-side aggregation.
+- [Phase 17-02]: RTEST-01 sharp-edge audit: 5/6 candidates pre-existing in Phase 11-15 test suites, only empty-string blocker_reason case genuinely missing; added as single new it() case
+- [Phase 17-02]: Pitfall 8 discipline honored: runner-tokens.test.ts line-194 allowlist-length assertion not modified (top-of-file comment only); preserves hands-off rule from Phase 15-04 deferred-items.md
 
 ### Pending Todos
 
@@ -330,6 +333,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T01:39:57.448Z
-Stopped at: Completed 16-05-PLAN.md
+Last session: 2026-04-21T03:06:41.143Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
