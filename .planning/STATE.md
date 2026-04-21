@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: planning
+status: executing
 stopped_at: Completed 16-05-PLAN.md
-last_updated: "2026-04-21T01:52:01.918Z"
-last_activity: 2026-04-21
+last_updated: "2026-04-21T02:57:47.417Z"
+last_activity: 2026-04-21 -- Phase 17 planning complete
 progress:
-  total_phases: 16
+  total_phases: 17
   completed_phases: 13
-  total_plans: 65
+  total_plans: 71
   completed_plans: 71
   percent: 100
 ---
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-18 — Milestone v1.2 initialized)
 
 Phase: 16
 Plans: 16-01 ✓ • 16-03 ✓ • 16-04 ✓ • 16-06 ✓ • (16-02, 16-05 in flight).
-Status: Plan 16-01 complete — Wave-0 foundation shipped: `src/lib/model-tier-colors.ts` exports `MODEL_TIER_COLORS` + `modelToTier()` + `modelTierClassName()` (3 helpers, 16 unit tests); Task interface widened with 12 v1.2 runtime fields in both `src/store/index.ts` AND `src/components/panels/task-board-panel.tsx` local decl (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_attempts, runner_max_attempts, runner_last_failure_reason); `use-server-events.ts` gained 6 new case branches relaying task.checkpoint_added/task.container_started/task.container_exited/task.runner_requested/recipe.indexed/recipe.removed as DOM CustomEvents (mc:checkpoint-added / mc:task-container-started / mc:task-container-exited / mc:task-runner-requested / mc:recipe-indexed / mc:recipe-removed) — follows chat.message precedent with typeof window SSR guard; `GET /api/runtime/runner-status` live at viewer auth returning `{online, last_heartbeat_at, tasks_waiting}` over runner_heartbeats (90s module-local stale window) + tasks WHERE recipe_slug IS NOT NULL AND status IN ('inbox','assigned') workspace-scoped; 54 new Phase 16 i18n keys seeded atomically across all 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) via idempotent Node script under `.planning/phases/16-runtime-ui-surfaces/seed-i18n.mjs` (refuses key clobbers, hard-fails on drift); targeted jq verification confirms 56 Phase 16 paths × 10 locales identical. 30 new unit tests pass; `pnpm typecheck` exits 0; `pnpm lint` exits 0.
-Last activity: 2026-04-21
+Status: Ready to execute
+Last activity: 2026-04-21 -- Phase 17 planning complete
 Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan reads `task.recipe_slug` directly (typed), imports MODEL_TIER_COLORS from `@/lib/model-tier-colors`, `addEventListener` for one of the 6 `mc:*` CustomEvents, polls `/api/runtime/runner-status` (banner) or consumes existing `/api/recipes/search` / `/api/tasks/:id/checkpoints` / `/api/recipes/resync`. No further foundation changes anticipated.
 
 ## Performance Metrics
