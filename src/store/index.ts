@@ -136,6 +136,21 @@ export interface Task {
   gate_approved_by?: string | null
   gate_approved_at?: number | null
   depends_on_task_ids?: string | null
+  // Phase 13/14 v1.2 runtime-context fields (all nullable — pre-v1.2 rows have NULL).
+  // Source of truth for the Task row shape returned by GET /api/tasks (mapTaskRow
+  // already parses workspace_source/read_only_mounts/extra_skills from JSON columns).
+  recipe_slug?: string | null
+  workspace_source?: { project_id: number; base_ref: string } | null
+  read_only_mounts?: Array<{ host_path: string; container_path: string; label: string }>
+  extra_skills?: string[]
+  model_override?: string | null
+  container_id?: string | null
+  runner_started_at?: number | null
+  runner_exit_code?: number | null
+  worktree_path?: string | null
+  runner_attempts?: number
+  runner_max_attempts?: number | null
+  runner_last_failure_reason?: string | null
 }
 
 export interface Agent {

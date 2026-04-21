@@ -55,6 +55,21 @@ interface Task {
   gate_status?: 'not_required' | 'pending' | 'approved' | 'rejected'
   gate_approved_by?: string | null
   gate_approved_at?: number | null
+  // Phase 13/14 v1.2 runtime-context fields (all nullable — pre-v1.2 rows have NULL).
+  // Mirrors the Zustand Task interface at src/store/index.ts; two conceptual declarations
+  // of the same shape kept in lockstep so Wave-1 plans can read recipe_slug without cast.
+  recipe_slug?: string | null
+  workspace_source?: { project_id: number; base_ref: string } | null
+  read_only_mounts?: Array<{ host_path: string; container_path: string; label: string }>
+  extra_skills?: string[]
+  model_override?: string | null
+  container_id?: string | null
+  runner_started_at?: number | null
+  runner_exit_code?: number | null
+  worktree_path?: string | null
+  runner_attempts?: number
+  runner_max_attempts?: number | null
+  runner_last_failure_reason?: string | null
 }
 
 interface Agent {

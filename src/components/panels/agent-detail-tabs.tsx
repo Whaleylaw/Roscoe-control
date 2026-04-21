@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Loader } from '@/components/ui/loader'
 import { createClientLogger } from '@/lib/client-logger'
+import { MODEL_TIER_COLORS } from '@/lib/model-tier-colors'
 import Link from 'next/link'
 
 const log = createClientLogger('AgentDetailTabs')
@@ -803,12 +804,6 @@ const TEMPLATES = [
   { type: 'content-creator', label: 'Content Creator', emoji: '\u270f\ufe0f', description: 'Write and edit for content generation', modelTier: 'haiku' as const, toolCount: 9, theme: 'content creator' },
   { type: 'security-auditor', label: 'Security Auditor', emoji: '\ud83d\udee1\ufe0f', description: 'Read-only + bash for security scanning', modelTier: 'sonnet' as const, toolCount: 10, theme: 'security auditor' },
 ]
-
-const MODEL_TIER_COLORS: Record<string, string> = {
-  opus: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  sonnet: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  haiku: 'bg-green-500/20 text-green-400 border-green-500/30',
-}
 
 const MODEL_TIER_LABELS: Record<string, string> = {
   opus: 'Opus $$$',

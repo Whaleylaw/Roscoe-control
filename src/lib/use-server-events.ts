@@ -189,6 +189,53 @@ export function useServerEvents() {
             })
           }
           break
+
+        // Phase 16 Wave-0 runtime relays — follow the 'chat.message' precedent
+        // (lines 152-158): no Zustand slice here, just a DOM CustomEvent so
+        // Wave-1 components can addEventListener('mc:<name>') without coupling
+        // to the SSE consumer. event.data is passed through verbatim.
+        case 'task.checkpoint_added':
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:checkpoint-added', { detail: event.data }),
+            )
+          }
+          break
+        case 'task.container_started':
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:task-container-started', { detail: event.data }),
+            )
+          }
+          break
+        case 'task.container_exited':
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:task-container-exited', { detail: event.data }),
+            )
+          }
+          break
+        case 'task.runner_requested':
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:task-runner-requested', { detail: event.data }),
+            )
+          }
+          break
+        case 'recipe.indexed':
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:recipe-indexed', { detail: event.data }),
+            )
+          }
+          break
+        case 'recipe.removed':
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mc:recipe-removed', { detail: event.data }),
+            )
+          }
+          break
       }
     }
 
