@@ -333,7 +333,7 @@ Plans:
 Plans:
 - [x] 16-01-PLAN.md — Wave 0 foundation: Task interface widening + MODEL_TIER_COLORS extraction + SSE dispatcher extension + /api/runtime/runner-status viewer endpoint + atomic 10-locale i18n seeding (RUI-01..06) (completed 2026-04-21)
 - [ ] 16-02-PLAN.md — Recipe Badge on task cards + recipes Zustand slice with SSE-driven refresh (RUI-01, RUI-05)
-- [ ] 16-03-PLAN.md — Runner Status Banner inside task-board-panel with 10s poll + debounced SSE refresh (RUI-02, RUI-05)
+- [x] 16-03-PLAN.md — Runner Status Banner inside task-board-panel with 10s poll + debounced SSE refresh (RUI-02, RUI-05)
 - [ ] 16-04-PLAN.md — Progress Tab on TaskDetailModal with subscribe-before-fetch + grouped timeline (RUI-03, RUI-05)
 - [ ] 16-05-PLAN.md — Recipe Combobox + Advanced Section on Create/Edit task forms with RECIPE_LOCKED gate (RUI-04, RUI-05)
 - [ ] 16-06-PLAN.md — Recipes Panel + nav rail entry + ContentRouter case + Playwright happy-path spec (RUI-06, RUI-05)

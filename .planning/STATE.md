@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Project Workspace & Dashboard
-status: in_progress
-stopped_at: Plan 16-01 complete — Wave-0 foundation for Phase 16 UI shipped (shared MODEL_TIER_COLORS, Task interface widened with 12 v1.2 fields, 6 new SSE→DOM CustomEvent relays, viewer-auth /api/runtime/runner-status, 54 i18n keys × 10 locales). Next Wave-1 (Plans 16-02..16-06) can execute in parallel.
-last_updated: "2026-04-21T01:15:34Z"
-last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (Task 1 — shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (Task 2 — atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied (Rule 2 missing-critical, Rule 4 scope-boundary, Rule 3 blocking-note)."
+status: planning
+stopped_at: Completed 16-03-PLAN.md (RUI-02 RunnerStatusBanner) — 2 task commits (fcc9137 component+tests, 1b6bef8 mount in task-board-panel), 9 unit tests passing, typecheck 0. Wave 1 continuing with 16-02/04/05/06 in parallel.
+last_updated: "2026-04-21T01:33:09.490Z"
+last_activity: "2026-04-21 — Plan 16-01 complete. 2 task commits: 763ae9d (shared util + interface widening + SSE relays + runner-status endpoint), d4b3fb3 (atomic 10-locale i18n seeding). 7 decisions logged. 3 auto-fixes applied: Rule 2 missing-critical (`modelTierClassName` fallback helper added to avoid Wave-1 duplication of the `'unknown'` tier branch); Rule 4 scope-boundary (pre-existing 131-line en↔other-locale drift left untouched; Phase-16-scoped jq filter verifies NEW-key parity); Rule 3 blocking-note (pre-existing `recipe-watcher-events.test.ts` macOS fsevents flake documented in `.planning/phases/16-runtime-ui-surfaces/deferred-items.md`, passes in isolation)."
 progress:
   total_phases: 16
   completed_phases: 12
-  total_plans: 71
+  total_plans: 65
   completed_plans: 67
-  percent: 94
+  percent: 100
 ---
 
 # Project State
@@ -125,6 +125,7 @@ Next: Wave 1 (Plans 16-02..16-06) can execute in parallel. Each Wave-1 plan read
 | Phase 15-checkpoints-scheduler-v1-2 P05 | 10min | 4 tasks | 8 files |
 | Phase 15-checkpoints-scheduler-v1-2 P07 | 7min | 3 tasks | 4 files |
 | Phase 16-runtime-ui-surfaces P01 | 10min | 2 tasks | 19 files |
+| Phase 16-runtime-ui-surfaces P03 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -279,6 +280,10 @@ Recent decisions affecting current work:
 - [Phase 16-01]: Task interface widening done in BOTH `src/store/index.ts` AND `src/components/panels/task-board-panel.tsx` (two conceptual declarations of the same shape kept in lockstep) — 12 v1.2 runtime fields (recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override, container_id, runner_started_at, runner_exit_code, worktree_path, runner_attempts, runner_max_attempts, runner_last_failure_reason) all nullable matching `/api/tasks` mapTaskRow JSON parse surface
 - [Phase 16-01]: i18n seeding via idempotent Node script (`.planning/phases/16-runtime-ui-surfaces/seed-i18n.mjs`) — 54 keys × 10 locales = 540 atomic insertions, refuses to clobber pre-existing keys, hard-fails on value drift. Reusable artifact for future phases
 - [Phase 16-01]: Pre-existing 131-line en.json ↔ other-locale path drift left untouched per deviation Rule 4 (scope boundary). Phase-16-scoped jq filter verifies NEW-key parity (56 paths × 10 locales identical); reconciling inherited drift is a separate chore PR
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: RunnerStatusBanner is stateless — POLL_INTERVAL_MS=10_000 matches runner heartbeat cadence, REFRESH_DEBOUNCE_MS=1_000 coalesces bursts of three SSE events (mc:task-container-started/exited/runner-requested) into one re-fetch; module-local constants, not shared, not user-configurable
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: Banner mounted INSIDE task-board-panel.tsx (line 1001 between error region and Kanban grid) — CONTEXT.md LOCK that ambient UI stays scoped to the task-board view only; NOT in header-bar.tsx / layout / project-workspace; renders regardless of scope prop so project workspaces still see global runner status
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: Three render branches (loading/ok/error) with loading=null-render (no mount flicker) and error=muted 'Runner status unavailable' fallback (never blocks board, never throws); role=status aria-live=polite on wrapper so state transitions announce to screen readers without stealing focus
+- [Phase 16-runtime-ui-surfaces]: [Phase 16-03]: DEFERRED per CONTEXT.md Claude's Discretion — auto-collapse-to-thin-strip-when-online variant. Rationale: 44-line three-branch first-ship at full sticky-banner height prioritises legibility; a follow-up polish plan can add a thin variant if operator feedback calls for it
 
 ### Pending Todos
 
@@ -301,6 +306,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T01:15:34Z
-Stopped at: Plan 16-01 complete — Wave-0 foundation for Phase 16 UI shipped (shared MODEL_TIER_COLORS, Task interface widened with 12 v1.2 fields, 6 new SSE→DOM CustomEvent relays, viewer-auth /api/runtime/runner-status, 54 i18n keys × 10 locales). Next: Wave-1 Plans 16-02..16-06 can execute in parallel.
-Resume file: Continue `/gsd:execute-phase 16` to pick up Wave-1 plans. See .planning/phases/16-runtime-ui-surfaces/16-01-SUMMARY.md for the Task-interface field block (grep-ready), DOM CustomEvent name table, runner-status response contract, and i18n parity verification. All Wave-1 plans can enter in parallel on top of this substrate.
+Last session: 2026-04-21T01:33:09.473Z
+Stopped at: Completed 16-03-PLAN.md (RUI-02 RunnerStatusBanner) — 2 task commits (fcc9137 component+tests, 1b6bef8 mount in task-board-panel), 9 unit tests passing, typecheck 0. Wave 1 continuing with 16-02/04/05/06 in parallel.
+Resume file: None

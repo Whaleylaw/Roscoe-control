@@ -197,10 +197,10 @@ Requirements for milestone v1.2. Source design: `docs/superpowers/specs/2026-04-
 ### UI Surfaces
 
 - [ ] **RUI-01**: Each task card on the Kanban displays a recipe badge when `recipe_slug` is set, including recipe name and model tier color
-- [ ] **RUI-02**: Task-board shell shows a runner-status banner with live state (`🟢 Runner online` / `🔴 Runner offline — tasks waiting: N`)
+- [x] **RUI-02**: Task-board shell shows a runner-status banner with live state (`🟢 Runner online` / `🔴 Runner offline — tasks waiting: N`)
 - [ ] **RUI-03**: Task detail view has a new "Progress" tab showing a live checkpoint timeline grouped by attempt, updating via SSE
 - [ ] **RUI-04**: Task create/edit form has a Recipe dropdown (autocomplete via `/api/recipes/search`) and a collapsible "Advanced" section exposing `read_only_mounts`, `extra_skills`, and `model_override`
-- [ ] **RUI-05**: All new UI strings are translated across 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) atomically per the established pattern
+- [x] **RUI-05**: All new UI strings are translated across 10 locales (en/es/fr/de/ja/ko/pt/ru/zh/ar) atomically per the established pattern
 - [ ] **RUI-06**: Minimal recipe list panel (reachable from main nav) shows indexed recipes with name, description, model, tags, and a "Resync" button — authoring stays filesystem-first
 
 ### Scheduler Integration
@@ -367,10 +367,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MODEL-03 | Phase 11 | Complete |
 | MODEL-04 | Phase 14 | Complete |
 | RUI-01 | Phase 16 | Pending |
-| RUI-02 | Phase 16 | Pending |
+| RUI-02 | Phase 16 | Complete |
 | RUI-03 | Phase 16 | Pending |
 | RUI-04 | Phase 16 | Pending |
-| RUI-05 | Phase 16 | Pending |
+| RUI-05 | Phase 16 | Complete |
 | RUI-06 | Phase 16 | Pending |
 | SCHED-01 | Phase 15 | Complete |
 | SCHED-02 | Phase 15 | Complete |
