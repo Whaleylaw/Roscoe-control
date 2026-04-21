@@ -140,7 +140,95 @@ app = fs.existsSync(standaloneServerPath)
     })
 children.push(app)
 
+// ---------------------------------------------------------------------------
+// Phase 17 Plan 17-06 — optional runner daemon child process.
+//
+// Gated by PHASE17_SPAWN_RUNNER=1. When set, we wait for the MC server to
+// become reachable on 127.0.0.1:3005 (readiness probe) and then spawn
+// scripts/mc-runner.mjs as a sibling child with MC_URL pointed at the
+// e2e server. The runner inherits MISSION_CONTROL_DATA_DIR so it sees the
+// same runner.secret and DB the server just initialised.
+//
+// On SIGINT/SIGTERM the shared `shutdown()` helper kills the runner with the
+// same signal; a 5s grace window then escalates to SIGKILL to guarantee no
+// process leaks in the Playwright webServer teardown.
+//
+// Default (unset/0) behavior is unchanged — existing specs continue to pass.
+// ---------------------------------------------------------------------------
+let runnerChild = null
+let runnerBooted = false
+
+async function spawnRunner() {
+  if (process.env.PHASE17_SPAWN_RUNNER !== '1') return
+  if (runnerBooted) return
+  runnerBooted = true
+
+  // Readiness probe — poll /api/status until the MC server answers. We use
+  // fetch (Node 22 has native fetch) and a 30s budget. Once MC answers we
+  // know runner.secret has been auto-generated and /api/runner/config will
+  // accept the daemon's bearer.
+  const deadline = Date.now() + 30_000
+  let ready = false
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch('http://127.0.0.1:3005/api/status')
+      if (res.ok || res.status === 401 || res.status === 403) {
+        ready = true
+        break
+      }
+    } catch {
+      // still booting
+    }
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  if (!ready) {
+    process.stderr.write('[e2e] PHASE17_SPAWN_RUNNER=1 but MC server never became reachable; skipping runner spawn\n')
+    return
+  }
+
+  runnerChild = spawn('node', ['scripts/mc-runner.mjs'], {
+    cwd: repoRoot,
+    env: {
+      ...baseEnv,
+      MC_URL: 'http://127.0.0.1:3005',
+    },
+    stdio: ['ignore', 'inherit', 'inherit'],
+  })
+  children.push(runnerChild)
+  // eslint-disable-next-line no-console
+  console.log(`[e2e] Spawned mc-runner.mjs pid=${runnerChild.pid}`)
+  runnerChild.on('exit', (code, signal) => {
+    // eslint-disable-next-line no-console
+    console.log(`[e2e] mc-runner.mjs exited code=${code ?? 'null'} signal=${signal ?? 'none'}`)
+  })
+}
+
+// Kick the runner spawn off the event loop so the rest of startup can finish
+// initialising shutdown handlers first. The readiness probe inside spawnRunner
+// handles the race between MC boot and runner launch.
+void spawnRunner().catch((err) => {
+  process.stderr.write(`[e2e] failed to spawn runner daemon: ${String(err)}\n`)
+})
+
 function shutdown(signal = 'SIGTERM') {
+  // Phase 17: kill the runner child first so it does not try to register
+  // a heartbeat against a server that is already tearing down.
+  if (runnerChild && !runnerChild.killed) {
+    try {
+      runnerChild.kill(signal)
+    } catch {
+      // noop
+    }
+    setTimeout(() => {
+      if (runnerChild && !runnerChild.killed) {
+        try {
+          runnerChild.kill('SIGKILL')
+        } catch {
+          // noop
+        }
+      }
+    }, 5000).unref?.()
+  }
   for (const child of children) {
     if (!child.killed) {
       try {
