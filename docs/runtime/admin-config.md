@@ -148,7 +148,7 @@ The runner's per-secret store is `.data/runner/secrets/<NAME>`. Each file is one
 >
 > The CONTAINER-01 invariant forbids any `docker run -e SECRET=value` argv pattern. All secrets — including `MC_API_TOKEN` and recipe-declared `recipe.secrets` values — flow via `docker run --env-file`, never via `--env` or `-e` flags. Argv is visible to any local user via `ps`; env-files are `0600` under `.data/runner/env/` and are deleted after container exit.
 >
-> The invariant is enforced by a unit test at [`src/lib/__tests__/runner-docker.test.ts`](../../src/lib/__tests__/runner-docker.test.ts) that scans every element of the composed argv for a `MC_API_TOKEN=` substring and asserts it is absent.
+> The invariant is enforced by a unit test at [`src/lib/__tests__/runner-docker-args.test.ts`](../../src/lib/__tests__/runner-docker-args.test.ts) that scans every element of the composed argv for a `MC_API_TOKEN=` substring and asserts it is absent.
 >
 > Also linked from [`docs/runtime/runner-daemon.md#configuration-and-secrets`](./runner-daemon.md#configuration-and-secrets).
 

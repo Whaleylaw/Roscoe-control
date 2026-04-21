@@ -59,7 +59,7 @@ These files live **outside** `docs/runtime/` and remain the canonical deep refer
 
 - [`scripts/README.runner.md`](../../scripts/README.runner.md) — authoritative runner-daemon CLI + LaunchAgent + troubleshooting reference (linked from [`runner-daemon.md`](./runner-daemon.md))
 - [`docker/hello-world-agent/README.md`](../../docker/hello-world-agent/README.md) — canonical reference image that implements every side of the agent contract end-to-end (linked from [`agent-contract.md`](./agent-contract.md))
-- [`docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`](../superpowers/specs/2026-04-18-recipe-agent-system-design.md) — the original DESIGN-ERA spec. ⚠️ Several claims no longer match shipped code (submit→done, `ro-overlay` workspace mode, embedded embeddings for recipe search). Use for historical context only; every shipped-behavior claim belongs to the docs in this directory.
+- [`docs/superpowers/specs/2026-04-18-recipe-agent-system-design.md`](../superpowers/specs/2026-04-18-recipe-agent-system-design.md) — the original DESIGN-ERA spec. ⚠️ Several claims no longer match shipped code (the legacy direct-to-done submit lifecycle, `ro-overlay` workspace mode, embedded embeddings for recipe search). Use for historical context only; every shipped-behavior claim belongs to the docs in this directory.
 
 ## Related milestone docs
 

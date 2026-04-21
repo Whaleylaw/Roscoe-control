@@ -164,7 +164,7 @@ The daemon is configured via admin settings (`runtime.*`), not env vars. See [`d
 > install -m 0600 /dev/stdin .data/runner/secrets/ANTHROPIC_API_KEY <<<'sk-...'
 > ```
 >
-> The invariant is enforced by a unit test at [`src/lib/__tests__/runner-docker.test.ts`](../../src/lib/__tests__/runner-docker.test.ts) that scans every argv element for a `MC_API_TOKEN=` substring and asserts it is absent. See also [`docs/runtime/admin-config.md#secrets-store`](./admin-config.md#secrets-store) for the full secrets story and [`docs/runtime/admin-config.md#standalone-mode-requirements`](./admin-config.md#standalone-mode-requirements) for deployment caveats.
+> The invariant is enforced by a unit test at [`src/lib/__tests__/runner-docker-args.test.ts`](../../src/lib/__tests__/runner-docker-args.test.ts) that scans every argv element for a `MC_API_TOKEN=` substring and asserts it is absent. See also [`docs/runtime/admin-config.md#secrets-store`](./admin-config.md#secrets-store) for the full secrets story and [`docs/runtime/admin-config.md#standalone-mode-requirements`](./admin-config.md#standalone-mode-requirements) for deployment caveats.
 
 ## Troubleshooting
 
