@@ -152,7 +152,7 @@ Active milestone. Closes the ~20–25% autonomous-routing gap identified in `.pl
 | 17. Integration Testing & Reference Pipeline | v1.2 | 6/6 | Complete | 2026-04-21 |
 | 18. v1.2 Tech-Debt Cleanup | v1.2 | 4/4 | Complete | 2026-04-21 |
 | 18.1. v1.2 Runtime Documentation | v1.2 | 7/7 | Complete | 2026-04-21 |
-| 19. Project-Scoped Queue & Plan Activation | 3/3 | Complete   | 2026-04-22 | — |
+| 19. Project-Scoped Queue & Plan Activation | 3/3 | Complete    | 2026-04-22 | — |
 | 20. Lane-Aware Routing & Unified Blocker Contract | v1.3 | 0/— | Pending | — |
 | 21. MCP Routing-Field Parity | v1.3 | 0/— | Pending | — |
 | 22. Doc Reconciliation & Test Debt Burn-Down | v1.3 | 0/— | Pending | — |
