@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-21 — v1.3 Autonomous-Routing Parity
 Phase: 19-project-scoped-queue-plan-activation
 Plan: 19-01 + 19-02 + 19-03 complete (QUEUE-01, QUEUE-02, COMPAT-01)
 Status: Phase 19 plans complete (3 of 3) — ready for /gsd:verify-work 19
-Last activity: 2026-04-22 — Plan 19-03 executed: documented project_id/gsd_plan_id/wave query params + inline 400 on GET /api/tasks/queue, added queue_activation response schema (oneOf[object,null]) on POST /api/gsd/plans/{id}/transition, wired --wave CLI flag and wave MCP input property; runtime-docs harness clean (10/10).
+Last activity: 2026-04-22 — Completed quick task 260417: silenced /api/openclaw/doctor 400s when CLI missing (soft 200 + banner hide). Also completed Phase 20 (Lane-Aware Routing & Unified Blocker Contract — ROUTE-01/02, COMPAT-02/03 validated, 20/20 must-haves passed).
 Next: Run `/gsd:verify-work 19` then plan Phase 20 (lane-aware default auto-routing / ROUTE-01..02).
 
 ## Performance Metrics
@@ -413,6 +413,7 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 260415-eev | Add GSD CLI subcommands (projects create/list/get/bootstrap/transition, tasks gate, tasks list filters) | 2026-04-15 | 2ef0ef8 | [260415-eev-add-gsd-cli-subcommands-projects-create-](./quick/260415-eev-add-gsd-cli-subcommands-projects-create-/) |
 | 260416-hna | Refactor Hermes send route (drop any-casts, route default URL through config, document intentional inlinings) | 2026-04-16 | c35839c | [260416-hna-refactor-api-sessions-hermes-send-remove](./quick/260416-hna-refactor-api-sessions-hermes-send-remove/) |
+| 260417 | Silence /api/openclaw/doctor 400s when OpenClaw isn't installed | 2026-04-22 | b2a1e45 | [260417-silence-api-openclaw-doctor-400s-when-op](./quick/260417-silence-api-openclaw-doctor-400s-when-op/) |
 
 ## Session Continuity
 
