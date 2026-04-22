@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Autonomous-Routing Parity
-status: in_progress
-last_updated: "2026-04-22T01:22:04.308Z"
+milestone: v1.0
+milestone_name: — Autonomous-Routing Parity
+status: unknown
+last_updated: "2026-04-22T01:25:52.807Z"
 progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 1
+  total_phases: 11
+  completed_phases: 7
+  total_plans: 32
+  completed_plans: 37
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-21 — v1.3 Autonomous-Routing Parity
 ## Current Position
 
 Phase: 19-project-scoped-queue-plan-activation
-Plan: 19-02 complete (QUEUE-02)
-Status: Executing (1 of 3 Phase 19 plans complete)
-Last activity: 2026-04-22 — Plan 19-02 executed: rewrote POST /api/gsd/plans/:id/transition activation for QUEUE-02 spec (four-counter queue_activation payload, single-transaction atomicity, assignee/recipe routing, dead-assignee recovery, gsd.plan.tasks_activated event).
-Next: Execute remaining Phase 19 plans (19-01 queue-scoping, 19-03 CLI/MCP/OpenAPI surface).
+Plan: 19-01 + 19-02 complete (QUEUE-01, QUEUE-02, COMPAT-01)
+Status: Executing (2 of 3 Phase 19 plans complete)
+Last activity: 2026-04-22 — Plan 19-01 executed: extended GET /api/tasks/queue with project_id/gsd_plan_id/wave filters, cross-filter 400 validation, COMPAT-01 preserved; shipped mandatory route-handler vitest file and E2E coverage.
+Next: Execute Plan 19-03 (CLI/MCP/OpenAPI reflection of scoped queue params).
 
 ## Performance Metrics
 
@@ -146,6 +146,7 @@ Next: Execute remaining Phase 19 plans (19-01 queue-scoping, 19-03 CLI/MCP/OpenA
 | Phase 18.1-v1-2-runtime-documentation P06 | 3min | 3 tasks | 4 files |
 | Phase 18.1-v1-2-runtime-documentation P07 | 7min | 3 tasks | 4 files (3 new + 1 mod) + 3 drift-fix |
 | Phase 19-project-scoped-queue-plan-activation P02 | 5min | 2 tasks | 3 files |
+| Phase 19-project-scoped-queue-plan-activation P01 | 5min | 2 tasks tasks | 3 files files |
 
 ## Accumulated Context
 
@@ -385,6 +386,9 @@ Recent decisions affecting current work:
 - [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Per-task task.status_changed broadcast dropped during plan activation — no consumer keys on reason='plan_activated'; only gsd.plan.tasks_activated fires (atomic from SSE observer)
 - [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Re-entry idempotence test uses in_progress->review->in_progress; GsdPlanStatus has no 'blocked' state, review->in_progress is the legal path per NEXT_GSD_PLAN_STATUSES
 - [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Plan UPDATE moved INSIDE db.transaction() wrapping task activations so real errors roll the plan flip back too
+- [Phase 19-01]: Queue wave filter uses correlated subquery (gsd_plan_id IN (SELECT id FROM gsd_plans WHERE wave = ?)) rather than mandatory JOIN — unscoped polls reduce to TRUE, SQL-equivalent to v1.2 (COMPAT-01)
+- [Phase 19-01]: Cross-filter validation walks gsd_plans -> gsd_phases -> gsd_milestones -> projects with workspace guard (no gsd_plans.project_id column exists); 400 names both plan id and both project ids so callers can disambiguate
+- [Phase 19-01]: Playwright cannot seed gsd_plans rows via REST helpers; wave + cross-filter 400 coverage moved to mandatory non-skippable vitest route-handler unit file (src/app/api/tasks/__tests__/queue-route.test.ts); Playwright tests for those two paths are test.skip with TODO pointers
 
 ### Pending Todos
 

@@ -19,7 +19,7 @@ Requirements for milestone v1.3. Each maps to roadmap phases.
 
 ### Queue (P0 — project-scoped queue primitives)
 
-- [ ] **QUEUE-01**: `GET /api/tasks/queue` accepts optional `project_id`, `gsd_plan_id`, and `wave` query parameters, applied consistently to current-in-progress lookup, capacity checks, and the atomic claim subquery. Backward-compatible when params absent. Reflected in `openapi.json`, `scripts/mc-cli.cjs`, and `scripts/mc-mcp-server.cjs`.
+- [x] **QUEUE-01**: `GET /api/tasks/queue` accepts optional `project_id`, `gsd_plan_id`, and `wave` query parameters, applied consistently to current-in-progress lookup, capacity checks, and the atomic claim subquery. Backward-compatible when params absent. Reflected in `openapi.json`, `scripts/mc-cli.cjs`, and `scripts/mc-mcp-server.cjs`.
 - [x] **QUEUE-02**: `POST /api/gsd/plans/:id/transition` to `in_progress` transitions linked execution tasks (`gsd_plan_id=planId`) from backlog-style states into `inbox` or `assigned` based on assignee, emits `gsd.plan.tasks_activated` with counts, and returns a `queue_activation` payload. Existing dependency, gate, and same-wave conflict checks continue to gate activation.
 
 ### Route (P0 — scheduler behavior + blocker contract)
@@ -50,7 +50,7 @@ Requirements for milestone v1.3. Each maps to roadmap phases.
 
 ### Compat (back-compat guardrails)
 
-- [ ] **COMPAT-01**: Existing workspace-level queue polling (no scoping params) continues to return the same result set and respect the same capacity semantics as before v1.3.
+- [x] **COMPAT-01**: Existing workspace-level queue polling (no scoping params) continues to return the same result set and respect the same capacity semantics as before v1.3.
 - [ ] **COMPAT-02**: Recipe fast-path dispatch behavior is unchanged by the lane-awareness introduced in ROUTE-01 (same claim order, same recipe resolution, same event shape).
 - [ ] **COMPAT-03**: Legacy dispatch retry and failure semantics (`assigned ↔ in_progress → failed/review`) are preserved; the ROUTE-02 blocker contract is additive, not a replacement for existing retry/fail transitions.
 - [ ] **COMPAT-04**: MCP callers that omit the new routing fields introduced in MCP-01/MCP-02 continue to function identically to their pre-v1.3 behavior (no required-field additions on existing call sites).
@@ -98,7 +98,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QUEUE-01 | Phase 19 | Pending |
+| QUEUE-01 | Phase 19 | Complete |
 | QUEUE-02 | Phase 19 | Complete |
 | ROUTE-01 | Phase 20 | Pending |
 | ROUTE-02 | Phase 20 | Pending |
@@ -111,7 +111,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | TESTS-02 | Phase 22 | Pending |
 | TESTS-03 | Phase 22 | Pending |
 | ACCEPT-01 | Phase 23 | Pending |
-| COMPAT-01 | Phase 19 | Pending |
+| COMPAT-01 | Phase 19 | Complete |
 | COMPAT-02 | Phase 20 | Pending |
 | COMPAT-03 | Phase 20 | Pending |
 | COMPAT-04 | Phase 21 | Pending |
