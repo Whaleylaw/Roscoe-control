@@ -148,9 +148,136 @@ export async function POST(
       }
     }
 
-    db.prepare(`UPDATE gsd_plans SET status = ?, updated_at = unixepoch() WHERE id = ?`).run(toStatus, planId)
+    type QueueActivation = {
+      activated: number
+      already_active: number
+      skipped_by_state: number
+      reassigned: number
+      by_status: { inbox: number; assigned: number }
+      task_ids: number[]
+    }
+
+    let queueActivation: QueueActivation | null = null
+
+    if (toStatus === 'in_progress') {
+      const projectId = Number(current.project_id)
+
+      // Phase 19 QUEUE-02 — one SQLite transaction wraps plan status flip + all task activations.
+      const runActivation = db.transaction((): QueueActivation => {
+        // 1. Flip plan status inside the transaction so real errors roll it back.
+        db.prepare(
+          `UPDATE gsd_plans SET status = ?, updated_at = unixepoch() WHERE id = ?`,
+        ).run(toStatus, planId)
+
+        // 2. Fetch ALL tasks linked to the plan (not just activatable ones) so we can bucket them.
+        const linkedTasks = db.prepare(
+          `SELECT id, status, assigned_to, recipe_slug
+           FROM tasks
+           WHERE workspace_id = ?
+             AND project_id = ?
+             AND gsd_plan_id = ?
+           ORDER BY created_at ASC, id ASC`,
+        ).all(workspaceId, projectId, planId) as Array<{
+          id: number
+          status: string
+          assigned_to: string | null
+          recipe_slug: string | null
+        }>
+
+        const counters: QueueActivation = {
+          activated: 0,
+          already_active: 0,
+          skipped_by_state: 0,
+          reassigned: 0,
+          by_status: { inbox: 0, assigned: 0 },
+          task_ids: [],
+        }
+
+        // Dead-assignee predicate: agent row with status = 'error' OR no matching agent row.
+        // Schema note: agents.status enum is (offline | idle | busy | error) — no `disabled` value,
+        // so CONTEXT.md's `disabled` predicate is mapped to `error` for Phase 19. Transient states
+        // (offline, idle, busy) may legitimately come back and are NOT treated as dead.
+        const lookupAgent = db.prepare(
+          `SELECT status FROM agents WHERE name = ? LIMIT 1`,
+        )
+        const updateActivate = db.prepare(
+          `UPDATE tasks
+           SET status = ?, assigned_to = ?, updated_at = unixepoch()
+           WHERE id = ?
+             AND status IN ('backlog', 'todo')`,
+        )
+
+        for (const row of linkedTasks) {
+          const currentStatus = row.status
+          if (currentStatus === 'backlog' || currentStatus === 'todo') {
+            let targetStatus: 'inbox' | 'assigned'
+            let nextAssignedTo: string | null = row.assigned_to
+            let reassigned = false
+
+            const hasAssignee = row.assigned_to != null && row.assigned_to !== ''
+            const hasRecipe = row.recipe_slug != null && row.recipe_slug !== ''
+
+            if (hasAssignee || hasRecipe) {
+              targetStatus = 'assigned'
+            } else {
+              targetStatus = 'inbox'
+            }
+
+            // Dead-assignee recovery: only when there IS a named assignee AND no recipe override.
+            // Recipe-tagged tasks route to `assigned` with a null assigned_to via the runner-token path
+            // and are NOT subject to the agent-alive check (runner claims by recipe slug, not agent name).
+            if (hasAssignee && !hasRecipe) {
+              const agent = lookupAgent.get(row.assigned_to) as { status?: string } | undefined
+              const agentDead = !agent || agent.status === 'error'
+              if (agentDead) {
+                targetStatus = 'inbox'
+                nextAssignedTo = null
+                reassigned = true
+              }
+            }
+
+            // Recipe-alone branch: preserve the null sentinel (do NOT synthesize an assignee).
+            if (!hasAssignee && hasRecipe) {
+              nextAssignedTo = null
+            }
+
+            const result = updateActivate.run(targetStatus, nextAssignedTo, row.id)
+            if (result.changes > 0) {
+              counters.activated += 1
+              counters.task_ids.push(row.id)
+              counters.by_status[targetStatus] += 1
+              if (reassigned) counters.reassigned += 1
+            }
+          } else if (currentStatus === 'inbox' || currentStatus === 'assigned') {
+            counters.already_active += 1
+          } else {
+            counters.skipped_by_state += 1
+          }
+        }
+
+        return counters
+      })
+
+      queueActivation = runActivation()
+    } else {
+      // Non-in_progress transitions: flip plan status outside any activation transaction.
+      db.prepare(`UPDATE gsd_plans SET status = ?, updated_at = unixepoch() WHERE id = ?`).run(toStatus, planId)
+    }
 
     const plan = getPlanInWorkspace(db, planId, workspaceId)
+
+    // Emit activation event AFTER the transaction commits, with the same payload shape as the response.
+    if (toStatus === 'in_progress' && queueActivation) {
+      eventBus.broadcast('gsd.plan.tasks_activated', {
+        project_id: Number(current.project_id),
+        plan_id: planId,
+        phase_id: current.phase_id,
+        queue_activation: queueActivation,
+        actor: auth.user.username,
+        workspace_id: workspaceId,
+      })
+    }
+
     eventBus.broadcast('gsd.plan.transitioned', {
       project_id: Number(current.project_id),
       plan_id: planId,
@@ -160,7 +287,12 @@ export async function POST(
       actor: auth.user.username,
       workspace_id: workspaceId,
     })
-    return NextResponse.json({ plan, from_status: fromStatus, to_status: toStatus })
+    return NextResponse.json({
+      plan,
+      from_status: fromStatus,
+      to_status: toStatus,
+      queue_activation: queueActivation,
+    })
   } catch (error) {
     if (error instanceof ForbiddenError) {
       return NextResponse.json({ error: error.message }, { status: error.status })

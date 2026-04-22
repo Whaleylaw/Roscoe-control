@@ -59,6 +59,7 @@ export type EventType =
   | 'task.checkpoint_added'     // SCHED-06 — emitted from POST /api/tasks/:id/checkpoints
   | 'recipe.indexed'            // SCHED-06 — emitted from recipe-watcher scheduleReindex
   | 'recipe.removed'            // SCHED-06 — emitted from recipe-watcher scheduleReindex
+  | 'gsd.plan.tasks_activated'  // Phase 19 QUEUE-02 — plan transition auto-activates linked tasks
 
 class ServerEventBus extends EventEmitter {
   private static instance: ServerEventBus | null = null
