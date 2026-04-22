@@ -255,8 +255,17 @@ describe('Phase 15 end-to-end: blocker → awaiting_owner → resume → progres
     // Broadcasts: task.status_changed (reason='blocked_checkpoint') AND
     // task.checkpoint_added (with blocker_reason). Status_changed fires FIRST
     // per Plan 15-05's cause-before-effect ordering.
+    //
+    // Plan 20-03 ROUTE-02 (Phase 20): the recipe checkpoint blocker branch
+    // now appends a third `task.blocker_transition` broadcast AFTER the
+    // existing pair. This is purely additive — the first two emissions are
+    // byte-identical to pre-20-03 behavior.
     const types = broadcastMock.mock.calls.map((c) => c[0])
-    expect(types).toEqual(['task.status_changed', 'task.checkpoint_added'])
+    expect(types).toEqual([
+      'task.status_changed',
+      'task.checkpoint_added',
+      'task.blocker_transition',
+    ])
     const checkpointFrame = broadcastMock.mock.calls.find(
       (c) => c[0] === 'task.checkpoint_added',
     )

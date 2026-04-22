@@ -214,8 +214,11 @@ describe('POST /api/tasks/:id/checkpoints — blocker branch (Plan 15-05)', () =
     const line = JSON.parse(fs.readFileSync(jsonlPath, 'utf8').trim())
     expect(line.blocker_reason).toBe('Missing ANTHROPIC_API_KEY in environment')
 
-    // Two broadcasts: task.status_changed (first) + task.checkpoint_added.
-    expect(broadcastMock).toHaveBeenCalledTimes(2)
+    // Three broadcasts: task.status_changed (first) + task.checkpoint_added
+    // + task.blocker_transition (added by Plan 20-03 ROUTE-02; additive —
+    // fires AFTER the pre-existing pair, payload conforms to the 10-key
+    // shape shared with the legacy PUT emission sites).
+    expect(broadcastMock).toHaveBeenCalledTimes(3)
     const [statusChangedType, statusChangedPayload] = broadcastMock.mock.calls[0]
     expect(statusChangedType).toBe('task.status_changed')
     expect(statusChangedPayload).toMatchObject({
@@ -234,6 +237,21 @@ describe('POST /api/tasks/:id/checkpoints — blocker branch (Plan 15-05)', () =
       blocker_reason: 'Missing ANTHROPIC_API_KEY in environment',
       workspace_id: 1,
     })
+    const [blockerType, blockerPayload] = broadcastMock.mock.calls[2]
+    expect(blockerType).toBe('task.blocker_transition')
+    expect(blockerPayload).toMatchObject({
+      task_id: 42,
+      workspace_id: 1,
+      direction: 'paused',
+      previous_status: 'in_progress',
+      status: 'awaiting_owner',
+      blocker_reason: 'Missing ANTHROPIC_API_KEY in environment',
+      blocker_kind: null,
+      resume_hint: null,
+      source: 'recipe',
+      attempt: 2,
+    })
+    expect(typeof blockerPayload.ts).toBe('number')
   })
 
   it('status=blocked but task status is not in_progress (race) → 409; tasks + comments + checkpoint all unchanged; JSONL back to pre-call size', async () => {

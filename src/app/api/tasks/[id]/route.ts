@@ -537,14 +537,62 @@ export async function PUT(
         // clients that listen on task.updated still see this pause. Keeps shape
         // consistent with the generic broadcast emitted at the end of this PUT.
         eventBus.broadcast('task.updated', freshTask)
-        // Plan 20-03 will add a third `task.blocker_transition` broadcast here,
-        // after both broadcasts above.
+        // Plan 20-03 ROUTE-02 — unified blocker pause event. Fires AFTER both
+        // broadcasts above. 10-key payload shared with the recipe emission site
+        // in src/app/api/tasks/[id]/checkpoints/route.ts. Additive — does not
+        // modify or reorder the broadcasts above.
+        eventBus.broadcast('task.blocker_transition', {
+          task_id: taskId,
+          workspace_id: workspaceId,
+          direction: 'paused',
+          previous_status: 'in_progress',
+          status: 'awaiting_owner',
+          blocker_reason: body.blocker_reason!.trim(),
+          blocker_kind: body.blocker_kind!,
+          resume_hint: body.resume_hint!.trim(),
+          source: 'legacy',
+          attempt: null,
+          ts: now,
+        })
 
         return NextResponse.json({ task: freshTask })
       }
 
       // --- Resume branch: awaiting_owner → assigned (legacy only) ---------
       if (normalizedStatus === 'assigned' && currentTask.status === 'awaiting_owner' && !isRecipe) {
+        // Plan 20-03 ROUTE-02 — capture the pre-clear blocker envelope BEFORE
+        // the transaction runs, because the UPDATE wipes runner_last_failure_reason
+        // to NULL. currentTask holds the pre-clear row value (frozen from the
+        // SELECT at line 185). The captured envelope is used in the
+        // task.blocker_transition broadcast so observers still see what the
+        // blocker WAS at resume time.
+        let priorEnvelope: {
+          blocker_reason: string | null
+          blocker_kind: string | null
+          resume_hint: string | null
+        } = { blocker_reason: null, blocker_kind: null, resume_hint: null }
+        const rawPriorReason = (currentTask as unknown as {
+          runner_last_failure_reason: string | null
+        }).runner_last_failure_reason
+        if (rawPriorReason) {
+          try {
+            const parsed = JSON.parse(rawPriorReason)
+            if (parsed && typeof parsed === 'object') {
+              priorEnvelope = {
+                blocker_reason:
+                  typeof parsed.blocker_reason === 'string' ? parsed.blocker_reason : null,
+                blocker_kind:
+                  typeof parsed.blocker_kind === 'string' ? parsed.blocker_kind : null,
+                resume_hint:
+                  typeof parsed.resume_hint === 'string' ? parsed.resume_hint : null,
+              }
+            }
+          } catch {
+            // Pre-v1.3 legacy data may have a free-text string here. Leave null —
+            // observers cope.
+          }
+        }
+
         // No required fields on resume — owner just clears the pause.
         const runResume = db.transaction(() => {
           const upd = db.prepare(
@@ -587,8 +635,24 @@ export async function PUT(
         // Mirror the existing generic-write-path `task.updated` broadcast so
         // task.updated subscribers still see this resume.
         eventBus.broadcast('task.updated', freshTask)
-        // Plan 20-03 will add a third `task.blocker_transition` broadcast here,
-        // after both broadcasts above.
+        // Plan 20-03 ROUTE-02 — unified blocker resume event. Fires AFTER both
+        // broadcasts above. priorEnvelope carries the pre-clear envelope context
+        // so observers see what the blocker WAS (UPDATE above already cleared
+        // the column to NULL). Additive — does not modify or reorder the
+        // broadcasts above.
+        eventBus.broadcast('task.blocker_transition', {
+          task_id: taskId,
+          workspace_id: workspaceId,
+          direction: 'resumed',
+          previous_status: 'awaiting_owner',
+          status: 'assigned',
+          blocker_reason: priorEnvelope.blocker_reason,
+          blocker_kind: priorEnvelope.blocker_kind,
+          resume_hint: priorEnvelope.resume_hint,
+          source: 'legacy',
+          attempt: null,
+          ts: now,
+        })
 
         return NextResponse.json({ task: freshTask })
       }
@@ -861,6 +925,52 @@ export async function PUT(
 
     // Broadcast to SSE clients
     eventBus.broadcast('task.updated', parsedTask);
+
+    // Plan 20-03 ROUTE-02 — recipe resume detection (Site 4).
+    // Only the awaiting_owner → assigned flip on a recipe-tagged task emits
+    // the unified blocker event from this generic write path. Other generic
+    // PUTs (backlog → inbox, review → done, etc.) do NOT emit this event.
+    //
+    // Column-clear policy — LOCKED per 20-CONTEXT.md option A: this path does
+    // NOT clear runner_last_failure_reason. The recipe path's `blocked:<reason>`
+    // string is self-healing — the next blocker checkpoint POST via
+    // writeCheckpoint rewrites the column atomically (see
+    // src/app/api/tasks/[id]/checkpoints/route.ts:170-183). A stale
+    // `blocked:<reason>` between resume and the next blocker cycle is
+    // acceptable; observers that care about "is this task currently blocked"
+    // check `status`, not runner_last_failure_reason.
+    if (
+      currentTask.status === 'awaiting_owner' &&
+      normalizedStatus === 'assigned' &&
+      (currentTask as unknown as { recipe_slug: string | null }).recipe_slug != null &&
+      (currentTask as unknown as { recipe_slug: string }).recipe_slug !== ''
+    ) {
+      // Best-effort reason extraction: recipe path stores `blocked:<reason>`
+      // or older formats. Strip the known prefix when present; otherwise pass
+      // the raw string. Missing field → null.
+      let priorReason: string | null = null
+      const raw = (currentTask as unknown as { runner_last_failure_reason: string | null })
+        .runner_last_failure_reason
+      if (typeof raw === 'string' && raw.length > 0) {
+        priorReason = raw.startsWith('blocked:') ? raw.slice('blocked:'.length) : raw
+      }
+
+      eventBus.broadcast('task.blocker_transition', {
+        task_id: taskId,
+        workspace_id: workspaceId,
+        direction: 'resumed',
+        previous_status: 'awaiting_owner',
+        status: 'assigned',
+        blocker_reason: priorReason,
+        blocker_kind: null,
+        resume_hint: null,
+        source: 'recipe',
+        attempt:
+          ((currentTask as unknown as { runner_attempts: number | null | undefined })
+            .runner_attempts ?? null),
+        ts: now,
+      })
+    }
 
     return NextResponse.json({ task: parsedTask });
   } catch (error) {

@@ -255,6 +255,27 @@ export async function POST(
       : {}),
   })
 
+  // Plan 20-03 ROUTE-02 — unified blocker pause event. Fires AFTER the existing
+  // task.status_changed + task.checkpoint_added pair so observers see the
+  // discriminator last. Payload shape is the 10-key contract shared with the
+  // legacy PUT emission sites in src/app/api/tasks/[id]/route.ts. Additive —
+  // does not modify or reorder the broadcasts above.
+  if (body.status === 'blocked') {
+    eventBus.broadcast('task.blocker_transition', {
+      task_id: taskId,
+      workspace_id: task.workspace_id,
+      direction: 'paused',
+      previous_status: 'in_progress',
+      status: 'awaiting_owner',
+      blocker_reason: body.blocker_reason!.trim(),
+      blocker_kind: null,
+      resume_hint: null,
+      source: 'recipe',
+      attempt,
+      ts: inserted.nowUnix,
+    })
+  }
+
   return NextResponse.json(
     {
       id: inserted.id,
