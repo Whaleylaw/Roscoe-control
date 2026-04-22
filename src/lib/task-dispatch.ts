@@ -1112,18 +1112,87 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
 
   // -------------------------------------------------------------------------
   // Legacy path — affinity-scored inbox tasks (recipe-tagged rows excluded).
+  //
+  // Phase 20 / ROUTE-01: two-pass lane-aware preference.
+  //   Pass 1 (lane-scoped): legacy inbox rows linked to any gsd_plan whose
+  //           status = 'in_progress'. Emitted with reason 'auto_route_lane_scoped'.
+  //   Pass 2 (unscoped fallback): the remaining inbox rows (LIMIT 5 - pass1_rows).
+  //           Emitted with reason 'auto_route_legacy_fallback'.
+  // The combined batch cap is 5/tick (v1.2 parity). The recipe fast-path above
+  // is BYTE-FOR-BYTE unchanged (COMPAT-02 lock).
   // -------------------------------------------------------------------------
-  const inboxTasks = db.prepare(`
-    SELECT id, title, description, priority, tags, workspace_id
-    FROM tasks
-    WHERE status = 'inbox' AND assigned_to IS NULL AND recipe_slug IS NULL
-    ORDER BY
-      CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC,
-      created_at ASC
-    LIMIT 5
-  `).all() as Array<{ id: number; title: string; description: string | null; priority: string; tags: string | null; workspace_id: number }>
+  const activePlanRows = db.prepare(
+    `SELECT id FROM gsd_plans WHERE status = 'in_progress'`,
+  ).all() as Array<{ id: number }>
+  const activePlanIds = activePlanRows.map(r => r.id)
 
-  if (inboxTasks.length === 0) {
+  type LegacyInboxRow = {
+    id: number
+    title: string
+    description: string | null
+    priority: string
+    tags: string | null
+    workspace_id: number
+    gsd_plan_id: number | null
+  }
+
+  const LANE_COLUMNS = 'id, title, description, priority, tags, workspace_id, gsd_plan_id'
+  const ORDER_CLAUSE = "ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC, created_at ASC"
+  const LEGACY_BATCH_CAP = 5
+
+  let laneRows: LegacyInboxRow[] = []
+  if (activePlanIds.length > 0) {
+    const inPlaceholders = activePlanIds.map(() => '?').join(',')
+    const laneSql = `
+      SELECT ${LANE_COLUMNS}
+      FROM tasks
+      WHERE status = 'inbox'
+        AND assigned_to IS NULL
+        AND recipe_slug IS NULL
+        AND gsd_plan_id IN (${inPlaceholders})
+      ${ORDER_CLAUSE}
+      LIMIT ${LEGACY_BATCH_CAP}
+    `
+    laneRows = db.prepare(laneSql).all(...activePlanIds) as LegacyInboxRow[]
+  }
+
+  const remainingBudget = LEGACY_BATCH_CAP - laneRows.length
+  const consumedIds = laneRows.map(r => r.id)
+
+  let unscopedRows: LegacyInboxRow[] = []
+  if (remainingBudget > 0) {
+    const clauses = [
+      "status = 'inbox'",
+      'assigned_to IS NULL',
+      'recipe_slug IS NULL',
+    ]
+    const params: Array<number> = []
+
+    if (activePlanIds.length > 0) {
+      const inPlaceholders = activePlanIds.map(() => '?').join(',')
+      clauses.push(`(gsd_plan_id IS NULL OR gsd_plan_id NOT IN (${inPlaceholders}))`)
+      params.push(...activePlanIds)
+    }
+
+    if (consumedIds.length > 0) {
+      const idPlaceholders = consumedIds.map(() => '?').join(',')
+      clauses.push(`id NOT IN (${idPlaceholders})`)
+      params.push(...consumedIds)
+    }
+
+    const unscopedSql = `
+      SELECT ${LANE_COLUMNS}
+      FROM tasks
+      WHERE ${clauses.join(' AND ')}
+      ${ORDER_CLAUSE}
+      LIMIT ?
+    `
+    params.push(remainingBudget)
+    unscopedRows = db.prepare(unscopedSql).all(...params) as LegacyInboxRow[]
+  }
+
+  const candidateCount = laneRows.length + unscopedRows.length
+  if (candidateCount === 0) {
     if (recipeRouted > 0) {
       return { ok: true, message: `Routed ${recipeRouted} recipe-tagged task(s); no legacy inbox tasks to route` }
     }
@@ -1140,80 +1209,102 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
 
   if (agents.length === 0) {
     const prefix = recipeRouted > 0 ? `Routed ${recipeRouted} recipe-tagged; ` : ''
-    return { ok: true, message: `${prefix}${inboxTasks.length} inbox task(s) but no available agents` }
+    return { ok: true, message: `${prefix}${candidateCount} inbox task(s) but no available agents` }
   }
 
   let routed = 0
+  let laneRouted = 0
+  let fallbackRouted = 0
   const now = Math.floor(Date.now() / 1000)
 
-  for (const task of inboxTasks) {
-    const taskText = `${task.title} ${task.description || ''}`
-    let parsedTags: string[] = []
-    if (task.tags) {
-      try { parsedTags = JSON.parse(task.tags) } catch { /* ignore */ }
-    }
-    const fullText = `${taskText} ${parsedTags.join(' ')}`
+  const passes: Array<{ rows: LegacyInboxRow[]; reason: 'auto_route_lane_scoped' | 'auto_route_legacy_fallback' }> = [
+    { rows: laneRows, reason: 'auto_route_lane_scoped' },
+    { rows: unscopedRows, reason: 'auto_route_legacy_fallback' },
+  ]
 
-    // Score each agent
-    const scored = agents
-      .map(a => ({ agent: a, score: scoreAgentForTask(a, fullText) }))
-      .filter(s => s.score > 0)
-      .sort((a, b) => b.score - a.score)
+  for (const pass of passes) {
+    for (const task of pass.rows) {
+      const routeReason = pass.reason
+      const taskText = `${task.title} ${task.description || ''}`
+      let parsedTags: string[] = []
+      if (task.tags) {
+        try { parsedTags = JSON.parse(task.tags) } catch { /* ignore */ }
+      }
+      const fullText = `${taskText} ${parsedTags.join(' ')}`
 
-    if (scored.length === 0) continue
+      // Score each agent
+      const scored = agents
+        .map(a => ({ agent: a, score: scoreAgentForTask(a, fullText) }))
+        .filter(s => s.score > 0)
+        .sort((a, b) => b.score - a.score)
 
-    const best = scored[0].agent
+      if (scored.length === 0) continue
 
-    // Check capacity — skip agents with 3+ in-progress tasks
-    const inProgressCount = (db.prepare(
-      'SELECT COUNT(*) as c FROM tasks WHERE assigned_to = ? AND status = \'in_progress\' AND workspace_id = ?'
-    ).get(best.name, task.workspace_id) as { c: number }).c
+      const best = scored[0].agent
 
-    if (inProgressCount >= 3) {
-      // Try next best agent
-      const alt = scored.find(s => {
-        const c = (db.prepare(
-          'SELECT COUNT(*) as c FROM tasks WHERE assigned_to = ? AND status = \'in_progress\' AND workspace_id = ?'
-        ).get(s.agent.name, task.workspace_id) as { c: number }).c
-        return c < 3
-      })
-      if (!alt) continue // all agents at capacity
-      db.prepare('UPDATE tasks SET status = ?, assigned_to = ?, updated_at = ? WHERE id = ?')
-        .run('assigned', alt.agent.name, now, task.id)
+      // Check capacity — skip agents with 3+ in-progress tasks
+      const inProgressCount = (db.prepare(
+        'SELECT COUNT(*) as c FROM tasks WHERE assigned_to = ? AND status = \'in_progress\' AND workspace_id = ?'
+      ).get(best.name, task.workspace_id) as { c: number }).c
+
+      if (inProgressCount >= 3) {
+        // Try next best agent
+        const alt = scored.find(s => {
+          const c = (db.prepare(
+            'SELECT COUNT(*) as c FROM tasks WHERE assigned_to = ? AND status = \'in_progress\' AND workspace_id = ?'
+          ).get(s.agent.name, task.workspace_id) as { c: number }).c
+          return c < 3
+        })
+        if (!alt) continue // all agents at capacity
+        const altUpd = db.prepare(
+          `UPDATE tasks SET status = ?, assigned_to = ?, updated_at = ? WHERE id = ? AND status = 'inbox'`,
+        ).run('assigned', alt.agent.name, now, task.id)
+        if (altUpd.changes === 0) continue // Racing tick already flipped this row.
+
+        db_helpers.logActivity('task_auto_routed', 'task', task.id, 'scheduler',
+          `Auto-assigned "${task.title}" to ${alt.agent.name} (${alt.agent.role}, score: ${alt.score})`,
+          { agent: alt.agent.name, role: alt.agent.role, score: alt.score, route_reason: routeReason },
+          task.workspace_id)
+
+        eventBus.broadcast('task.status_changed', { id: task.id, status: 'assigned', previous_status: 'inbox', assigned_to: alt.agent.name, reason: routeReason })
+        syncAndEscalateIfFailed(task as any, 'assigned')
+        routed++
+        if (routeReason === 'auto_route_lane_scoped') laneRouted++
+        else fallbackRouted++
+        continue
+      }
+
+      const primaryUpd = db.prepare(
+        `UPDATE tasks SET status = ?, assigned_to = ?, updated_at = ? WHERE id = ? AND status = 'inbox'`,
+      ).run('assigned', best.name, now, task.id)
+      if (primaryUpd.changes === 0) continue // Racing tick already flipped this row.
 
       db_helpers.logActivity('task_auto_routed', 'task', task.id, 'scheduler',
-        `Auto-assigned "${task.title}" to ${alt.agent.name} (${alt.agent.role}, score: ${alt.score})`,
-        { agent: alt.agent.name, role: alt.agent.role, score: alt.score },
+        `Auto-assigned "${task.title}" to ${best.name} (${best.role}, score: ${scored[0].score})`,
+        { agent: best.name, role: best.role, score: scored[0].score, route_reason: routeReason },
         task.workspace_id)
 
-      eventBus.broadcast('task.status_changed', { id: task.id, status: 'assigned', previous_status: 'inbox', assigned_to: alt.agent.name })
+      eventBus.broadcast('task.status_changed', { id: task.id, status: 'assigned', previous_status: 'inbox', assigned_to: best.name, reason: routeReason })
       syncAndEscalateIfFailed(task as any, 'assigned')
       routed++
-      continue
+      if (routeReason === 'auto_route_lane_scoped') laneRouted++
+      else fallbackRouted++
     }
-
-    db.prepare('UPDATE tasks SET status = ?, assigned_to = ?, updated_at = ? WHERE id = ?')
-      .run('assigned', best.name, now, task.id)
-
-    db_helpers.logActivity('task_auto_routed', 'task', task.id, 'scheduler',
-      `Auto-assigned "${task.title}" to ${best.name} (${best.role}, score: ${scored[0].score})`,
-      { agent: best.name, role: best.role, score: scored[0].score },
-      task.workspace_id)
-
-    eventBus.broadcast('task.status_changed', { id: task.id, status: 'assigned', previous_status: 'inbox', assigned_to: best.name })
-    syncAndEscalateIfFailed(task as any, 'assigned')
-    routed++
   }
+
+  const legacyBreakdown = (laneRouted > 0 || fallbackRouted > 0)
+    ? ` (${laneRouted} lane-scoped, ${fallbackRouted} fallback)`
+    : ''
 
   return {
     ok: true,
     message: recipeRouted > 0
       ? (routed > 0
-        ? `Routed ${recipeRouted} recipe-tagged + ${routed}/${inboxTasks.length} legacy inbox task(s)`
-        : `Routed ${recipeRouted} recipe-tagged; ${inboxTasks.length} legacy inbox task(s), no suitable agents found`)
+        ? `Routed ${recipeRouted} recipe-tagged + ${routed}/${candidateCount} legacy inbox task(s)${legacyBreakdown}`
+        : `Routed ${recipeRouted} recipe-tagged; ${candidateCount} legacy inbox task(s), no suitable agents found`)
       : (routed > 0
-        ? `Auto-routed ${routed}/${inboxTasks.length} inbox task(s)`
-        : `${inboxTasks.length} inbox task(s), no suitable agents found`),
+        ? `Auto-routed ${routed}/${candidateCount} inbox task(s)${legacyBreakdown}`
+        : `${candidateCount} inbox task(s), no suitable agents found`),
   }
 }
 
