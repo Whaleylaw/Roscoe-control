@@ -6,6 +6,20 @@ import { logger } from '@/lib/logger'
 
 type QueueReason = 'continue_current' | 'assigned' | 'at_capacity' | 'no_tasks_available'
 
+type QueueScope = {
+  projectId: number | null
+  gsdPlanId: number | null
+  wave: number | null
+}
+
+function parseOptionalPositiveInt(value: string | null): number | null | 'invalid' {
+  if (value == null || value.trim() === '') return null
+  if (!/^\d+$/.test(value)) return 'invalid'
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) return 'invalid'
+  return parsed
+}
+
 function safeParseJson<T>(raw: string | null | undefined, fallback: T): T {
   if (!raw) return fallback
   try {
@@ -71,15 +85,77 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid max_capacity. Expected integer 1..20.' }, { status: 400 })
     }
 
+    const projectIdParsed = parseOptionalPositiveInt(searchParams.get('project_id'))
+    if (projectIdParsed === 'invalid') {
+      return NextResponse.json({ error: 'Invalid project_id. Expected positive integer.' }, { status: 400 })
+    }
+    const gsdPlanIdParsed = parseOptionalPositiveInt(searchParams.get('gsd_plan_id'))
+    if (gsdPlanIdParsed === 'invalid') {
+      return NextResponse.json({ error: 'Invalid gsd_plan_id. Expected positive integer.' }, { status: 400 })
+    }
+    const waveParsed = parseOptionalPositiveInt(searchParams.get('wave'))
+    if (waveParsed === 'invalid') {
+      return NextResponse.json({ error: 'Invalid wave. Expected positive integer.' }, { status: 400 })
+    }
+
+    const scope: QueueScope = {
+      projectId: projectIdParsed,
+      gsdPlanId: gsdPlanIdParsed,
+      wave: waveParsed,
+    }
+
+    // Cross-filter validation: when BOTH project_id and gsd_plan_id are present,
+    // verify the plan belongs to the requested project. Fail loud (400) rather
+    // than return a silently-empty result set.
+    if (scope.projectId !== null && scope.gsdPlanId !== null) {
+      const planRow = db.prepare(
+        `SELECT p.project_id AS project_id
+         FROM gsd_plans gp
+         JOIN gsd_phases ph ON ph.id = gp.phase_id
+         JOIN gsd_milestones m ON m.id = ph.milestone_id
+         JOIN projects p ON p.id = m.project_id
+         WHERE gp.id = ? AND p.workspace_id = ?`,
+      ).get(scope.gsdPlanId, workspaceId) as { project_id: number } | undefined
+
+      if (!planRow) {
+        return NextResponse.json(
+          { error: `gsd_plan_id ${scope.gsdPlanId} not found` },
+          { status: 400 },
+        )
+      }
+      if (planRow.project_id !== scope.projectId) {
+        return NextResponse.json(
+          {
+            error: `gsd_plan_id ${scope.gsdPlanId} belongs to project ${planRow.project_id}, not requested project_id ${scope.projectId}`,
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     const now = Math.floor(Date.now() / 1000)
 
     const currentTask = db.prepare(`
       SELECT *
       FROM tasks
-      WHERE workspace_id = ? AND assigned_to = ? AND status = 'in_progress'
+      WHERE workspace_id = ?
+        AND assigned_to = ?
+        AND status = 'in_progress'
+        AND (? IS NULL OR project_id = ?)
+        AND (? IS NULL OR gsd_plan_id = ?)
+        AND (? IS NULL OR gsd_plan_id IN (SELECT id FROM gsd_plans WHERE wave = ?))
       ORDER BY updated_at DESC
       LIMIT 1
-    `).get(workspaceId, agent) as any | undefined
+    `).get(
+      workspaceId,
+      agent,
+      scope.projectId,
+      scope.projectId,
+      scope.gsdPlanId,
+      scope.gsdPlanId,
+      scope.wave,
+      scope.wave,
+    ) as any | undefined
 
     if (currentTask) {
       return NextResponse.json({
@@ -93,8 +169,22 @@ export async function GET(request: NextRequest) {
     const inProgressCount = (db.prepare(`
       SELECT COUNT(*) as c
       FROM tasks
-      WHERE workspace_id = ? AND assigned_to = ? AND status = 'in_progress'
-    `).get(workspaceId, agent) as { c: number }).c
+      WHERE workspace_id = ?
+        AND assigned_to = ?
+        AND status = 'in_progress'
+        AND (? IS NULL OR project_id = ?)
+        AND (? IS NULL OR gsd_plan_id = ?)
+        AND (? IS NULL OR gsd_plan_id IN (SELECT id FROM gsd_plans WHERE wave = ?))
+    `).get(
+      workspaceId,
+      agent,
+      scope.projectId,
+      scope.projectId,
+      scope.gsdPlanId,
+      scope.gsdPlanId,
+      scope.wave,
+      scope.wave,
+    ) as { c: number }).c
 
     if (inProgressCount >= maxCapacity) {
       return NextResponse.json({
@@ -114,11 +204,25 @@ export async function GET(request: NextRequest) {
         WHERE workspace_id = ?
           AND status IN ('assigned', 'inbox')
           AND (assigned_to IS NULL OR assigned_to = ?)
+          AND (? IS NULL OR project_id = ?)
+          AND (? IS NULL OR gsd_plan_id = ?)
+          AND (? IS NULL OR gsd_plan_id IN (SELECT id FROM gsd_plans WHERE wave = ?))
         ORDER BY ${priorityRankSql()} ASC, due_date ASC NULLS LAST, created_at ASC
         LIMIT 1
       )
       RETURNING *
-    `).get(agent, now, workspaceId, agent) as any | undefined
+    `).get(
+      agent,
+      now,
+      workspaceId,
+      agent,
+      scope.projectId,
+      scope.projectId,
+      scope.gsdPlanId,
+      scope.gsdPlanId,
+      scope.wave,
+      scope.wave,
+    ) as any | undefined
 
     if (claimed) {
       return NextResponse.json({
