@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     // than return a silently-empty result set.
     if (scope.projectId !== null && scope.gsdPlanId !== null) {
       const planRow = db.prepare(
-        `SELECT p.project_id AS project_id
+        `SELECT p.id AS project_id
          FROM gsd_plans gp
          JOIN gsd_phases ph ON ph.id = gp.phase_id
          JOIN gsd_milestones m ON m.id = ph.milestone_id
