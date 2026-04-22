@@ -20,7 +20,7 @@ Requirements for milestone v1.3. Each maps to roadmap phases.
 ### Queue (P0 — project-scoped queue primitives)
 
 - [ ] **QUEUE-01**: `GET /api/tasks/queue` accepts optional `project_id`, `gsd_plan_id`, and `wave` query parameters, applied consistently to current-in-progress lookup, capacity checks, and the atomic claim subquery. Backward-compatible when params absent. Reflected in `openapi.json`, `scripts/mc-cli.cjs`, and `scripts/mc-mcp-server.cjs`.
-- [ ] **QUEUE-02**: `POST /api/gsd/plans/:id/transition` to `in_progress` transitions linked execution tasks (`gsd_plan_id=planId`) from backlog-style states into `inbox` or `assigned` based on assignee, emits `gsd.plan.tasks_activated` with counts, and returns a `queue_activation` payload. Existing dependency, gate, and same-wave conflict checks continue to gate activation.
+- [x] **QUEUE-02**: `POST /api/gsd/plans/:id/transition` to `in_progress` transitions linked execution tasks (`gsd_plan_id=planId`) from backlog-style states into `inbox` or `assigned` based on assignee, emits `gsd.plan.tasks_activated` with counts, and returns a `queue_activation` payload. Existing dependency, gate, and same-wave conflict checks continue to gate activation.
 
 ### Route (P0 — scheduler behavior + blocker contract)
 
@@ -99,7 +99,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | QUEUE-01 | Phase 19 | Pending |
-| QUEUE-02 | Phase 19 | Pending |
+| QUEUE-02 | Phase 19 | Complete |
 | ROUTE-01 | Phase 20 | Pending |
 | ROUTE-02 | Phase 20 | Pending |
 | MCP-01 | Phase 21 | Pending |

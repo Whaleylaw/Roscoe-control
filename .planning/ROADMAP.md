@@ -78,7 +78,10 @@ Active milestone. Closes the ~20–25% autonomous-routing gap identified in `.pl
   3. Transitioning a plan to `in_progress` via `POST /api/gsd/plans/:id/transition` moves every linked execution task (`gsd_plan_id=planId`) from backlog-style states into `inbox` or `assigned` based on assignee, returns a `queue_activation` payload with counts, and emits `gsd.plan.tasks_activated`.
   4. Plan activation still respects existing dependency, gate, and same-wave conflict checks — a blocked transition does not activate tasks.
   5. `openapi.json`, `scripts/mc-cli.cjs`, and `scripts/mc-mcp-server.cjs` reflect the new scoping params so CLI and MCP callers can drive the scoped queue without raw REST.
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 19-01-PLAN.md — Project/plan/wave scoping + cross-filter validation on GET /api/tasks/queue
+- [ ] 19-02-PLAN.md — Plan-transition activation side effect with full queue_activation payload + gsd.plan.tasks_activated event
+- [ ] 19-03-PLAN.md — OpenAPI/CLI/MCP surface updates for scoping params and queue_activation response
 
 ### Phase 20: Lane-Aware Routing & Unified Blocker Contract
 **Goal**: The default auto-router prefers lifecycle-ready plan lanes over unscoped legacy inbox, and every dispatch path — recipe runner and legacy — supports the same structured owner-intervention pause/resume contract.
@@ -149,7 +152,7 @@ Active milestone. Closes the ~20–25% autonomous-routing gap identified in `.pl
 | 17. Integration Testing & Reference Pipeline | v1.2 | 6/6 | Complete | 2026-04-21 |
 | 18. v1.2 Tech-Debt Cleanup | v1.2 | 4/4 | Complete | 2026-04-21 |
 | 18.1. v1.2 Runtime Documentation | v1.2 | 7/7 | Complete | 2026-04-21 |
-| 19. Project-Scoped Queue & Plan Activation | v1.3 | 0/— | Pending | — |
+| 19. Project-Scoped Queue & Plan Activation | 1/3 | In Progress|  | — |
 | 20. Lane-Aware Routing & Unified Blocker Contract | v1.3 | 0/— | Pending | — |
 | 21. MCP Routing-Field Parity | v1.3 | 0/— | Pending | — |
 | 22. Doc Reconciliation & Test Debt Burn-Down | v1.3 | 0/— | Pending | — |

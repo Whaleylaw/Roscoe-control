@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Autonomous-Routing Parity
-status: roadmap_complete
-last_updated: "2026-04-21T23:15:00.000Z"
+status: in_progress
+last_updated: "2026-04-22T01:22:04.308Z"
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 0
-  completed_plans: 0
+  completed_plans: 1
 ---
 
 # Project State
@@ -22,11 +22,11 @@ See: .planning/PROJECT.md (updated 2026-04-21 — v1.3 Autonomous-Routing Parity
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-21 — Milestone v1.3 Autonomous-Routing Parity started; PROJECT.md updated with Current Milestone section; requirements definition pending.
-Next: Define REQUIREMENTS.md → roadmap via gsd-roadmapper (starting phase 19) → `/gsd:discuss-phase 19`.
+Phase: 19-project-scoped-queue-plan-activation
+Plan: 19-02 complete (QUEUE-02)
+Status: Executing (1 of 3 Phase 19 plans complete)
+Last activity: 2026-04-22 — Plan 19-02 executed: rewrote POST /api/gsd/plans/:id/transition activation for QUEUE-02 spec (four-counter queue_activation payload, single-transaction atomicity, assignee/recipe routing, dead-assignee recovery, gsd.plan.tasks_activated event).
+Next: Execute remaining Phase 19 plans (19-01 queue-scoping, 19-03 CLI/MCP/OpenAPI surface).
 
 ## Performance Metrics
 
@@ -145,6 +145,7 @@ Next: Define REQUIREMENTS.md → roadmap via gsd-roadmapper (starting phase 19) 
 | Phase 18.1-v1-2-runtime-documentation P05 | 3min | 1 tasks | 1 files |
 | Phase 18.1-v1-2-runtime-documentation P06 | 3min | 3 tasks | 4 files |
 | Phase 18.1-v1-2-runtime-documentation P07 | 7min | 3 tasks | 4 files (3 new + 1 mod) + 3 drift-fix |
+| Phase 19-project-scoped-queue-plan-activation P02 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -380,6 +381,10 @@ Recent decisions affecting current work:
 - [Phase 18.1-03]: Append-only Pitfall-10 neutralized with BOTH correct (fs.appendFileSync) AND wrong (fs.writeFileSync) JavaScript examples side-by-side — plan's must-have #5 required appendFileSync in every progress/checkpoints code example; the wrong-example is explicitly marked as a drift-guard, not a runnable alternative.
 - [Phase 18.1-03]: Agent-contract-doc structure (7-step overview → env vars → mount layout → reading order → append-only pitfall → checkpoint HTTP → submit HTTP two-hop → allowlist → lifetime → exit codes → resume → blocker → drift-guards → reference image → related docs) sets the template for any future substrate-contract doc in Mission Control (recipe-level, runner-level, container-level). Reuse pattern: ⚠️ pitfall callouts placed at the location where drift would occur, not in a catch-all warnings section.
 - [Phase 18.1-v1-2-runtime-documentation]: Plan 18.1-06 (DOC-INDEX+README): docs/runtime/INDEX.md created (93 lines) with Mermaid claim→submit→review→done sequence diagram + 6 cross-links; README.md gets 7 new Documentation-table rows + new 'Ephemeral Agent Runtime (v1.2)' feature block; '32 panels' drift fixed to '33+ panels' in 2 places (header card + architecture-tree comment); design-era ⚠️ banner inserted after H1 of 2026-04-18 design spec naming 3 drifts (submit→review, workspace_mode enum, recipe search); docs/cli-agent-control.md gets 'See also — Runtime documentation' section with 5 cross-links. Commits 01b807f, c588a1c, 1102ff0. Zero scope creep — exactly the 4 files from files_modified. Duration 3min.
+- [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Dead-assignee predicate = agents.status='error' OR no matching agent row (schema has no 'disabled' state; transient offline/idle/busy NOT terminal)
+- [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Per-task task.status_changed broadcast dropped during plan activation — no consumer keys on reason='plan_activated'; only gsd.plan.tasks_activated fires (atomic from SSE observer)
+- [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Re-entry idempotence test uses in_progress->review->in_progress; GsdPlanStatus has no 'blocked' state, review->in_progress is the legal path per NEXT_GSD_PLAN_STATUSES
+- [Phase 19-project-scoped-queue-plan-activation]: [Phase 19-02] Plan UPDATE moved INSIDE db.transaction() wrapping task activations so real errors roll the plan flip back too
 
 ### Pending Todos
 
