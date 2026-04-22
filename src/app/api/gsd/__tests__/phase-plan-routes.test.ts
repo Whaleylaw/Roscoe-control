@@ -463,4 +463,381 @@ describe('Phase 10 phase/plan routes', () => {
     const body = await res.json()
     expect(body.plan.status).toBe('in_progress')
   })
+
+  it('POST /api/gsd/plans/:id/transition activates only backlog/todo-sourced tasks; skips awaiting_owner/review/in_progress/failed', async () => {
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+    ).run()
+
+    const statuses: Array<{ title: string; status: string }> = [
+      { title: 'Backlog task', status: 'backlog' },
+      { title: 'Todo task', status: 'todo' },
+      { title: 'Awaiting owner task', status: 'awaiting_owner' },
+      { title: 'Review task', status: 'review' },
+      { title: 'In progress task', status: 'in_progress' },
+      { title: 'Failed task', status: 'failed' },
+    ]
+    for (const row of statuses) {
+      db.prepare(
+        `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+         VALUES (?, ?, 'medium', 1, 1, 1, unixepoch(), unixepoch())`,
+      ).run(row.title, row.status)
+    }
+
+    const current = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+
+    const { POST } = await loadPlanTransition()
+    const res = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'in_progress',
+        expected_updated_at: current.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.plan.status).toBe('in_progress')
+    expect(body.queue_activation.activated).toBe(2)
+    expect(body.queue_activation.skipped_by_state).toBe(4)
+    expect(body.queue_activation.already_active).toBe(0)
+    expect(body.queue_activation.reassigned).toBe(0)
+
+    const backlogRow = db.prepare(`SELECT id FROM tasks WHERE title = 'Backlog task'`).get() as { id: number }
+    const todoRow = db.prepare(`SELECT id FROM tasks WHERE title = 'Todo task'`).get() as { id: number }
+    expect(body.queue_activation.task_ids.sort()).toEqual([backlogRow.id, todoRow.id].sort())
+
+    const allRows = db.prepare(
+      `SELECT title, status FROM tasks WHERE gsd_plan_id = 1 ORDER BY id ASC`,
+    ).all() as Array<{ title: string; status: string }>
+    const byTitle = new Map(allRows.map((r) => [r.title, r.status]))
+    expect(byTitle.get('Backlog task')).toBe('inbox')
+    expect(byTitle.get('Todo task')).toBe('inbox')
+    expect(byTitle.get('Awaiting owner task')).toBe('awaiting_owner')
+    expect(byTitle.get('Review task')).toBe('review')
+    expect(byTitle.get('In progress task')).toBe('in_progress')
+    expect(byTitle.get('Failed task')).toBe('failed')
+  })
+
+  it("POST /api/gsd/plans/:id/transition routes assigned_to tasks to 'assigned', recipe-tagged tasks to 'assigned' without assignee, unassigned to 'inbox'", async () => {
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    // Seed agent 'claude-A' in idle state so the dead-assignee check does NOT fire.
+    db.prepare(
+      `INSERT INTO agents (name, role, status, workspace_id, created_at, updated_at)
+       VALUES ('claude-A', 'developer', 'idle', 1, unixepoch(), unixepoch())`,
+    ).run()
+
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, assigned_to, created_at, updated_at)
+       VALUES ('Assigned task', 'backlog', 'medium', 1, 1, 1, 'claude-A', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, recipe_slug, created_at, updated_at)
+       VALUES ('Recipe task', 'backlog', 'medium', 1, 1, 1, 'generic-agent', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Unassigned task', 'backlog', 'medium', 1, 1, 1, unixepoch(), unixepoch())`,
+    ).run()
+
+    const current = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+
+    const { POST } = await loadPlanTransition()
+    const res = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'in_progress',
+        expected_updated_at: current.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.queue_activation.activated).toBe(3)
+    expect(body.queue_activation.by_status).toEqual({ inbox: 1, assigned: 2 })
+    expect(body.queue_activation.reassigned).toBe(0)
+
+    const assigned = db.prepare(`SELECT status, assigned_to FROM tasks WHERE title = 'Assigned task'`).get() as {
+      status: string
+      assigned_to: string | null
+    }
+    expect(assigned.status).toBe('assigned')
+    expect(assigned.assigned_to).toBe('claude-A')
+
+    const recipe = db.prepare(`SELECT status, assigned_to FROM tasks WHERE title = 'Recipe task'`).get() as {
+      status: string
+      assigned_to: string | null
+    }
+    expect(recipe.status).toBe('assigned')
+    expect(recipe.assigned_to).toBeNull()
+
+    const unassigned = db.prepare(`SELECT status, assigned_to FROM tasks WHERE title = 'Unassigned task'`).get() as {
+      status: string
+      assigned_to: string | null
+    }
+    expect(unassigned.status).toBe('inbox')
+    expect(unassigned.assigned_to).toBeNull()
+  })
+
+  it('POST /api/gsd/plans/:id/transition counts already-inbox/assigned tasks as already_active without re-updating', async () => {
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+    ).run()
+
+    // Seed two already-active tasks with an explicit updated_at in the past so the
+    // idempotent "do nothing" path leaves the timestamp unchanged.
+    const pastTs = 1700000000
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Backlog task', 'backlog', 'medium', 1, 1, 1, unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Inbox task', 'inbox', 'medium', 1, 1, 1, ?, ?)`,
+    ).run(pastTs, pastTs)
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Assigned task', 'assigned', 'medium', 1, 1, 1, ?, ?)`,
+    ).run(pastTs, pastTs)
+
+    const current = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+
+    const { POST } = await loadPlanTransition()
+    const res = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'in_progress',
+        expected_updated_at: current.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.queue_activation.activated).toBe(1)
+    expect(body.queue_activation.already_active).toBe(2)
+    expect(body.queue_activation.skipped_by_state).toBe(0)
+
+    const inboxUpdatedAt = db.prepare(`SELECT updated_at FROM tasks WHERE title = 'Inbox task'`).get() as {
+      updated_at: number
+    }
+    const assignedUpdatedAt = db.prepare(`SELECT updated_at FROM tasks WHERE title = 'Assigned task'`).get() as {
+      updated_at: number
+    }
+    expect(inboxUpdatedAt.updated_at).toBe(pastTs)
+    expect(assignedUpdatedAt.updated_at).toBe(pastTs)
+  })
+
+  it('POST /api/gsd/plans/:id/transition is idempotent on re-entry (in_progress -> review -> in_progress activates zero new tasks)', async () => {
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Backlog task', 'backlog', 'medium', 1, 1, 1, unixepoch(), unixepoch())`,
+    ).run()
+
+    const { POST } = await loadPlanTransition()
+
+    // Transition 1: todo -> in_progress (should activate the one backlog task).
+    const firstLock = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+    const firstRes = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'in_progress',
+        expected_updated_at: firstLock.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+    expect(firstRes.status).toBe(200)
+    const firstBody = await firstRes.json()
+    expect(firstBody.queue_activation.activated).toBe(1)
+
+    // Transition 2: in_progress -> review (valid per NEXT_GSD_PLAN_STATUSES).
+    const secondLock = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+    const secondRes = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'review',
+        expected_updated_at: secondLock.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+    expect(secondRes.status).toBe(200)
+    const secondBody = await secondRes.json()
+    expect(secondBody.queue_activation).toBeNull()
+
+    // Transition 3: review -> in_progress. The task is already inbox, so activated=0, already_active=1.
+    const thirdLock = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+    const thirdRes = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'in_progress',
+        expected_updated_at: thirdLock.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+    expect(thirdRes.status).toBe(200)
+    const thirdBody = await thirdRes.json()
+    expect(thirdBody.queue_activation.activated).toBe(0)
+    expect(thirdBody.queue_activation.already_active).toBe(1)
+
+    const finalTask = db.prepare(`SELECT status FROM tasks WHERE title = 'Backlog task'`).get() as { status: string }
+    expect(finalTask.status).toBe('inbox')
+  })
+
+  it('POST /api/gsd/plans/:id/transition gate-blocked transition performs NO activation', async () => {
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    // Undone gate task linked to the plan — triggers GATE_BLOCKED pre-write guard.
+    db.prepare(
+      `INSERT INTO tasks (project_id, workspace_id, title, status, priority, gate_required, gate_status, gsd_plan_id, created_at, updated_at)
+       VALUES (1, 1, 'Gate review', 'review', 'high', 1, 'pending', 1, unixepoch(), unixepoch())`,
+    ).run()
+    // Activation-eligible backlog task linked to same plan — MUST remain backlog if the guard fires.
+    db.prepare(
+      `INSERT INTO tasks (project_id, workspace_id, title, status, priority, gsd_plan_id, created_at, updated_at)
+       VALUES (1, 1, 'Backlog task', 'backlog', 'medium', 1, unixepoch(), unixepoch())`,
+    ).run()
+
+    const { POST } = await loadPlanTransition()
+    const res = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', { to_status: 'in_progress' }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.code).toBe('GATE_BLOCKED')
+
+    // Plan status unchanged.
+    const planAfter = db.prepare(`SELECT status FROM gsd_plans WHERE id = 1`).get() as { status: string }
+    expect(planAfter.status).toBe('todo')
+
+    // Backlog task unchanged.
+    const backlogAfter = db.prepare(`SELECT status FROM tasks WHERE title = 'Backlog task'`).get() as {
+      status: string
+    }
+    expect(backlogAfter.status).toBe('backlog')
+  })
+
+  it('POST /api/gsd/plans/:id/transition emits gsd.plan.tasks_activated event with full queue_activation payload', async () => {
+    const { eventBus } = await import('@/lib/event-bus')
+    const broadcastSpy = vi.spyOn(eventBus, 'broadcast')
+
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Backlog task', 'backlog', 'medium', 1, 1, 1, unixepoch(), unixepoch())`,
+    ).run()
+
+    const current = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+
+    const { POST } = await loadPlanTransition()
+    const res = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'in_progress',
+        expected_updated_at: current.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+    expect(res.status).toBe(200)
+
+    const backlogTask = db.prepare(`SELECT id FROM tasks WHERE title = 'Backlog task'`).get() as { id: number }
+
+    const activationCalls = broadcastSpy.mock.calls.filter((call) => call[0] === 'gsd.plan.tasks_activated')
+    expect(activationCalls.length).toBe(1)
+    const payload = activationCalls[0][1] as {
+      plan_id: number
+      queue_activation: {
+        activated: number
+        already_active: number
+        skipped_by_state: number
+        reassigned: number
+        by_status: { inbox: number; assigned: number }
+        task_ids: number[]
+      }
+    }
+    expect(payload.plan_id).toBe(1)
+    expect(payload.queue_activation).toEqual({
+      activated: 1,
+      already_active: 0,
+      skipped_by_state: 0,
+      reassigned: 0,
+      by_status: { inbox: 1, assigned: 0 },
+      task_ids: [backlogTask.id],
+    })
+
+    broadcastSpy.mockRestore()
+  })
+
+  it('POST /api/gsd/plans/:id/transition returns queue_activation: null for non-in_progress transitions', async () => {
+    db.prepare(
+      `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+       VALUES (1, '20', 'phase-20', 'execute', 20, 'active', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    db.prepare(
+      `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+       VALUES (1, '20-01', 'Execution', 1, 'in_progress', '[]', unixepoch(), unixepoch())`,
+    ).run()
+    // Seed a backlog task linked to the plan — it would be eligible IF this were a transition TO in_progress,
+    // but because we're going in_progress -> done the activation path MUST NOT run.
+    db.prepare(
+      `INSERT INTO tasks (title, status, priority, project_id, workspace_id, gsd_plan_id, created_at, updated_at)
+       VALUES ('Backlog task', 'backlog', 'medium', 1, 1, 1, unixepoch(), unixepoch())`,
+    ).run()
+
+    const current = db.prepare(`SELECT updated_at FROM gsd_plans WHERE id = 1`).get() as { updated_at: number }
+
+    const { POST } = await loadPlanTransition()
+    const res = await POST(
+      req('/api/gsd/plans/1/transition', 'POST', {
+        to_status: 'done',
+        expected_updated_at: current.updated_at,
+      }),
+      { params: Promise.resolve({ plan_id: '1' }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.plan.status).toBe('done')
+    expect(body.queue_activation).toBeNull()
+
+    // Backlog task UNCHANGED.
+    const backlogAfter = db.prepare(`SELECT status FROM tasks WHERE title = 'Backlog task'`).get() as {
+      status: string
+    }
+    expect(backlogAfter.status).toBe('backlog')
+  })
 })
