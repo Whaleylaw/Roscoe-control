@@ -432,6 +432,174 @@ export async function PUT(
           { status: 403 }
         )
       }
+
+      // -----------------------------------------------------------------------
+      // Phase 20 Plan 20-02 (ROUTE-02, COMPAT-03) — legacy blocker contract branch.
+      //
+      // Fires ONLY when the PUT is targeting a legacy pause (in_progress → awaiting_owner)
+      // or a legacy resume (awaiting_owner → assigned). Both transitions own the
+      // status write and the runner_last_failure_reason envelope write atomically
+      // inside one db.transaction() and return early, short-circuiting the generic
+      // fieldsToUpdate write path below.
+      //
+      // Recipe-tagged tasks (recipe_slug IS NOT NULL) MUST use the checkpoints
+      // endpoint (POST /api/tasks/:id/checkpoints with status='blocked') — a PUT
+      // against a recipe task here returns 409 and redirects the caller.
+      //
+      // Retry/fail paths in scheduler (`requeueStaleTasks`,
+      // `dispatchAssignedTasks` catch branches) are UNCHANGED — they write
+      // directly via db.prepare(...).run(...) and never traverse this branch.
+      // The existing gate-required guard runs BEFORE this branch; awaiting_owner
+      // is not a forward-motion target so it is inherently bypassed — gate-blocked
+      // tasks can still be paused for owner input, matching D-31.
+      // -----------------------------------------------------------------------
+      const currentRecipeSlugForBlocker = (currentTask as unknown as { recipe_slug: string | null }).recipe_slug ?? null
+      const isRecipe = currentRecipeSlugForBlocker !== null && currentRecipeSlugForBlocker !== ''
+
+      // --- Pause branch: in_progress → awaiting_owner ---------------------
+      if (normalizedStatus === 'awaiting_owner' && currentTask.status === 'in_progress') {
+        if (isRecipe) {
+          return NextResponse.json(
+            {
+              error:
+                'Recipe-tagged tasks must use the checkpoints endpoint to pause. POST /api/tasks/:id/checkpoints with status="blocked" and a blocker_reason.',
+              code: 'RECIPE_BLOCKER_VIA_CHECKPOINTS',
+            },
+            { status: 409 },
+          )
+        }
+
+        const missing: string[] = []
+        if (!body.blocker_reason || !body.blocker_reason.trim()) missing.push('blocker_reason')
+        if (!body.blocker_kind) missing.push('blocker_kind')
+        if (!body.resume_hint || !body.resume_hint.trim()) missing.push('resume_hint')
+        if (missing.length > 0) {
+          return NextResponse.json(
+            {
+              error: `Blocker pause requires ${missing.join(', ')}`,
+              code: 'BLOCKER_FIELDS_MISSING',
+              missing,
+            },
+            { status: 400 },
+          )
+        }
+
+        const envelope = JSON.stringify({
+          blocker_reason: body.blocker_reason!.trim(),
+          blocker_kind: body.blocker_kind!,
+          resume_hint: body.resume_hint!.trim(),
+        })
+
+        const runPause = db.transaction(() => {
+          const upd = db.prepare(
+            `UPDATE tasks
+               SET status = 'awaiting_owner',
+                   runner_last_failure_reason = ?,
+                   updated_at = ?
+             WHERE id = ? AND workspace_id = ? AND status = 'in_progress' AND recipe_slug IS NULL`,
+          ).run(envelope, now, taskId, workspaceId)
+          if (upd.changes === 0) {
+            // Raced with another transition OR recipe_slug appeared — surface a 409.
+            throw new Error('concurrent_transition')
+          }
+        })
+
+        try {
+          runPause()
+        } catch (err) {
+          if (err instanceof Error && err.message === 'concurrent_transition') {
+            return NextResponse.json(
+              {
+                error: 'Task status changed during blocker transition; retry',
+                code: 'CONCURRENT_TRANSITION',
+              },
+              { status: 409 },
+            )
+          }
+          throw err
+        }
+
+        // Re-SELECT the fresh row (not currentTask) so the response reflects
+        // the committed envelope + status.
+        const freshRow = db.prepare(
+          'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
+        ).get(taskId, workspaceId) as Task
+        const freshTask = mapTaskRow(freshRow)
+
+        eventBus.broadcast('task.status_changed', {
+          id: taskId,
+          status: 'awaiting_owner',
+          previous_status: 'in_progress',
+          reason: 'blocker_pause_legacy',
+          workspace_id: workspaceId,
+        })
+        // Mirror the existing generic-write-path `task.updated` broadcast so
+        // clients that listen on task.updated still see this pause. Keeps shape
+        // consistent with the generic broadcast emitted at the end of this PUT.
+        eventBus.broadcast('task.updated', freshTask)
+        // Plan 20-03 will add a third `task.blocker_transition` broadcast here,
+        // after both broadcasts above.
+
+        return NextResponse.json({ task: freshTask })
+      }
+
+      // --- Resume branch: awaiting_owner → assigned (legacy only) ---------
+      if (normalizedStatus === 'assigned' && currentTask.status === 'awaiting_owner' && !isRecipe) {
+        // No required fields on resume — owner just clears the pause.
+        const runResume = db.transaction(() => {
+          const upd = db.prepare(
+            `UPDATE tasks
+               SET status = 'assigned',
+                   runner_last_failure_reason = NULL,
+                   updated_at = ?
+             WHERE id = ? AND workspace_id = ? AND status = 'awaiting_owner' AND recipe_slug IS NULL`,
+          ).run(now, taskId, workspaceId)
+          if (upd.changes === 0) throw new Error('concurrent_transition')
+        })
+
+        try {
+          runResume()
+        } catch (err) {
+          if (err instanceof Error && err.message === 'concurrent_transition') {
+            return NextResponse.json(
+              {
+                error: 'Task status changed during resume; retry',
+                code: 'CONCURRENT_TRANSITION',
+              },
+              { status: 409 },
+            )
+          }
+          throw err
+        }
+
+        const freshRow = db.prepare(
+          'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
+        ).get(taskId, workspaceId) as Task
+        const freshTask = mapTaskRow(freshRow)
+
+        eventBus.broadcast('task.status_changed', {
+          id: taskId,
+          status: 'assigned',
+          previous_status: 'awaiting_owner',
+          reason: 'blocker_resume_legacy',
+          workspace_id: workspaceId,
+        })
+        // Mirror the existing generic-write-path `task.updated` broadcast so
+        // task.updated subscribers still see this resume.
+        eventBus.broadcast('task.updated', freshTask)
+        // Plan 20-03 will add a third `task.blocker_transition` broadcast here,
+        // after both broadcasts above.
+
+        return NextResponse.json({ task: freshTask })
+      }
+
+      // Neither pause nor resume matched — fall through to the generic write
+      // path below. Examples: PUT { status: 'awaiting_owner' } on an already-
+      // awaiting task, PUT { status: 'assigned' } as part of a non-blocker
+      // transition (e.g., scheduler requeue), recipe-path awaiting_owner →
+      // assigned resume (generic write path, COMPAT lock). COMPAT-03: generic
+      // path keeps working.
+
       fieldsToUpdate.push('status = ?');
       updateParams.push(normalizedStatus);
     }
