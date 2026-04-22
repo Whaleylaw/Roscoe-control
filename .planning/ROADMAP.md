@@ -61,7 +61,7 @@ Phase directories archived to `.planning/milestones/v1.2-phases/`. Full audit at
 Active milestone. Closes the ~20–25% autonomous-routing gap identified in `.planning/GSD_PARITY_DIFF_vs_gsd-lawyerinc_2026-04-21.md` — delivers a single deterministic "automatic unless blocker" loop across every task type (recipe + legacy).
 
 - [x] **Phase 19: Project-Scoped Queue & Plan Activation** — Scope the queue endpoint to project/plan/wave lanes and couple plan `in_progress` transitions into queue-entering task activations. (QUEUE-01, QUEUE-02, COMPAT-01) (completed 2026-04-22)
-- [ ] **Phase 20: Lane-Aware Routing & Unified Blocker Contract** — Make the scheduler prefer active plan lanes over legacy inbox and give legacy dispatch the same structured `awaiting_owner` pause/resume contract as the recipe runner. (ROUTE-01, ROUTE-02, COMPAT-02, COMPAT-03)
+- [x] **Phase 20: Lane-Aware Routing & Unified Blocker Contract** — Make the scheduler prefer active plan lanes over legacy inbox and give legacy dispatch the same structured `awaiting_owner` pause/resume contract as the recipe runner. (ROUTE-01, ROUTE-02, COMPAT-02, COMPAT-03) (completed 2026-04-22)
 - [ ] **Phase 21: MCP Routing-Field Parity** — Extend `mc_create_task` / `mc_update_task` to accept the full project + GSD linkage + gate field set so MCP-only agents can produce queue-ready, lifecycle-linked tasks without REST fallback. (MCP-01, MCP-02, MCP-03, COMPAT-04)
 - [ ] **Phase 22: Doc Reconciliation & Test Debt Burn-Down** — Reconcile `GSD-MODEL-COMPARISON.md` contradictions, keep the runtime drift harness green, and replace high-value `it.todo` placeholders on the workspace shell + queue/transition paths with executable tests. (DOCS-01, DOCS-02, TESTS-01, TESTS-02, TESTS-03)
 - [ ] **Phase 23: End-to-End Acceptance Validation** — Prove the full deterministic "automatic unless blocker" loop end-to-end across both recipe and legacy execution paths. (ACCEPT-01)
@@ -153,7 +153,7 @@ Active milestone. Closes the ~20–25% autonomous-routing gap identified in `.pl
 | 18. v1.2 Tech-Debt Cleanup | v1.2 | 4/4 | Complete | 2026-04-21 |
 | 18.1. v1.2 Runtime Documentation | v1.2 | 7/7 | Complete | 2026-04-21 |
 | 19. Project-Scoped Queue & Plan Activation | 3/3 | Complete    | 2026-04-22 | — |
-| 20. Lane-Aware Routing & Unified Blocker Contract | 2/3 | In Progress|  | — |
+| 20. Lane-Aware Routing & Unified Blocker Contract | 3/3 | Complete   | 2026-04-22 | — |
 | 21. MCP Routing-Field Parity | v1.3 | 0/— | Pending | — |
 | 22. Doc Reconciliation & Test Debt Burn-Down | v1.3 | 0/— | Pending | — |
 | 23. End-to-End Acceptance Validation | v1.3 | 0/— | Pending | — |
