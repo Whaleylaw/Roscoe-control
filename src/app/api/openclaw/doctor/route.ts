@@ -33,22 +33,45 @@ export async function GET(request: Request) {
 
   try {
     const result = await runOpenClaw(['doctor'], { timeoutMs: 15000 })
-    return NextResponse.json(parseOpenClawDoctorOutput(`${result.stdout}\n${result.stderr}`, result.code ?? 0, {
-      stateDir: config.openclawStateDir,
-    }), {
-      headers: { 'Cache-Control': 'no-store' },
-    })
+    return NextResponse.json(
+      {
+        installed: true,
+        ...parseOpenClawDoctorOutput(`${result.stdout}\n${result.stderr}`, result.code ?? 0, {
+          stateDir: config.openclawStateDir,
+        }),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     const { detail, code } = getCommandDetail(error)
     if (isMissingOpenClaw(detail)) {
-      return NextResponse.json({ error: 'OpenClaw is not installed or not reachable' }, { status: 400 })
+      return NextResponse.json(
+        {
+          installed: false,
+          level: 'warning' as const,
+          category: 'general' as const,
+          healthy: false,
+          summary: 'OpenClaw is not installed or not reachable',
+          issues: [],
+          canFix: false,
+          raw: detail,
+        },
+        {
+          status: 200,
+          headers: { 'Cache-Control': 'no-store' },
+        }
+      )
     }
 
-    return NextResponse.json(parseOpenClawDoctorOutput(detail, code ?? 1, {
-      stateDir: config.openclawStateDir,
-    }), {
-      headers: { 'Cache-Control': 'no-store' },
-    })
+    return NextResponse.json(
+      {
+        installed: true,
+        ...parseOpenClawDoctorOutput(detail, code ?? 1, {
+          stateDir: config.openclawStateDir,
+        }),
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   }
 }
 
