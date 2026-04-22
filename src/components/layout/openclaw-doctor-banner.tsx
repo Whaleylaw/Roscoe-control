@@ -13,6 +13,7 @@ interface OpenClawDoctorStatus {
   issues: string[]
   canFix: boolean
   raw: string
+  installed?: boolean
 }
 
 interface OpenClawDoctorFixProgress {
@@ -102,7 +103,7 @@ export function OpenClawDoctorBanner() {
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000
   const dismissed = doctorDismissedAt != null && (Date.now() - doctorDismissedAt) < TWENTY_FOUR_HOURS
 
-  if (loading || dismissed || !doctor || doctor.healthy) return null
+  if (loading || dismissed || !doctor || doctor.healthy || doctor.installed === false) return null
 
   const tone =
     doctor.level === 'error'
