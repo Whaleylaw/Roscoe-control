@@ -84,7 +84,26 @@ export const createTaskSchema = z.object({
   metadata: taskMetadataSchema.default({} as Record<string, unknown>),
 })
 
-export const updateTaskSchema = createTaskSchema.partial()
+// Phase 20 Plan 20-02 (ROUTE-02, COMPAT-03) — legacy blocker contract envelope.
+// The three fields below are OPTIONAL at the schema level. The cross-field
+// "required-when-pausing" check lives in the PUT handler in
+// src/app/api/tasks/[id]/route.ts because it depends on DB state (the current
+// task's status + recipe_slug) that the schema cannot see. Recipe-tagged tasks
+// MUST use POST /api/tasks/:id/checkpoints instead — see 20-02-PLAN.md.
+export const BLOCKER_KINDS = [
+  'needs_input',
+  'needs_approval',
+  'external_dependency',
+  'policy',
+  'other',
+] as const
+export type BlockerKind = typeof BLOCKER_KINDS[number]
+
+export const updateTaskSchema = createTaskSchema.partial().extend({
+  blocker_reason: z.string().trim().min(1).max(2000).optional(),
+  blocker_kind: z.enum(BLOCKER_KINDS).optional(),
+  resume_hint: z.string().trim().min(1).max(500).optional(),
+})
 
 export const createAgentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
