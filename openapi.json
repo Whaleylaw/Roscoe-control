@@ -6738,6 +6738,72 @@
                     },
                     "to_status": {
                       "$ref": "#/components/schemas/GsdPlanStatus"
+                    },
+                    "queue_activation": {
+                      "description": "Side effect of a to_status='in_progress' transition — summarizes which tasks linked to this plan were moved into queue-entering states (inbox/assigned). NULL for any other to_status. Identical shape is also carried by the `gsd.plan.tasks_activated` event.",
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "activated",
+                            "already_active",
+                            "skipped_by_state",
+                            "reassigned",
+                            "by_status",
+                            "task_ids"
+                          ],
+                          "properties": {
+                            "activated": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Count of tasks newly moved from backlog/todo into inbox or assigned."
+                            },
+                            "already_active": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Count of linked tasks that were already in inbox or assigned (no UPDATE fired)."
+                            },
+                            "skipped_by_state": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Count of linked tasks in out-of-set states (review, in_progress, awaiting_owner, failed, etc.) — not activated."
+                            },
+                            "reassigned": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Count of tasks whose dead (errored / missing) assignee was cleared and the task was re-routed to inbox."
+                            },
+                            "by_status": {
+                              "type": "object",
+                              "required": [
+                                "inbox",
+                                "assigned"
+                              ],
+                              "properties": {
+                                "inbox": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "assigned": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "description": "Breakdown of newly-activated tasks by target status. Sum equals `activated`."
+                            },
+                            "task_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer"
+                              },
+                              "description": "IDs of the newly-activated tasks. Length equals `activated`."
+                            }
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   }
                 }
@@ -8495,6 +8561,36 @@
             }
           },
           {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Optional project scope — narrow queue polling to tasks linked to this project. Omit for v1.2 workspace-level behavior."
+          },
+          {
+            "name": "gsd_plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Optional plan scope — narrow queue polling to tasks linked to this GSD plan. If combined with project_id, the plan's project must match or the request returns 400."
+          },
+          {
+            "name": "wave",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Optional plan-wave scope — narrow queue polling to tasks whose linked plan has gsd_plans.wave = this value. Requires Phase 10 wave column on gsd_plans."
+          },
+          {
             "name": "x-agent-name",
             "in": "header",
             "required": false,
@@ -8543,7 +8639,19 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "Invalid query params — one of: project_id / gsd_plan_id / wave is not a positive integer (`Invalid <param>. Expected positive integer.`), or gsd_plan_id points at a plan whose project does not match the project_id filter (cross-filter mismatch).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
