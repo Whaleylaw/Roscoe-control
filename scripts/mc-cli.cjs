@@ -89,6 +89,7 @@ Examples:
   mc gsd phases create --milestone-id 11 --key 10-01 --slug schema-and-api-foundation --order 10.01 --json
   mc gsd plans transition --plan-id 27 --to in_progress --json
   mc tasks queue --agent Aegis --max-capacity 2
+  mc tasks queue --agent Aegis --project 42 --plan 27 --wave 1
   mc tasks comments list --id 42
   mc tasks comments add --id 42 --content "Looks good"
   mc tasks gate --id 105 --approve --note "Plan reviewed"
@@ -672,6 +673,9 @@ const commands = {
       const agent = required(flags, 'agent');
       let qs = `?agent=${encodeURIComponent(agent)}`;
       if (flags['max-capacity']) qs += `&max_capacity=${encodeURIComponent(String(flags['max-capacity']))}`;
+      if (flags.project) qs += `&project_id=${encodeURIComponent(String(flags.project))}`;
+      if (flags['plan-id']) qs += `&gsd_plan_id=${encodeURIComponent(String(flags['plan-id']))}`;
+      if (flags.wave) qs += `&wave=${encodeURIComponent(String(flags.wave))}`;
       return { method: 'GET', route: `/api/tasks/queue${qs}` };
     },
     broadcast: (flags) => ({

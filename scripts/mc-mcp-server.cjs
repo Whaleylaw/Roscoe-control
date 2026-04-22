@@ -375,12 +375,24 @@ const TOOLS = [
       properties: {
         agent: { type: 'string', description: 'Agent name to poll for' },
         max_capacity: { type: 'number', description: 'Max tasks to return (default 1)' },
+        project_id: { type: ['string', 'number'], description: 'Optional project scope for queue polling' },
+        gsd_plan_id: { type: ['string', 'number'], description: 'Optional plan scope for queue polling' },
+        wave: { type: ['string', 'number'], description: 'Optional plan-wave scope for queue polling (matches gsd_plans.wave on the linked plan)' },
       },
       required: ['agent'],
     },
-    handler: async ({ agent, max_capacity }) => {
+    handler: async ({ agent, max_capacity, project_id, gsd_plan_id, wave }) => {
       let qs = `?agent=${encodeURIComponent(agent)}`;
       if (max_capacity) qs += `&max_capacity=${max_capacity}`;
+      if (project_id !== undefined && project_id !== null && String(project_id).trim() !== '') {
+        qs += `&project_id=${encodeURIComponent(String(project_id))}`;
+      }
+      if (gsd_plan_id !== undefined && gsd_plan_id !== null && String(gsd_plan_id).trim() !== '') {
+        qs += `&gsd_plan_id=${encodeURIComponent(String(gsd_plan_id))}`;
+      }
+      if (wave !== undefined && wave !== null && String(wave).trim() !== '') {
+        qs += `&wave=${encodeURIComponent(String(wave))}`;
+      }
       return api('GET', `/api/tasks/queue${qs}`);
     },
   },
@@ -396,6 +408,333 @@ const TOOLS = [
       required: ['id', 'message'],
     },
     handler: async ({ id, message }) => api('POST', `/api/tasks/${id}/broadcast`, { message }),
+  },
+
+  // --- Projects / GSD shell ---
+  {
+    name: 'mc_list_projects',
+    description: 'List projects; optionally include archived projects',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        include_archived: { type: 'boolean', description: 'Include archived projects (default false)' },
+      },
+      required: [],
+    },
+    handler: async ({ include_archived } = {}) =>
+      api('GET', include_archived ? '/api/projects?includeArchived=1' : '/api/projects'),
+  },
+  {
+    name: 'mc_get_project',
+    description: 'Get a specific project by ID',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: ['string', 'number'], description: 'Project ID' } },
+      required: ['id'],
+    },
+    handler: async ({ id }) => api('GET', `/api/projects/${id}`),
+  },
+  {
+    name: 'mc_create_project',
+    description: 'Create a project (supports GSD shell fields such as gsd_enabled, gsd_track, gsd_gate_mode)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Project name' },
+        ticket_prefix: { type: 'string', description: 'Optional ticket prefix' },
+        slug: { type: 'string', description: 'Optional project slug' },
+        description: { type: 'string', description: 'Optional project description' },
+        gsd_enabled: { type: 'boolean', description: 'Enable GSD shell on create' },
+        gsd_track: { type: 'string', enum: ['ops', 'product', 'marketing', 'legal', 'firmvault', 'custom'] },
+        gsd_gate_mode: { type: 'string', enum: ['manual_approval', 'auto_internal'] },
+      },
+      required: ['name'],
+    },
+    handler: async (args) => api('POST', '/api/projects', args),
+  },
+  {
+    name: 'mc_bootstrap_project_gsd',
+    description: 'Bootstrap the legacy GSD task pack for a project',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: ['string', 'number'], description: 'Project ID' } },
+      required: ['id'],
+    },
+    handler: async ({ id }) => api('POST', `/api/projects/${id}/gsd/bootstrap`, {}),
+  },
+  {
+    name: 'mc_transition_project_gsd',
+    description: 'Transition project-level GSD shell lifecycle (discuss→plan→execute→verify→done)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: ['string', 'number'], description: 'Project ID' },
+        to_phase: { type: 'string', enum: ['discuss', 'plan', 'execute', 'verify', 'done'] },
+        waive_remaining: { type: 'boolean', description: 'Allow execute→verify transition with waiver' },
+        reason: { type: 'string', description: 'Required when waive_remaining is true' },
+      },
+      required: ['id', 'to_phase'],
+    },
+    handler: async ({ id, to_phase, waive_remaining, reason }) => {
+      const body = { to_phase };
+      if (waive_remaining !== undefined) body.waive_remaining = Boolean(waive_remaining);
+      if (reason) body.reason = reason;
+      return api('POST', `/api/projects/${id}/gsd/transition`, body);
+    },
+  },
+  {
+    name: 'mc_get_gsd_lifecycle_graph',
+    description: 'Get full GSD lifecycle graph for a project (workstreams, milestones, phases, plans, rollups)',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: ['string', 'number'], description: 'Project ID' } },
+      required: ['project_id'],
+    },
+    handler: async ({ project_id }) => api('GET', `/api/projects/${project_id}/gsd/lifecycle-graph`),
+  },
+
+  // --- GSD hierarchy ---
+  {
+    name: 'mc_list_workstreams',
+    description: 'List GSD workstreams for a project',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: ['string', 'number'], description: 'Project ID' } },
+      required: ['project_id'],
+    },
+    handler: async ({ project_id }) => api('GET', `/api/projects/${project_id}/gsd/workstreams`),
+  },
+  {
+    name: 'mc_create_workstream',
+    description: 'Create a GSD workstream in a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: ['string', 'number'] },
+        key: { type: 'string' },
+        name: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'paused', 'complete'] },
+      },
+      required: ['project_id', 'key', 'name'],
+    },
+    handler: async ({ project_id, ...body }) => api('POST', `/api/projects/${project_id}/gsd/workstreams`, body),
+  },
+  {
+    name: 'mc_update_workstream',
+    description: 'Update a GSD workstream',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: ['string', 'number'] },
+        workstream_id: { type: ['string', 'number'] },
+        key: { type: 'string' },
+        name: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'paused', 'complete'] },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['project_id', 'workstream_id'],
+    },
+    handler: async ({ project_id, workstream_id, ...body }) =>
+      api('PATCH', `/api/projects/${project_id}/gsd/workstreams/${workstream_id}`, body),
+  },
+  {
+    name: 'mc_complete_workstream',
+    description: 'Mark a workstream complete',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: ['string', 'number'] },
+        workstream_id: { type: ['string', 'number'] },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['project_id', 'workstream_id'],
+    },
+    handler: async ({ project_id, workstream_id, expected_updated_at }) =>
+      api('POST', `/api/projects/${project_id}/gsd/workstreams/${workstream_id}/complete`, expected_updated_at == null ? {} : { expected_updated_at }),
+  },
+  {
+    name: 'mc_list_milestones',
+    description: 'List GSD milestones for a project',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: ['string', 'number'], description: 'Project ID' } },
+      required: ['project_id'],
+    },
+    handler: async ({ project_id }) => api('GET', `/api/projects/${project_id}/gsd/milestones`),
+  },
+  {
+    name: 'mc_create_milestone',
+    description: 'Create a GSD milestone in a project',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: ['string', 'number'] },
+        workstream_id: { type: ['string', 'number', 'null'] },
+        version_label: { type: 'string' },
+        title: { type: 'string' },
+        status: { type: 'string', enum: ['planned', 'active', 'complete', 'archived'] },
+        started_at: { type: 'number' },
+        completed_at: { type: 'number' },
+      },
+      required: ['project_id', 'version_label', 'title'],
+    },
+    handler: async ({ project_id, ...body }) => api('POST', `/api/projects/${project_id}/gsd/milestones`, body),
+  },
+  {
+    name: 'mc_update_milestone',
+    description: 'Update a GSD milestone',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: ['string', 'number'] },
+        milestone_id: { type: ['string', 'number'] },
+        workstream_id: { type: ['string', 'number', 'null'] },
+        version_label: { type: 'string' },
+        title: { type: 'string' },
+        status: { type: 'string', enum: ['planned', 'active', 'complete', 'archived'] },
+        started_at: { type: 'number' },
+        completed_at: { type: 'number' },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['project_id', 'milestone_id'],
+    },
+    handler: async ({ project_id, milestone_id, ...body }) =>
+      api('PATCH', `/api/projects/${project_id}/gsd/milestones/${milestone_id}`, body),
+  },
+  {
+    name: 'mc_complete_milestone',
+    description: 'Mark a milestone complete',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: ['string', 'number'] },
+        milestone_id: { type: ['string', 'number'] },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['project_id', 'milestone_id'],
+    },
+    handler: async ({ project_id, milestone_id, expected_updated_at }) =>
+      api('POST', `/api/projects/${project_id}/gsd/milestones/${milestone_id}/complete`, expected_updated_at == null ? {} : { expected_updated_at }),
+  },
+  {
+    name: 'mc_list_gsd_phases',
+    description: 'List phases for a milestone',
+    inputSchema: {
+      type: 'object',
+      properties: { milestone_id: { type: ['string', 'number'] } },
+      required: ['milestone_id'],
+    },
+    handler: async ({ milestone_id }) => api('GET', `/api/gsd/milestones/${milestone_id}/phases`),
+  },
+  {
+    name: 'mc_create_gsd_phase',
+    description: 'Create a phase under a milestone',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        milestone_id: { type: ['string', 'number'] },
+        phase_key: { type: 'string' },
+        phase_slug: { type: 'string' },
+        lifecycle_phase: { type: 'string', enum: ['discuss', 'plan', 'execute', 'verify', 'done'] },
+        ordering_numeric: { type: 'number' },
+        status: { type: 'string', enum: ['planned', 'active', 'complete', 'deferred'] },
+        depends_on_phase_ids: { type: 'array', items: { type: 'number' } },
+      },
+      required: ['milestone_id', 'phase_key', 'phase_slug', 'ordering_numeric'],
+    },
+    handler: async ({ milestone_id, ...body }) => api('POST', `/api/gsd/milestones/${milestone_id}/phases`, body),
+  },
+  {
+    name: 'mc_update_gsd_phase',
+    description: 'Update a phase',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        phase_id: { type: ['string', 'number'] },
+        phase_key: { type: 'string' },
+        phase_slug: { type: 'string' },
+        lifecycle_phase: { type: 'string', enum: ['discuss', 'plan', 'execute', 'verify', 'done'] },
+        ordering_numeric: { type: 'number' },
+        status: { type: 'string', enum: ['planned', 'active', 'complete', 'deferred'] },
+        depends_on_phase_ids: { type: 'array', items: { type: 'number' } },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['phase_id'],
+    },
+    handler: async ({ phase_id, ...body }) => api('PATCH', `/api/gsd/phases/${phase_id}`, body),
+  },
+  {
+    name: 'mc_transition_gsd_phase',
+    description: 'Transition phase lifecycle forward',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        phase_id: { type: ['string', 'number'] },
+        to_lifecycle_phase: { type: 'string', enum: ['discuss', 'plan', 'execute', 'verify', 'done'] },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['phase_id', 'to_lifecycle_phase'],
+    },
+    handler: async ({ phase_id, ...body }) => api('POST', `/api/gsd/phases/${phase_id}/transition`, body),
+  },
+  {
+    name: 'mc_list_gsd_plans',
+    description: 'List plans for a phase',
+    inputSchema: {
+      type: 'object',
+      properties: { phase_id: { type: ['string', 'number'] } },
+      required: ['phase_id'],
+    },
+    handler: async ({ phase_id }) => api('GET', `/api/gsd/phases/${phase_id}/plans`),
+  },
+  {
+    name: 'mc_create_gsd_plan',
+    description: 'Create a plan under a phase',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        phase_id: { type: ['string', 'number'] },
+        plan_ref: { type: 'string' },
+        title: { type: 'string' },
+        wave: { type: 'number' },
+        status: { type: 'string', enum: ['todo', 'in_progress', 'review', 'done', 'failed'] },
+        depends_on_plan_ids: { type: 'array', items: { type: 'number' } },
+      },
+      required: ['phase_id', 'plan_ref', 'title'],
+    },
+    handler: async ({ phase_id, ...body }) => api('POST', `/api/gsd/phases/${phase_id}/plans`, body),
+  },
+  {
+    name: 'mc_update_gsd_plan',
+    description: 'Update a plan',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: ['string', 'number'] },
+        plan_ref: { type: 'string' },
+        title: { type: 'string' },
+        wave: { type: 'number' },
+        status: { type: 'string', enum: ['todo', 'in_progress', 'review', 'done', 'failed'] },
+        depends_on_plan_ids: { type: 'array', items: { type: 'number' } },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['plan_id'],
+    },
+    handler: async ({ plan_id, ...body }) => api('PATCH', `/api/gsd/plans/${plan_id}`, body),
+  },
+  {
+    name: 'mc_transition_gsd_plan',
+    description: 'Transition plan status (enforces dependency and wave-conflict checks server-side)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plan_id: { type: ['string', 'number'] },
+        to_status: { type: 'string', enum: ['todo', 'in_progress', 'review', 'done', 'failed'] },
+        expected_updated_at: { type: 'number' },
+      },
+      required: ['plan_id', 'to_status'],
+    },
+    handler: async ({ plan_id, ...body }) => api('POST', `/api/gsd/plans/${plan_id}/transition`, body),
   },
 
   // --- Task Comments ---
