@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: — Autonomous-Routing Parity
 status: unknown
-last_updated: "2026-04-22T01:25:52.807Z"
+last_updated: "2026-04-22T01:30:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 32
-  completed_plans: 37
+  completed_plans: 38
 ---
 
 # Project State
@@ -23,10 +23,10 @@ See: .planning/PROJECT.md (updated 2026-04-21 — v1.3 Autonomous-Routing Parity
 ## Current Position
 
 Phase: 19-project-scoped-queue-plan-activation
-Plan: 19-01 + 19-02 complete (QUEUE-01, QUEUE-02, COMPAT-01)
-Status: Executing (2 of 3 Phase 19 plans complete)
-Last activity: 2026-04-22 — Plan 19-01 executed: extended GET /api/tasks/queue with project_id/gsd_plan_id/wave filters, cross-filter 400 validation, COMPAT-01 preserved; shipped mandatory route-handler vitest file and E2E coverage.
-Next: Execute Plan 19-03 (CLI/MCP/OpenAPI reflection of scoped queue params).
+Plan: 19-01 + 19-02 + 19-03 complete (QUEUE-01, QUEUE-02, COMPAT-01)
+Status: Phase 19 plans complete (3 of 3) — ready for /gsd:verify-work 19
+Last activity: 2026-04-22 — Plan 19-03 executed: documented project_id/gsd_plan_id/wave query params + inline 400 on GET /api/tasks/queue, added queue_activation response schema (oneOf[object,null]) on POST /api/gsd/plans/{id}/transition, wired --wave CLI flag and wave MCP input property; runtime-docs harness clean (10/10).
+Next: Run `/gsd:verify-work 19` then plan Phase 20 (lane-aware default auto-routing / ROUTE-01..02).
 
 ## Performance Metrics
 
@@ -147,6 +147,7 @@ Next: Execute Plan 19-03 (CLI/MCP/OpenAPI reflection of scoped queue params).
 | Phase 18.1-v1-2-runtime-documentation P07 | 7min | 3 tasks | 4 files (3 new + 1 mod) + 3 drift-fix |
 | Phase 19-project-scoped-queue-plan-activation P02 | 5min | 2 tasks | 3 files |
 | Phase 19-project-scoped-queue-plan-activation P01 | 5min | 2 tasks tasks | 3 files files |
+| Phase 19-project-scoped-queue-plan-activation P03 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -389,6 +390,10 @@ Recent decisions affecting current work:
 - [Phase 19-01]: Queue wave filter uses correlated subquery (gsd_plan_id IN (SELECT id FROM gsd_plans WHERE wave = ?)) rather than mandatory JOIN — unscoped polls reduce to TRUE, SQL-equivalent to v1.2 (COMPAT-01)
 - [Phase 19-01]: Cross-filter validation walks gsd_plans -> gsd_phases -> gsd_milestones -> projects with workspace guard (no gsd_plans.project_id column exists); 400 names both plan id and both project ids so callers can disambiguate
 - [Phase 19-01]: Playwright cannot seed gsd_plans rows via REST helpers; wave + cross-filter 400 coverage moved to mandatory non-skippable vitest route-handler unit file (src/app/api/tasks/__tests__/queue-route.test.ts); Playwright tests for those two paths are test.skip with TODO pointers
+- [Phase 19-03]: openapi.json has no events extension (x-events / asyncapi / similar) — `gsd.plan.tasks_activated` is referenced only via the queue_activation description, NOT a new extension scheme. Deferred per plan direction; future phase that wants channelized event docs can introduce the dialect.
+- [Phase 19-03]: GET /api/tasks/queue uses an INLINE 400 response (not `$ref: BadRequest`) because Wave 1 ships two specific, loud failure modes (per-scope positive-integer validation, cross-filter project/plan mismatch) worth documenting verbatim for CLI/MCP callers debugging scope-integer errors.
+- [Phase 19-03]: MCP `mc_poll_task_queue` wave input uses the SAME normalisation pattern the WIP established for project_id / gsd_plan_id (undefined/null guard + `String(v).trim() !== ''`) — kept cross-scope symmetry rather than introducing a fourth coercion style for the third param.
+- [Phase 19-03]: CLI help block adds a SECOND `tasks queue` example (`--agent ... --project --plan --wave`) alongside the existing `--max-capacity` example rather than rewriting. Preserves discoverability of the simple unscoped call while surfacing the new scoped flags.
 
 ### Pending Todos
 
@@ -411,6 +416,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-21T15:05:54Z
-Stopped at: Completed 18.1-03-PLAN.md (DOC-AGT — docs/runtime/agent-contract.md, 439-line tool-agnostic substrate contract for recipe image authors)
+Last session: 2026-04-22T01:30:00Z
+Stopped at: Completed 19-03-PLAN.md (CLI/MCP/OpenAPI surface reflection — --wave CLI flag, wave MCP input, project_id/gsd_plan_id/wave query params + queue_activation response in openapi.json)
 Resume file: None
