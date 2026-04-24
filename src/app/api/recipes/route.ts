@@ -21,6 +21,7 @@ import { indexRecipe } from '@/lib/recipe-indexer'
 import { getRecipesRoot } from '@/lib/recipe-watcher'
 import { parseRecipeYaml } from '@/lib/recipe-schema'
 import { mutationLimiter } from '@/lib/rate-limit'
+import { eventBus } from '@/lib/event-bus'
 
 /**
  * GET /api/recipes — list all fully-indexed recipes (error_message IS NULL).
@@ -247,6 +248,9 @@ export async function POST(request: NextRequest) {
     const row = getDatabase()
       .prepare(`SELECT * FROM recipes WHERE slug = ?`)
       .get(slug) as Record<string, unknown>
+    if (indexResult.status === 'indexed') {
+      eventBus.broadcast('recipe.indexed', { slug, dir_sha: indexResult.dirSha })
+    }
     return NextResponse.json({ recipe: mapRow(row) }, { status: 201 })
   } catch (err) {
     // Best-effort cleanup on any unexpected error: remove temp + target, surface 500.

@@ -102,6 +102,24 @@ describe('NavRail Projects item', () => {
     expect(projectsIdx).toBeLessThan(tasksIdx)
   })
 
+  it('Law Firm nav item appears under Projects and routes to law-firm', () => {
+    mountStore({ interfaceMode: 'full' })
+    const { container } = render(<NavRail />)
+    const nav = container.querySelector('nav[aria-label="Main navigation"]')
+    expect(nav).toBeTruthy()
+    const buttons = Array.from(nav!.querySelectorAll('button')) as HTMLButtonElement[]
+    const labels = buttons.map((b) => b.textContent?.trim() || '')
+    const projectsIdx = labels.findIndex((l) => /^projects$/i.test(l))
+    const lawFirmIdx = labels.findIndex((l) => /^lawFirm$/i.test(l))
+    const tasksIdx = labels.findIndex((l) => /^tasks$/i.test(l))
+    expect(projectsIdx).toBeGreaterThanOrEqual(0)
+    expect(lawFirmIdx).toBeGreaterThan(projectsIdx)
+    expect(lawFirmIdx).toBeLessThan(tasksIdx)
+
+    fireEvent.click(within(nav as HTMLElement).getAllByRole('button', { name: /^lawFirm$/i })[0])
+    expect(navigateToPanelMock).toHaveBeenCalledWith('law-firm')
+  })
+
   it('invokes navigateToPanel("projects") when the Projects item is clicked', () => {
     mountStore({ interfaceMode: 'full' })
     const { container } = render(<NavRail />)

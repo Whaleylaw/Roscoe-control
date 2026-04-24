@@ -32,6 +32,8 @@ interface DispatchableTask {
   agent_name: string
   agent_id: number
   agent_config: string | null
+  agent_session_key: string | null
+  agent_runtime_type: string | null
   ticket_prefix: string | null
   project_ticket_no: number | null
   project_id: number | null
@@ -159,6 +161,20 @@ function parseGatewayJson(raw: string): any | null {
 interface AgentResponseParsed {
   text: string | null
   sessionId: string | null
+}
+
+function isHermesRuntimeTask(task: DispatchableTask): boolean {
+  if ((task.agent_runtime_type || '').toLowerCase() === 'hermes') return true
+  if (!task.agent_config) return false
+  try {
+    const cfg = JSON.parse(task.agent_config)
+    const cfgType = typeof cfg?.type === 'string' ? cfg.type.toLowerCase() : ''
+    if (cfgType === 'hermes') return true
+    if (typeof cfg?.hermesApiUrl === 'string' && cfg.hermesApiUrl.trim()) return true
+  } catch {
+    return false
+  }
+  return false
 }
 
 function parseAgentResponse(stdout: string): AgentResponseParsed {
@@ -336,6 +352,60 @@ async function callClaudeDirectly(
   return { text, sessionId: null }
 }
 
+async function callHermesDirectly(
+  task: DispatchableTask,
+  prompt: string,
+): Promise<AgentResponseParsed> {
+  let apiUrl = config.hermesApiUrl
+  let apiKey = ''
+  let model: string | null = null
+
+  if (task.agent_config) {
+    try {
+      const cfg = JSON.parse(task.agent_config)
+      if (typeof cfg?.hermesApiUrl === 'string' && cfg.hermesApiUrl.trim()) apiUrl = cfg.hermesApiUrl.trim()
+      if (typeof cfg?.hermesApiKey === 'string' && cfg.hermesApiKey.trim()) apiKey = cfg.hermesApiKey.trim()
+      if (typeof cfg?.dispatchModel === 'string' && cfg.dispatchModel.trim()) model = cfg.dispatchModel.trim()
+    } catch { /* ignore malformed config */ }
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+
+  const body: Record<string, unknown> = {
+    messages: [{ role: 'user', content: prompt }],
+    stream: false,
+  }
+  if (model) body.model = model
+
+  logger.info({ taskId: task.id, agent: task.agent_name, apiUrl, model }, 'Dispatching task via Hermes API')
+
+  const res = await fetch(`${apiUrl}/v1/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120_000),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(`Hermes API ${res.status}: ${errText.substring(0, 500)}`)
+  }
+
+  const data = await res.json() as {
+    id?: string
+    choices?: Array<{ message?: { content?: string } }>
+  }
+
+  const text = typeof data?.choices?.[0]?.message?.content === 'string'
+    ? data.choices![0]!.message!.content!.trim()
+    : null
+
+  return { text, sessionId: typeof data?.id === 'string' ? data.id : null }
+}
+
 interface ReviewableTask {
   id: number
   title: string
@@ -452,8 +522,12 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
           id: task.id, title: task.title, description: task.description,
           status: 'quality_review', priority: 'high', assigned_to: 'aegis',
           workspace_id: task.workspace_id, agent_name: 'aegis', agent_id: 0,
-          agent_config: null, ticket_prefix: task.ticket_prefix,
-          project_ticket_no: task.project_ticket_no, project_id: null,
+          agent_config: null,
+          agent_session_key: null,
+          agent_runtime_type: null,
+          ticket_prefix: task.ticket_prefix,
+          project_ticket_no: task.project_ticket_no,
+          project_id: null,
         }
         agentResponse = await callClaudeDirectly(reviewTask, prompt)
       } else {
@@ -758,6 +832,7 @@ export async function dispatchAssignedTasks(): Promise<{ ok: boolean; message: s
 
   const tasks = db.prepare(`
     SELECT t.*, a.name as agent_name, a.id as agent_id, a.config as agent_config,
+           a.session_key as agent_session_key, a.runtime_type as agent_runtime_type,
            p.ticket_prefix, t.project_ticket_no
     FROM tasks t
     JOIN agents a ON a.name = t.assigned_to AND a.workspace_id = t.workspace_id
@@ -825,14 +900,23 @@ export async function dispatchAssignedTasks(): Promise<{ ok: boolean; message: s
           return row?.metadata ? JSON.parse(row.metadata) : {}
         } catch { return {} }
       })()
-      const targetSession: string | null = typeof taskMeta?.target_session === 'string' && taskMeta.target_session
+      const metadataTargetSession: string | null = typeof taskMeta?.target_session === 'string' && taskMeta.target_session
         ? taskMeta.target_session
         : null
+      const profileSession: string | null = typeof task.agent_session_key === 'string' && task.agent_session_key.trim().length > 0
+        ? task.agent_session_key.trim()
+        : null
+      const targetSession: string | null = metadataTargetSession || profileSession
 
       let agentResponse: AgentResponseParsed
       const useDirectApi = !isGatewayAvailable() && getAnthropicApiKey()
+      const useHermesDirectApi = isHermesRuntimeTask(task)
 
-      if (useDirectApi && !targetSession) {
+      if (useHermesDirectApi) {
+        // Runtime-aware legacy dispatch: Hermes profiles should not require
+        // OpenClaw CLI/gateway. Send directly to the configured Hermes API.
+        agentResponse = await callHermesDirectly(task, prompt)
+      } else if (useDirectApi && !targetSession) {
         // Direct Claude API dispatch — no gateway needed
         agentResponse = await callClaudeDirectly(task, prompt)
       } else if (targetSession) {

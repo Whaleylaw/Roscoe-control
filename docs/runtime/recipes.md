@@ -38,7 +38,7 @@ The recipes root is resolved by [`getRecipesRoot()`](../../src/lib/recipe-watche
 1. If `MISSION_CONTROL_RECIPES_DIR` is set, resolve that path (absolute or cwd-relative).
 2. Otherwise default to `<process.cwd()>/recipes`.
 
-> 🟢 **Standalone builds:** `node .next/standalone/server.js` runs with `cwd` = `.next/standalone/`, which does **not** contain the authored `recipes/` tree. Standalone deployments MUST export `MISSION_CONTROL_RECIPES_DIR` pointing at the repo's absolute `recipes/` path — see [`admin-config.md` → Environment variables](./admin-config.md) (to be written in Plan 18.1-02) for the full standalone checklist.
+> 🟢 **Standalone builds:** `node .next/standalone/server.js` runs with `cwd` = `.next/standalone/`, which does **not** contain the authored `recipes/` tree. Standalone deployments MUST export `MISSION_CONTROL_RECIPES_DIR` pointing at the repo's absolute `recipes/` path — see [`admin-config.md` → Environment variables](./admin-config.md) for the full standalone checklist.
 
 Source: [`src/lib/recipe-watcher.ts:33-48`](../../src/lib/recipe-watcher.ts#L33-L48).
 
@@ -142,7 +142,7 @@ secrets:
   - OPENAI_API_KEY          # same convention, one file per name
 ```
 
-Source: [`src/lib/recipe-schema.ts:55`](../../src/lib/recipe-schema.ts#L55) (`secrets: z.array(z.string().min(1)).default([])`). Runner-side resolution is documented in [`runner-daemon.md`](./runner-daemon.md) (to be written in Plan 18.1-02).
+Source: [`src/lib/recipe-schema.ts:55`](../../src/lib/recipe-schema.ts#L55) (`secrets: z.array(z.string().min(1)).default([])`). Runner-side resolution is documented in [`runner-daemon.md`](./runner-daemon.md).
 
 ## `SOUL.md` convention
 
@@ -167,7 +167,7 @@ Your job:
 Keep it short. No model calls. No retries. This exists to prove the pipeline.
 ```
 
-> ⚠️ **`/recipe/PREAMBLE.md` is authored by the RUNNER, not the recipe author.** At claim time the runner writes `PREAMBLE.md` alongside your `SOUL.md` and will **overwrite** any recipe-authored `PREAMBLE.md`. If you need to ship content that survives, put it in `SOUL.md` or `README.md`. The full preamble contract is covered in [`agent-contract.md`](./agent-contract.md#preamble) (to be written in Plan 18.1-03).
+> ⚠️ **`/recipe/PREAMBLE.md` is authored by the RUNNER, not the recipe author.** At claim time the runner writes `PREAMBLE.md` alongside your `SOUL.md` and will **overwrite** any recipe-authored `PREAMBLE.md`. If you need to ship content that survives, put it in `SOUL.md` or `README.md`. The full preamble contract is covered in [`agent-contract.md`](./agent-contract.md#preamble).
 
 ## Canonical `recipe.yaml` example
 
@@ -209,7 +209,7 @@ After the boot scan, `src/lib/recipe-watcher.ts` installs a chokidar watcher on 
 
 ### 3. Admin resync endpoint
 
-`POST /api/recipes/resync` (admin only) invokes [`resyncRecipes()`](../../src/lib/recipe-watcher.ts#L183) — the same full-rescan code path as boot, exposed as an HTTP surface. Operators trigger it from the Recipes panel's **Resync** button (cross-linked in [`task-board-surfaces.md`](./task-board-surfaces.md), to be written in Plan 18.1-04) when the watcher has fallen behind or after bulk external edits (`git pull`, external editor writes).
+`POST /api/recipes/resync` (admin only) invokes [`resyncRecipes()`](../../src/lib/recipe-watcher.ts#L183) — the same full-rescan code path as boot, exposed as an HTTP surface. Operators trigger it from the Recipes panel's **Resync** button (cross-linked in [`task-board-surfaces.md`](./task-board-surfaces.md)) when the watcher has fallen behind or after bulk external edits (`git pull`, external editor writes).
 
 ### Error-row flow
 
@@ -263,4 +263,4 @@ When `indexRecipe()` writes an error row, the `error_message` column quotes the 
 - **YAML syntax error** — caught by `parseRecipeYaml` ([`recipe-schema.ts:101-114`](../../src/lib/recipe-schema.ts#L101-L114)); error message starts with `YAML parse error:`.
 - **Duplicate slug across directories** — the indexer writes each directory's row keyed by `slug`, so two sibling directories with the same `slug` collide; last writer wins. Use unique directory names that match the recipe's declared slug.
 
-At runtime, the runner daemon performs additional claim-time rejections (recipe's image not pulled, `max_attempts` exceeded, etc.) that do **not** round-trip through the indexer. Those are documented in [`scripts/README.runner.md`](../../scripts/README.runner.md) (troubleshooting section) and in [`runner-daemon.md`](./runner-daemon.md) (to be written in Plan 18.1-02).
+At runtime, the runner daemon performs additional claim-time rejections (recipe's image not pulled, `max_attempts` exceeded, etc.) that do **not** round-trip through the indexer. Those are documented in [`scripts/README.runner.md`](../../scripts/README.runner.md) (troubleshooting section) and in [`runner-daemon.md`](./runner-daemon.md).

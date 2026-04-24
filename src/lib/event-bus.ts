@@ -38,6 +38,7 @@ export type EventType =
   | 'run.eval_attached'
   | 'task.escalated'
   | 'session.updated'
+  | 'project.agent_assigned'
   | 'project.gsd.transition'   // Phase 09 GSD-28, D-34
   | 'task.gate.changed'         // Phase 09 GSD-28, D-34
   | 'gsd.workstream.created'

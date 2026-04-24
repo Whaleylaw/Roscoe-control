@@ -117,11 +117,11 @@ function seedAgent(
 
 function seedAssignment(
   database: Database.Database,
-  a: { projectId: number; agentName: string },
+  a: { projectId: number; agentName: string; role?: string },
 ) {
   database
-    .prepare('INSERT OR IGNORE INTO project_agent_assignments (project_id, agent_name) VALUES (?, ?)')
-    .run(a.projectId, a.agentName)
+    .prepare('INSERT OR IGNORE INTO project_agent_assignments (project_id, agent_name, role) VALUES (?, ?, ?)')
+    .run(a.projectId, a.agentName, a.role ?? 'member')
 }
 
 function seedTask(
@@ -215,6 +215,23 @@ describe('GET /api/projects/[id]/sessions', () => {
       const body = await res.json()
       const names = body.threads.map((t: any) => t.agentName).sort()
       expect(names).toEqual(['Aegis', 'Hermes'])
+    })
+
+    it('marks the primary project agent and returns primaryAgent metadata', async () => {
+      seedProject(db, { id: 10, slug: 'alpha' })
+      seedAgent(db, { name: 'Aegis' })
+      seedAgent(db, { name: 'Hermes' })
+      seedAssignment(db, { projectId: 10, agentName: 'aegis', role: 'primary' })
+      seedAssignment(db, { projectId: 10, agentName: 'hermes' })
+      const res = await callGet('10')
+      const body = await res.json()
+      expect(body.primaryAgent).toEqual({ name: 'Aegis', status: 'idle' })
+      const primaryThread = body.threads.find((t: any) => t.agentName === 'Aegis')
+      expect(primaryThread.isPrimary).toBe(true)
+      expect(primaryThread.assignmentRole).toBe('primary')
+      const memberThread = body.threads.find((t: any) => t.agentName === 'Hermes')
+      expect(memberThread.isPrimary).toBe(false)
+      expect(memberThread.assignmentRole).toBe('member')
     })
 
     it('thread id format is exactly `thread:<projectId>:<agentNameLower>`', async () => {

@@ -10,7 +10,8 @@ const VIEWS = ['dashboard', 'lifecycle', 'tasks', 'sessions', 'agents', 'setting
 export function ProjectTabs() {
   const router = useRouter()
   const t = useTranslations('project')
-  const { slug, view } = useProjectWorkspace()
+  const { slug, view, project } = useProjectWorkspace()
+  const views = project?.gsd_enabled ? VIEWS : VIEWS.filter((v) => v !== 'lifecycle')
 
   const navigate = (targetView: string) => {
     const href = targetView === 'dashboard'
@@ -23,7 +24,7 @@ export function ProjectTabs() {
 
   return (
     <nav aria-label="Project views" className="flex gap-1 border-b border-border">
-      {VIEWS.map((v) => (
+      {views.map((v) => (
         <button
           key={v}
           onClick={() => navigate(v)}

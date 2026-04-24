@@ -78,8 +78,13 @@ const sampleRuntime = {
   agent: 'aegis',
 }
 
-function mockResponse(payload: any) {
-  fetchSpy.mockResolvedValue({ ok: true, json: async () => payload } as any)
+function mockResponse(payload: any, agents: any[] = []) {
+  fetchSpy.mockImplementation(async (url: string) => {
+    if (typeof url === 'string' && url.startsWith('/api/agents')) {
+      return { ok: true, json: async () => ({ agents }) } as any
+    }
+    return { ok: true, json: async () => payload } as any
+  })
 }
 
 describe('SessionsView', () => {
@@ -114,7 +119,7 @@ describe('SessionsView', () => {
       mockResponse({ threads: [], runtimeSessions: [] })
       fireEvent.click(screen.getByText('project.common.retry'))
       await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledTimes(2)
+        expect(fetchSpy).toHaveBeenCalledTimes(4)
       })
     })
   })
@@ -297,15 +302,15 @@ describe('SessionsView', () => {
       mockResponse({ threads: [], runtimeSessions: [] })
       render(<SessionsView />)
       await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledTimes(1)
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
       })
       await act(async () => {
         window.dispatchEvent(new CustomEvent('mc:chat-message'))
       })
       await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalledTimes(2)
+        expect(fetchSpy).toHaveBeenCalledTimes(4)
       })
-      expect(fetchSpy).toHaveBeenLastCalledWith('/api/projects/42/sessions')
+      expect(fetchSpy.mock.calls.some((args) => args[0] === '/api/projects/42/sessions')).toBe(true)
     })
 
     it('when SSE updates a thread.lastMessage, the row text updates with animate-fade-in class applied', async () => {
@@ -317,6 +322,43 @@ describe('SessionsView', () => {
       // We assert the class shows up somewhere in the row subtree so the
       // SSE-driven update reads as an "appear" rather than a hard repaint.
       expect(row.outerHTML).toContain('animate-fade-in')
+    })
+  })
+
+  describe('primary agent project chat', () => {
+    it('renders the primary agent selector and opens the selected primary thread', async () => {
+      mockResponse(
+        { threads: [{ ...sampleThread, isPrimary: true, assignmentRole: 'primary' }], runtimeSessions: [], primaryAgent: { name: 'Aegis', status: 'idle' } },
+        [{ name: 'Aegis', status: 'idle' }, { name: 'Hermes', status: 'idle' }],
+      )
+      render(<SessionsView />)
+      const selector = await screen.findByLabelText('project.sessions.primaryAgentSelect')
+      expect(selector).toHaveValue('Aegis')
+      fireEvent.click(screen.getByText('project.sessions.openPrimaryChat'))
+      await waitFor(() => {
+        expect(pushSpy).toHaveBeenCalledWith('/project/alpha/sessions/thread:42:aegis', expect.anything())
+      })
+    })
+
+    it('setting a primary agent POSTs role=primary to the project agents endpoint', async () => {
+      mockResponse(
+        { threads: [], runtimeSessions: [], primaryAgent: null },
+        [{ name: 'Aegis', status: 'idle' }],
+      )
+      render(<SessionsView />)
+      const selector = await screen.findByLabelText('project.sessions.primaryAgentSelect')
+      fireEvent.change(selector, { target: { value: 'Aegis' } })
+      await waitFor(() => {
+        const postCall = fetchSpy.mock.calls.find((args) => {
+          const init = args[1] as RequestInit | undefined
+          return args[0] === '/api/projects/42/agents' && init?.method === 'POST'
+        })
+        expect(postCall).toBeTruthy()
+        expect(JSON.parse(String((postCall?.[1] as RequestInit).body))).toEqual({
+          agent_name: 'Aegis',
+          role: 'primary',
+        })
+      })
     })
   })
 })

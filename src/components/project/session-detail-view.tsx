@@ -11,7 +11,7 @@ import { SessionDetailsPanel } from '@/components/panels/session-details-panel'
  * detected via the "thread:" prefix on sessionId.
  */
 export function SessionDetailView({ sessionId }: { sessionId: string }) {
-  const { slug } = useProjectWorkspace()
+  const { project, slug } = useProjectWorkspace()
   const threadMode = sessionId.startsWith('thread:')
   return (
     <SessionDetailsPanel
@@ -21,6 +21,9 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
         hideHeader: true,
         threadMode,
         backHref: `/project/${slug}/sessions`,
+        projectId: project?.id,
+        projectName: project?.name,
+        projectSlug: project?.slug,
       }}
     />
   )

@@ -3,6 +3,7 @@ import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
+import { eventBus } from '@/lib/event-bus'
 import {
   ensureTenantWorkspaceAccess,
   ForbiddenError
@@ -107,11 +108,47 @@ export async function POST(
     const role = String(body?.role || 'member').trim()
 
     if (!agentName) return NextResponse.json({ error: 'agent_name is required' }, { status: 400 })
+    if (!['member', 'primary'].includes(role)) {
+      return NextResponse.json({ error: 'role must be member or primary' }, { status: 400 })
+    }
 
-    db.prepare(`
-      INSERT OR IGNORE INTO project_agent_assignments (project_id, agent_name, role)
-      VALUES (?, ?, ?)
-    `).run(projectId, agentName, role)
+    const assignAgent = db.transaction(() => {
+      if (role === 'primary') {
+        db.prepare(`
+          UPDATE project_agent_assignments
+          SET role = 'member'
+          WHERE project_id = ? AND role = 'primary'
+        `).run(projectId)
+      }
+
+      const existing = db.prepare(`
+        SELECT id FROM project_agent_assignments
+        WHERE project_id = ? AND LOWER(agent_name) = LOWER(?)
+        LIMIT 1
+      `).get(projectId, agentName) as { id: number } | undefined
+
+      if (existing) {
+        db.prepare(`
+          UPDATE project_agent_assignments
+          SET agent_name = ?, role = ?
+          WHERE id = ?
+        `).run(agentName, role, existing.id)
+      } else {
+        db.prepare(`
+          INSERT INTO project_agent_assignments (project_id, agent_name, role)
+          VALUES (?, ?, ?)
+        `).run(projectId, agentName, role)
+      }
+    })
+
+    assignAgent()
+
+    eventBus.broadcast('project.agent_assigned', {
+      project_id: projectId,
+      agent_name: agentName,
+      role,
+      workspace_id: workspaceId,
+    })
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SessionDetailsPanel } from '@/components/panels/session-details-panel'
 
 const useSmartPollSpy = vi.fn()
@@ -203,6 +203,46 @@ describe('SessionDetailsPanel', () => {
       )
       expect(screen.queryByText('sessionDetails.thinking')).not.toBeInTheDocument()
       expect(screen.queryByText('sessionDetails.verbose')).not.toBeInTheDocument()
+    })
+
+    it('when scope.threadMode is true, submitting the composer POSTs a project-scoped forwarded message', async () => {
+      render(
+        <SessionDetailsPanel
+          scope={{
+            sessionId: 'thread:1:aegis',
+            threadMode: true,
+            hideHeader: true,
+            hideFilters: true,
+            projectId: 1,
+            projectName: 'Alpha',
+            projectSlug: 'alpha',
+          }}
+        />,
+      )
+      const input = await screen.findByLabelText(/project\.sessions\.messageLabel/)
+      fireEvent.change(input, { target: { value: 'Create a follow-up task' } })
+      fireEvent.click(screen.getByRole('button', { name: 'project.sessions.send' }))
+
+      await waitFor(() => {
+        const postCall = (fetchMock.mock.calls as unknown as Array<[string, RequestInit | undefined]>).find((args) => {
+          const init = args[1] as RequestInit | undefined
+          return args[0] === '/api/chat/messages' && init?.method === 'POST'
+        })
+        expect(postCall).toBeTruthy()
+        const body = JSON.parse(String(postCall?.[1]?.body))
+        expect(body).toMatchObject({
+          to: 'aegis',
+          content: 'Create a follow-up task',
+          conversation_id: 'project:1:agent:aegis',
+          forward: true,
+          metadata: {
+            project_chat: true,
+            project_id: 1,
+            project_name: 'Alpha',
+            project_slug: 'alpha',
+          },
+        })
+      })
     })
 
     it('when scope.threadMode is false, /api/chat/messages is NOT fetched', async () => {

@@ -9,13 +9,16 @@ import {
 } from '../model-registry'
 
 describe('model-registry: MODELS seeded entries', () => {
-  it('exposes exactly the three v1.2 Claude models', () => {
-    expect(MODEL_IDS.length).toBe(3)
+  it('exposes Anthropic + OpenRouter model IDs required by runtime recipes', () => {
+    expect(MODEL_IDS.length).toBe(6)
     expect(MODEL_IDS).toEqual(
       expect.arrayContaining([
         'claude-opus-4-7',
         'claude-sonnet-4-6',
         'claude-haiku-4-5-20251001',
+        'openai/gpt-5.3-codex',
+        'openai/gpt-5.4-mini',
+        'google/gemini-3-flash',
       ])
     )
   })
@@ -52,6 +55,39 @@ describe('model-registry: MODELS seeded entries', () => {
       supports_thinking: false,
     })
   })
+
+  it('seeds OpenRouter GPT-5.3 Codex with expected metadata', () => {
+    const codex = MODELS['openai/gpt-5.3-codex']
+    expect(codex).toEqual<Model>({
+      provider: 'openai-codex',
+      context_window: 200000,
+      output_tokens_max: 32000,
+      supports_tools: true,
+      supports_thinking: true,
+    })
+  })
+
+  it('seeds OpenRouter GPT-5.4 Mini with expected metadata', () => {
+    const gptMini = MODELS['openai/gpt-5.4-mini']
+    expect(gptMini).toEqual<Model>({
+      provider: 'openrouter',
+      context_window: 200000,
+      output_tokens_max: 32000,
+      supports_tools: true,
+      supports_thinking: true,
+    })
+  })
+
+  it('seeds OpenRouter Gemini 3 Flash with expected metadata', () => {
+    const geminiFlash = MODELS['google/gemini-3-flash']
+    expect(geminiFlash).toEqual<Model>({
+      provider: 'openrouter',
+      context_window: 1048576,
+      output_tokens_max: 8192,
+      supports_tools: true,
+      supports_thinking: true,
+    })
+  })
 })
 
 describe('model-registry: getModel()', () => {
@@ -63,10 +99,13 @@ describe('model-registry: getModel()', () => {
     expect(result?.supports_thinking).toBe(true)
   })
 
-  it('returns non-null for each of the three seeded models', () => {
+  it('returns non-null for all seeded runtime models', () => {
     expect(getModel('claude-opus-4-7')).not.toBeNull()
     expect(getModel('claude-sonnet-4-6')).not.toBeNull()
     expect(getModel('claude-haiku-4-5-20251001')).not.toBeNull()
+    expect(getModel('openai/gpt-5.3-codex')).not.toBeNull()
+    expect(getModel('openai/gpt-5.4-mini')).not.toBeNull()
+    expect(getModel('google/gemini-3-flash')).not.toBeNull()
   })
 
   it('returns null (not undefined, not a throw) for an unknown id', () => {
@@ -90,6 +129,9 @@ describe('model-registry: isKnownModel()', () => {
     expect(isKnownModel('claude-opus-4-7')).toBe(true)
     expect(isKnownModel('claude-sonnet-4-6')).toBe(true)
     expect(isKnownModel('claude-haiku-4-5-20251001')).toBe(true)
+    expect(isKnownModel('openai/gpt-5.3-codex')).toBe(true)
+    expect(isKnownModel('openai/gpt-5.4-mini')).toBe(true)
+    expect(isKnownModel('google/gemini-3-flash')).toBe(true)
   })
 
   it('returns false for an unknown id', () => {

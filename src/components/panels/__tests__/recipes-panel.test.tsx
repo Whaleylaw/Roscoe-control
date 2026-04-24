@@ -276,6 +276,78 @@ describe('RecipesPanel', () => {
     expect(screen.queryByTestId('markdown-renderer')).toBeNull()
   })
 
+  it('Create recipe opens editor and POSTs recipe_yaml plus soul_md', async () => {
+    const { calls } = installFetchStub([
+      () => jsonResponse({ recipes: [] }),
+      () => jsonResponse({ recipe: { ...recipeAlpha, slug: 'my-recipe' } }, { status: 201 }),
+      () => jsonResponse({ recipes: [recipeAlpha] }),
+    ])
+
+    render(<RecipesPanel />)
+    await waitFor(() => expect(screen.getByText('emptyHeading')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: /createRecipe/i }))
+    fireEvent.change(screen.getByLabelText('slugField'), { target: { value: 'new-recipe' } })
+    fireEvent.change(screen.getByLabelText('nameField'), { target: { value: 'New Recipe' } })
+    fireEvent.change(screen.getByLabelText('imageField'), { target: { value: 'mc-agent' } })
+    fireEvent.change(screen.getByLabelText('timeoutSecondsField'), { target: { value: '300' } })
+    fireEvent.change(screen.getByLabelText('tagsField'), { target: { value: 'docs, planning' } })
+    fireEvent.change(screen.getByLabelText('soulMd'), { target: { value: '# New SOUL' } })
+    fireEvent.click(screen.getByRole('button', { name: /^saveRecipe$/i }))
+
+    await waitFor(() => expect(screen.getByText('createSuccess')).toBeTruthy())
+    expect(calls[1]?.url).toBe('/api/recipes')
+    expect(calls[1]?.init?.method).toBe('POST')
+    const body = JSON.parse(String(calls[1]?.init?.body))
+    expect(body.slug).toBe('new-recipe')
+    expect(body.recipe_yaml).toContain('slug: new-recipe')
+    expect(body.recipe_yaml).toContain('name: New Recipe')
+    expect(body.recipe_yaml).toContain('timeout_seconds: 300')
+    expect(body.recipe_yaml).toContain('  - docs')
+    expect(body.soul_md).toBe('# New SOUL')
+  })
+
+  it('Edit recipe opens populated editor and PUTs changes', async () => {
+    const { calls } = installFetchStub([
+      () => jsonResponse({ recipes: [recipeAlpha] }),
+      () => jsonResponse({ recipe: { ...recipeAlpha, name: 'Alpha Updated' } }),
+      () => jsonResponse({ recipes: [{ ...recipeAlpha, name: 'Alpha Updated' }] }),
+    ])
+
+    render(<RecipesPanel />)
+    await waitFor(() => expect(screen.getByText('Alpha Recipe')).toBeTruthy())
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editRecipe/i })[0])
+    expect((screen.getByLabelText('slugField') as HTMLInputElement).value).toBe('alpha')
+    expect((screen.getByLabelText('nameField') as HTMLInputElement).value).toBe('Alpha Recipe')
+    fireEvent.change(screen.getByLabelText('nameField'), { target: { value: 'Alpha Updated' } })
+    fireEvent.click(screen.getByRole('button', { name: /^saveRecipe$/i }))
+
+    await waitFor(() => expect(screen.getByText('updateSuccess')).toBeTruthy())
+    expect(calls[1]?.url).toBe('/api/recipes/alpha')
+    expect(calls[1]?.init?.method).toBe('PUT')
+    const body = JSON.parse(String(calls[1]?.init?.body))
+    expect(body.recipe_yaml).toContain('name: Alpha Updated')
+  })
+
+  it('Delete recipe confirms, DELETEs, and refreshes recipes', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    const { calls } = installFetchStub([
+      () => jsonResponse({ recipes: [recipeAlpha] }),
+      () => jsonResponse({ ok: true, removed: true }),
+      () => jsonResponse({ recipes: [] }),
+    ])
+
+    render(<RecipesPanel />)
+    await waitFor(() => expect(screen.getByText('Alpha Recipe')).toBeTruthy())
+
+    fireEvent.click(screen.getAllByRole('button', { name: /deleteRecipe/i })[0])
+
+    await waitFor(() => expect(screen.getByText(/deleteSuccess/)).toBeTruthy())
+    expect(calls[1]?.url).toBe('/api/recipes/alpha')
+    expect(calls[1]?.init?.method).toBe('DELETE')
+  })
+
   it('removes event listeners on unmount so late events do not trigger stale fetches', async () => {
     const removeSpy = vi.spyOn(window, 'removeEventListener')
     installFetchStub([() => jsonResponse({ recipes: [] })])

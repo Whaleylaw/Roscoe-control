@@ -1,6 +1,6 @@
 # GSD Model vs Mission Control Implementation (Current State)
 
-Last updated: 2026-04-15
+Last updated: 2026-04-21
 Compared paths:
 
 - Model repo: `/Users/aaronwhaley/mission-control/get-shit-done-main`
@@ -48,8 +48,8 @@ Bottom line:
 | Legacy bootstrap and shell transitions | N/A | Yes | Mission Control extension |
 | Interactive hierarchy UI | Planning docs and prompts | Yes, in Lifecycle tab | Mission Control extension |
 | Live SSE refresh from hierarchy events | Workflow-driven | Yes | Parity |
-| Automatic wave conflict detection | Yes, richer guidance | Placeholder rollup only | Gap |
-| Dedicated CLI/MCP wrappers for hierarchy | Prompt/tooling-driven | Not yet; use REST or `mc raw` | Gap |
+| Automatic wave conflict detection | Yes, richer guidance | Live (`WAVE_CONFLICT_BLOCKED`, `rollups.wave_conflicts`) | Closed |
+| Dedicated CLI/MCP wrappers for hierarchy | Prompt/tooling-driven | Live (`mc projects ...`, `mc gsd ...`, MCP wrappers) | Closed |
 
 ---
 
@@ -114,13 +114,13 @@ The project Lifecycle tab now supports:
 
 ### Remaining gaps
 
-- No automatic wave-conflict detector yet:
-  - `wave_conflicts` exists in the lifecycle graph rollups, but it is still `0` placeholder logic
-- No dedicated hierarchy CLI wrappers yet:
-  - the current first-party CLI wraps the legacy project shell, bootstrap, and gate operations
-  - hierarchy CRUD and transitions currently go through REST or `mc raw`
-- No dedicated hierarchy MCP tools yet:
-  - agents can still call REST or raw passthrough, but the hierarchy is not surfaced as named MCP tools yet
+Core parity gaps called out in earlier drafts are now closed:
+
+- wave-conflict detection is live (`WAVE_CONFLICT_BLOCKED` + `rollups.wave_conflicts`)
+- hierarchy CLI wrappers are live (`projects workstreams|milestones`, `gsd phases|plans`)
+- hierarchy MCP wrappers are live in `scripts/mc-mcp-server.cjs`
+
+Current delta vs the model repo is mostly operational polish (default queue policy, opinionated automation templates, and higher-order orchestration heuristics), not missing lifecycle primitives.
 
 ### Intentional Mission Control differences
 
@@ -185,12 +185,12 @@ The old project-per-workstream workaround is no longer the preferred path.
 
 ## Decision point
 
-The meaningful choice is no longer whether to add hierarchy primitives. Those exist.
+The meaningful choice is no longer whether to add hierarchy primitives or wrappers. Those are in place.
 
 The next choices are operational:
 
-A) Keep using the hierarchy through the Lifecycle tab and REST only
-B) Add dedicated CLI and MCP wrappers for hierarchy operations
-C) Add wave-conflict analysis and higher-order orchestration automation
+A) Keep using the hierarchy with default queue behavior
+B) Add stricter project/plan queue scoping and automatic plan-linked task activation defaults
+C) Add higher-order orchestration templates (auto-routing, blocker escalation, wave balancing)
 
-Given the current state, B and C are the right follow-on work. The data model and UI are already in place.
+Given the current state, B and C are the right follow-on work. The data model, wrappers, and UI are already in place.

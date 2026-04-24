@@ -14,10 +14,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { mkdir, readFile, rm, unlink, writeFile } from 'fs/promises'
+import { join } from 'path'
+import { z } from 'zod'
 import { requireRole } from '@/lib/auth'
-import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer'
+import { getIndexedRecipeBySlug, indexRecipe, removeRecipe } from '@/lib/recipe-indexer'
 import { logger } from '@/lib/logger'
 import { mapRow } from '../route'
+import { getRecipesRoot } from '@/lib/recipe-watcher'
+import { parseRecipeYaml } from '@/lib/recipe-schema'
+import { mutationLimiter } from '@/lib/rate-limit'
+import { eventBus } from '@/lib/event-bus'
 
 /**
  * GET /api/recipes/:slug — fetch a single recipe, returning either:
@@ -50,5 +57,142 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
   } catch (err) {
     logger.error({ err: (err as Error).message }, 'GET /api/recipes/:slug failed')
     return NextResponse.json({ error: 'Failed to fetch recipe' }, { status: 500 })
+  }
+}
+
+const mutationBodySchema = z.object({
+  recipe_yaml: z.string().min(1),
+  soul_md: z.string().default(''),
+})
+
+/**
+ * PUT /api/recipes/:slug — update recipe.yaml and SOUL.md on disk, then force reindex.
+ *
+ * The route intentionally edits only the two UI-owned files. Existing README.md,
+ * tools/, and skills/ content is preserved.
+ */
+export async function PUT(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
+  const auth = requireRole(request, 'admin')
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+  const rateLimited = mutationLimiter(request)
+  if (rateLimited) return rateLimited
+
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const parsed = mutationBodySchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      },
+      { status: 400 },
+    )
+  }
+
+  const { slug } = await context.params
+  const yamlResult = parseRecipeYaml(parsed.data.recipe_yaml)
+  if (!yamlResult.ok) {
+    return NextResponse.json(
+      { error: 'Recipe YAML invalid', details: [yamlResult.error] },
+      { status: 400 },
+    )
+  }
+  if (yamlResult.value.slug !== slug) {
+    return NextResponse.json(
+      {
+        error: `Slug mismatch: route slug='${slug}' but recipe_yaml slug='${yamlResult.value.slug}'`,
+      },
+      { status: 400 },
+    )
+  }
+
+  const recipeDir = join(getRecipesRoot(), slug)
+  const yamlPath = join(recipeDir, 'recipe.yaml')
+  const soulPath = join(recipeDir, 'SOUL.md')
+
+  let previousYaml: string | null = null
+  let previousSoul: string | null = null
+  try {
+    previousYaml = await readFile(yamlPath, 'utf8')
+  } catch {
+    return NextResponse.json({ error: `Recipe '${slug}' not found on disk` }, { status: 404 })
+  }
+  try {
+    previousSoul = await readFile(soulPath, 'utf8')
+  } catch {
+    previousSoul = null
+  }
+
+  try {
+    await writeFile(yamlPath, parsed.data.recipe_yaml, 'utf8')
+    if (parsed.data.soul_md) {
+      await writeFile(soulPath, parsed.data.soul_md, 'utf8')
+    } else {
+      await unlink(soulPath).catch(() => {})
+    }
+
+    const indexResult = await indexRecipe(recipeDir, { force: true })
+    if (indexResult.status === 'error') {
+      throw new Error(indexResult.error)
+    }
+    const row = getIndexedRecipeBySlug(slug)
+    if (!row || row.error_message !== null) {
+      throw new Error('Recipe reindex did not produce a valid row')
+    }
+    eventBus.broadcast('recipe.indexed', {
+      slug,
+      dir_sha: indexResult.status === 'indexed' || indexResult.status === 'unchanged' ? indexResult.dirSha : null,
+    })
+
+    const raw: Record<string, unknown> = { ...(row as unknown as Record<string, unknown>) }
+    if ('env' in raw) raw.env_json = JSON.stringify(raw.env)
+    if ('secrets' in raw) raw.secrets_json = JSON.stringify(raw.secrets)
+    if ('tags' in raw) raw.tags_json = JSON.stringify(raw.tags)
+    if ('model' in raw) raw.model_json = JSON.stringify(raw.model)
+    return NextResponse.json({ recipe: mapRow(raw) })
+  } catch (err) {
+    if (previousYaml !== null) {
+      await mkdir(recipeDir, { recursive: true }).catch(() => {})
+      await writeFile(yamlPath, previousYaml, 'utf8').catch(() => {})
+    }
+    if (previousSoul !== null) {
+      await writeFile(soulPath, previousSoul, 'utf8').catch(() => {})
+    } else {
+      await unlink(soulPath).catch(() => {})
+    }
+    await indexRecipe(recipeDir, { force: true }).catch(() => {})
+    logger.error({ err: (err as Error).message, slug }, 'PUT /api/recipes/:slug failed')
+    return NextResponse.json({ error: 'Failed to update recipe' }, { status: 500 })
+  }
+}
+
+/**
+ * DELETE /api/recipes/:slug — remove the recipe directory and indexed row.
+ */
+export async function DELETE(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
+  const auth = requireRole(request, 'admin')
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+
+  const rateLimited = mutationLimiter(request)
+  if (rateLimited) return rateLimited
+
+  const { slug } = await context.params
+  try {
+    await rm(join(getRecipesRoot(), slug), { recursive: true, force: true })
+    const result = removeRecipe(slug)
+    if (result.removed) {
+      eventBus.broadcast('recipe.removed', { slug })
+    }
+    return NextResponse.json({ ok: true, removed: result.removed })
+  } catch (err) {
+    logger.error({ err: (err as Error).message, slug }, 'DELETE /api/recipes/:slug failed')
+    return NextResponse.json({ error: 'Failed to delete recipe' }, { status: 500 })
   }
 }

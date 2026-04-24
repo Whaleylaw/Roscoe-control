@@ -12,6 +12,8 @@ type Thread = {
   conversationId: string
   agentName: string
   agentStatus: string
+  assignmentRole: 'member' | 'primary'
+  isPrimary: boolean
   lastMessage: string | null
   lastActivity: number
   assignmentSource: 'assigned' | 'task'
@@ -26,6 +28,11 @@ type RuntimeSession = {
   status: 'running' | 'finished' | 'failed'
   agent: string | null
 }
+
+type PrimaryAgent = {
+  name: string
+  status: string
+} | null
 
 /**
  * Union linkage rule (Open Question 1 resolution — Pitfall 1 + Pitfall 2):
@@ -86,10 +93,11 @@ export async function GET(
 
   // 1) Agent union (mirrors /api/agents?project_id=<id> from Plan 05-01) —
   // assigned ∪ task-derived, LOWER()-deduped, with assignment_source.
-  const agentRows = db
+    const agentRows = db
     .prepare(
       `
       SELECT a.name, a.status,
+        COALESCE(paa.role, 'member') AS assignment_role,
         CASE WHEN paa.agent_name IS NOT NULL THEN 'assigned' ELSE 'task' END AS assignment_source
       FROM agents a
       LEFT JOIN project_agent_assignments paa
@@ -109,8 +117,14 @@ export async function GET(
     .all(projectId, workspaceId, projectId, workspaceId) as Array<{
       name: string
       status: string
+      assignment_role: 'member' | 'primary'
       assignment_source: 'assigned' | 'task'
     }>
+
+  const primaryRow = agentRows.find((row) => row.assignment_role === 'primary')
+  const primaryAgent: PrimaryAgent = primaryRow
+    ? { name: primaryRow.name, status: primaryRow.status }
+    : null
 
   // 2) Threads — Option B (Pitfall 3): derive without writes.
   const lastMessageStmt = db.prepare(
@@ -128,6 +142,8 @@ export async function GET(
       conversationId,
       agentName: row.name,
       agentStatus: row.status,
+      assignmentRole: row.assignment_role === 'primary' ? 'primary' : 'member',
+      isPrimary: row.assignment_role === 'primary',
       lastMessage: lastMsg?.content ?? null,
       lastActivity: lastMsg?.created_at ?? 0,
       assignmentSource: row.assignment_source,
@@ -187,7 +203,7 @@ export async function GET(
 
   runtimeSessions.sort((a, b) => b.startedAt - a.startedAt)
 
-  return NextResponse.json({ threads, runtimeSessions })
+  return NextResponse.json({ threads, runtimeSessions, primaryAgent })
 }
 
 export const dynamic = 'force-dynamic'

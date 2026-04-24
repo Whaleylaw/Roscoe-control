@@ -53,6 +53,8 @@ interface Task {
   github_pr_state?: string
   comment_count?: number
   error_message?: string
+  outcome?: 'success' | 'failed' | 'partial' | 'abandoned'
+  resolution?: string
   dispatch_attempts?: number
   // Phase 09 GSD fields — extended in Wave 2a (migration 052 + store Task type)
   gsd_phase?: 'discuss' | 'plan' | 'execute' | 'verify' | 'done' | null
@@ -423,6 +425,8 @@ export interface TaskBoardScope {
   hideProjectFilter?: boolean
   /** Hide the card-view ticket_ref span. Detail modal ticket_ref stays visible. */
   hideProjectLabels?: boolean
+  /** Include projects that are hidden from the normal Projects tab. */
+  includeHiddenProjects?: boolean
   /** Default project_id used in CreateTaskModal's useState initializer. */
   defaultCreateProjectId?: number
 }
@@ -501,11 +505,12 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
         tasksQuery.set('project_id', projectFilter)
       }
       const tasksUrl = tasksQuery.toString() ? `/api/tasks?${tasksQuery.toString()}` : '/api/tasks'
+      const projectsUrl = scope?.includeHiddenProjects ? '/api/projects?includeLawFirm=1' : '/api/projects'
 
       const [tasksResponse, agentsResponse, projectsResponse] = await Promise.all([
         fetch(tasksUrl),
         fetch('/api/agents'),
-        fetch('/api/projects')
+        fetch(projectsUrl)
       ])
 
       if (!tasksResponse.ok || !agentsResponse.ok || !projectsResponse.ok) {
@@ -548,7 +553,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
     } finally {
       setLoading(false)
     }
-  }, [projectFilter, storeSetTasks])
+  }, [projectFilter, scope?.includeHiddenProjects, storeSetTasks])
 
   useEffect(() => {
     fetchData()
@@ -1714,6 +1719,28 @@ function TaskDetailModal({
                   </div>
                 )}
               </div>
+
+              {/* Execution output */}
+              {(task.resolution || task.outcome || task.error_message) && (
+                <div className="pt-3 border-t border-border/30 space-y-2">
+                  <span className="text-muted-foreground/60 uppercase tracking-wider text-[10px]">Execution Output</span>
+                  {task.outcome && (
+                    <div className="text-[11px] text-muted-foreground">
+                      Outcome: <span className="text-foreground">{task.outcome}</span>
+                    </div>
+                  )}
+                  {task.resolution && (
+                    <div className="rounded-md border border-border/40 bg-secondary/20 p-3 text-xs text-foreground whitespace-pre-wrap break-words max-h-64 overflow-auto">
+                      {task.resolution}
+                    </div>
+                  )}
+                  {!task.resolution && task.error_message && (
+                    <div className="rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 whitespace-pre-wrap break-words max-h-64 overflow-auto">
+                      {task.error_message}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* GitHub section */}
               {(task.github_issue_number || task.github_branch || task.github_pr_number) && (

@@ -5,6 +5,27 @@ function setNodeEnv(value: string) {
 }
 
 describe('proxy host matching', () => {
+  it('allows Next static assets without auth redirects', async () => {
+    vi.resetModules()
+
+    const { proxy } = await import('./proxy')
+    const request = {
+      headers: new Headers({ host: 'localhost:3000' }),
+      nextUrl: {
+        host: 'localhost:3000',
+        hostname: 'localhost',
+        pathname: '/_next/static/chunks/app.js',
+        clone: () => ({ pathname: '/_next/static/chunks/app.js' }),
+      },
+      method: 'GET',
+      cookies: { get: () => undefined },
+    } as any
+
+    const response = proxy(request)
+    expect(response.status).not.toBe(307)
+    expect(response.headers.get('location')).toBeNull()
+  })
+
   it('allows the system hostname implicitly', async () => {
     vi.resetModules()
     vi.doMock('node:os', () => ({

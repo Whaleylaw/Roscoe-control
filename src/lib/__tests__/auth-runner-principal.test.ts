@@ -207,6 +207,19 @@ describe('getUserFromRequest — runner principal', () => {
       currentRunnerSecret = null
     })
 
+    it('authenticates /api/runner/* with the configured API_KEY as runner principal', () => {
+      process.env = { ...originalEnv, API_KEY: knownSecret, MC_PROXY_AUTH_HEADER: '' }
+
+      const user = getUserFromRequest(
+        makeRequest('/api/runner/ready-tasks', { authorization: `Bearer ${knownSecret}` }),
+      )
+
+      expect(user).not.toBeNull()
+      expect(user!.username).toBe('runner')
+      expect(user!.role).toBe('operator')
+      expect(user!.id).toBe(-1000)
+    })
+
     it('returns null on /api/runner/* even with a bearer header', () => {
       const user = getUserFromRequest(
         makeRequest(

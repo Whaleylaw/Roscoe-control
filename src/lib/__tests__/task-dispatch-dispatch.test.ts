@@ -40,17 +40,24 @@ vi.mock('@/lib/github-sync-engine', () => ({
 vi.mock('@/lib/openclaw-gateway', () => ({ callOpenClawGateway: vi.fn() }))
 vi.mock('@/lib/command', () => ({ runOpenClaw: vi.fn(() => Promise.resolve({ stdout: '', stderr: '' })) }))
 vi.mock('@/lib/config', () => ({
-  config: { openclawHome: null, gnap: { enabled: false, autoSync: false, repoPath: '/tmp/noop' } },
+  config: {
+    openclawHome: null,
+    hermesApiUrl: 'http://hermes-default.local',
+    gnap: { enabled: false, autoSync: false, repoPath: '/tmp/noop' },
+  },
 }))
 
 import { dispatchAssignedTasks } from '@/lib/task-dispatch'
 
-function seedAgent(name: string): number {
+function seedAgent(
+  name: string,
+  options: { runtime_type?: string | null; config?: Record<string, unknown> } = {},
+): number {
   const now = Math.floor(Date.now() / 1000)
   const res = testDb.prepare(`
-    INSERT INTO agents (name, role, status, workspace_id, created_at, updated_at, hidden)
-    VALUES (?, 'agent', 'idle', 1, ?, ?, 0)
-  `).run(name, now, now)
+    INSERT INTO agents (name, role, status, workspace_id, created_at, updated_at, hidden, runtime_type, config)
+    VALUES (?, 'agent', 'idle', 1, ?, ?, 0, ?, ?)
+  `).run(name, now, now, options.runtime_type ?? null, JSON.stringify(options.config ?? {}))
   return Number(res.lastInsertRowid)
 }
 
@@ -85,10 +92,12 @@ beforeEach(() => {
   // Clear any seeded agents to keep the agent table small and predictable.
   testDb.prepare(`DELETE FROM agents`).run()
   broadcast.mockClear()
+  vi.stubGlobal('fetch', vi.fn())
 })
 
 afterEach(() => {
   testDb.close()
+  vi.unstubAllGlobals()
   vi.unstubAllEnvs()
 })
 
@@ -171,5 +180,62 @@ describe('dispatchAssignedTasks — recipe-tagged rows excluded (SCHED-02)', () 
     const res = await dispatchAssignedTasks()
     expect(res.ok).toBe(true)
     expect(res.message).toBe('No assigned tasks to dispatch')
+  })
+
+  it('dispatches Hermes runtime agents directly through the Hermes chat API', async () => {
+    seedAgent('hermes-agent', {
+      runtime_type: 'hermes',
+      config: {
+        hermesApiUrl: 'http://hermes-agent.local',
+        hermesApiKey: 'hermes-secret',
+        dispatchModel: 'openai/gpt-5.3-codex',
+      },
+    })
+    const taskId = insertAssignedTask({
+      title: 'hermes direct task',
+      assigned_to: 'hermes-agent',
+      recipe_slug: null,
+    })
+    const fetchMock = vi.mocked(fetch)
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({
+      id: 'hermes-session-1',
+      choices: [{ message: { content: 'Hermes completed the task.' } }],
+    }), { status: 200 }))
+
+    const res = await dispatchAssignedTasks()
+    const task = testDb.prepare(
+      `SELECT status, outcome, resolution, metadata FROM tasks WHERE id = ?`,
+    ).get(taskId) as {
+      status: string
+      outcome: string | null
+      resolution: string | null
+      metadata: string | null
+    }
+    const comment = testDb.prepare(
+      `SELECT author, content FROM comments WHERE task_id = ? ORDER BY id DESC LIMIT 1`,
+    ).get(taskId) as { author: string; content: string } | undefined
+
+    expect(res.ok).toBe(true)
+    expect(task.status).toBe('review')
+    expect(task.outcome).toBe('success')
+    expect(task.resolution).toBe('Hermes completed the task.')
+    expect(JSON.parse(task.metadata || '{}')).toMatchObject({
+      dispatch_session_id: 'hermes-session-1',
+    })
+    expect(comment).toMatchObject({
+      author: 'hermes-agent',
+      content: 'Hermes completed the task.',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://hermes-agent.local/v1/chat/completions',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer hermes-secret',
+          'Content-Type': 'application/json',
+        }),
+        body: expect.stringContaining('openai/gpt-5.3-codex'),
+      }),
+    )
   })
 })

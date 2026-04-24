@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger'
 import { scanForInjection, sanitizeForPrompt } from '@/lib/injection-guard'
 import { callOpenClawGateway } from '@/lib/openclaw-gateway'
 import { resolveCoordinatorDeliveryTarget } from '@/lib/coordinator-routing'
+import { config } from '@/lib/config'
 
 type ForwardInfo = {
   attempted: boolean
@@ -15,6 +16,7 @@ type ForwardInfo = {
   reason?: string
   session?: string
   runId?: string
+  channel?: 'gateway_session' | 'openclaw_agent' | 'hermes_run'
 }
 
 type ToolEvent = {
@@ -76,6 +78,64 @@ function safeParseMetadata(raw: string | null | undefined): any | null {
   }
 }
 
+function parseAgentConfig(rawConfig: string | null | undefined): Record<string, any> {
+  if (!rawConfig) return {}
+  try {
+    const parsed = JSON.parse(rawConfig)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function isHermesAgent(agent: any): boolean {
+  if (!agent) return false
+  if (String(agent.runtime_type || '').toLowerCase() === 'hermes') return true
+  const cfg = parseAgentConfig(agent.config)
+  const cfgType = typeof cfg.type === 'string' ? cfg.type.toLowerCase() : ''
+  if (cfgType === 'hermes') return true
+  return typeof cfg.hermesApiUrl === 'string' && cfg.hermesApiUrl.trim().length > 0
+}
+
+function buildForwardContent(content: string, metadata: any): string {
+  const projectId = metadata?.project_id ?? metadata?.projectContext?.project_id
+  const projectName = metadata?.project_name ?? metadata?.projectContext?.project_name
+  const projectSlug = metadata?.project_slug ?? metadata?.projectContext?.project_slug
+  if (!projectId && !projectName && !projectSlug) return content
+
+  const label = [projectName, projectSlug ? `(${projectSlug})` : null]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
+  return [
+    'Mission Control project chat context:',
+    `- Project: ${label || 'Unknown project'}${projectId ? ` [id ${projectId}]` : ''}`,
+    '- This is a dedicated project conversation with the assigned primary agent.',
+    '- Keep responses scoped to this project. If the user asks you to create or update project work, use the available Mission Control task/project tools when possible.',
+    '',
+    'User message:',
+    content,
+  ].join('\n')
+}
+
+function resolveHermesConfig(agent: any): { apiUrl: string; headers: Record<string, string> } {
+  const cfg = parseAgentConfig(agent?.config)
+  const apiUrl = typeof cfg.hermesApiUrl === 'string' && cfg.hermesApiUrl.trim()
+    ? cfg.hermesApiUrl.trim()
+    : config.hermesApiUrl
+  const apiKey = typeof cfg.hermesApiKey === 'string' && cfg.hermesApiKey.trim()
+    ? cfg.hermesApiKey.trim()
+    : ''
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  return { apiUrl, headers }
+}
+
+function projectChatSessionId(conversationId: string, agentName: string): string {
+  return `mc-${conversationId || `agent-${agentName}`}`.replace(/[^a-zA-Z0-9._:-]+/g, '-').slice(0, 120)
+}
+
 function createChatReply(
   db: ReturnType<typeof getDatabase>,
   workspaceId: number,
@@ -109,6 +169,113 @@ function createChatReply(
     ...row,
     metadata: safeParseMetadata(row.metadata),
   })
+}
+
+async function watchHermesProjectChatReply(args: {
+  apiUrl: string
+  headers: Record<string, string>
+  runId: string
+  workspaceId: number
+  conversationId: string
+  fromAgent: string
+  toAgent: string
+  metadata: Record<string, any> | null
+}) {
+  const { apiUrl, headers, runId, workspaceId, conversationId, fromAgent, toAgent, metadata } = args
+  try {
+    const response = await fetch(`${apiUrl}/v1/runs/${encodeURIComponent(runId)}/events`, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(30 * 60 * 1000),
+    })
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => '')
+      logger.warn(
+        { runId, status: response.status, error: errorText.substring(0, 300) },
+        'Hermes project chat run event stream failed',
+      )
+      createChatReply(
+        getDatabase(),
+        workspaceId,
+        conversationId,
+        fromAgent,
+        toAgent,
+        'I received your message, but I could not read the Hermes response stream.',
+        'status',
+        { ...(metadata || {}), status: 'stream_failed', hermes_run_id: runId },
+      )
+      return
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      let boundary = buffer.indexOf('\n\n')
+      while (boundary >= 0) {
+        const rawEvent = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+        const dataLine = rawEvent
+          .split('\n')
+          .map((line) => line.trim())
+          .find((line) => line.startsWith('data:'))
+        if (dataLine) {
+          try {
+            const event = JSON.parse(dataLine.slice(5).trim())
+            if (event?.event === 'run.completed') {
+              const output = typeof event.output === 'string' ? event.output.trim() : ''
+              if (output) {
+                createChatReply(
+                  getDatabase(),
+                  workspaceId,
+                  conversationId,
+                  fromAgent,
+                  toAgent,
+                  output,
+                  'text',
+                  { ...(metadata || {}), status: 'completed', hermes_run_id: runId },
+                )
+              }
+              return
+            }
+            if (event?.event === 'run.failed') {
+              const reason = typeof event.error === 'string' ? event.error : 'Hermes run failed.'
+              createChatReply(
+                getDatabase(),
+                workspaceId,
+                conversationId,
+                fromAgent,
+                toAgent,
+                `Hermes received your message, but execution failed: ${reason}`,
+                'status',
+                { ...(metadata || {}), status: 'failed', hermes_run_id: runId },
+              )
+              return
+            }
+          } catch (error) {
+            logger.warn({ runId, err: error }, 'Failed to parse Hermes project chat event')
+          }
+        }
+        boundary = buffer.indexOf('\n\n')
+      }
+    }
+  } catch (error) {
+    logger.warn({ runId, err: error }, 'Hermes project chat run watcher failed')
+    createChatReply(
+      getDatabase(),
+      workspaceId,
+      conversationId,
+      fromAgent,
+      toAgent,
+      'I received your message, but the Hermes response watcher stopped before completion.',
+      'status',
+      { ...(metadata || {}), status: 'watch_failed', hermes_run_id: runId },
+    )
+  }
 }
 
 function extractReplyText(waitPayload: any): string | null {
@@ -353,7 +520,7 @@ export async function POST(request: NextRequest) {
 
     // Scan content for injection when it will be forwarded to an agent
     if (body.forward && to) {
-      const injectionReport = scanForInjection(content, { context: 'prompt' })
+      const injectionReport = scanForInjection(buildForwardContent(content, metadata), { context: 'prompt' })
       if (!injectionReport.safe) {
         const criticals = injectionReport.matches.filter(m => m.severity === 'critical')
         if (criticals.length > 0) {
@@ -465,7 +632,73 @@ export async function POST(request: NextRequest) {
         // Prefer configured openclawId when present, fallback to normalized name
         let openclawAgentId: string | null = coordinatorResolution.openclawAgentId
 
-        if (!sessionKey && !openclawAgentId) {
+        if (!sessionKey && isHermesAgent(agent)) {
+          try {
+            const { apiUrl, headers } = resolveHermesConfig(agent)
+            const hermesResponse = await fetch(`${apiUrl}/v1/runs`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                input: buildForwardContent(content, metadata),
+                session_id: projectChatSessionId(conversation_id, String(agent?.name || to || 'Hermes')),
+              }),
+              signal: AbortSignal.timeout(45_000),
+            })
+
+            if (!hermesResponse.ok) {
+              const errorText = await hermesResponse.text().catch(() => '')
+              forwardInfo.reason = 'hermes_direct_non_200'
+              logger.warn(
+                { to, status: hermesResponse.status, error: errorText.substring(0, 300) },
+                'Hermes project chat delivery failed',
+              )
+              createChatReply(
+                db,
+                workspaceId,
+                conversation_id,
+                String(agent?.name || to || 'Hermes'),
+                from,
+                `I received your message, but Hermes delivery failed: API ${hermesResponse.status}.`,
+                'status',
+                { ...(metadata || {}), status: 'delivery_failed', reason: 'hermes_direct_non_200' },
+              )
+            } else {
+              const hermesPayload = await hermesResponse.json().catch(() => ({}))
+              const runId = typeof hermesPayload?.run_id === 'string' ? hermesPayload.run_id : null
+              forwardInfo.delivered = true
+              forwardInfo.channel = 'hermes_run'
+              forwardInfo.session = projectChatSessionId(conversation_id, String(agent?.name || to || 'Hermes'))
+              if (runId) {
+                forwardInfo.runId = runId
+                void watchHermesProjectChatReply({
+                  apiUrl,
+                  headers,
+                  runId,
+                  workspaceId,
+                  conversationId: conversation_id,
+                  fromAgent: String(agent?.name || to || 'Hermes'),
+                  toAgent: from,
+                  metadata: metadata && typeof metadata === 'object'
+                    ? { ...metadata, project_chat: true }
+                    : { project_chat: true },
+                })
+              }
+            }
+          } catch (err: any) {
+            forwardInfo.reason = 'hermes_direct_error'
+            logger.error({ err }, 'Failed to forward project chat message to Hermes')
+            createChatReply(
+              db,
+              workspaceId,
+              conversation_id,
+              String(agent?.name || to || 'Hermes'),
+              from,
+              `I received your message, but Hermes delivery failed: ${String(err?.message || err).slice(0, 200)}`,
+              'status',
+              { ...(metadata || {}), status: 'delivery_failed', reason: 'hermes_direct_error' },
+            )
+          }
+        } else if (!sessionKey && !openclawAgentId) {
           forwardInfo.reason = 'no_active_session'
 
           // For coordinator messages, emit an immediate visible status reply
@@ -484,6 +717,21 @@ export async function POST(request: NextRequest) {
             } catch (e) {
               logger.error({ err: e }, 'Failed to create offline status reply')
             }
+          } else if (metadata?.project_chat || typeof conversation_id === 'string' && conversation_id.startsWith('project:')) {
+            try {
+              createChatReply(
+                db,
+                workspaceId,
+                conversation_id,
+                String(to),
+                from,
+                'I received your message, but this agent does not have an active delivery session configured.',
+                'status',
+                { ...(metadata || {}), status: 'offline', reason: 'no_active_session' }
+              )
+            } catch (e) {
+              logger.error({ err: e }, 'Failed to create project chat offline status reply')
+            }
           }
         } else {
           try {
@@ -494,7 +742,7 @@ export async function POST(request: NextRequest) {
                 'chat.send',
                 {
                   sessionKey,
-                  message: content,
+                  message: buildForwardContent(content, metadata),
                   idempotencyKey,
                   deliver: false,
                   attachments: toGatewayAttachments(body.attachments),
@@ -504,12 +752,13 @@ export async function POST(request: NextRequest) {
               const status = String(acceptedPayload?.status || '').toLowerCase()
               forwardInfo.delivered = status === 'started' || status === 'ok' || status === 'in_flight'
               forwardInfo.session = sessionKey
+              forwardInfo.channel = 'gateway_session'
               if (typeof acceptedPayload?.runId === 'string' && acceptedPayload.runId) {
                 forwardInfo.runId = acceptedPayload.runId
               }
             } else {
               const invokeParams: any = {
-                message: `Message from ${from}: ${content}`,
+                message: `Message from ${from}: ${buildForwardContent(content, metadata)}`,
                 idempotencyKey,
                 deliver: false,
               }
@@ -531,6 +780,7 @@ export async function POST(request: NextRequest) {
               const acceptedPayload = parseGatewayJson(invokeResult.stdout)
               forwardInfo.delivered = true
               forwardInfo.session = openclawAgentId || undefined
+              forwardInfo.channel = 'openclaw_agent'
               if (typeof acceptedPayload?.runId === 'string' && acceptedPayload.runId) {
                 forwardInfo.runId = acceptedPayload.runId
               }
@@ -565,6 +815,21 @@ export async function POST(request: NextRequest) {
                   )
                 } catch (e) {
                   logger.error({ err: e }, 'Failed to create gateway failure status reply')
+                }
+              } else if (metadata?.project_chat || typeof conversation_id === 'string' && conversation_id.startsWith('project:')) {
+                try {
+                  createChatReply(
+                    db,
+                    workspaceId,
+                    conversation_id,
+                    String(to),
+                    from,
+                    'I received your message, but delivery to the agent runtime failed. Please check the agent session and retry.',
+                    'status',
+                    { ...(metadata || {}), status: 'delivery_failed', reason: 'gateway_send_failed' }
+                  )
+                } catch (e) {
+                  logger.error({ err: e }, 'Failed to create project chat gateway failure status reply')
                 }
               }
             }

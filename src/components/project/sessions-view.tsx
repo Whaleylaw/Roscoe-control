@@ -10,6 +10,8 @@ type Thread = {
   conversationId: string
   agentName: string
   agentStatus: string
+  assignmentRole?: 'member' | 'primary'
+  isPrimary?: boolean
   lastMessage: string | null
   lastActivity: number
   assignmentSource: 'assigned' | 'task'
@@ -26,6 +28,15 @@ type RuntimeSession = {
 }
 
 type ProjectSessionsResponse = { threads: Thread[]; runtimeSessions: RuntimeSession[] }
+
+type AgentOption = {
+  name: string
+  status: string
+}
+
+type ProjectSessionsData = ProjectSessionsResponse & {
+  primaryAgent?: AgentOption | null
+}
 
 const STATUS_DOT_CLASS: Record<string, string> = {
   idle: 'bg-success',
@@ -81,17 +92,26 @@ export function SessionsView() {
   const router = useRouter()
   const { project, slug, detailId } = useProjectWorkspace()
 
-  const [data, setData] = useState<ProjectSessionsResponse | null>(null)
+  const [data, setData] = useState<ProjectSessionsData | null>(null)
+  const [agents, setAgents] = useState<AgentOption[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [savingPrimary, setSavingPrimary] = useState(false)
 
   const load = useCallback(async () => {
     if (!project) return
     setError(null)
     try {
-      const res = await fetch(`/api/projects/${project.id}/sessions`)
+      const [res, agentsRes] = await Promise.all([
+        fetch(`/api/projects/${project.id}/sessions`),
+        fetch('/api/agents?limit=200'),
+      ])
       if (!res.ok) throw new Error(res.statusText || 'fetch failed')
-      const json: ProjectSessionsResponse = await res.json()
+      const json: ProjectSessionsData = await res.json()
       setData(json)
+      if (agentsRes.ok) {
+        const agentsJson = await agentsRes.json()
+        setAgents(Array.isArray(agentsJson?.agents) ? agentsJson.agents : [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'fetch failed')
     }
@@ -119,6 +139,28 @@ export function SessionsView() {
     [router],
   )
 
+  const setPrimaryAgent = useCallback(async (agentName: string) => {
+    if (!project || !agentName) return
+    setSavingPrimary(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects/${project.id}/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_name: agentName, role: 'primary' }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || res.statusText || 'fetch failed')
+      }
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'fetch failed')
+    } finally {
+      setSavingPrimary(false)
+    }
+  }, [load, project])
+
   if (!project) return null
 
   if (error) {
@@ -144,29 +186,60 @@ export function SessionsView() {
     return <div className="p-6 text-sm text-muted-foreground">{t('loading')}</div>
   }
 
+  const primaryThread = data.primaryAgent
+    ? data.threads.find((thread) => thread.agentName.toLowerCase() === data.primaryAgent?.name.toLowerCase())
+    : null
   const empty = data.threads.length === 0 && data.runtimeSessions.length === 0
-
-  if (empty) {
-    return (
-      <div className="p-6 flex flex-col items-center justify-center gap-4 text-center">
-        <span className="text-4xl" aria-hidden="true">
-          💬
-        </span>
-        <h2 className="text-lg font-semibold">{t('emptyHeading')}</h2>
-        <p className="text-sm text-muted-foreground max-w-sm">{t('emptyBody')}</p>
-        <button
-          type="button"
-          onClick={() => navigate(`/project/${slug}/agents`)}
-          className="mt-6 bg-primary text-primary-foreground text-sm font-semibold px-4 py-2 rounded-md transition-colors"
-        >
-          {t('emptyCta')}
-        </button>
-      </div>
-    )
-  }
 
   return (
     <div className="p-6 space-y-6">
+      <section className="bg-card border border-border rounded-md p-4 flex flex-col md:flex-row md:items-end gap-4">
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold">{t('primaryAgentTitle')}</h3>
+          <p className="text-xs text-muted-foreground mt-1">{t('primaryAgentBody')}</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <label className="sr-only" htmlFor="project-primary-agent">{t('primaryAgentSelect')}</label>
+          <select
+            id="project-primary-agent"
+            value={data.primaryAgent?.name || ''}
+            onChange={(event) => setPrimaryAgent(event.target.value)}
+            disabled={savingPrimary || agents.length === 0}
+            className="h-9 min-w-48 rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          >
+            <option value="">{agents.length === 0 ? t('noAgentsAvailable') : t('primaryAgentPlaceholder')}</option>
+            {agents.map((agent) => (
+              <option key={agent.name} value={agent.name}>{agent.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!primaryThread}
+            onClick={() => primaryThread && navigate(`/project/${slug}/sessions/${primaryThread.id}`)}
+            className="h-9 rounded-md bg-primary text-primary-foreground px-3 text-sm font-semibold disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {t('openPrimaryChat')}
+          </button>
+        </div>
+      </section>
+
+      {empty && (
+        <div className="flex flex-col items-center justify-center gap-4 text-center py-10">
+          <span className="text-4xl" aria-hidden="true">
+            💬
+          </span>
+          <h2 className="text-lg font-semibold">{t('emptyHeading')}</h2>
+          <p className="text-sm text-muted-foreground max-w-sm">{t('emptyBody')}</p>
+          <button
+            type="button"
+            onClick={() => navigate(`/project/${slug}/agents`)}
+            className="mt-6 bg-primary text-primary-foreground text-sm font-semibold px-4 py-2 rounded-md transition-colors"
+          >
+            {t('emptyCta')}
+          </button>
+        </div>
+      )}
+
       {data.threads.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold mb-2">{t('threadsHeader')}</h3>
@@ -197,7 +270,7 @@ export function SessionsView() {
                         <span className="text-sm font-semibold">{thread.agentName}</span>
                         {thread.assignmentSource === 'assigned' && (
                           <span className="text-xs font-normal bg-primary/10 text-primary border border-primary/30 px-2 py-0.5 rounded">
-                            {tAgents('assignedChip')}
+                            {thread.isPrimary ? t('primaryChip') : tAgents('assignedChip')}
                           </span>
                         )}
                       </div>

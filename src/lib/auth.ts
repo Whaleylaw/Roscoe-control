@@ -472,7 +472,14 @@ export function getUserFromRequest(request: Request): User | null {
   if (url.pathname.startsWith('/api/runner/')) {
     const bearer = extractApiKeyFromHeaders(request.headers)
     const runnerSecret = getRunnerSecret()
-    if (bearer && runnerSecret && safeCompare(bearer, runnerSecret)) {
+    const configuredApiKey = resolveActiveApiKey()
+    const isRunnerPrincipal = Boolean(
+      bearer && (
+        (runnerSecret && safeCompare(bearer, runnerSecret)) ||
+        (configuredApiKey && safeCompare(bearer, configuredApiKey))
+      ),
+    )
+    if (isRunnerPrincipal) {
       try {
         logSecurityEvent({
           event_type: 'runner_auth',
@@ -844,4 +851,3 @@ export function requireRunnerToken(
     },
   }
 }
-

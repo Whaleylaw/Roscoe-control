@@ -2,7 +2,7 @@
 
 Purpose: one canonical operator and agent map of how GSD runs in Mission Control after Phase 10, including the legacy project shell, the hierarchical execution model, the main mutation paths, dependency/conflict rules, and live event refresh behavior.
 
-Last updated: 2026-04-15
+Last updated: 2026-04-21
 Sources: `docs/agent-gsd-guide.md`, `src/app/api/projects/[id]/gsd/lifecycle-graph/route.ts`, `src/lib/gsd-hierarchy.ts`, `src/lib/event-bus.ts`
 
 ---
@@ -297,10 +297,10 @@ For new GSD projects:
 
 ## 10) What remains intentionally incomplete
 
-Current gaps relative to the reference model:
+Current gaps relative to the reference model are now mostly orchestration polish, not missing primitives:
 
-- no automatic wave-conflict detector yet; `wave_conflicts` remains a placeholder rollup
-- no dedicated CLI or MCP wrappers yet for hierarchy CRUD and transitions
-- hierarchy APIs are real and stable, but they are currently best driven through REST or `mc raw`
+- phase/plan dependency and wave-conflict enforcement is implemented server-side (`WAVE_CONFLICT_BLOCKED` and `rollups.wave_conflicts` are live)
+- dedicated CLI wrappers for hierarchy CRUD/transitions are implemented (`pnpm mc projects ...`, `pnpm mc gsd ...`)
+- dedicated MCP wrappers for hierarchy CRUD/transitions are implemented in `scripts/mc-mcp-server.cjs`
 
-This means the hierarchy is operational now, but higher-level orchestration polish is still being layered on.
+The remaining work is policy-level automation and operator defaults (queue routing, guardrails, and reporting ergonomics), not core API/CLI/MCP capability gaps.

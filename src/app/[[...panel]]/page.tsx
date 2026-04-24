@@ -13,6 +13,7 @@ import { CostTrackerPanel } from '@/components/panels/cost-tracker-panel'
 import { TaskBoardPanel } from '@/components/panels/task-board-panel'
 import { RecipesPanel } from '@/components/panels/recipes-panel'
 import { ProjectsPanel } from '@/components/panels/projects-panel'
+import { LawFirmPanel } from '@/components/panels/law-firm-panel'
 import { ActivityFeedPanel } from '@/components/panels/activity-feed-panel'
 import { AgentSquadPanelPhase3 } from '@/components/panels/agent-squad-panel-phase3'
 import { AgentCommsPanel } from '@/components/panels/agent-comms-panel'
@@ -54,6 +55,7 @@ import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
 import { Loader } from '@/components/ui/loader'
 import { ProjectManagerModal } from '@/components/modals/project-manager-modal'
 import { ProjectWorkspace } from '@/components/project/project-workspace'
+import { LawFirmCaseWorkspace } from '@/components/law-firm/case-workspace'
 import { ExecApprovalOverlay } from '@/components/modals/exec-approval-overlay'
 import { useWebSocket } from '@/lib/websocket'
 import { useServerEvents } from '@/lib/use-server-events'
@@ -98,8 +100,9 @@ export default function Home() {
   // Sync URL → Zustand activeTab
   const pathname = usePathname()
   const isProjectRoute = pathname.startsWith('/project/')
+  const isLawFirmCaseRoute = pathname.startsWith('/law-firm/case/')
   const panelFromUrl = pathname === '/' ? 'overview' : pathname.slice(1)
-  const normalizedPanel = panelFromUrl === 'sessions' ? 'chat' : panelFromUrl
+  const normalizedPanel = isLawFirmCaseRoute ? 'law-firm' : panelFromUrl === 'sessions' ? 'chat' : panelFromUrl
 
   useEffect(() => {
     completeNavigationTiming(pathname)
@@ -432,8 +435,8 @@ export default function Home() {
           aria-hidden={showOnboarding}
         >
           <div aria-live="polite" className="flex flex-col min-h-full">
-            <ErrorBoundary key={isProjectRoute ? pathname : activeTab}>
-              {isProjectRoute ? <ProjectWorkspace /> : <ContentRouter tab={activeTab} />}
+            <ErrorBoundary key={isProjectRoute || isLawFirmCaseRoute ? pathname : activeTab}>
+              {isProjectRoute ? <ProjectWorkspace /> : isLawFirmCaseRoute ? <LawFirmCaseWorkspace /> : <ContentRouter tab={activeTab} />}
             </ErrorBoundary>
           </div>
 {/* Footer removed — attribution moved to nav sidebar */}
@@ -480,7 +483,7 @@ export default function Home() {
 }
 
 const ESSENTIAL_PANELS = new Set([
-  'overview', 'agents', 'projects', 'tasks', 'chat', 'activity', 'logs', 'settings',
+  'overview', 'agents', 'projects', 'law-firm', 'tasks', 'chat', 'activity', 'logs', 'settings',
 ])
 
 function ContentRouter({ tab }: { tab: string }) {
@@ -534,6 +537,8 @@ function ContentRouter({ tab }: { tab: string }) {
       )
     case 'projects':
       return <ProjectsPanel />
+    case 'law-firm':
+      return <LawFirmPanel />
     case 'tasks':
       return <TaskBoardPanel />
     case 'recipes':

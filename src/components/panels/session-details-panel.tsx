@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,10 @@ export interface SessionDetailScope {
   threadMode?: boolean
   /** Back link target URL — if provided, a "Back to sessions" link is rendered. */
   backHref?: string
+  /** Project context used when sending a project-scoped chat message. */
+  projectId?: number
+  projectName?: string | null
+  projectSlug?: string | null
 }
 
 const selectClass =
@@ -45,6 +49,11 @@ const selectClass =
 function sessionIdToConversationId(id: string): string | null {
   const m = id.match(/^thread:(\d+):(.+)$/)
   return m ? `project:${m[1]}:agent:${m[2]}` : null
+}
+
+function sessionIdToAgentName(id: string): string | null {
+  const m = id.match(/^thread:\d+:(.+)$/)
+  return m ? m[1] : null
 }
 
 interface ThreadMessage {
@@ -89,16 +98,73 @@ export function SessionDetailsPanel({ scope }: { scope?: SessionDetailScope } = 
   const conversationId = scope?.threadMode && scope.sessionId
     ? sessionIdToConversationId(scope.sessionId)
     : null
+  const threadAgentName = scope?.threadMode && scope.sessionId
+    ? sessionIdToAgentName(scope.sessionId)
+    : null
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([])
+  const [threadDraft, setThreadDraft] = useState('')
+  const [threadSending, setThreadSending] = useState(false)
+  const [threadError, setThreadError] = useState<string | null>(null)
+  const loadThreadMessages = useCallback(async (signal?: AbortSignal) => {
+    if (!conversationId) return
+    const response = await fetch(`/api/chat/messages?conversation_id=${encodeURIComponent(conversationId)}`, { signal })
+    if (!response.ok) throw new Error('Failed to load messages')
+    const data = await response.json()
+    setThreadMessages(data.messages || [])
+  }, [conversationId])
+
   useEffect(() => {
     if (!conversationId) return
     const ctrl = new AbortController()
-    fetch(`/api/chat/messages?conversation_id=${encodeURIComponent(conversationId)}`, { signal: ctrl.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((data) => setThreadMessages(data.messages || []))
+    loadThreadMessages(ctrl.signal)
       .catch(() => { /* leave empty */ })
     return () => ctrl.abort()
-  }, [conversationId])
+  }, [conversationId, loadThreadMessages])
+
+  useEffect(() => {
+    if (!conversationId) return
+    const handler = () => {
+      loadThreadMessages().catch(() => { /* leave current messages */ })
+    }
+    window.addEventListener('mc:chat-message', handler)
+    return () => window.removeEventListener('mc:chat-message', handler)
+  }, [conversationId, loadThreadMessages])
+
+  const sendThreadMessage = useCallback(async (event: FormEvent) => {
+    event.preventDefault()
+    const content = threadDraft.trim()
+    if (!conversationId || !threadAgentName || !content) return
+    setThreadSending(true)
+    setThreadError(null)
+    try {
+      const response = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: threadAgentName,
+          content,
+          message_type: 'text',
+          conversation_id: conversationId,
+          forward: true,
+          metadata: {
+            project_chat: true,
+            project_id: scope?.projectId ?? null,
+            project_name: scope?.projectName ?? null,
+            project_slug: scope?.projectSlug ?? null,
+            agent_name: threadAgentName,
+          },
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Failed to send message')
+      setThreadDraft('')
+      await loadThreadMessages()
+    } catch (error) {
+      setThreadError(error instanceof Error ? error.message : 'Failed to send message')
+    } finally {
+      setThreadSending(false)
+    }
+  }, [conversationId, loadThreadMessages, scope?.projectId, scope?.projectName, scope?.projectSlug, threadAgentName, threadDraft])
 
   const [controllingSession, setControllingSession] = useState<string | null>(null)
   const [sessionFilter, setSessionFilter] = useState<'all' | 'active' | 'idle'>('all')
@@ -388,17 +454,55 @@ export function SessionDetailsPanel({ scope }: { scope?: SessionDetailScope } = 
 
       {/* SESS-01 thread-mode branch — render chat thread when scope.threadMode is true */}
       {scope?.threadMode ? (
-        <div className="flex flex-col gap-3 p-4 bg-card border border-border rounded-lg">
-          {threadMessages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{tProject('threadEmptyPreview')}</p>
-          ) : (
-            threadMessages.map((m) => (
-              <div key={m.id} className="rounded border border-border bg-background p-3">
-                <div className="text-xs text-muted-foreground mb-1">{m.from_agent || 'user'}</div>
-                <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+        <div className="flex flex-col gap-4 p-4 bg-card border border-border rounded-lg">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                {tProject('projectChatTitle', { agent: threadAgentName || 'agent' })}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {tProject('projectChatSubtitle', { project: scope?.projectName || scope?.projectSlug || '' })}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 max-h-[52vh] overflow-y-auto pr-1">
+            {threadMessages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{tProject('threadEmptyPreview')}</p>
+            ) : (
+              threadMessages.map((m) => (
+                <div key={m.id} className="rounded border border-border bg-background p-3">
+                  <div className="text-xs text-muted-foreground mb-1">{m.from_agent || 'user'}</div>
+                  <div className="text-sm whitespace-pre-wrap">{m.content}</div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <form onSubmit={sendThreadMessage} className="border-t border-border pt-4 space-y-3">
+            {threadError && (
+              <div role="alert" className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+                {threadError}
               </div>
-            ))
-          )}
+            )}
+            <label className="block text-xs text-muted-foreground" htmlFor="project-thread-message">
+              {tProject('messageLabel', { agent: threadAgentName || 'agent' })}
+            </label>
+            <textarea
+              id="project-thread-message"
+              value={threadDraft}
+              onChange={(e) => setThreadDraft(e.target.value)}
+              rows={4}
+              className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+              placeholder={tProject('messagePlaceholder')}
+              disabled={threadSending}
+            />
+            <div className="flex justify-end">
+              <Button type="submit" disabled={!threadDraft.trim() || threadSending}>
+                {threadSending ? tProject('sending') : tProject('send')}
+              </Button>
+            </div>
+          </form>
         </div>
       ) : (
 

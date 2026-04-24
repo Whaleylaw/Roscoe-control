@@ -31,6 +31,7 @@ const navGroups: NavGroup[] = [
       { id: 'overview', label: 'Overview', icon: <OverviewIcon />, priority: true, essential: true },
       { id: 'agents', label: 'Agents', icon: <AgentsIcon />, priority: true, essential: true },
       { id: 'projects', label: 'Projects', icon: <ProjectsIcon />, priority: true, essential: true },
+      { id: 'law-firm', label: 'Law Firm', icon: <LawFirmIcon />, priority: false, essential: true },
       { id: 'tasks', label: 'Tasks', icon: <TasksIcon />, priority: true, essential: true },
       { id: 'recipes', label: 'Recipes', icon: <RecipesIcon />, priority: false, essential: false },
       { id: 'chat', label: 'Chat', icon: <ChatIcon />, priority: false, essential: true },
@@ -88,6 +89,7 @@ const navItemTranslationKeys: Record<string, string> = {
   overview: 'overview',
   agents: 'agents',
   projects: 'projects',
+  'law-firm': 'lawFirm',
   tasks: 'tasks',
   recipes: 'recipes',
   chat: 'chat',
@@ -1268,6 +1270,18 @@ function ProjectsIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M1.5 4.5a1 1 0 0 1 1-1h4l1.5 1.5h5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-10.5a1 1 0 0 1-1-1z" />
+    </svg>
+  )
+}
+
+function LawFirmIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 1.5v13" />
+      <path d="M3 4h10" />
+      <path d="M5 4l-3 5h6L5 4z" />
+      <path d="M11 4L8 9h6l-3-5z" />
+      <path d="M5 14h6" />
     </svg>
   )
 }

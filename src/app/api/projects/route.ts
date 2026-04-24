@@ -5,6 +5,7 @@ import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { GSD_TRACKS, GSD_GATE_MODES } from '@/lib/validation'
+import { isLawFirmCaseProjectId } from '@/lib/law-firm'
 
 function slugify(input: string): string {
   return input
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
       userAgent: request.headers.get('user-agent'),
     })
     const includeArchived = new URL(request.url).searchParams.get('includeArchived') === '1'
+    const includeLawFirm = new URL(request.url).searchParams.get('includeLawFirm') === '1'
 
     const rows = db.prepare(`
       SELECT p.id, p.workspace_id, p.name, p.slug, p.description, p.ticket_prefix, p.ticket_counter, p.status,
@@ -54,12 +56,14 @@ export async function GET(request: NextRequest) {
       ORDER BY p.name COLLATE NOCASE ASC
     `).all(workspaceId) as Array<Record<string, unknown>>
 
-    const projects = rows.map(row => ({
-      ...row,
-      assigned_agents: row.assigned_agents_csv ? String(row.assigned_agents_csv).split(',') : [],
-      assigned_agents_csv: undefined,
-      last_activity_at: row.last_activity_at == null ? null : Number(row.last_activity_at),
-    }))
+    const projects = rows
+      .filter(row => includeLawFirm || !isLawFirmCaseProjectId(row.gsd_project_id))
+      .map(row => ({
+        ...row,
+        assigned_agents: row.assigned_agents_csv ? String(row.assigned_agents_csv).split(',') : [],
+        assigned_agents_csv: undefined,
+        last_activity_at: row.last_activity_at == null ? null : Number(row.last_activity_at),
+      }))
 
     return NextResponse.json({ projects })
   } catch (error) {
