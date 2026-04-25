@@ -47,20 +47,33 @@ name: Lien Resolution
 version: 1
 subject_type: law_firm_case
 
-trigger:
-  type: manual_or_condition
-  condition: law_firm.landmarks.liens_identified == true
+vars:
+  case_slug:
+    description: FirmVault case slug.
+    required: true
+    type: string
+  lien_scope:
+    description: Optional lien holder filter.
+    default: all
+    type: string
+
+triggers:
+  - type: manual
+  - type: condition
+    condition: law_firm.landmarks.liens_identified == true
 
 nodes:
   identify_liens:
     type: recipe
     recipe: firmvault-identify-liens
+    description: Check the case file and lien folder before creating new lien work.
     completes:
       - law_firm.landmarks.liens_identified
 
   open_liens:
     type: recipe
     recipe: firmvault-open-liens
+    description_file: workflows/lien-resolution/open-liens.md
     depends_on:
       - identify_liens
     review:
@@ -97,6 +110,57 @@ nodes:
       conditions:
         - law_firm.landmarks.final_amounts_received != true
 ```
+
+## Variables
+
+Workflows can declare reusable variables under `vars`. A variable can be a
+simple scalar default or an object with metadata:
+
+```yaml
+vars:
+  case_slug:
+    description: FirmVault case slug.
+    required: true
+    type: string
+  follow_up_days: 30
+```
+
+Variables are definition metadata for now. They give orchestrators, future
+workflow builders, and UI forms a contract for what must be supplied when a
+workflow instance is started. The runtime does not yet template-substitute
+workflow YAML from these values.
+
+## Triggers
+
+Use `triggers` for workflow activation rules. `trigger` is still accepted as a
+legacy alias and is normalized to a one-item `triggers` array.
+
+```yaml
+triggers:
+  - type: manual
+  - type: condition
+    condition: law_firm.landmarks.treatment_complete == true
+  - type: event
+    on: case.landmark.satisfied
+  - type: cooldown
+    interval: 30d
+  - type: cron
+    schedule: "0 9 * * 1"
+```
+
+Supported trigger types:
+
+- `manual`: user or orchestrator starts the workflow explicitly.
+- `condition`: a named condition, such as a FirmVault landmark expression,
+  opens the workflow.
+- `event`: a workflow starts when a matching system event is observed.
+- `cooldown`: elapsed-time activation, useful for repeating patrol-style work.
+- `cron`: calendar-style activation.
+
+The current implementation validates and stores these triggers in the workflow
+YAML. Automatic trigger dispatch is a later layer; condition dependencies inside
+running workflow instances are already push-satisfied through
+`POST /api/workflow-dependencies/satisfy`.
 
 `depends_on` can be the legacy shorthand list of node keys or the expanded
 object form:
@@ -161,6 +225,25 @@ This mirrors the useful part of Beads' formula/proto/molecule model:
 - workflow node = a graph node
 - Mission Control task = materialized agent/human work for a ready recipe node
 - dependency rows = the auditable gate/blocker state for that node
+
+## Node Instructions
+
+Recipe and review nodes can include short inline instructions and/or a reference
+to a longer instruction file:
+
+```yaml
+nodes:
+  request_records:
+    type: recipe
+    recipe: firmvault-medical-records-send-request
+    description: Confirm the request packet before drafting the send handoff.
+    description_file: recipes/firmvault-medical-records-send-request/references/sending-methods.md
+```
+
+When a recipe node materializes into a Mission Control task, the task
+description includes the node goal from `config.task_goal`, the inline
+`description`, and the `description_file` path. The recipe itself still owns the
+runner's SOUL.md, tools, references, model, workspace, and review.md.
 
 ## Lifecycle
 

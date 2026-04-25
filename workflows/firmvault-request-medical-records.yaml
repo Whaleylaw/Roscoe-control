@@ -4,15 +4,26 @@ name: FirmVault Request Medical Records and Bills
 version: 1
 subject_type: law_firm_case
 
-trigger:
-  type: condition
-  condition: law_firm.landmarks.treatment_complete == true
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  provider_scope:
+    description: Provider filter for this request cycle. Defaults to all eligible providers.
+    default: all
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.treatment_complete == true
 
 nodes:
   verify_medical_authorization:
     type: recipe
     name: Verify HIPAA Authorization
     recipe: firmvault-medical-records-verify-authorization
+    description_file: recipes/firmvault-medical-records-verify-authorization/references/source-skill-medical-records-request.md
     depends_on:
       conditions:
         - law_firm.landmarks.providers_setup == true
@@ -26,6 +37,7 @@ nodes:
     type: recipe
     name: Prepare Records and Bills Request
     recipe: firmvault-medical-records-prepare-request
+    description_file: recipes/firmvault-medical-records-prepare-request/references/source-skill-medical-records-request.md
     depends_on:
       nodes:
         - verify_medical_authorization
@@ -40,6 +52,7 @@ nodes:
     type: recipe
     name: Send Medical Records and Bills Request
     recipe: firmvault-medical-records-send-request
+    description_file: recipes/firmvault-medical-records-send-request/references/sending-methods.md
     depends_on:
       nodes:
         - prepare_records_request
@@ -52,6 +65,7 @@ nodes:
     type: recipe
     name: First Follow-Up on Medical Records and Bills
     recipe: firmvault-medical-records-first-follow-up
+    description_file: recipes/firmvault-medical-records-first-follow-up/references/follow-up-process.md
     depends_on:
       nodes:
         - send_records_request
@@ -65,6 +79,7 @@ nodes:
     type: recipe
     name: Second Follow-Up on Medical Records and Bills
     recipe: firmvault-medical-records-second-follow-up
+    description_file: recipes/firmvault-medical-records-second-follow-up/references/follow-up-process.md
     depends_on:
       nodes:
         - first_follow_up_records_request
@@ -78,6 +93,7 @@ nodes:
     type: recipe
     name: Escalate Delayed Medical Records and Bills
     recipe: firmvault-medical-records-escalate-delay
+    description_file: recipes/firmvault-medical-records-escalate-delay/references/error-handling.md
     depends_on:
       nodes:
         - second_follow_up_records_request

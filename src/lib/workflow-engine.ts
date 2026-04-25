@@ -37,9 +37,48 @@ const dependsOnSchema = z.union([
   }),
 ]).default([])
 
+const workflowTriggerSchema = z.object({
+  type: z.enum(['manual', 'condition', 'event', 'cooldown', 'cron']),
+  condition: z.string().min(1).optional(),
+  on: z.string().min(1).optional(),
+  interval: z.string().regex(durationPattern).optional(),
+  schedule: z.string().min(1).optional(),
+  enabled: z.boolean().default(true),
+  config: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((trigger, ctx) => {
+  if (trigger.type === 'condition' && !trigger.condition) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['condition'], message: 'condition triggers require condition' })
+  }
+  if (trigger.type === 'event' && !trigger.on) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['on'], message: 'event triggers require on' })
+  }
+  if (trigger.type === 'cooldown' && !trigger.interval) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['interval'], message: 'cooldown triggers require interval' })
+  }
+  if (trigger.type === 'cron' && !trigger.schedule) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['schedule'], message: 'cron triggers require schedule' })
+  }
+})
+
+const workflowVarValueSchema = z.union([z.string(), z.number(), z.boolean()])
+
+const workflowVarSchema = z.union([
+  workflowVarValueSchema,
+  z.object({
+    description: z.string().min(1).optional(),
+    default: workflowVarValueSchema.optional(),
+    required: z.boolean().default(false),
+    enum: z.array(workflowVarValueSchema).optional(),
+    pattern: z.string().min(1).optional(),
+    type: z.enum(['string', 'number', 'boolean', 'json']).default('string'),
+  }),
+])
+
 const workflowNodeSchema = z.object({
   type: z.enum(['recipe', 'review', 'wait', 'code', 'gateway', 'gate']),
   name: z.string().min(1).max(200).optional(),
+  description: z.string().min(1).optional(),
+  description_file: z.string().min(1).optional(),
   recipe: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   depends_on: dependsOnSchema,
   blockers: z.array(z.string().min(1)).default([]),
@@ -70,10 +109,8 @@ const workflowDefinitionSchema = z.object({
   name: z.string().min(1).max(200),
   version: z.number().int().min(1).default(1),
   subject_type: z.string().min(1).max(100).default('generic'),
-  trigger: z.object({
-    type: z.string().min(1).max(100).default('manual'),
-    condition: z.string().min(1).optional(),
-  }).default({ type: 'manual' }),
+  vars: z.record(z.string(), workflowVarSchema).default({}),
+  triggers: z.array(workflowTriggerSchema).min(1).default([{ type: 'manual', enabled: true, config: {} }]),
   nodes: z.record(z.string().min(1), workflowNodeSchema).refine((nodes) => Object.keys(nodes).length > 0, {
     message: 'workflow must define at least one node',
   }),
@@ -189,8 +226,36 @@ export type SatisfyWorkflowConditionResult = {
   materialized: MaterializeReadyWorkflowNodesResult[]
 }
 
+function normalizeWorkflowDefinitionInput(parsed: unknown): unknown {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parsed
+  const raw = parsed as Record<string, unknown>
+  const normalized = { ...raw }
+  if (!Array.isArray(normalized.triggers)) {
+    const legacyTrigger = normalized.trigger
+    normalized.triggers = legacyTrigger && typeof legacyTrigger === 'object'
+      ? [normalizeWorkflowTriggerInput(legacyTrigger)]
+      : [{ type: 'manual' }]
+  } else {
+    normalized.triggers = normalized.triggers.map(normalizeWorkflowTriggerInput)
+  }
+  delete normalized.trigger
+  return normalized
+}
+
+function normalizeWorkflowTriggerInput(trigger: unknown): unknown {
+  if (!trigger || typeof trigger !== 'object' || Array.isArray(trigger)) return trigger
+  const raw = trigger as Record<string, unknown>
+  if (raw.type === 'event' && !raw.on && typeof raw.event === 'string') {
+    return { ...raw, on: raw.event }
+  }
+  if (raw.type === 'cooldown' && !raw.interval && typeof raw.duration === 'string') {
+    return { ...raw, interval: raw.duration }
+  }
+  return raw
+}
+
 export function parseWorkflowDefinition(raw: string): WorkflowDefinition {
-  const parsed = parseYaml(raw)
+  const parsed = normalizeWorkflowDefinitionInput(parseYaml(raw))
   const result = workflowDefinitionSchema.safeParse(parsed)
   if (!result.success) {
     const message = result.error.issues.map((issue) => {
@@ -294,7 +359,16 @@ export function startWorkflowInstance(
         node.type,
         node.recipe ?? null,
         JSON.stringify(node.depends_on ?? []),
-        JSON.stringify({ ...node.config, review: node.review ?? null, duration: node.duration ?? null, until: node.until ?? null, exit_when: node.exit_when ?? null, completes: node.completes ?? [] }),
+        JSON.stringify({
+          ...node.config,
+          description: node.description ?? null,
+          description_file: node.description_file ?? null,
+          review: node.review ?? null,
+          duration: node.duration ?? null,
+          until: node.until ?? null,
+          exit_when: node.exit_when ?? null,
+          completes: node.completes ?? [],
+        }),
         now,
         now,
       )
@@ -1320,9 +1394,13 @@ function workflowTaskDescription(
     definition_name: string
     definition_version: number
   },
-  node: { node_key: string; node_type: WorkflowNodeType; recipe_slug: string | null },
+  node: { node_key: string; node_type: WorkflowNodeType; recipe_slug: string | null; config_json?: string | null },
 ): string {
-  return [
+  const config = parseObject(node.config_json)
+  const taskGoal = typeof config.task_goal === 'string' ? config.task_goal.trim() : ''
+  const description = typeof config.description === 'string' ? config.description.trim() : ''
+  const descriptionFile = typeof config.description_file === 'string' ? config.description_file.trim() : ''
+  const lines = [
     `Workflow task for ${context.definition_name}.`,
     '',
     `Workflow: ${context.definition_slug} v${context.definition_version}`,
@@ -1330,13 +1408,32 @@ function workflowTaskDescription(
     `Subject: ${context.subject_type}:${context.subject_id}`,
     `Node: ${node.node_key} (${node.node_type})`,
     `Recipe: ${node.recipe_slug ?? 'not set'}`,
+  ]
+  if (taskGoal || description || descriptionFile) {
+    lines.push('', 'Node instructions:')
+    if (taskGoal) lines.push(`Goal: ${taskGoal}`)
+    if (description) lines.push(description)
+    if (descriptionFile) lines.push(`Additional instruction file: ${descriptionFile}`)
+  }
+  lines.push(
     '',
     'Worker contract:',
     '- Read /recipe/PREAMBLE.md and /recipe/SOUL.md before acting.',
     '- Work only inside the mounted /workspace.',
     '- Use task comments/checkpoints for questions, blockers, and final handoff.',
     '- Submit the task through the recipe runner API when complete.',
-  ].join('\n')
+  )
+  return lines.join('\n')
+}
+
+function parseObject(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
 }
 
 function materializationContextForWorkflow(db: Database.Database, workflowInstanceId: number): {

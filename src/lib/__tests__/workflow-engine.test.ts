@@ -34,8 +34,68 @@ describe('workflow-engine', () => {
   it('parses a workflow definition with recipe and wait nodes', () => {
     const definition = parseWorkflowDefinition(sample)
     expect(definition.id).toBe('lien-resolution')
+    expect(definition.triggers).toEqual([{ type: 'manual', enabled: true, config: {} }])
     expect(definition.nodes.open_liens.depends_on).toEqual(['identify_liens'])
     expect(definition.nodes.wait_30_days.duration).toBe('30d')
+  })
+
+  it('parses workflow variables, plural triggers, and node instruction files', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: trigger-vars
+name: Trigger Vars
+vars:
+  provider_name:
+    description: Provider name to request records from.
+    required: true
+    type: string
+  follow_up_days: 30
+triggers:
+  - type: manual
+  - type: condition
+    condition: law_firm.landmarks.treatment_complete == true
+  - type: event
+    event: case.landmark.satisfied
+  - type: cooldown
+    duration: 30d
+nodes:
+  request_records:
+    type: recipe
+    recipe: hello-world
+    description: Prepare and send a provider-specific records request.
+    description_file: workflows/request-records/request.md
+`)
+    expect(definition.vars.provider_name).toMatchObject({
+      description: 'Provider name to request records from.',
+      required: true,
+      type: 'string',
+    })
+    expect(definition.vars.follow_up_days).toBe(30)
+    expect(definition.triggers).toEqual([
+      { type: 'manual', enabled: true, config: {} },
+      { type: 'condition', condition: 'law_firm.landmarks.treatment_complete == true', enabled: true, config: {} },
+      { type: 'event', on: 'case.landmark.satisfied', enabled: true, config: {} },
+      { type: 'cooldown', interval: '30d', enabled: true, config: {} },
+    ])
+    expect(definition.nodes.request_records.description_file).toBe('workflows/request-records/request.md')
+  })
+
+  it('accepts legacy singular trigger and normalizes it to triggers', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: legacy-trigger
+name: Legacy Trigger
+trigger:
+  type: condition
+  condition: case.ready == true
+nodes:
+  run:
+    type: recipe
+    recipe: hello-world
+`)
+    expect(definition.triggers).toEqual([
+      { type: 'condition', condition: 'case.ready == true', enabled: true, config: {} },
+    ])
   })
 
   it('parses node, condition, and timer dependencies', () => {
