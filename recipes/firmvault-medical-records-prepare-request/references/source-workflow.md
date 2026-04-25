@@ -20,6 +20,8 @@ repeatable: true
 per_item: medical_providers
 ---
 
+> **Mission Control reconciliation warning:** This file is preserved only as legacy process source for workflow shape, timing, and common issue handling. Do not follow its FalkorDB, graph-query, JSON-file, or old project-path instructions. Runtime reads and writes must follow `source-skill-medical-records-request.md`, `template-placeholders.md`, and the mounted FirmVault vault contract.
+
 > **⚠️ Migration Note (Jan 2026):** This workflow has been updated to use the knowledge graph instead of JSON files.
 > Case data is now stored in FalkorDB and accessed via graph queries. See `KNOWLEDGE_GRAPH_SCHEMA.md` for entity types and relationships.
 
@@ -345,4 +347,3 @@ After records received, update `case_state.json`:
 | Records very large | Request CD/DVD delivery |
 | Wrong patient records | Return immediately, re-request |
 | Provider requests subpoena | May be needed in litigation |
-

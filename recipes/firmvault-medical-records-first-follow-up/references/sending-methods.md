@@ -1,117 +1,47 @@
-# Medical Records Request Sending Methods
+# Sending Methods — Medical Records Request
 
-## Method Priority
+Order of preference: fax, email, mail, manual. Fax is still the most reliable channel for provider records departments.
 
-1. **Fax** (Preferred) - Most reliable for medical providers
-2. **Email** - If provider accepts and secure
-3. **Mail** - If no fax/email available
-4. **Manual** - User handles sending
+## Fax
 
-## Fax Sending
-
-### Requirements
-- Provider fax number
-- HIPAA-compliant fax service
-- Merged PDF (request + HIPAA)
-
-### Process
-```python
-# If fax service integrated
-send_fax(
-    document=merged_output,
-    to_number=provider.fax,
-    cover_sheet=False  # HIPAA already attached
-)
-```
-
-### Output
-```
-📠 FAX SENT
-
-To: (502) 555-1234
-Provider: Louisville EMS
-Pages: 3
-Confirmation: Y
-
-Request document and HIPAA authorization sent successfully.
-```
-
-## Email Sending
-
-### Requirements
-- Provider records department email
-- Secure email transmission
-- PDF attachment
-
-### Process
-```python
-send_email(
-    to=provider.records_contact.email,
-    subject=f"Medical Records Request - {client.name}",
-    body="Please see attached records request with HIPAA authorization.",
-    attachment=merged_output
-)
-```
-
-### Output
-```
-📧 EMAIL SENT
-
-To: records@provider.org
-Subject: Medical Records Request - John Smith
-Attachment: Records_Request_with_HIPAA.pdf
-
-Request sent successfully.
-```
-
-## Manual Sending
-
-When automated sending not available:
-
-```
-📄 Records request generated and saved:
-
-File: {case_folder}/Medical Providers/{provider}/Records_Request_with_HIPAA.pdf
-
-Please send this document to the provider:
-- Fax: (502) 555-1234
-- Email: records@provider.org
-- Mail: 123 Medical Way, Louisville, KY 40202
-
-Let me know when sent and I'll update the tracking.
-```
-
-## Merging Request with HIPAA
-
-Before sending, combine the records request with signed HIPAA:
+Requires provider fax number and a HIPAA-compliant fax service. Before sending, merge the filled request with the signed HIPAA authorization so the provider receives a single PDF:
 
 ```python
 from merge_pdfs import merge_pdfs
 
-merged_output = merge_pdfs(
+merged = merge_pdfs(
     input_files=[
-        records_request_pdf,
-        signed_hipaa_pdf  # From {case_folder}/Client/
+        "cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.pdf",
+        "cases/<slug>/documents/<signed-hipaa>.pdf",
     ],
-    output_path=f"{case_folder}/Medical Providers/{provider}/Records_Request_with_HIPAA.pdf"
+    output_path="cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider> - with HIPAA.pdf",
 )
 ```
 
-## Tracking After Send
+Then send via the fax integration with `cover_sheet=False` — the merged PDF already carries the authorization.
 
-Update medical_providers.json:
+## Email
 
-```json
-{
-  "provider_id": "provider_001",
-  "records": {
-    "requested_date": "2024-12-06",
-    "request_method": "fax",
-    "request_document_path": "Medical Providers/Louisville EMS/Records_Request_with_HIPAA.pdf",
-    "fax_confirmation": "Y",
-    "received_date": null,
-    "follow_up_date": "2024-12-20"
-  }
-}
+For providers that accept secure email records requests. Subject: `Medical Records Request — <Client>`; attach the merged PDF; short body pointing at the attachment. Log the sent email the same way as any other outbound correspondence.
+
+## Mail
+
+Last resort. Print the merged PDF, certified mail with return receipt.
+
+## Manual
+
+If the worker cannot send automatically (no fax credentials, no email integration), write the merged PDF to `cases/<slug>/documents/` and queue a task for the paralegal, with provider contact info in the task body.
+
+## Tracking after send
+
+Update the provider stub frontmatter in `cases/<slug>/contacts/<provider-slug>.md`:
+
+```yaml
+records_requested: "YYYY-MM-DD"
+bills_requested: "YYYY-MM-DD"
+request_method: fax | email | mail | manual
+fax_confirmation: "Y" | ""
+follow_up_date: "YYYY-MM-DD"   # +14 days
 ```
 
+Then append an activity log entry at `cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md` per `DATA_CONTRACT.md` §5, body linking back to the case file and naming the provider and method.

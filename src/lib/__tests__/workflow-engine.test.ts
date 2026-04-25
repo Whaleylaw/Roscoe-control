@@ -338,13 +338,31 @@ nodes:
     const raw = await readFile(join(process.cwd(), 'workflows', 'firmvault-request-medical-records.yaml'), 'utf8')
     const definition = parseWorkflowDefinition(raw)
     expect(definition.id).toBe('firmvault-request-medical-records')
-    expect(definition.nodes.first_follow_up_records_request.depends_on).toMatchObject({
-      nodes: ['send_records_request'],
-      timers: [{ after: 'send_records_request', duration: '14d' }],
+    expect(definition.version).toBe(2)
+    expect(definition.vars.provider_slug).toMatchObject({
+      required: true,
+      type: 'string',
     })
-    expect(definition.nodes.escalate_records_request.depends_on).toMatchObject({
-      nodes: ['second_follow_up_records_request'],
-      timers: [{ after: 'second_follow_up_records_request', duration: '9d' }],
+    expect(definition.nodes.wait_14_days_for_records).toMatchObject({
+      type: 'wait',
+      duration: '14d',
+      depends_on: { nodes: ['send_records_request'], conditions: [], timers: [] },
+      exit_when: { condition: 'law_firm.provider.records_and_bills_received == true' },
+    })
+    expect(definition.nodes.first_follow_up_records_request.depends_on).toMatchObject({
+      nodes: ['wait_14_days_for_records'],
+    })
+    expect(definition.nodes.wait_9_days_for_escalation).toMatchObject({
+      type: 'wait',
+      duration: '9d',
+      depends_on: { nodes: ['second_follow_up_records_request'], conditions: [], timers: [] },
+    })
+    expect(definition.nodes.receive_and_process_records_bills).toMatchObject({
+      type: 'recipe',
+      recipe: 'firmvault-medical-records-receive-and-process',
+      depends_on: {
+        conditions: ['law_firm.provider.records_or_bills_received == true'],
+      },
     })
   })
 

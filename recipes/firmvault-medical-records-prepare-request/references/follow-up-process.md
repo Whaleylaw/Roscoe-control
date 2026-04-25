@@ -1,124 +1,60 @@
-# Medical Records Follow-Up Process
-
-## Standard Timeline
+# Follow-Up Process — Medical Records Request
 
 | Day | Action |
-|-----|--------|
-| 0 | Request sent |
-| 14 | First follow-up |
-| 21 | Second follow-up (if not received) |
-| 30 | Escalation (if still not received) |
+|---|---|
+| 0 | Initial request sent |
+| 14 | First follow-up (call or re-send) |
+| 21 | Second follow-up |
+| 30+ | Escalate: formal demand letter, compliance department, subpoena if in litigation |
 
-## 14-Day Follow-Up
+## 14-day check
 
-When follow-up date arrives:
-
-```
-📋 RECORDS FOLLOW-UP DUE
-
-Provider: Louisville EMS
-Records requested: December 6, 2024
-Days since request: 14
-
-Status: Not yet received
-
-Options:
-A) Call provider to check status
-B) Re-send request via different method
-C) Mark as received (if just came in)
-D) Extend follow-up 7 more days
-```
-
-## Follow-Up Call Script
+Read the provider stub; if `records_received` or `bills_received` is still blank, place a call to the records department using the script below, then update the stub with the result and the next follow-up date.
 
 ```
-"Hi, I'm calling from Whaley Law Firm regarding a medical records 
-request for our client [John Smith], date of birth [01/15/1985].
-
-We sent a records request on [December 6th] via [fax]. I'm following 
-up to check on the status of that request.
-
-Can you tell me when we might expect to receive the records?
-And what is the fee for records?"
+Hi, I'm calling from <Firm> regarding a medical records request for
+our client <Client Name>, date of birth <MM/DD/YYYY>. We sent a
+records request on <sent date> via <method>. I'm following up to
+check status and whether there's a fee.
 ```
 
-## Documenting Follow-Up
+## Documenting a follow-up
 
-After each follow-up, update tracking:
+Append to the provider stub frontmatter:
 
-```json
-{
-  "records": {
-    "requested_date": "2024-12-06",
-    "follow_ups": [
-      {
-        "date": "2024-12-20",
-        "method": "phone",
-        "contact": "Records Dept",
-        "result": "Processing, expect within 7 days",
-        "next_follow_up": "2024-12-27"
-      }
-    ]
-  }
-}
+```yaml
+follow_ups:
+  - date: "YYYY-MM-DD"
+    method: phone | fax | email
+    contact: "<dept or person>"
+    result: "<short outcome>"
+    next_follow_up: "YYYY-MM-DD"
 ```
 
-## When Records Are Received
+And write an activity log entry under `cases/<slug>/Activity Log/` with category `phone` or `correspondence` depending on the method.
 
-Mark as received and file:
+## Marking records/bills received
 
-```json
-{
-  "records": {
-    "requested_date": "2024-12-06",
-    "received_date": "2024-12-23",
-    "file_path": "Medical Providers/Louisville EMS/medical_records/records_2024-12-23.pdf",
-    "pages": 45,
-    "notes": "Complete EMS run report and patient care documentation"
-  }
-}
+When the documents arrive, drop them into `cases/<slug>/documents/` (filename `<YYYY-MM-DD> - <client> - Medical Records - <provider>.pdf` per the case-file-organization naming convention), update the provider stub:
+
+```yaml
+records_received: "YYYY-MM-DD"
+records_path: "cases/<slug>/documents/<filename>.pdf"
+records_pages: <count>
 ```
 
-Output:
-```
-✅ RECORDS RECEIVED
+And log the receipt as an activity log entry. When every provider has `records_received` set, the `all_records_received` landmark (PHASE_DAG Phase 3) flips true.
 
-Provider: Louisville EMS
-Received: December 23, 2024
-Pages: 45
-Filed: Medical Providers/Louisville EMS/medical_records/
+## Common delays
 
-Records have been saved to the case file.
-```
+| Reason given | Response |
+|---|---|
+| "Processing" | Confirm expected timeframe, note it in the follow-up entry |
+| "Need payment" | Obtain fee amount, queue check request |
+| "HIPAA not on file" | Re-send merged request+HIPAA |
+| "Wrong fax/address" | Verify against the master card and re-send |
+| "Patient not found" | Verify DOB and service dates; confirm spelling |
 
-## Escalation (30+ Days)
+## 30+ day escalation
 
-If records not received after 30 days:
-
-```
-⚠️ RECORDS SIGNIFICANTLY DELAYED
-
-Provider: Louisville EMS
-Original Request: December 6, 2024
-Days Pending: 30+
-Follow-ups: 2
-
-Escalation Options:
-1. Send formal demand letter with deadline
-2. Contact provider's compliance department
-3. Consider subpoena (if in litigation)
-4. Flag for attorney review
-
-Which action would you like to take?
-```
-
-## Common Delays and Responses
-
-| Reason Given | Response |
-|--------------|----------|
-| "Processing" | Confirm expected timeframe |
-| "Need payment" | Obtain fee amount, request payment |
-| "HIPAA not on file" | Resend HIPAA |
-| "Wrong address/fax" | Verify and resend |
-| "Patient not found" | Verify DOB, dates of service |
-
+Options: (a) formal demand letter with deadline, (b) contact the provider's compliance or privacy officer, (c) subpoena duces tecum if the case is in litigation, (d) flag for attorney review. Pick based on the provider's posture and whether the case is still in Phase 2 or has moved into Phase 3.

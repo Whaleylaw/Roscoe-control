@@ -1,130 +1,25 @@
-# Medical Records Request Error Handling
+# Error Handling — Medical Records Request
 
-## Pre-Send Errors
+The theme: do not fabricate data. When a required field is missing, surface the gap and stop.
 
-### No Signed HIPAA
+## Pre-send validation
 
-```
-⚠️ Cannot send records request - Signed HIPAA not found.
+**No signed HIPAA.** Records request cannot proceed. Expected under `cases/<slug>/documents/` with a filename containing `hipaa` or `medical-authorization`. If missing, the caller needs to finish Phase 0 document collection before this skill can run.
 
-The Medical Authorization (HIPAA) from Phase 0 is required.
-Expected location: {case_folder}/Client/
+**Missing provider fax.** Provider stub has no `fax` value and the master card has no `fax` either. Either look it up and add it to the master card (`Contacts/Medical/<slug>.md`), fall back to email/mail, or queue for manual send.
 
-Options:
-A) Check if HIPAA was filed under different name
-B) Request new HIPAA signature from client
-C) Cancel this records request for now
-```
+**Missing treatment dates.** Provider stub has no `treatment_start`/`treatment_end`. Ask the caller whether to use accident date only, enter a known range, or request "all records" with no date restriction.
 
-### Missing Provider Fax
+**Missing client DOB.** Required by every provider. DOB lives on `Contacts/Clients/<slug>.md` — if the master card has nothing, pause and surface the gap.
 
-```
-⚠️ No fax number for provider
+**Template not found.** The firm template library at `Templates/` is the source of truth; if the expected slug is missing, check `Templates/INDEX.md` for a rename, then flag it for the parent agent.
 
-Provider: Louisville EMS
-Fax: Not on file
+## Send failures
 
-Options:
-A) Look up provider fax number
-B) Use email instead: [email if available]
-C) Prepare for manual sending/mailing
-D) Skip this provider for now
+**Fax fails (busy, no answer).** Retry once immediately; if still failing, try email or mail; if neither is available, write the merged PDF out and queue a manual send task.
 
-Please provide fax number or select alternative: _______
-```
+**Email bounces.** Verify the address against the master card, correct it, re-send. Never guess at a provider email domain.
 
-### Template Not Found
+## Logging
 
-```
-⚠️ Template not found
-
-Expected: templates/2022 Whaley Medical Record Request (URR).docx
-
-Options:
-A) Check alternative template location
-B) Use PDF template instead
-C) Generate request manually
-```
-
-## Send Errors
-
-### Fax Failed
-
-```
-⚠️ Fax send failed
-
-Provider: Louisville EMS
-Fax: (502) 555-1234
-Error: Line busy / No answer
-
-Retry Options:
-A) Retry fax now
-B) Schedule retry in 1 hour
-C) Try email instead
-D) Prepare for manual sending
-```
-
-### Invalid Email Address
-
-```
-⚠️ Email send failed
-
-To: records@provider
-Error: Invalid email address format
-
-Please provide correct email address: _______
-```
-
-## Data Validation Errors
-
-### Missing Client DOB
-
-```
-⚠️ Client date of birth required
-
-Provider records requests require client DOB.
-
-Please provide client's date of birth (MM/DD/YYYY): _______
-```
-
-### Treatment Dates Unknown
-
-```
-ℹ️ Treatment dates not specified
-
-For provider: Louisville EMS
-
-Options:
-A) Use accident date as treatment date
-B) Enter specific treatment date range: _______
-C) Request "all records" (no date range)
-```
-
-## Recovery Actions
-
-| Error | Recovery |
-|-------|----------|
-| HIPAA not found | Complete Phase 0 first |
-| Fax failed | Retry or use alternative method |
-| Template missing | Use backup template |
-| Provider info incomplete | Prompt for missing data |
-| Send permission denied | Queue for manual sending |
-
-## Error Logging
-
-All errors should be logged:
-
-```json
-{
-  "provider_id": "provider_001",
-  "records_request_errors": [
-    {
-      "date": "2024-12-06T10:30:00",
-      "error_type": "fax_failed",
-      "error_message": "Line busy",
-      "resolution": "Retried successfully at 10:45"
-    }
-  ]
-}
-```
-
+Every error, retry, and workaround gets an activity log entry (`cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md` for send attempts, `-phone.md` for call-based recovery). The activity log is the audit trail — nothing else records the attempts.

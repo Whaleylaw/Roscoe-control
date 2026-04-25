@@ -55,9 +55,9 @@ Optional:
 - `send_method_preference`: `fax | email | mail | manual`, default `fax`.
 - `source_trigger`: text label such as `provider_treatment_complete`, `demand_preparation`, or `manual`.
 
-Open implementation issue:
+Implementation status:
 
-- Current Mission Control workflow YAML only has `provider_scope`; it should be tightened to provider-specific variables so each workflow instance has a clear subject and worktree task context.
+- Mission Control workflow YAML now uses provider-specific variables instead of the earlier broad `provider_scope`.
 
 ## Vault Reads
 
@@ -351,9 +351,9 @@ Completion effects:
 - If every eligible provider has bills, satisfy `law_firm.landmarks.all_bills_received == true`.
 - Trigger `firmvault-medical-chronology-update` workflow or recipe.
 
-Open implementation issue:
+Implementation status:
 
-- This recipe does not exist yet in Mission Control. Current YAML ends with a human review condition instead.
+- Mission Control now includes `firmvault-medical-records-receive-and-process` as the receipt-processing recipe.
 
 ### 11. `confirm_workflow_complete`
 
@@ -403,12 +403,11 @@ Existing recipes:
 
 Needed recipes:
 
-- `firmvault-medical-records-receive-and-process`
 - `firmvault-medical-chronology-update` or equivalent, unless this is handled by a separate workflow.
 
 Review file issue:
 
-- Existing recipe packages use `REVIEW.md`. The roadmap/checklist says `review.md`. Pick one convention and make recipe loading match it. Preferred convention should be lowercase `review.md` unless the loader already expects uppercase.
+- Resolved: current Mission Control recipe indexing and runner claim paths expect uppercase `REVIEW.md`, so FirmVault recipe packages use `REVIEW.md`.
 
 ## Tool Policy
 
@@ -482,11 +481,11 @@ Do not carry forward:
 
 This workflow is ready to implement when:
 
-- YAML is provider-scoped.
-- Every node maps to either an existing recipe, a new needed recipe, a wait, or a human review/gateway.
+- YAML is provider-scoped. Done.
+- Every node maps to either an existing recipe, a wait, or a human review/gateway. Done for the records request workflow.
 - All reads/writes are expressed in FirmVault vault paths.
 - All timers have early-exit conditions for receipt.
 - All all-provider landmarks require aggregate checks.
-- The receipt/process node exists.
-- The review file naming convention is settled.
+- The receipt/process node exists. Done.
+- The review file naming convention is settled. Done, using `REVIEW.md`.
 - At least one test or dry-run fixture proves a provider-specific workflow starts and materializes only the first eligible task.

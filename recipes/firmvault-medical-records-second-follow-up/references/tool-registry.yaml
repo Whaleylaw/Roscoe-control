@@ -47,3 +47,25 @@ legacy_source_tools:
     status: legacy_reference
     exposed_to_recipe_agent: false
     reason: Needs a safe PDF/text extraction wrapper and dependency review before being granted to recipe agents.
+
+planned_constrained_tools:
+  - id: fill_medical_request_template
+    status: planned
+    scope: workspace-write
+    description: Fill approved FirmVault medical request templates using vault-contract fields only.
+  - id: merge_request_with_authorization
+    status: planned
+    scope: workspace-write
+    description: Merge a prepared request PDF with a signed authorization already present in the mounted case workspace.
+  - id: extract_pdf_text
+    status: planned
+    scope: workspace-read
+    description: Extract text from a PDF in /workspace through a reviewed dependency path.
+  - id: record_provider_request_sent
+    status: planned
+    scope: workspace-write
+    description: Deterministically update provider request-sent frontmatter and write a corresponding Activity Log entry.
+  - id: record_provider_documents_received
+    status: planned
+    scope: workspace-write
+    description: Deterministically update provider receipt frontmatter and write a corresponding Activity Log entry.

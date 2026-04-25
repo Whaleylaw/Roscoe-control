@@ -203,4 +203,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Update `firmvault-request-medical-records` YAML and recipes from `.planning/REQUEST_RECORDS_BILLS_RECONCILED_SPEC.md`**.
+Current recommended next step: **Add workflow definition registry/sync, then install the reconciled `firmvault-request-medical-records` definition through that path**.
