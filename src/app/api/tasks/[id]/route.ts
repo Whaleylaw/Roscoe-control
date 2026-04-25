@@ -16,6 +16,7 @@ import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer';
 import { getMountsCap, getExtraSkillsCap } from '@/lib/task-runtime-settings';
 import { isKnownModel, MODEL_IDS } from '@/lib/model-registry';
 import { bypassLawFirmCaseLandmark } from '@/lib/law-firm';
+import { satisfyWorkflowCondition } from '@/lib/workflow-engine';
 import {
   validateHostPathAgainstAllowlist,
   buildAggregatedValidationResponse,
@@ -286,6 +287,20 @@ export async function PUT(
       const nextResolution = `Marked not applicable by ${actor}: ${bypassReasonSentence}. The FirmVault workflow item is complete, but no factual landmark such as an exhausted-benefits finding was asserted.`
 
       await bypassLawFirmCaseLandmark(caseSlug, landmark, bypassReason, actor, taskId)
+      satisfyWorkflowCondition(db, {
+        subjectType: 'law_firm_case',
+        subjectId: caseSlug,
+        condition: `law_firm.landmarks.${landmark} == true`,
+        actor,
+        workspaceId,
+        payload: {
+          source: 'task_bypass_not_applicable',
+          landmark,
+          task_id: taskId,
+          reason: bypassReason,
+        },
+        status: 'inbox',
+      })
 
       db.transaction(() => {
         db.prepare(`
