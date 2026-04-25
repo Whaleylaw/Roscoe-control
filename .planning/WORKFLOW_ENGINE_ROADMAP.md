@@ -71,7 +71,18 @@ The law-firm/FirmVault workflows are the first production use case, but the engi
 
 ## Next Implementation Steps
 
-### 1. Workflow Definition Registry and Sync
+### 1. FirmVault Workflow Source Reconciliation
+
+Goal: decide the canonical source material before converting more law-firm workflows.
+
+- Use `.planning/FIRMVault_WORKFLOW_SOURCE_RECONCILIATION.md` as the source-selection rule.
+- Reconcile each workflow from both historical FirmVault folders before writing Mission Control YAML.
+- Start with `request_records_bills`.
+- Produce a reconciled workflow spec before changing recipes or workflow YAML.
+
+Status: next recommended step.
+
+### 2. Workflow Definition Registry and Sync
 
 Goal: installed YAML workflows should be first-class, repeatable, and updatable.
 
@@ -82,9 +93,9 @@ Goal: installed YAML workflows should be first-class, repeatable, and updatable.
 - Add a CLI, script, or admin API endpoint for sync.
 - Add tests proving sync creates and updates definitions deterministically.
 
-Status: next recommended step.
+Status: high priority after source reconciliation.
 
-### 2. Quality Review to Workflow Advancement
+### 3. Quality Review to Workflow Advancement
 
 Goal: when a workflow-created task passes review, its workflow node completes and the next eligible node appears.
 
@@ -96,7 +107,7 @@ Goal: when a workflow-created task passes review, its workflow node completes an
 
 Status: high priority.
 
-### 3. Timer Scheduler
+### 4. Timer Scheduler
 
 Goal: wait nodes and timer dependencies wake up automatically at the right time.
 
@@ -108,7 +119,7 @@ Goal: wait nodes and timer dependencies wake up automatically at the right time.
 
 Status: high priority.
 
-### 4. Case Workflow Controls
+### 5. Case Workflow Controls
 
 Goal: users can manage workflows directly from the case UI.
 
@@ -123,7 +134,7 @@ Goal: users can manage workflows directly from the case UI.
 
 Status: medium priority.
 
-### 5. Complete Request Medical Records Workflow
+### 6. Complete Request Medical Records Workflow
 
 Goal: make the first real FirmVault workflow production-usable.
 
@@ -137,7 +148,7 @@ Goal: make the first real FirmVault workflow production-usable.
 
 Status: active law-firm conversion track.
 
-### 6. Additional FirmVault Workflow Conversion
+### 7. Additional FirmVault Workflow Conversion
 
 Goal: convert the natural-language FirmVault workflows into concrete YAML + recipes.
 
@@ -192,4 +203,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Workflow Definition Registry and Sync**.
+Current recommended next step: **FirmVault Workflow Source Reconciliation**.
