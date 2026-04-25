@@ -380,21 +380,28 @@ workflows:
     steps:
       - id: verify_medical_authorization
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-records-verify-authorization
         landmark_id: medical_auth_signed
         depends_on:
           conditions:
             - law_firm.landmarks.providers_setup == true
             - law_firm.landmarks.treatment_complete == true
-      - id: send_initial_request
+      - id: prepare_records_request
         type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: records_requested_all_providers
+        recipe_slug: firmvault-medical-records-prepare-request
+        landmark_id: records_request_packet_prepared
         depends_on:
           nodes:
             - verify_medical_authorization
           conditions:
             - law_firm.landmarks.medical_auth_signed == true
+      - id: send_initial_request
+        type: recipe
+        recipe_slug: firmvault-medical-records-send-request
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - prepare_records_request
       - id: wait_for_first_followup
         type: wait
         wait: { days: 14 }
@@ -407,7 +414,7 @@ workflows:
           - all_bills_received
       - id: first_follow_up_request
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-records-first-follow-up
         landmark_id: records_requested_all_providers
         depends_on:
           nodes:
@@ -424,7 +431,7 @@ workflows:
           - all_bills_received
       - id: second_follow_up_request
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-records-second-follow-up
         landmark_id: records_requested_all_providers
         depends_on:
           nodes:
@@ -441,7 +448,7 @@ workflows:
           - all_bills_received
       - id: escalate_delayed_records
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-records-escalate-delay
         landmark_id: records_requested_all_providers
         depends_on:
           nodes:

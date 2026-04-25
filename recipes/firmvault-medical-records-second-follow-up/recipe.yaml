@@ -1,0 +1,26 @@
+slug: firmvault-medical-records-second-follow-up
+name: FirmVault Medical Records Second Follow-Up
+description: Performs the 21-day second follow-up review for pending medical records and bills requests.
+when_to_use: Use 7 days after the first follow-up if records or bills remain missing.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 2700
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - write_file
+  - run_shell
+tags:
+  - law-firm
+  - firmvault
+  - medical-records
+  - follow-up
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

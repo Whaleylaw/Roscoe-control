@@ -12,7 +12,7 @@ nodes:
   verify_medical_authorization:
     type: recipe
     name: Verify HIPAA Authorization
-    recipe: firmvault-workflow-task
+    recipe: firmvault-medical-records-verify-authorization
     depends_on:
       conditions:
         - law_firm.landmarks.providers_setup == true
@@ -25,7 +25,7 @@ nodes:
   prepare_records_request:
     type: recipe
     name: Prepare Records and Bills Request
-    recipe: firmvault-workflow-task
+    recipe: firmvault-medical-records-prepare-request
     depends_on:
       nodes:
         - verify_medical_authorization
@@ -39,7 +39,7 @@ nodes:
   send_records_request:
     type: recipe
     name: Send Medical Records and Bills Request
-    recipe: firmvault-workflow-task
+    recipe: firmvault-medical-records-send-request
     depends_on:
       nodes:
         - prepare_records_request
@@ -51,7 +51,7 @@ nodes:
   first_follow_up_records_request:
     type: recipe
     name: First Follow-Up on Medical Records and Bills
-    recipe: firmvault-workflow-task
+    recipe: firmvault-medical-records-first-follow-up
     depends_on:
       nodes:
         - send_records_request
@@ -64,7 +64,7 @@ nodes:
   second_follow_up_records_request:
     type: recipe
     name: Second Follow-Up on Medical Records and Bills
-    recipe: firmvault-workflow-task
+    recipe: firmvault-medical-records-second-follow-up
     depends_on:
       nodes:
         - first_follow_up_records_request
@@ -77,7 +77,7 @@ nodes:
   escalate_records_request:
     type: recipe
     name: Escalate Delayed Medical Records and Bills
-    recipe: firmvault-workflow-task
+    recipe: firmvault-medical-records-escalate-delay
     depends_on:
       nodes:
         - second_follow_up_records_request
