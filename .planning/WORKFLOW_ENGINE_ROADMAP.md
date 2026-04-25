@@ -77,10 +77,10 @@ Goal: decide the canonical source material before converting more law-firm workf
 
 - Use `.planning/FIRMVault_WORKFLOW_SOURCE_RECONCILIATION.md` as the source-selection rule.
 - Reconcile each workflow from both historical FirmVault folders before writing Mission Control YAML.
-- Start with `request_records_bills`.
-- Produce a reconciled workflow spec before changing recipes or workflow YAML.
+- Initial `request_records_bills` reconciliation is documented in `.planning/REQUEST_RECORDS_BILLS_RECONCILED_SPEC.md`.
+- Use that spec to update the Mission Control YAML and recipes.
 
-Status: next recommended step.
+Status: initial pass complete; implementation updates are next.
 
 ### 2. Workflow Definition Registry and Sync
 
@@ -203,4 +203,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **FirmVault Workflow Source Reconciliation**.
+Current recommended next step: **Update `firmvault-request-medical-records` YAML and recipes from `.planning/REQUEST_RECORDS_BILLS_RECONCILED_SPEC.md`**.
