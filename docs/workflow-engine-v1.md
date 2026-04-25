@@ -128,6 +128,12 @@ materialized follow-up tasks default to the inbox unless the workflow caller
 explicitly assigns them, so a runner does not pick up downstream work until a
 human or orchestrator intentionally moves it forward.
 
+Timer nodes are advanced by `POST /api/workflow-timers/run`. The timer poller
+finds active `wait` nodes whose `due_at` has passed, completes each wait node,
+records `node.completed` with `reason: timer_due`, reevaluates dependencies, and
+materializes any newly ready recipe nodes. This is deterministic and idempotent:
+once a wait node is complete, later timer runs ignore it.
+
 ## Audit Trail
 
 The append-only `workflow_events` table answers:
@@ -158,10 +164,13 @@ v1 creates the generic runtime substrate:
 - materializer that turns ready `recipe` nodes into Mission Control tasks
 - approval bridge that completes a linked node and materializes the next ready
   recipe nodes
+- timer bridge that completes due `wait` nodes and materializes the next ready
+  recipe nodes
 - APIs for registering definitions and starting instances:
   - `POST /api/workflow-definitions`
   - `POST /api/workflow-instances`
   - `POST /api/workflow-instances/:id/materialize`
+  - `POST /api/workflow-timers/run`
 - event writer
 
-Review-loop orchestration and timer polling build on top of this substrate.
+Review-loop orchestration builds on top of this substrate.

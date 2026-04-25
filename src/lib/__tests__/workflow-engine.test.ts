@@ -77,7 +77,7 @@ nodes:
     expect(readyNodeKeys(definition, nodes)).toEqual(['open_liens'])
   })
 
-  it('does not ready a wait node until its due_at expires', () => {
+  it('does not ready an already-waiting wait node', () => {
     const definition = parseWorkflowDefinition(sample)
     const nodes: WorkflowRuntimeNode[] = [
       { node_key: 'identify_liens', node_type: 'recipe', status: 'complete', due_at: null, completed_at: 10, blocked_by: [] },
@@ -86,7 +86,18 @@ nodes:
       { node_key: 'follow_up', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
     ]
     expect(readyNodeKeys(definition, nodes, 100)).toEqual([])
-    expect(readyNodeKeys(definition, nodes, 250)).toEqual(['wait_30_days'])
+    expect(readyNodeKeys(definition, nodes, 250)).toEqual([])
+  })
+
+  it('readies a pending wait node once dependencies are complete', () => {
+    const definition = parseWorkflowDefinition(sample)
+    const nodes: WorkflowRuntimeNode[] = [
+      { node_key: 'identify_liens', node_type: 'recipe', status: 'complete', due_at: null, completed_at: 10, blocked_by: [] },
+      { node_key: 'open_liens', node_type: 'recipe', status: 'complete', due_at: null, completed_at: 20, blocked_by: [] },
+      { node_key: 'wait_30_days', node_type: 'wait', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
+      { node_key: 'follow_up', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
+    ]
+    expect(readyNodeKeys(definition, nodes, 100)).toEqual(['wait_30_days'])
   })
 
   it('parses compact durations', () => {

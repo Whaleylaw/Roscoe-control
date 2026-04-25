@@ -114,6 +114,19 @@ export type AdvanceWorkflowAfterTaskApprovalResult = {
   materialized: MaterializeReadyWorkflowNodesResult | null
 }
 
+export type AdvanceDueWorkflowTimersInput = {
+  actor?: string
+  workspaceId?: number
+  limit?: number
+  status?: 'inbox' | 'assigned'
+  now?: number
+}
+
+export type AdvanceDueWorkflowTimersResult = {
+  completed: Array<{ workflow_instance_id: number; node_instance_id: number; node_key: string }>
+  materialized: MaterializeReadyWorkflowNodesResult[]
+}
+
 export function parseWorkflowDefinition(raw: string): WorkflowDefinition {
   const parsed = parseYaml(raw)
   const result = workflowDefinitionSchema.safeParse(parsed)
@@ -152,7 +165,7 @@ export function readyNodeKeys(
     const dependencies = node.depends_on ?? []
     const incomplete = dependencies.filter((dependency) => runtimeByKey.get(dependency)?.status !== 'complete')
     if (incomplete.length > 0) continue
-    if (node.type === 'wait' && runtime.due_at != null && runtime.due_at > now) continue
+    if (node.type === 'wait' && runtime.status === 'waiting') continue
     ready.push(nodeKey)
   }
   return ready
@@ -359,6 +372,84 @@ export function advanceWorkflowAfterTaskApproval(
     status: input.status ?? 'inbox',
     now,
   })
+
+  return { completed, materialized }
+}
+
+export function advanceDueWorkflowTimers(
+  db: Database.Database,
+  input: AdvanceDueWorkflowTimersInput = {},
+): AdvanceDueWorkflowTimersResult {
+  const now = input.now ?? Math.floor(Date.now() / 1000)
+  const actor = input.actor ?? 'workflow-timer'
+  const limit = Math.max(1, Math.min(input.limit ?? 100, 500))
+  const completed: AdvanceDueWorkflowTimersResult['completed'] = []
+  const workflowIds = new Set<number>()
+
+  db.transaction(() => {
+    const rows = db.prepare(`
+      SELECT wni.id, wni.workflow_instance_id, wni.node_key, wni.due_at, wi.workspace_id
+      FROM workflow_node_instances wni
+      JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
+      WHERE wni.node_type = 'wait'
+        AND wni.status = 'waiting'
+        AND wni.due_at IS NOT NULL
+        AND wni.due_at <= ?
+        AND wi.status = 'active'
+        ${input.workspaceId ? 'AND wi.workspace_id = ?' : ''}
+      ORDER BY wni.due_at ASC, wni.id ASC
+      LIMIT ?
+    `).all(...(input.workspaceId ? [now, input.workspaceId, limit] : [now, limit])) as Array<{
+      id: number
+      workflow_instance_id: number
+      node_key: string
+      due_at: number
+      workspace_id: number
+    }>
+
+    for (const row of rows) {
+      const updated = db.prepare(`
+        UPDATE workflow_node_instances
+        SET status = 'complete', completed_at = COALESCE(completed_at, ?), output_json = ?, updated_at = ?
+        WHERE id = ? AND status = 'waiting' AND due_at IS NOT NULL AND due_at <= ?
+      `).run(now, JSON.stringify({ reason: 'timer_due', due_at: row.due_at }), now, row.id, now)
+      if (updated.changes === 0) continue
+
+      writeWorkflowEvent(db, {
+        workflowInstanceId: row.workflow_instance_id,
+        nodeInstanceId: row.id,
+        nodeKey: row.node_key,
+        eventType: 'node.completed',
+        actorType: 'system',
+        actorId: actor,
+        payload: { reason: 'timer_due', due_at: row.due_at },
+        workspaceId: row.workspace_id,
+        createdAt: now,
+      })
+      completed.push({
+        workflow_instance_id: row.workflow_instance_id,
+        node_instance_id: row.id,
+        node_key: row.node_key,
+      })
+      workflowIds.add(row.workflow_instance_id)
+      evaluateWorkflowInstanceInTransaction(db, row.workflow_instance_id, now)
+    }
+  })()
+
+  const materialized: MaterializeReadyWorkflowNodesResult[] = []
+  for (const workflowInstanceId of workflowIds) {
+    const context = materializationContextForWorkflow(db, workflowInstanceId)
+    if (!context) continue
+    materialized.push(materializeReadyWorkflowNodes(db, {
+      workflowInstanceId,
+      projectId: context.project_id,
+      workspaceId: context.workspace_id,
+      actor,
+      baseRef: baseRefFromWorkspaceSource(context.workspace_source),
+      status: input.status ?? 'inbox',
+      now,
+    }))
+  }
 
   return { completed, materialized }
 }
@@ -696,6 +787,32 @@ function workflowTaskDescription(
     '- Use task comments/checkpoints for questions, blockers, and final handoff.',
     '- Submit the task through the recipe runner API when complete.',
   ].join('\n')
+}
+
+function materializationContextForWorkflow(db: Database.Database, workflowInstanceId: number): {
+  project_id: number
+  workspace_id: number
+  workspace_source: string | null
+} | null {
+  const row = db.prepare(`
+    SELECT t.project_id, t.workspace_id, t.workspace_source
+    FROM workflow_node_instances wni
+    JOIN tasks t ON t.id = wni.task_id
+    WHERE wni.workflow_instance_id = ?
+      AND t.project_id IS NOT NULL
+    ORDER BY t.created_at DESC, t.id DESC
+    LIMIT 1
+  `).get(workflowInstanceId) as {
+    project_id: number | null
+    workspace_id: number
+    workspace_source: string | null
+  } | undefined
+  if (!row?.project_id) return null
+  return {
+    project_id: row.project_id,
+    workspace_id: row.workspace_id,
+    workspace_source: row.workspace_source,
+  }
 }
 
 function baseRefFromWorkspaceSource(raw: string | null): string | undefined {
