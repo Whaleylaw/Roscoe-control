@@ -226,6 +226,64 @@ export type SatisfyWorkflowConditionResult = {
   materialized: MaterializeReadyWorkflowNodesResult[]
 }
 
+export type RunWorkflowTriggersInput = {
+  subjectType: string
+  subjectId: string
+  triggerType: 'condition' | 'event' | 'cooldown' | 'cron'
+  condition?: string
+  event?: string
+  projectId?: number
+  baseRef?: string
+  assignedTo?: string | null
+  status?: 'inbox' | 'assigned'
+  actor: string
+  workspaceId: number
+  tenantId?: number
+  now?: number
+}
+
+export type RunWorkflowTriggersResult = {
+  matched: number
+  started: Array<{ workflow_instance_id: number; definition_id: number; definition_slug: string; workflow_key: string }>
+  skipped: Array<{ definition_id: number; definition_slug: string; reason: string; workflow_instance_id?: number | null }>
+  materialized: MaterializeReadyWorkflowNodesResult[]
+}
+
+export type WorkflowActivity = {
+  workflow_instance_id: number
+  workflow_key: string
+  definition_id: number
+  definition_slug: string
+  definition_name: string
+  definition_version: number
+  subject_type: string
+  subject_id: string
+  status: WorkflowInstanceStatus
+  started_by: string
+  started_at: number
+  completed_at: number | null
+  updated_at: number
+  total_nodes: number
+  ready_nodes: number
+  running_nodes: number
+  waiting_nodes: number
+  blocked_nodes: number
+  complete_nodes: number
+  failed_nodes: number
+  task_count: number
+  nodes: Array<{
+    id: number
+    node_key: string
+    node_type: WorkflowNodeType
+    status: WorkflowNodeStatus
+    recipe_slug: string | null
+    task_id: number | null
+    due_at: number | null
+    completed_at: number | null
+    blocked_by: string[]
+  }>
+}
+
 function normalizeWorkflowDefinitionInput(parsed: unknown): unknown {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parsed
   const raw = parsed as Record<string, unknown>
@@ -252,6 +310,18 @@ function normalizeWorkflowTriggerInput(trigger: unknown): unknown {
     return { ...raw, interval: raw.duration }
   }
   return raw
+}
+
+function workflowTriggerMatches(
+  trigger: WorkflowDefinition['triggers'][number],
+  input: RunWorkflowTriggersInput,
+): boolean {
+  if (!trigger.enabled || trigger.type !== input.triggerType) return false
+  if (trigger.type === 'condition') return Boolean(input.condition) && trigger.condition === input.condition
+  if (trigger.type === 'event') return Boolean(input.event) && trigger.on === input.event
+  if (trigger.type === 'cooldown') return input.triggerType === 'cooldown'
+  if (trigger.type === 'cron') return input.triggerType === 'cron'
+  return false
 }
 
 export function parseWorkflowDefinition(raw: string): WorkflowDefinition {
@@ -312,6 +382,176 @@ export function createWorkflowDefinition(
     ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
   `).run(definition.id, definition.name, definition.version, definition.subject_type, rawYaml, actor, workspaceId, tenantId, now, now)
   return Number(result.lastInsertRowid)
+}
+
+export function runWorkflowTriggers(
+  db: Database.Database,
+  input: RunWorkflowTriggersInput,
+): RunWorkflowTriggersResult {
+  const now = input.now ?? Math.floor(Date.now() / 1000)
+  const rows = db.prepare(`
+    SELECT id, slug, name, version, subject_type, definition_yaml
+    FROM workflow_definitions
+    WHERE workspace_id = ?
+      AND status = 'active'
+      AND subject_type IN (?, 'generic')
+    ORDER BY slug ASC, version DESC, id DESC
+  `).all(input.workspaceId, input.subjectType) as Array<{
+    id: number
+    slug: string
+    name: string
+    version: number
+    subject_type: string
+    definition_yaml: string
+  }>
+
+  const started: RunWorkflowTriggersResult['started'] = []
+  const skipped: RunWorkflowTriggersResult['skipped'] = []
+  const materialized: MaterializeReadyWorkflowNodesResult[] = []
+  let matched = 0
+
+  for (const row of rows) {
+    const definition = parseWorkflowDefinition(row.definition_yaml)
+    if (!definition.triggers.some((trigger) => workflowTriggerMatches(trigger, input))) continue
+    matched += 1
+    const workflowKey = `${definition.id}:${input.subjectType}:${input.subjectId}`
+    const existing = db.prepare(`
+      SELECT id, status
+      FROM workflow_instances
+      WHERE workspace_id = ?
+        AND workflow_key = ?
+      LIMIT 1
+    `).get(input.workspaceId, workflowKey) as { id: number; status: WorkflowInstanceStatus } | undefined
+    if (existing && existing.status !== 'cancelled' && existing.status !== 'failed') {
+      skipped.push({ definition_id: row.id, definition_slug: row.slug, reason: `existing_${existing.status}`, workflow_instance_id: existing.id })
+      continue
+    }
+
+    const startedInstance = startWorkflowInstance(db, {
+      definitionId: row.id,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      workflowKey,
+      actor: input.actor,
+      workspaceId: input.workspaceId,
+      tenantId: input.tenantId,
+      now,
+    })
+    started.push({
+      workflow_instance_id: startedInstance.instance_id,
+      definition_id: row.id,
+      definition_slug: row.slug,
+      workflow_key: workflowKey,
+    })
+    if (input.projectId) {
+      materialized.push(materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: startedInstance.instance_id,
+        projectId: input.projectId,
+        workspaceId: input.workspaceId,
+        actor: input.actor,
+        baseRef: input.baseRef,
+        assignedTo: input.assignedTo,
+        status: input.status ?? 'inbox',
+        now,
+      }))
+    }
+  }
+
+  return { matched, started, skipped, materialized }
+}
+
+export function listWorkflowActivity(
+  db: Database.Database,
+  input: {
+    subjectType: string
+    subjectId: string
+    workspaceId: number
+    limit?: number
+  },
+): WorkflowActivity[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 50, 200))
+  const rows = db.prepare(`
+    SELECT wi.id, wi.workflow_key, wi.definition_id, wi.subject_type, wi.subject_id,
+           wi.status, wi.started_by, wi.started_at, wi.completed_at, wi.updated_at,
+           wd.slug AS definition_slug, wd.name AS definition_name, wd.version AS definition_version
+    FROM workflow_instances wi
+    JOIN workflow_definitions wd ON wd.id = wi.definition_id
+    WHERE wi.workspace_id = ?
+      AND wi.subject_type = ?
+      AND wi.subject_id = ?
+    ORDER BY wi.updated_at DESC, wi.id DESC
+    LIMIT ?
+  `).all(input.workspaceId, input.subjectType, input.subjectId, limit) as Array<{
+    id: number
+    workflow_key: string
+    definition_id: number
+    subject_type: string
+    subject_id: string
+    status: WorkflowInstanceStatus
+    started_by: string
+    started_at: number
+    completed_at: number | null
+    updated_at: number
+    definition_slug: string
+    definition_name: string
+    definition_version: number
+  }>
+
+  const nodeStmt = db.prepare(`
+    SELECT id, node_key, node_type, status, recipe_slug, task_id, due_at, completed_at, blocked_by_json
+    FROM workflow_node_instances
+    WHERE workflow_instance_id = ?
+    ORDER BY id ASC
+  `)
+
+  return rows.map((row) => {
+    const nodes = nodeStmt.all(row.id) as Array<{
+      id: number
+      node_key: string
+      node_type: WorkflowNodeType
+      status: WorkflowNodeStatus
+      recipe_slug: string | null
+      task_id: number | null
+      due_at: number | null
+      completed_at: number | null
+      blocked_by_json: string | null
+    }>
+    const mappedNodes = nodes.map((node) => ({
+      id: node.id,
+      node_key: node.node_key,
+      node_type: node.node_type,
+      status: node.status,
+      recipe_slug: node.recipe_slug,
+      task_id: node.task_id,
+      due_at: node.due_at,
+      completed_at: node.completed_at,
+      blocked_by: parseStringArray(node.blocked_by_json),
+    }))
+    return {
+      workflow_instance_id: row.id,
+      workflow_key: row.workflow_key,
+      definition_id: row.definition_id,
+      definition_slug: row.definition_slug,
+      definition_name: row.definition_name,
+      definition_version: row.definition_version,
+      subject_type: row.subject_type,
+      subject_id: row.subject_id,
+      status: row.status,
+      started_by: row.started_by,
+      started_at: row.started_at,
+      completed_at: row.completed_at,
+      updated_at: row.updated_at,
+      total_nodes: mappedNodes.length,
+      ready_nodes: mappedNodes.filter((node) => node.status === 'ready').length,
+      running_nodes: mappedNodes.filter((node) => node.status === 'running').length,
+      waiting_nodes: mappedNodes.filter((node) => node.status === 'waiting').length,
+      blocked_nodes: mappedNodes.filter((node) => node.status === 'blocked').length,
+      complete_nodes: mappedNodes.filter((node) => node.status === 'complete').length,
+      failed_nodes: mappedNodes.filter((node) => node.status === 'failed').length,
+      task_count: mappedNodes.filter((node) => node.task_id !== null).length,
+      nodes: mappedNodes,
+    }
+  })
 }
 
 export function startWorkflowInstance(

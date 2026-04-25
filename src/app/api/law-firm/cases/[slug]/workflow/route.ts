@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
+import { listWorkflowActivity } from '@/lib/workflow-engine'
 import {
   materializeLawFirmWorkflowTasks,
   previewLawFirmWorkflowStatuses,
@@ -31,11 +32,18 @@ export async function GET(
 
   try {
     const { slug } = await params
+    const db = getDatabase()
+    const workspaceId = auth.user.workspace_id ?? 1
     const [readyItems, workflows] = await Promise.all([
       previewLawFirmWorkflowTasks(slug),
       previewLawFirmWorkflowStatuses(slug),
     ])
-    return NextResponse.json({ case_slug: slug, ready_items: readyItems, workflows })
+    const workflowInstances = listWorkflowActivity(db, {
+      subjectType: 'law_firm_case',
+      subjectId: slug,
+      workspaceId,
+    })
+    return NextResponse.json({ case_slug: slug, ready_items: readyItems, workflows, workflow_instances: workflowInstances })
   } catch (error) {
     logger.error({ err: error }, 'GET /api/law-firm/cases/[slug]/workflow failed')
     return NextResponse.json({ error: 'Failed to preview FirmVault workflow tasks' }, { status: 500 })

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
-import { durationToSeconds, parseWorkflowDefinition, readyNodeKeys, type WorkflowRuntimeNode } from '../workflow-engine'
+import Database from 'better-sqlite3'
+import { runMigrations } from '../migrations'
+import {
+  createWorkflowDefinition,
+  durationToSeconds,
+  listWorkflowActivity,
+  parseWorkflowDefinition,
+  readyNodeKeys,
+  runWorkflowTriggers,
+  type WorkflowRuntimeNode,
+} from '../workflow-engine'
 
 const sample = `
 schema_version: 1
@@ -336,5 +346,78 @@ nodes:
       nodes: ['second_follow_up_records_request'],
       timers: [{ after: 'second_follow_up_records_request', duration: '9d' }],
     })
+  })
+
+  it('starts and materializes a workflow from a matching condition trigger once per subject', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`
+        SELECT id FROM projects
+        WHERE workspace_id = 1 AND slug = 'general'
+        LIMIT 1
+      `).get() as { id: number } | undefined
+      expect(project).toBeTruthy()
+
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: trigger-materialization
+name: Trigger Materialization
+subject_type: law_firm_case
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.records_needed == true
+nodes:
+  request_records:
+    type: recipe
+    recipe: hello-world
+`, 'tester', 1, 1)
+
+      const first = runWorkflowTriggers(db, {
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        triggerType: 'condition',
+        condition: 'law_firm.landmarks.records_needed == true',
+        projectId: project!.id,
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 1000,
+      })
+
+      expect(first.matched).toBe(1)
+      expect(first.started).toMatchObject([{ definition_id: definitionId, definition_slug: 'trigger-materialization' }])
+      expect(first.materialized[0].created).toHaveLength(1)
+      expect(first.materialized[0].created[0].node_key).toBe('request_records')
+
+      const second = runWorkflowTriggers(db, {
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        triggerType: 'condition',
+        condition: 'law_firm.landmarks.records_needed == true',
+        projectId: project!.id,
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 1001,
+      })
+
+      expect(second.started).toHaveLength(0)
+      expect(second.skipped).toMatchObject([{ definition_slug: 'trigger-materialization', reason: 'existing_active' }])
+
+      const activity = listWorkflowActivity(db, {
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        workspaceId: 1,
+      })
+      expect(activity).toHaveLength(1)
+      expect(activity[0]).toMatchObject({
+        definition_slug: 'trigger-materialization',
+        running_nodes: 1,
+        task_count: 1,
+      })
+    } finally {
+      db.close()
+    }
   })
 })

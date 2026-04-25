@@ -35,6 +35,36 @@ type CaseDetail = {
 }
 
 type WorkflowPreview = {
+  workflow_instances: Array<{
+    workflow_instance_id: number
+    workflow_key: string
+    definition_slug: string
+    definition_name: string
+    definition_version: number
+    status: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
+    started_by: string
+    started_at: number
+    updated_at: number
+    total_nodes: number
+    ready_nodes: number
+    running_nodes: number
+    waiting_nodes: number
+    blocked_nodes: number
+    complete_nodes: number
+    failed_nodes: number
+    task_count: number
+    nodes: Array<{
+      id: number
+      node_key: string
+      node_type: 'recipe' | 'review' | 'wait' | 'code' | 'gateway' | 'gate'
+      status: 'pending' | 'ready' | 'running' | 'waiting' | 'blocked' | 'complete' | 'failed' | 'skipped' | 'cancelled'
+      recipe_slug: string | null
+      task_id: number | null
+      due_at: number | null
+      completed_at: number | null
+      blocked_by: string[]
+    }>
+  }>
   ready_items: Array<{
     workflow_key: string
     phase_name: string
@@ -124,6 +154,7 @@ export function LawFirmCaseWorkspace() {
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
       setWorkflowPreview({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : [],
         ready_items: Array.isArray(body.ready_items) ? body.ready_items : [],
         workflows: Array.isArray(body.workflows) ? body.workflows : [],
       })
@@ -210,6 +241,7 @@ export function LawFirmCaseWorkspace() {
       const body = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
       setWorkflowPreview((prev) => ({
+        workflow_instances: prev?.workflow_instances ?? [],
         ready_items: prev?.ready_items ?? [],
         workflows: Array.isArray(body.workflows) ? body.workflows : prev?.workflows ?? [],
       }))
@@ -401,6 +433,7 @@ function WorkflowView({
   onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
 }) {
   const t = useTranslations('lawFirm')
+  const workflowInstances = workflowPreview?.workflow_instances ?? []
   const readyItems = workflowPreview?.ready_items ?? []
   const workflows = workflowPreview?.workflows ?? []
   const grouped = {
@@ -410,6 +443,57 @@ function WorkflowView({
   }
   return (
     <div className="p-6 space-y-4">
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Workflow Activity</h2>
+            <p className="text-sm text-muted-foreground">
+              Actual workflow instances running for this case. Agent work appears on the existing Tasks board.
+            </p>
+          </div>
+          <span className="rounded border px-2 py-1 text-xs text-muted-foreground">{workflowInstances.length} instances</span>
+        </div>
+        {workflowInstances.length === 0 ? (
+          <p className="mt-4 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            No workflow instances have started for this case yet.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {workflowInstances.map((workflow) => (
+              <article key={workflow.workflow_instance_id} className="rounded-md border bg-background p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-foreground">{workflow.definition_name}</h3>
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">{workflow.definition_slug} v{workflow.definition_version}</p>
+                  </div>
+                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${workflowInstanceTone(workflow.status)}`}>
+                    {formatLabel(workflow.status)}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-5 gap-2 text-center text-xs">
+                  <WorkflowMetric label="Ready" value={workflow.ready_nodes} />
+                  <WorkflowMetric label="Running" value={workflow.running_nodes} />
+                  <WorkflowMetric label="Waiting" value={workflow.waiting_nodes} />
+                  <WorkflowMetric label="Blocked" value={workflow.blocked_nodes} />
+                  <WorkflowMetric label="Done" value={`${workflow.complete_nodes}/${workflow.total_nodes}`} />
+                </div>
+                <div className="mt-3 space-y-1.5">
+                  {workflow.nodes.map((node) => (
+                    <div key={node.id} className="flex items-center justify-between gap-2 rounded border px-2 py-1 text-xs">
+                      <span className="min-w-0 truncate text-foreground">
+                        {formatLabel(node.node_key)}
+                        {node.task_id ? <span className="ml-1 text-muted-foreground">#{node.task_id}</span> : null}
+                      </span>
+                      <span className={`shrink-0 rounded px-1.5 py-0.5 ${workflowNodeTone(node.status)}`}>{formatLabel(node.status)}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="rounded-md border bg-card p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -529,6 +613,31 @@ function workflowStepTone(status: WorkflowPreview['workflows'][number]['steps'][
   if (status === 'ready') return 'bg-blue-500/10 text-blue-500'
   if (status === 'waiting') return 'bg-purple-500/10 text-purple-500'
   return 'bg-amber-500/10 text-amber-500'
+}
+
+function workflowInstanceTone(status: WorkflowPreview['workflow_instances'][number]['status']): string {
+  if (status === 'complete') return 'bg-green-500/10 text-green-500'
+  if (status === 'failed' || status === 'cancelled') return 'bg-red-500/10 text-red-500'
+  if (status === 'blocked') return 'bg-amber-500/10 text-amber-500'
+  return 'bg-blue-500/10 text-blue-500'
+}
+
+function workflowNodeTone(status: WorkflowPreview['workflow_instances'][number]['nodes'][number]['status']): string {
+  if (status === 'complete' || status === 'skipped') return 'bg-green-500/10 text-green-500'
+  if (status === 'ready') return 'bg-blue-500/10 text-blue-500'
+  if (status === 'running') return 'bg-yellow-500/10 text-yellow-500'
+  if (status === 'waiting') return 'bg-purple-500/10 text-purple-500'
+  if (status === 'failed' || status === 'cancelled') return 'bg-red-500/10 text-red-500'
+  return 'bg-amber-500/10 text-amber-500'
+}
+
+function WorkflowMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded border bg-card/50 px-2 py-1">
+      <div className="font-semibold text-foreground">{value}</div>
+      <div className="text-[10px] text-muted-foreground">{label}</div>
+    </div>
+  )
 }
 
 function ActivityView({ detail }: { detail: CaseDetail }) {
