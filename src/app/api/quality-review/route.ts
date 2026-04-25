@@ -5,6 +5,7 @@ import { validateBody, qualityReviewSchema } from '@/lib/validation'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { logger } from '@/lib/logger'
 import { eventBus } from '@/lib/event-bus'
+import { advanceWorkflowAfterTaskApproval } from '@/lib/workflow-engine'
 
 export async function GET(request: NextRequest) {
   const auth = requireRole(request, 'viewer')
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     const workspaceId = auth.user.workspace_id ?? 1;
 
     const task = db
-      .prepare('SELECT id, title FROM tasks WHERE id = ? AND workspace_id = ?')
+      .prepare('SELECT id, title, status FROM tasks WHERE id = ? AND workspace_id = ?')
       .get(taskId, workspaceId) as any
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
@@ -105,13 +106,30 @@ export async function POST(request: NextRequest) {
     )
 
     // Auto-advance task based on review outcome
+    let workflowAdvancement = null
     if (status === 'approved') {
-      db.prepare('UPDATE tasks SET status = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?')
+      db.prepare(`
+        UPDATE tasks
+        SET status = ?, completed_at = COALESCE(completed_at, unixepoch()), updated_at = unixepoch()
+        WHERE id = ? AND workspace_id = ?
+      `)
         .run('done', taskId, workspaceId)
+      workflowAdvancement = advanceWorkflowAfterTaskApproval(db, {
+        taskId,
+        actor: reviewer,
+        payload: {
+          source: 'quality_review',
+          quality_review_id: Number(result.lastInsertRowid),
+          reviewer,
+          status,
+          notes,
+        },
+        status: 'inbox',
+      })
       eventBus.broadcast('task.status_changed', {
         id: taskId,
         status: 'done',
-        previous_status: 'review',
+        previous_status: task.status,
         updated_at: Math.floor(Date.now() / 1000),
       })
     } else if (status === 'rejected') {
@@ -121,12 +139,12 @@ export async function POST(request: NextRequest) {
       eventBus.broadcast('task.status_changed', {
         id: taskId,
         status: 'in_progress',
-        previous_status: 'review',
+        previous_status: task.status,
         updated_at: Math.floor(Date.now() / 1000),
       })
     }
 
-    return NextResponse.json({ success: true, id: result.lastInsertRowid })
+    return NextResponse.json({ success: true, id: result.lastInsertRowid, workflow_advancement: workflowAdvancement })
   } catch (error) {
     logger.error({ err: error }, 'POST /api/quality-review error')
     return NextResponse.json({ error: 'Failed to create quality review' }, { status: 500 })

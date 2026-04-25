@@ -4,12 +4,15 @@ import { join } from 'path'
 import Database from 'better-sqlite3'
 import { runMigrations } from '../migrations'
 import {
+  advanceWorkflowAfterTaskApproval,
   createWorkflowDefinition,
   durationToSeconds,
   listWorkflowActivity,
+  materializeReadyWorkflowNodes,
   parseWorkflowDefinition,
   readyNodeKeys,
   runWorkflowTriggers,
+  startWorkflowInstance,
   type WorkflowRuntimeNode,
 } from '../workflow-engine'
 
@@ -434,6 +437,136 @@ nodes:
         running_nodes: 1,
         task_count: 1,
       })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('advances workflow nodes after task approval and materializes the next ready task', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`
+        SELECT id FROM projects
+        WHERE workspace_id = 1 AND slug = 'general'
+        LIMIT 1
+      `).get() as { id: number } | undefined
+      expect(project).toBeTruthy()
+
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: approval-advancement
+name: Approval Advancement
+subject_type: law_firm_case
+nodes:
+  first_step:
+    type: recipe
+    recipe: hello-world
+  second_step:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      - first_step
+`, 'tester', 1, 1)
+
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 1000,
+      })
+      const firstMaterialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project!.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 1001,
+      })
+      expect(firstMaterialized.created).toMatchObject([{ node_key: 'first_step' }])
+
+      const firstTaskId = firstMaterialized.created[0].task_id
+      const advanced = advanceWorkflowAfterTaskApproval(db, {
+        taskId: firstTaskId,
+        actor: 'aegis',
+        payload: { source: 'quality_review' },
+        now: 1002,
+      })
+
+      expect(advanced.completed?.ready_nodes).toContain('second_step')
+      expect(advanced.materialized?.created).toMatchObject([{ node_key: 'second_step' }])
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'first_step'
+      `).get(instance.instance_id)).toMatchObject({ status: 'complete' })
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'second_step'
+      `).get(instance.instance_id)).toMatchObject({ status: 'running' })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('marks a workflow complete when the final task-backed node is approved', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`
+        SELECT id FROM projects
+        WHERE workspace_id = 1 AND slug = 'general'
+        LIMIT 1
+      `).get() as { id: number } | undefined
+      expect(project).toBeTruthy()
+
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: final-approval
+name: Final Approval
+subject_type: law_firm_case
+nodes:
+  only_step:
+    type: recipe
+    recipe: hello-world
+`, 'tester', 1, 1)
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 2000,
+      })
+      const materialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project!.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 2001,
+      })
+
+      advanceWorkflowAfterTaskApproval(db, {
+        taskId: materialized.created[0].task_id,
+        actor: 'aegis',
+        payload: { source: 'quality_review' },
+        now: 2002,
+      })
+
+      expect(db.prepare(`
+        SELECT status, completed_at
+        FROM workflow_instances
+        WHERE id = ?
+      `).get(instance.instance_id)).toMatchObject({ status: 'complete', completed_at: 2002 })
+      expect(db.prepare(`
+        SELECT event_type
+        FROM workflow_events
+        WHERE workflow_instance_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `).get(instance.instance_id)).toMatchObject({ event_type: 'workflow.completed' })
     } finally {
       db.close()
     }

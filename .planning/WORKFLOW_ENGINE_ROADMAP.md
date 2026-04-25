@@ -59,6 +59,7 @@ The law-firm/FirmVault workflows are the first production use case, but the engi
 - Initial FirmVault request-medical-records recipe set.
 - Tool registry baseline.
 - Workflow definition registry/sync from `workflows/*.yaml`.
+- Quality-review approval advances workflow nodes and materializes next ready recipe tasks.
 
 ## Active Design Decisions
 
@@ -106,7 +107,7 @@ Goal: when a workflow-created task passes review, its workflow node completes an
 - Materialize newly ready recipe nodes into the same case project.
 - Add tests for task approval -> node complete -> next task created.
 
-Status: high priority.
+Status: implemented for approved quality reviews; rejection still returns the task to in-progress without workflow advancement.
 
 ### 4. Timer Scheduler
 
@@ -204,4 +205,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Connect quality-review approval to workflow advancement so approved recipe tasks complete their workflow node and materialize the next eligible node**.
+Current recommended next step: **Wire the timer scheduler path so due wait/timer dependencies wake workflows and materialize the next eligible node automatically**.

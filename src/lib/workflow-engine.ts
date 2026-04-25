@@ -704,6 +704,7 @@ export function completeWorkflowNodeForTask(
       })
     }
     const readyNodes = evaluateWorkflowInstanceInTransaction(db, node.workflow_instance_id, now)
+    updateWorkflowInstanceCompletionInTransaction(db, node.workflow_instance_id, node.workspace_id, actor, now)
     result = { workflow_instance_id: node.workflow_instance_id, ready_nodes: readyNodes }
   })()
   return result
@@ -1449,7 +1450,41 @@ function promoteEligibleWorkflowNodesInTransaction(
       })
     }
   }
+  updateWorkflowInstanceCompletionInTransaction(db, workflowInstanceId, rows[0]?.workspace_id ?? 1, 'workflow-engine', now)
   return promoted
+}
+
+function updateWorkflowInstanceCompletionInTransaction(
+  db: Database.Database,
+  workflowInstanceId: number,
+  workspaceId: number,
+  actor: string,
+  now: number,
+): void {
+  const incomplete = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM workflow_node_instances
+    WHERE workflow_instance_id = ?
+      AND status NOT IN ('complete', 'skipped', 'cancelled')
+  `).get(workflowInstanceId) as { count: number } | undefined
+  if ((incomplete?.count ?? 0) > 0) return
+
+  const updated = db.prepare(`
+    UPDATE workflow_instances
+    SET status = 'complete', completed_at = COALESCE(completed_at, ?), updated_at = ?
+    WHERE id = ? AND status != 'complete'
+  `).run(now, now, workflowInstanceId)
+  if (updated.changes === 0) return
+
+  writeWorkflowEvent(db, {
+    workflowInstanceId,
+    eventType: 'workflow.completed',
+    actorType: 'system',
+    actorId: actor,
+    payload: { workflow_instance_id: workflowInstanceId },
+    workspaceId,
+    createdAt: now,
+  })
 }
 
 function loadWorkflowForEvaluation(db: Database.Database, workflowInstanceId: number): {
