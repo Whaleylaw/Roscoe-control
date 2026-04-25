@@ -66,6 +66,61 @@ nodes:
     })
   })
 
+  it('parses Beads-style typed node dependencies', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: typed-dependencies
+name: Typed Dependencies
+nodes:
+  primary_path:
+    type: recipe
+    recipe: hello-world
+  fallback_path:
+    type: recipe
+    recipe: hello-world
+  aggregate:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      nodes:
+        - node: primary_path
+          type: waits_for_any
+          group: outcome
+        - node: fallback_path
+          type: waits_for_any
+          group: outcome
+        - node: primary_path
+          type: related
+`)
+    expect(definition.nodes.aggregate.depends_on).toMatchObject({
+      nodes: [
+        { node: 'primary_path', type: 'waits_for_any', group: 'outcome' },
+        { node: 'fallback_path', type: 'waits_for_any', group: 'outcome' },
+        { node: 'primary_path', type: 'related' },
+      ],
+    })
+  })
+
+  it('parses gate nodes as first-class workflow nodes', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: gate-workflow
+name: Gate Workflow
+nodes:
+  wait_for_owner:
+    type: gate
+    depends_on:
+      conditions:
+        - owner.approved == true
+  after_gate:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      - wait_for_owner
+`)
+    expect(definition.nodes.wait_for_owner.type).toBe('gate')
+  })
+
   it('rejects unknown dependencies', () => {
     expect(() => parseWorkflowDefinition(`
 schema_version: 1
@@ -121,6 +176,62 @@ nodes:
       { node_key: 'follow_up', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
     ]
     expect(readyNodeKeys(definition, nodes)).toEqual(['open_liens'])
+  })
+
+  it('does not let related dependencies block ready work', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: related-dependency
+name: Related Dependency
+nodes:
+  reference_only:
+    type: recipe
+    recipe: hello-world
+  actionable:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      nodes:
+        - node: reference_only
+          type: related
+`)
+    const nodes: WorkflowRuntimeNode[] = [
+      { node_key: 'reference_only', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
+      { node_key: 'actionable', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
+    ]
+    expect(readyNodeKeys(definition, nodes)).toEqual(['reference_only', 'actionable'])
+  })
+
+  it('readies waits_for_any dependencies when any dependency in the group is complete', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: any-dependency
+name: Any Dependency
+nodes:
+  primary_path:
+    type: recipe
+    recipe: hello-world
+  fallback_path:
+    type: recipe
+    recipe: hello-world
+  aggregate:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      nodes:
+        - node: primary_path
+          type: waits_for_any
+          group: outcome
+        - node: fallback_path
+          type: waits_for_any
+          group: outcome
+`)
+    const nodes: WorkflowRuntimeNode[] = [
+      { node_key: 'primary_path', node_type: 'recipe', status: 'complete', due_at: null, completed_at: 10, blocked_by: [] },
+      { node_key: 'fallback_path', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
+      { node_key: 'aggregate', node_type: 'recipe', status: 'pending', due_at: null, completed_at: null, blocked_by: [] },
+    ]
+    expect(readyNodeKeys(definition, nodes)).toEqual(['fallback_path', 'aggregate'])
   })
 
   it('does not ready an already-waiting wait node', () => {

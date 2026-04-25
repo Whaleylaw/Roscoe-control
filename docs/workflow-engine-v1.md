@@ -112,6 +112,34 @@ depends_on:
       duration: 30d
 ```
 
+Node dependencies can also carry Beads-style semantics. Plain strings are
+treated as `blocks`.
+
+```yaml
+depends_on:
+  nodes:
+    - draft_request
+    - node: alternate_source
+      type: related
+    - node: insurer_response
+      type: waits_for_any
+      group: response_or_timeout
+    - node: follow_up_timer
+      type: waits_for_any
+      group: response_or_timeout
+```
+
+Supported dependency semantics:
+
+- `blocks`: the downstream node waits until this node completes.
+- `waits_for_all`: same blocking behavior as `blocks`, but clearer for fan-in
+  gates.
+- `waits_for_any`: the downstream node waits until one dependency in the same
+  group completes.
+- `conditional_on_failure`: reserved for failure branches. It is stored and
+  auditable, but failure-branch automation is a later layer.
+- `related`: records graph context without blocking readiness.
+
 The expanded form creates runtime dependency rows. Those rows are the mutable
 state; the YAML remains the reusable blueprint.
 
@@ -122,6 +150,17 @@ state; the YAML remains the reusable blueprint.
 - `wait`: waits until a duration expires or an exit condition becomes true.
 - `code`: reserved for deterministic functions.
 - `gateway`: reserved for branching.
+- `gate`: a generic non-task gate. Use this when a workflow needs to wait on a
+  human, timer, external condition, or future deterministic check without
+  pretending the gate is an agent recipe task.
+
+This mirrors the useful part of Beads' formula/proto/molecule model:
+
+- workflow YAML = reusable formula/prototype
+- workflow instance = one running molecule for a case/project/request
+- workflow node = a graph node
+- Mission Control task = materialized agent/human work for a ready recipe node
+- dependency rows = the auditable gate/blocker state for that node
 
 ## Lifecycle
 

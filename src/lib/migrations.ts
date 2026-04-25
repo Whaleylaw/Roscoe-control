@@ -1884,6 +1884,8 @@ const migrations: Migration[] = [
           node_key TEXT NOT NULL,
           dependency_type TEXT NOT NULL,
           dependency_key TEXT NOT NULL,
+          dependency_semantics TEXT NOT NULL DEFAULT 'blocks',
+          dependency_group TEXT,
           source_node_key TEXT,
           status TEXT NOT NULL DEFAULT 'pending',
           duration_seconds INTEGER,
@@ -1907,6 +1909,25 @@ const migrations: Migration[] = [
           ON workflow_node_dependencies(workspace_id, dependency_type, status, due_at);
         CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_source
           ON workflow_node_dependencies(workflow_instance_id, source_node_key, dependency_type, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_semantics
+          ON workflow_node_dependencies(node_instance_id, dependency_semantics, dependency_group, status);
+      `)
+    }
+  },
+  {
+    id: '065_workflow_dependency_semantics',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(workflow_node_dependencies)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('dependency_semantics')) {
+        db.exec(`ALTER TABLE workflow_node_dependencies ADD COLUMN dependency_semantics TEXT NOT NULL DEFAULT 'blocks'`)
+      }
+      if (!hasCol('dependency_group')) {
+        db.exec(`ALTER TABLE workflow_node_dependencies ADD COLUMN dependency_group TEXT`)
+      }
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_semantics
+          ON workflow_node_dependencies(node_instance_id, dependency_semantics, dependency_group, status);
       `)
     }
   }

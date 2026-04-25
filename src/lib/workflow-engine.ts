@@ -11,17 +11,34 @@ const dependencyTimerSchema = z.object({
   key: z.string().min(1).optional(),
 })
 
-const dependsOnSchema = z.union([
-  z.array(z.string().min(1)),
+const nodeDependencySemanticsSchema = z.enum([
+  'blocks',
+  'waits_for_all',
+  'waits_for_any',
+  'conditional_on_failure',
+  'related',
+])
+
+const dependencyNodeSchema = z.union([
+  z.string().min(1),
   z.object({
-    nodes: z.array(z.string().min(1)).default([]),
+    node: z.string().min(1),
+    type: nodeDependencySemanticsSchema.default('blocks'),
+    group: z.string().min(1).optional(),
+  }),
+])
+
+const dependsOnSchema = z.union([
+  z.array(dependencyNodeSchema),
+  z.object({
+    nodes: z.array(dependencyNodeSchema).default([]),
     conditions: z.array(z.string().min(1)).default([]),
     timers: z.array(dependencyTimerSchema).default([]),
   }),
 ]).default([])
 
 const workflowNodeSchema = z.object({
-  type: z.enum(['recipe', 'review', 'wait', 'code', 'gateway']),
+  type: z.enum(['recipe', 'review', 'wait', 'code', 'gateway', 'gate']),
   name: z.string().min(1).max(200).optional(),
   recipe: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
   depends_on: dependsOnSchema,
@@ -62,14 +79,20 @@ const workflowDefinitionSchema = z.object({
   }),
 })
 
-export type WorkflowNodeType = 'recipe' | 'review' | 'wait' | 'code' | 'gateway'
+export type WorkflowNodeType = 'recipe' | 'review' | 'wait' | 'code' | 'gateway' | 'gate'
 export type WorkflowDefinition = z.infer<typeof workflowDefinitionSchema>
 export type WorkflowDefinitionNode = WorkflowDefinition['nodes'][string]
 export type WorkflowNodeStatus = 'pending' | 'ready' | 'running' | 'waiting' | 'blocked' | 'complete' | 'failed' | 'skipped' | 'cancelled'
 export type WorkflowInstanceStatus = 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
 export type WorkflowNodeDependencyStatus = 'pending' | 'scheduled' | 'satisfied' | 'cancelled'
+export type WorkflowNodeDependencySemantics = z.infer<typeof nodeDependencySemanticsSchema>
+export type NormalizedWorkflowNodeDependency = {
+  node: string
+  type: WorkflowNodeDependencySemantics
+  group?: string
+}
 export type NormalizedWorkflowDependencies = {
-  nodes: string[]
+  nodes: NormalizedWorkflowNodeDependency[]
   conditions: string[]
   timers: Array<{ after: string; duration: string; key?: string }>
 }
@@ -201,9 +224,7 @@ export function readyNodeKeys(
   for (const [nodeKey, node] of Object.entries(definition.nodes)) {
     const runtime = runtimeByKey.get(nodeKey)
     if (!runtime || !['pending', 'blocked', 'waiting'].includes(runtime.status)) continue
-    const dependencies = normalizeDependsOn(node.depends_on).nodes
-    const incomplete = dependencies.filter((dependency) => runtimeByKey.get(dependency)?.status !== 'complete')
-    if (incomplete.length > 0) continue
+    if (!normalizedNodeDependenciesSatisfied(normalizeDependsOn(node.depends_on).nodes, runtimeByKey)) continue
     if (node.type === 'wait' && runtime.status === 'waiting') continue
     ready.push(nodeKey)
   }
@@ -801,8 +822,10 @@ function seedWorkflowDependencies(
         nodeInstanceId,
         nodeKey,
         dependencyType: 'node',
-        dependencyKey: nodeDependencyKey(dependency),
-        sourceNodeKey: dependency,
+        dependencyKey: nodeDependencyKey(dependency.node),
+        dependencySemantics: dependency.type,
+        dependencyGroup: dependency.group ?? (dependency.type === 'waits_for_any' ? `any:${nodeKey}` : null),
+        sourceNodeKey: dependency.node,
         workspaceId: input.workspaceId,
         now: input.now,
       })
@@ -815,6 +838,7 @@ function seedWorkflowDependencies(
         nodeKey,
         dependencyType: 'condition',
         dependencyKey: conditionDependencyKey(input.subjectType, input.subjectId, condition),
+        dependencySemantics: 'blocks',
         workspaceId: input.workspaceId,
         now: input.now,
       })
@@ -827,6 +851,7 @@ function seedWorkflowDependencies(
         nodeKey,
         dependencyType: 'timer',
         dependencyKey: timerDependencyKey(input.workflowInstanceId, nodeKey, timer),
+        dependencySemantics: 'blocks',
         sourceNodeKey: timer.after === nodeKey ? null : timer.after,
         durationSeconds: durationToSeconds(timer.duration),
         workspaceId: input.workspaceId,
@@ -844,6 +869,8 @@ function insertWorkflowDependency(
     nodeKey: string
     dependencyType: 'node' | 'condition' | 'timer'
     dependencyKey: string
+    dependencySemantics?: WorkflowNodeDependencySemantics
+    dependencyGroup?: string | null
     sourceNodeKey?: string | null
     durationSeconds?: number | null
     workspaceId: number
@@ -853,14 +880,17 @@ function insertWorkflowDependency(
   db.prepare(`
     INSERT OR IGNORE INTO workflow_node_dependencies (
       workflow_instance_id, node_instance_id, node_key, dependency_type, dependency_key,
-      source_node_key, duration_seconds, workspace_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      dependency_semantics, dependency_group, source_node_key, duration_seconds, workspace_id,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     input.workflowInstanceId,
     input.nodeInstanceId,
     input.nodeKey,
     input.dependencyType,
     input.dependencyKey,
+    input.dependencySemantics ?? 'blocks',
+    input.dependencyGroup ?? null,
     input.sourceNodeKey ?? null,
     input.durationSeconds ?? null,
     input.workspaceId,
@@ -989,7 +1019,17 @@ function scheduleSelfTimersForDependencyReadyNodes(
         FROM workflow_node_dependencies other
         WHERE other.node_instance_id = wnd.node_instance_id
           AND other.id != wnd.id
+          AND other.dependency_semantics IN ('blocks', 'waits_for_all', 'conditional_on_failure')
           AND other.status != 'satisfied'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM workflow_node_dependencies any_dep
+        WHERE any_dep.node_instance_id = wnd.node_instance_id
+          AND any_dep.id != wnd.id
+          AND any_dep.dependency_semantics = 'waits_for_any'
+        GROUP BY COALESCE(any_dep.dependency_group, any_dep.dependency_key)
+        HAVING SUM(CASE WHEN any_dep.status = 'satisfied' THEN 1 ELSE 0 END) = 0
       )
   `).all(workflowInstanceId) as Array<{
     id: number
@@ -1043,7 +1083,16 @@ function promoteEligibleWorkflowNodesInTransaction(
         SELECT 1
         FROM workflow_node_dependencies wnd
         WHERE wnd.node_instance_id = wni.id
+          AND wnd.dependency_semantics IN ('blocks', 'waits_for_all', 'conditional_on_failure')
           AND wnd.status != 'satisfied'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM workflow_node_dependencies any_dep
+        WHERE any_dep.node_instance_id = wni.id
+          AND any_dep.dependency_semantics = 'waits_for_any'
+        GROUP BY COALESCE(any_dep.dependency_group, any_dep.dependency_key)
+        HAVING SUM(CASE WHEN any_dep.status = 'satisfied' THEN 1 ELSE 0 END) = 0
       )
     ORDER BY wni.id ASC
   `).all(workflowInstanceId) as Array<{
@@ -1056,7 +1105,7 @@ function promoteEligibleWorkflowNodesInTransaction(
 
   const promoted: string[] = []
   for (const row of rows) {
-    const nextStatus: WorkflowNodeStatus = row.node_type === 'wait' ? 'complete' : 'ready'
+    const nextStatus: WorkflowNodeStatus = ['wait', 'gateway', 'gate'].includes(row.node_type) ? 'complete' : 'ready'
     const updated = db.prepare(`
       UPDATE workflow_node_instances
       SET status = ?, completed_at = CASE WHEN ? = 'complete' THEN COALESCE(completed_at, ?) ELSE completed_at END,
@@ -1166,7 +1215,7 @@ function assertWorkflowGraph(definition: WorkflowDefinition): void {
   for (const [nodeKey, node] of Object.entries(definition.nodes)) {
     const dependencies = normalizeDependsOn(node.depends_on)
     for (const dependency of dependencies.nodes) {
-      if (!nodeKeys.has(dependency)) throw new Error(`Workflow node '${nodeKey}' depends on unknown node '${dependency}'`)
+      if (!nodeKeys.has(dependency.node)) throw new Error(`Workflow node '${nodeKey}' depends on unknown node '${dependency.node}'`)
     }
     for (const timer of dependencies.timers) {
       if (!nodeKeys.has(timer.after)) throw new Error(`Workflow node '${nodeKey}' timer depends on unknown node '${timer.after}'`)
@@ -1182,7 +1231,9 @@ function assertAcyclic(definition: WorkflowDefinition): void {
     if (visited.has(nodeKey)) return
     if (visiting.has(nodeKey)) throw new Error(`Workflow dependency cycle includes '${nodeKey}'`)
     visiting.add(nodeKey)
-    for (const dependency of normalizeDependsOn(definition.nodes[nodeKey]?.depends_on).nodes) visit(dependency)
+    for (const dependency of normalizeDependsOn(definition.nodes[nodeKey]?.depends_on).nodes) {
+      if (dependency.type !== 'related') visit(dependency.node)
+    }
     for (const timer of normalizeDependsOn(definition.nodes[nodeKey]?.depends_on).timers) visit(timer.after)
     visiting.delete(nodeKey)
     visited.add(nodeKey)
@@ -1192,12 +1243,42 @@ function assertAcyclic(definition: WorkflowDefinition): void {
 
 function normalizeDependsOn(value: WorkflowDefinitionNode['depends_on'] | undefined): NormalizedWorkflowDependencies {
   if (!value) return { nodes: [], conditions: [], timers: [] }
-  if (Array.isArray(value)) return { nodes: value, conditions: [], timers: [] }
+  if (Array.isArray(value)) return { nodes: normalizeNodeDependencies(value), conditions: [], timers: [] }
   return {
-    nodes: value.nodes ?? [],
+    nodes: normalizeNodeDependencies(value.nodes ?? []),
     conditions: value.conditions ?? [],
     timers: value.timers ?? [],
   }
+}
+
+function normalizeNodeDependencies(
+  nodes: Array<string | { node: string; type?: WorkflowNodeDependencySemantics; group?: string }>,
+): NormalizedWorkflowNodeDependency[] {
+  return nodes.map((dependency) => {
+    if (typeof dependency === 'string') return { node: dependency, type: 'blocks' }
+    return { node: dependency.node, type: dependency.type ?? 'blocks', ...(dependency.group ? { group: dependency.group } : {}) }
+  })
+}
+
+function normalizedNodeDependenciesSatisfied(
+  dependencies: NormalizedWorkflowNodeDependency[],
+  runtimeByKey: Map<string, WorkflowRuntimeNode>,
+): boolean {
+  const waitsForAnyByGroup = new Map<string, NormalizedWorkflowNodeDependency[]>()
+  for (const dependency of dependencies) {
+    if (dependency.type === 'related') continue
+    if (dependency.type === 'waits_for_any') {
+      const group = dependency.group ?? 'default'
+      waitsForAnyByGroup.set(group, [...(waitsForAnyByGroup.get(group) ?? []), dependency])
+      continue
+    }
+    if (runtimeByKey.get(dependency.node)?.status !== 'complete') return false
+  }
+
+  for (const group of waitsForAnyByGroup.values()) {
+    if (!group.some((dependency) => runtimeByKey.get(dependency.node)?.status === 'complete')) return false
+  }
+  return true
 }
 
 function nodeDependencyKey(nodeKey: string): string {
