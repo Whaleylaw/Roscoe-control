@@ -6,6 +6,7 @@ import { runMigrations } from '../migrations'
 import {
   advanceWorkflowAfterTaskApproval,
   advanceDueWorkflowTimers,
+  cancelWorkflowInstance,
   createWorkflowDefinition,
   durationToSeconds,
   listWorkflowActivity,
@@ -651,6 +652,74 @@ nodes:
         SELECT status FROM workflow_node_instances
         WHERE workflow_instance_id = ? AND node_key = 'follow_up'
       `).get(instance.instance_id)).toMatchObject({ status: 'running' })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('cancels an active workflow instance and unfinished nodes without mutating linked tasks', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`
+        SELECT id FROM projects
+        WHERE workspace_id = 1 AND slug = 'general'
+        LIMIT 1
+      `).get() as { id: number } | undefined
+      expect(project).toBeTruthy()
+
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: cancel-example
+name: Cancel Example
+subject_type: law_firm_case
+nodes:
+  first_step:
+    type: recipe
+    recipe: hello-world
+  second_step:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      - first_step
+`, 'tester', 1, 1)
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 3000,
+      })
+      const materialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project!.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 3001,
+      })
+
+      const cancelled = cancelWorkflowInstance(db, {
+        workflowInstanceId: instance.instance_id,
+        actor: 'operator',
+        workspaceId: 1,
+        reason: 'not needed',
+        now: 3002,
+      })
+
+      expect(cancelled).toMatchObject({ workflow_instance_id: instance.instance_id, cancelled_nodes: 2 })
+      expect(db.prepare(`SELECT status FROM workflow_instances WHERE id = ?`).get(instance.instance_id)).toMatchObject({ status: 'cancelled' })
+      expect(db.prepare(`
+        SELECT COUNT(*) AS count FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND status = 'cancelled'
+      `).get(instance.instance_id)).toMatchObject({ count: 2 })
+      expect(db.prepare(`SELECT status FROM tasks WHERE id = ?`).get(materialized.created[0].task_id)).toMatchObject({ status: 'inbox' })
+      expect(db.prepare(`
+        SELECT event_type FROM workflow_events
+        WHERE workflow_instance_id = ?
+        ORDER BY id DESC LIMIT 1
+      `).get(instance.instance_id)).toMatchObject({ event_type: 'workflow.cancelled' })
     } finally {
       db.close()
     }

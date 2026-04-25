@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { LawFirmCaseWorkspace } from '../case-workspace'
 
 const nav = vi.hoisted(() => ({
@@ -83,7 +83,69 @@ beforeEach(() => {
       return new Response(JSON.stringify({ project: { id: 42 } }))
     }
     if (href === '/api/law-firm/cases/colleen-colvin/workflow') {
+      if (init?.method === 'PATCH') {
+        return new Response(JSON.stringify({
+          workflow_instances: [
+            {
+              workflow_instance_id: 7,
+              workflow_key: 'firmvault-request-medical-records:law_firm_case:colleen-colvin',
+              definition_slug: 'firmvault-request-medical-records',
+              definition_name: 'Request Medical Records',
+              definition_version: 2,
+              status: 'cancelled',
+              started_by: 'tester',
+              started_at: 1000,
+              completed_at: 1700000000,
+              updated_at: 1700000000,
+              total_nodes: 2,
+              ready_nodes: 0,
+              running_nodes: 0,
+              waiting_nodes: 0,
+              blocked_nodes: 0,
+              complete_nodes: 0,
+              failed_nodes: 0,
+              task_count: 1,
+              nodes: [],
+            },
+          ],
+        }))
+      }
       return new Response(JSON.stringify({
+        workflow_instances: [
+          {
+            workflow_instance_id: 7,
+            workflow_key: 'firmvault-request-medical-records:law_firm_case:colleen-colvin',
+            definition_slug: 'firmvault-request-medical-records',
+            definition_name: 'Request Medical Records',
+            definition_version: 2,
+            status: 'active',
+            started_by: 'tester',
+            started_at: 1000,
+            completed_at: null,
+            updated_at: 1000,
+            total_nodes: 2,
+            ready_nodes: 0,
+            running_nodes: 1,
+            waiting_nodes: 1,
+            blocked_nodes: 0,
+            complete_nodes: 0,
+            failed_nodes: 0,
+            task_count: 1,
+            nodes: [
+              {
+                id: 71,
+                node_key: 'wait_for_records',
+                node_type: 'wait',
+                status: 'waiting',
+                recipe_slug: null,
+                task_id: null,
+                due_at: 1700000000,
+                completed_at: null,
+                blocked_by: [],
+              },
+            ],
+          },
+        ],
         ready_items: [],
         workflows: [
           {
@@ -157,8 +219,28 @@ describe('LawFirmCaseWorkspace', () => {
     await waitFor(() => expect(screen.getByText('Lien Identification and Resolution')).toBeTruthy())
 
     expect(screen.getByText('Active')).toBeTruthy()
+    expect(screen.getByText('Request Medical Records')).toBeTruthy()
+    expect(document.body.textContent).toContain('due')
     expect(screen.getByText('identify liens')).toBeTruthy()
     expect(screen.getByText('open liens')).toBeTruthy()
+  })
+
+  it('can cancel an active workflow instance from the workflow tab', async () => {
+    nav.pathname = '/law-firm/case/colleen-colvin/workflow'
+    render(<LawFirmCaseWorkspace />)
+
+    await waitFor(() => expect(screen.getByText('Request Medical Records')).toBeTruthy())
+    fireEvent.click(screen.getByText('Cancel'))
+
+    await waitFor(() => expect(document.body.textContent).toContain('Workflow instance cancelled'))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/law-firm/cases/colleen-colvin/workflow',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.stringContaining('cancel_instance'),
+      }),
+    )
+    expect(document.body.textContent).toContain('cancelled')
   })
 
   it('renders a task board scoped to the hidden case project', async () => {

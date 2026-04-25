@@ -44,6 +44,7 @@ type WorkflowPreview = {
     status: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
     started_by: string
     started_at: number
+    completed_at: number | null
     updated_at: number
     total_nodes: number
     ready_nodes: number
@@ -122,6 +123,7 @@ export function LawFirmCaseWorkspace() {
   const [workflowLoading, setWorkflowLoading] = useState(false)
   const [workflowMaterializing, setWorkflowMaterializing] = useState(false)
   const [workflowOverriding, setWorkflowOverriding] = useState<string | null>(null)
+  const [workflowInstanceUpdating, setWorkflowInstanceUpdating] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
 
   const loadDetail = useCallback(async () => {
@@ -253,6 +255,35 @@ export function LawFirmCaseWorkspace() {
     }
   }, [slug, t, workflowOverriding])
 
+  const cancelWorkflowInstance = useCallback(async (workflowInstanceId: number) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(workflowInstanceId)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel_instance',
+          workflow_instance_id: workflowInstanceId,
+          reason: 'Cancelled from the case Workflow tab.',
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      setFeedback('Workflow instance cancelled')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
   if (loading && !detail) {
     return <div className="p-6 text-sm text-muted-foreground">{t('detailLoading')}</div>
   }
@@ -315,8 +346,10 @@ export function LawFirmCaseWorkspace() {
           workflowLoading={workflowLoading}
           workflowMaterializing={workflowMaterializing}
           workflowOverriding={workflowOverriding}
+          workflowInstanceUpdating={workflowInstanceUpdating}
           onMaterialize={materializeWorkflow}
           onWorkflowOverride={updateWorkflowOverride}
+          onCancelWorkflowInstance={cancelWorkflowInstance}
         />
       )}
       {view === 'activity' && <ActivityView detail={detail} />}
@@ -422,15 +455,19 @@ function WorkflowView({
   workflowLoading,
   workflowMaterializing,
   workflowOverriding,
+  workflowInstanceUpdating,
   onMaterialize,
   onWorkflowOverride,
+  onCancelWorkflowInstance,
 }: {
   workflowPreview: WorkflowPreview | null
   workflowLoading: boolean
   workflowMaterializing: boolean
   workflowOverriding: string | null
+  workflowInstanceUpdating: number | null
   onMaterialize: () => void
   onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
+  onCancelWorkflowInstance: (workflowInstanceId: number) => void
 }) {
   const t = useTranslations('lawFirm')
   const workflowInstances = workflowPreview?.workflow_instances ?? []
@@ -466,9 +503,21 @@ function WorkflowView({
                     <h3 className="truncate text-sm font-semibold text-foreground">{workflow.definition_name}</h3>
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">{workflow.definition_slug} v{workflow.definition_version}</p>
                   </div>
-                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${workflowInstanceTone(workflow.status)}`}>
-                    {formatLabel(workflow.status)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className={`rounded px-2 py-0.5 text-xs ${workflowInstanceTone(workflow.status)}`}>
+                      {formatLabel(workflow.status)}
+                    </span>
+                    {workflow.status === 'active' || workflow.status === 'blocked' ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onCancelWorkflowInstance(workflow.workflow_instance_id)}
+                        disabled={workflowInstanceUpdating !== null}
+                      >
+                        {workflowInstanceUpdating === workflow.workflow_instance_id ? 'Cancelling' : 'Cancel'}
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="mt-3 grid grid-cols-5 gap-2 text-center text-xs">
                   <WorkflowMetric label="Ready" value={workflow.ready_nodes} />
@@ -483,6 +532,7 @@ function WorkflowView({
                       <span className="min-w-0 truncate text-foreground">
                         {formatLabel(node.node_key)}
                         {node.task_id ? <span className="ml-1 text-muted-foreground">#{node.task_id}</span> : null}
+                        {node.due_at ? <span className="ml-1 text-purple-500">due {formatUnixTime(node.due_at)}</span> : null}
                       </span>
                       <span className={`shrink-0 rounded px-1.5 py-0.5 ${workflowNodeTone(node.status)}`}>{formatLabel(node.status)}</span>
                     </div>
@@ -690,4 +740,17 @@ function Metric({ label, value }: { label: string; value: string }) {
 function formatLabel(value: string | null): string {
   if (!value) return ''
   return value.replace(/_/g, ' ')
+}
+
+function formatUnixTime(value: number): string {
+  try {
+    return new Date(value * 1000).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return String(value)
+  }
 }

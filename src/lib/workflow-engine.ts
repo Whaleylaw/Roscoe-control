@@ -181,12 +181,25 @@ export type CompleteWorkflowNodeResult = {
   ready_nodes: string[]
 } | null
 
+export type CancelWorkflowInstanceResult = {
+  workflow_instance_id: number
+  cancelled_nodes: number
+} | null
+
 export type AdvanceWorkflowAfterTaskApprovalInput = {
   taskId: number
   actor: string
   payload?: Record<string, unknown>
   assignedTo?: string | null
   status?: 'inbox' | 'assigned'
+  now?: number
+}
+
+export type CancelWorkflowInstanceInput = {
+  workflowInstanceId: number
+  actor: string
+  workspaceId: number
+  reason?: string
   now?: number
 }
 
@@ -743,6 +756,63 @@ export function advanceWorkflowAfterTaskApproval(
   })
 
   return { completed, materialized }
+}
+
+export function cancelWorkflowInstance(
+  db: Database.Database,
+  input: CancelWorkflowInstanceInput,
+): CancelWorkflowInstanceResult {
+  const now = input.now ?? Math.floor(Date.now() / 1000)
+  let result: CancelWorkflowInstanceResult = null
+
+  db.transaction(() => {
+    const instance = db.prepare(`
+      SELECT id, status
+      FROM workflow_instances
+      WHERE id = ? AND workspace_id = ?
+      LIMIT 1
+    `).get(input.workflowInstanceId, input.workspaceId) as { id: number; status: WorkflowInstanceStatus } | undefined
+    if (!instance) return
+
+    const updated = db.prepare(`
+      UPDATE workflow_instances
+      SET status = 'cancelled', completed_at = COALESCE(completed_at, ?), updated_at = ?
+      WHERE id = ? AND workspace_id = ? AND status NOT IN ('complete', 'cancelled')
+    `).run(now, now, input.workflowInstanceId, input.workspaceId)
+
+    const nodes = db.prepare(`
+      UPDATE workflow_node_instances
+      SET status = 'cancelled', updated_at = ?
+      WHERE workflow_instance_id = ?
+        AND status NOT IN ('complete', 'skipped', 'cancelled')
+    `).run(now, input.workflowInstanceId)
+
+    db.prepare(`
+      UPDATE workflow_node_dependencies
+      SET status = 'cancelled', updated_at = ?
+      WHERE workflow_instance_id = ?
+        AND status IN ('pending', 'scheduled')
+    `).run(now, input.workflowInstanceId)
+
+    if (updated.changes > 0 || nodes.changes > 0) {
+      writeWorkflowEvent(db, {
+        workflowInstanceId: input.workflowInstanceId,
+        eventType: 'workflow.cancelled',
+        actorType: 'human',
+        actorId: input.actor,
+        payload: { reason: input.reason ?? null },
+        workspaceId: input.workspaceId,
+        createdAt: now,
+      })
+    }
+
+    result = {
+      workflow_instance_id: input.workflowInstanceId,
+      cancelled_nodes: nodes.changes,
+    }
+  })()
+
+  return result
 }
 
 export function advanceDueWorkflowTimers(

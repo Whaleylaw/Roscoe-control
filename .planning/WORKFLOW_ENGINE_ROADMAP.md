@@ -61,6 +61,7 @@ The law-firm/FirmVault workflows are the first production use case, but the engi
 - Workflow definition registry/sync from `workflows/*.yaml`.
 - Quality-review approval advances workflow nodes and materializes next ready recipe tasks.
 - Workflow timer scheduler task advances due timer dependencies without OpenClaw cron.
+- Case Workflow tab can cancel active workflow instances and show timer due dates.
 
 ## Active Design Decisions
 
@@ -135,7 +136,7 @@ Goal: users can manage workflows directly from the case UI.
 - Keep execution tasks on the existing Tasks tab.
 - Add tests around action rendering and API behavior.
 
-Status: medium priority.
+Status: in progress. Activate/close exists for legacy FirmVault workflow plans; cancel and timer visibility now exist for engine workflow instances. Remaining work: bypass/not-applicable controls at workflow/node level and richer blocker display.
 
 ### 6. Complete Request Medical Records Workflow
 
