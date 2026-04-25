@@ -1,8 +1,9 @@
 /**
  * POST + GET /api/tasks/:id/checkpoints — Plan 15-04 Task 2.
  *
- * POST (runner-token authenticated):
+ * POST (runner authenticated):
  *   - runner-token principal (id=-2000) scoped to the path :id → 201 happy path
+ *   - runner-secret principal (id=-1000) → 201 for daemon-side preflight blockers
  *   - non-runner-token principal (e.g. API-key admin) → 403
  *   - cross-task runner-token → 401 (auth.ts refuses to issue the principal)
  *     OR 403 if we simulate the defense-in-depth gate firing (hard to hit
@@ -94,17 +95,19 @@ function seedTask(
     worktree_path?: string | null
     runner_attempts?: number
     workspace_id?: number
+    recipe_slug?: string | null
   } = {},
 ): void {
   const status = opts.status ?? 'in_progress'
   const worktreePath = opts.worktree_path ?? null
   const attempts = opts.runner_attempts ?? 1
   const workspace_id = opts.workspace_id ?? 1
+  const recipeSlug = opts.recipe_slug ?? null
   db.prepare(
     `INSERT INTO tasks
-       (id, title, status, priority, workspace_id, worktree_path, runner_attempts)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, `task ${id}`, status, 'medium', workspace_id, worktreePath, attempts)
+       (id, title, status, priority, workspace_id, worktree_path, runner_attempts, recipe_slug)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, `task ${id}`, status, 'medium', workspace_id, worktreePath, attempts, recipeSlug)
 }
 
 function buildReq(
@@ -212,6 +215,22 @@ describe('POST /api/tasks/:id/checkpoints', () => {
     expect(payload.workspace_id).toBe(1)
   })
 
+  it('happy path: runner-secret daemon principal → 201 for preflight checkpoint', async () => {
+    const res = await callPost(42, 'known-runner-secret-test-value-abc-1234567890', {
+      step: 'runner-secret-preflight',
+      summary: 'missing secret',
+      status: 'blocked',
+      blocker_reason: 'OPENROUTER_API_KEY is missing',
+    })
+    expect(res.status).toBe(201)
+    const row = testDb
+      .prepare(`SELECT step, status, blocker_reason FROM task_checkpoints WHERE task_id = 42`)
+      .get() as { step: string; status: string; blocker_reason: string }
+    expect(row.step).toBe('runner-secret-preflight')
+    expect(row.status).toBe('blocked')
+    expect(row.blocker_reason).toBe('OPENROUTER_API_KEY is missing')
+  })
+
   it('non-runner-token principal (admin API key, id=0) → 403', async () => {
     const res = await callPost(42, 'test-admin-api-key-aaaaaaaaaaaaaaaaaaa', {
       step: 'init',
@@ -220,7 +239,7 @@ describe('POST /api/tasks/:id/checkpoints', () => {
     })
     expect(res.status).toBe(403)
     const body = await res.json()
-    expect(body.error).toContain('runner-token principal required')
+    expect(body.error).toContain('runner principal required')
   })
 
   it('cross-task runner-token (token for task A, path task B) → 401 (auth layer rejects)', async () => {
@@ -370,6 +389,39 @@ describe('POST /api/tasks/:id/checkpoints', () => {
     const [, payload] = checkpointCall!
     expect(payload.status).toBe('blocked')
     expect(payload.blocker_reason).toBe('missing API key')
+  })
+
+  it('status=blocked on a recipe task moves the task to review for user handoff', async () => {
+    seedTask(testDb, 77, {
+      worktree_path: worktreeRoot,
+      runner_attempts: 1,
+      recipe_slug: 'firmvault-pip-confirm-approval',
+    })
+    const { token } = issueRunnerToken(testDb, 77, 1, 300)
+    const res = await callPost(77, token, {
+      step: 'needs-confirmation',
+      summary: 'found claim information but needs human confirmation',
+      status: 'blocked',
+      blocker_reason: 'Carrier and claim number found; human confirmation needed before marking PIP approved.',
+    })
+    expect(res.status).toBe(201)
+
+    const task = testDb
+      .prepare(`SELECT status, runner_last_failure_reason FROM tasks WHERE id = 77`)
+      .get() as { status: string; runner_last_failure_reason: string | null }
+    expect(task.status).toBe('review')
+    expect(task.runner_last_failure_reason).toContain('blocked:Carrier and claim number found')
+
+    const statusCall = broadcastMock.mock.calls.find(
+      ([type]) => type === 'task.status_changed',
+    )
+    expect(statusCall).toBeDefined()
+    expect(statusCall![1]).toMatchObject({
+      task_id: 77,
+      status: 'review',
+      previous_status: 'in_progress',
+      reason: 'blocked_checkpoint',
+    })
   })
 
   it('artifact kind=file with path → 201; JSONL contains the artifact', async () => {

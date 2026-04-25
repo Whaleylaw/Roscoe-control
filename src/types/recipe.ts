@@ -49,11 +49,13 @@ export interface RecipeRow {
   max_concurrent: number
   env: Record<string, string>
   secrets: string[]
+  tools?: Array<'read_file' | 'list_dir' | 'write_file' | 'run_shell'>
   tags: string[]
   model: RecipeModel
   version: number
   dir_sha: string
   soul_md: string | null
+  review_md: string | null
   error_message: null
   workspace_id: number
   tenant_id: number

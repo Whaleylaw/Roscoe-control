@@ -1771,6 +1771,107 @@ const migrations: Migration[] = [
       `)
       db.exec(`CREATE INDEX IF NOT EXISTS idx_task_runner_attempts_task ON task_runner_attempts(task_id, attempt DESC)`)
     }
+  },
+  {
+    id: '062_recipe_review_md',
+    up(db: Database.Database) {
+      const recipeCols = db.prepare(`PRAGMA table_info(recipes)`).all() as Array<{ name: string }>
+      const hasRecipeCol = (n: string) => recipeCols.some((c) => c.name === n)
+
+      if (!hasRecipeCol('review_md')) {
+        db.exec(`ALTER TABLE recipes ADD COLUMN review_md TEXT`)
+      }
+    }
+  },
+  {
+    id: '063_workflow_engine_v1',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workflow_definitions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL,
+          name TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          subject_type TEXT NOT NULL DEFAULT 'generic',
+          definition_yaml TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_by TEXT NOT NULL DEFAULT 'system',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE (workspace_id, slug, version)
+        );
+
+        CREATE TABLE IF NOT EXISTS workflow_instances (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          definition_id INTEGER NOT NULL,
+          workflow_key TEXT NOT NULL,
+          subject_type TEXT NOT NULL,
+          subject_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          started_by TEXT NOT NULL DEFAULT 'system',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          started_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          completed_at INTEGER,
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (definition_id) REFERENCES workflow_definitions(id) ON DELETE RESTRICT,
+          UNIQUE (workspace_id, workflow_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS workflow_node_instances (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workflow_instance_id INTEGER NOT NULL,
+          node_key TEXT NOT NULL,
+          node_type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          recipe_slug TEXT,
+          task_id INTEGER,
+          review_task_id INTEGER,
+          due_at INTEGER,
+          review_round INTEGER NOT NULL DEFAULT 0,
+          depends_on_json TEXT NOT NULL DEFAULT '[]',
+          blocked_by_json TEXT NOT NULL DEFAULT '[]',
+          config_json TEXT NOT NULL DEFAULT '{}',
+          output_json TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          started_at INTEGER,
+          completed_at INTEGER,
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+          FOREIGN KEY (review_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+          UNIQUE (workflow_instance_id, node_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS workflow_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workflow_instance_id INTEGER NOT NULL,
+          node_instance_id INTEGER,
+          task_id INTEGER,
+          node_key TEXT,
+          event_type TEXT NOT NULL,
+          actor_type TEXT NOT NULL,
+          actor_id TEXT,
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+          FOREIGN KEY (node_instance_id) REFERENCES workflow_node_instances(id) ON DELETE SET NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_workflow_definitions_workspace_slug ON workflow_definitions(workspace_id, slug, version);
+        CREATE INDEX IF NOT EXISTS idx_workflow_instances_subject ON workflow_instances(workspace_id, subject_type, subject_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_instances_definition ON workflow_instances(definition_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_instances_workflow_status ON workflow_node_instances(workflow_instance_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_instances_task ON workflow_node_instances(task_id);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_instances_due ON workflow_node_instances(status, due_at);
+        CREATE INDEX IF NOT EXISTS idx_workflow_events_instance_created ON workflow_events(workflow_instance_id, created_at, id);
+        CREATE INDEX IF NOT EXISTS idx_workflow_events_task ON workflow_events(task_id, created_at);
+      `)
+    }
   }
 ]
 

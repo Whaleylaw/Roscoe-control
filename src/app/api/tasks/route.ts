@@ -535,7 +535,8 @@ export async function PUT(request: NextRequest) {
         const oldTask = db.prepare('SELECT * FROM tasks WHERE id = ? AND workspace_id = ?').get(task.id, workspaceId) as Task;
         if (!oldTask) continue;
 
-        if (task.status === 'done' && !hasAegisApproval(db, task.id, workspaceId)) {
+        const oldTaskRecipeSlug = (oldTask as unknown as { recipe_slug?: string | null }).recipe_slug
+        if (task.status === 'done' && !oldTaskRecipeSlug && !hasAegisApproval(db, task.id, workspaceId)) {
           throw new Error(`Aegis approval required for task ${task.id}`)
         }
 

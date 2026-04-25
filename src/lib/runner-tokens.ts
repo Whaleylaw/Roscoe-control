@@ -18,6 +18,7 @@ import type Database from 'better-sqlite3'
 export const RUNNER_TOKEN_ALLOWLIST: ReadonlyArray<{ method: string; pathPattern: RegExp }> = [
   { method: 'POST', pathPattern: /^\/api\/runner\/tasks\/(\d+)\/checkpoints\/?$/ },
   { method: 'POST', pathPattern: /^\/api\/runner\/tasks\/(\d+)\/submit\/?$/ },
+  { method: 'POST', pathPattern: /^\/api\/runner\/tasks\/(\d+)\/review\/?$/ },
   { method: 'POST', pathPattern: /^\/api\/runner\/tasks\/(\d+)\/fail\/?$/ },
   { method: 'GET',  pathPattern: /^\/api\/runner\/tasks\/(\d+)\/status\/?$/ },
   { method: 'GET',  pathPattern: /^\/api\/runner\/tasks\/(\d+)\/?$/ },

@@ -65,6 +65,7 @@ vi.mock('@/lib/config', () => ({
 }))
 
 const { PUT, GET } = await import('../route')
+const { eventBus } = await import('@/lib/event-bus')
 
 let tmpRoot: string
 
@@ -72,6 +73,7 @@ beforeEach(async () => {
   testDb = new Database(':memory:')
   testDb.pragma('foreign_keys = ON')
   runMigrations(testDb)
+  vi.mocked(eventBus.broadcast).mockClear()
 
   // Migration 001 seeds no workspace; migration 021 seeds workspace id=1 slug='default'.
   // Migration 024 seeds a default project with slug='general' ticket_prefix='TASK' for every workspace.
@@ -229,6 +231,22 @@ describe('PUT /api/tasks/:id runtime-context (Plan 13-03)', () => {
     const body = await res.json()
     expect(body.task.recipe_slug).toBe('ro-recipe')
     expect(body.task.title).toBe('new title')
+  })
+
+  it('7b. PATCH recipe task inbox→assigned emits task.runner_requested', async () => {
+    const id = seedTask({ status: 'inbox', recipe_slug: 'ro-recipe' })
+
+    const res = await putTask(id, { status: 'assigned' })
+    expect(res.status).toBe(200)
+
+    expect(eventBus.broadcast).toHaveBeenCalledWith(
+      'task.runner_requested',
+      {
+        task_id: id,
+        recipe_slug: 'ro-recipe',
+        workspace_id: 1,
+      },
+    )
   })
 
   // -------------------------------------------------------------------------

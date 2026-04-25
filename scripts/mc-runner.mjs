@@ -6,7 +6,7 @@
  * recipe-tagged tasks. Boots, heartbeats, consumes SSE `task.runner_requested`
  * events (+ 15s poll fallback), atomically claims tasks via
  * POST /api/runner/claim/:task_id, seeds the worktree, launches the container
- * via `docker run --rm -d`, reports back via
+ * via `docker run -d`, reports back via
  * POST /api/runner/tasks/:id/container-started and
  * POST /api/runner/tasks/:id/runner-exit, and runs a 10-minute GC tick against
  * GET /api/runner/terminal-tasks.
@@ -88,7 +88,11 @@ function ensureAttemptDir(paths, meta) {
 }
 
 function updateLatestSymlink(paths, attempt) {
-  fs.rmSync(paths.latestSymlink, { force: true })
+  try {
+    fs.unlinkSync(paths.latestSymlink)
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err
+  }
   fs.symlinkSync(`attempt-${attempt}`, paths.latestSymlink, 'dir')
 }
 
@@ -175,6 +179,7 @@ function buildDockerRunArgs(input) {
     runnerStartedAtIso,
     containerName,
     worktreePath,
+    workspaceMountPath,
     recipeStagePath,
     readOnlyMounts,
     extraSkills,
@@ -182,11 +187,11 @@ function buildDockerRunArgs(input) {
     memory,
     cpus,
     networkHostGateway,
+    workspaceReadOnly,
   } = input
 
   const argv = [
     'run',
-    '--rm',
     '-d',
     '--name', containerName,
     '--label', `mc.task_id=${taskId}`,
@@ -201,7 +206,7 @@ function buildDockerRunArgs(input) {
     argv.push('--add-host', 'host.docker.internal:host-gateway')
   }
   argv.push('--env-file', envFilePath)
-  argv.push('-v', `${worktreePath}:/workspace:rw`)
+  argv.push('-v', `${workspaceMountPath || worktreePath}:/workspace:${workspaceReadOnly ? 'ro' : 'rw'}`)
   argv.push('-v', `${recipeStagePath}:/recipe:ro`)
   for (const mount of readOnlyMounts) {
     const containerPath = mount.container_path ?? `/refs/${slugify(mount.label)}`
@@ -236,6 +241,59 @@ function writeEnvFile(envMap, filePath) {
 
 function cleanupEnvFile(filePath) {
   try { fs.rmSync(filePath, { force: true }) } catch {}
+}
+
+function taskBranchName(taskId) {
+  return `mc/task-${taskId}`
+}
+
+function gitOutput(repoPath, args) {
+  const result = spawnSync('git', ['-C', repoPath, ...args], { encoding: 'utf8' })
+  if (result.status !== 0) return ''
+  return result.stdout.trim()
+}
+
+function pruneGitWorktrees(repoPath) {
+  const pruneR = spawnSync('git', ['-C', repoPath, 'worktree', 'prune'], { encoding: 'utf8' })
+  if (pruneR.status !== 0) {
+    log('warn', 'git worktree prune non-zero (continuing)', {
+      repo: repoPath,
+      stderr_tail: (pruneR.stderr || pruneR.stdout || '').slice(-1000),
+    })
+  }
+}
+
+function refreshEmptyTaskBranch(repoPath, baseRef, branchName, taskId) {
+  const uniqueCount = gitOutput(repoPath, ['rev-list', '--count', `${baseRef}..${branchName}`])
+  const branchBehindBase = spawnSync(
+    'git',
+    ['-C', repoPath, 'merge-base', '--is-ancestor', branchName, baseRef],
+    { stdio: 'ignore' },
+  ).status === 0
+  if (uniqueCount === '0' && branchBehindBase) {
+    const resetR = spawnSync('git', ['-C', repoPath, 'branch', '-f', branchName, baseRef], { encoding: 'utf8' })
+    if (resetR.status !== 0) {
+      log('warn', 'failed to refresh empty task branch (continuing)', {
+        task_id: taskId,
+        branch: branchName,
+        base_ref: baseRef,
+        stderr_tail: (resetR.stderr || resetR.stdout || '').slice(-1000),
+      })
+    }
+  }
+}
+
+function firmVaultCaseWorkspaceSubpath(task) {
+  const slug = task?.metadata?.law_firm?.case_slug
+  if (typeof slug === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+    return path.join('cases', slug)
+  }
+  const description = typeof task?.description === 'string' ? task.description : ''
+  const caseFileMatch = description.match(/\bcases\/([a-z0-9][a-z0-9-]*)\/[a-z0-9][a-z0-9-]*\.md\b/)
+  if (caseFileMatch?.[1]) return path.join('cases', caseFileMatch[1])
+  const caseSlugMatch = description.match(/\bCase:\s*([a-z0-9][a-z0-9-]*)\b/)
+  if (caseSlugMatch?.[1]) return path.join('cases', caseSlugMatch[1])
+  return null
 }
 
 // NOTE: mirrors src/lib/runner-worktree.ts seedMcDir. Keep in sync.
@@ -840,24 +898,30 @@ async function tryClaim(taskId) {
     log('error', 'claim body parse failed', { task_id: taskId, err: String(err) })
     return
   }
-  await runContainer(dispatch).catch((err) => {
+  await runContainer(dispatch).catch(async (err) => {
     log('error', 'runContainer threw', { task_id: taskId, err: String(err) })
+    const attempt = dispatch?.task?.attempt
+    if (Number.isFinite(attempt)) {
+      await postRunnerExit(taskId, attempt, null, 'crash', String(err))
+    }
   })
 }
 
 async function postRunnerExit(taskId, attempt, exitCode, reason, stderrTail) {
-  try {
-    const body = { exit_code: exitCode, reason, attempt }
-    if (stderrTail !== undefined && stderrTail !== null) body.stderr_tail = stderrTail
-    const res = await mcFetch(`/api/runner/tasks/${taskId}/runner-exit`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
-    if (!res.ok && res.status !== 409) {
-      log('warn', 'runner-exit non-OK', { task_id: taskId, status: res.status })
+  const body = { exit_code: exitCode, reason, attempt }
+  if (stderrTail !== undefined && stderrTail !== null) body.stderr_tail = stderrTail
+  for (let tryNo = 1; tryNo <= 5; tryNo += 1) {
+    try {
+      const res = await mcFetch(`/api/runner/tasks/${taskId}/runner-exit`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      if (res.ok || res.status === 409) return
+      log('warn', 'runner-exit non-OK', { task_id: taskId, status: res.status, try_no: tryNo })
+    } catch (err) {
+      log('error', 'runner-exit post failed', { task_id: taskId, try_no: tryNo, err: String(err) })
     }
-  } catch (err) {
-    log('error', 'runner-exit post failed', { task_id: taskId, err: String(err) })
+    await new Promise((resolve) => setTimeout(resolve, Math.min(tryNo * 1000, 5000)))
   }
 }
 
@@ -867,18 +931,96 @@ async function postRunnerExit(taskId, attempt, exitCode, reason, stderrTail) {
  * Returns { ENV_NAME: value, ... } for merging into env-file.
  */
 function loadRecipeSecrets(secretNames) {
-  const out = {}
+  const values = {}
+  const missing = []
   for (const name of secretNames || []) {
     const p = path.join(DATA_DIR, 'runner', 'secrets', name)
     try {
       const raw = fs.readFileSync(p, 'utf8').trim()
-      if (raw) out[name] = raw
-      else log('warn', 'recipe secret empty', { name })
+      if (raw) values[name] = raw
+      else {
+        missing.push(name)
+        log('warn', 'recipe secret empty', { name })
+      }
     } catch {
+      missing.push(name)
       log('warn', 'recipe secret missing', { name, path: p })
     }
   }
-  return out
+  return { values, missing }
+}
+
+async function postRunnerCheckpoint(taskId, body) {
+  try {
+    const res = await fetch(`${MC_URL}/api/tasks/${taskId}/checkpoints`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok && res.status !== 409) {
+      const text = await res.text().catch(() => '')
+      log('warn', 'checkpoint non-OK', {
+        task_id: taskId,
+        status: res.status,
+        body: text.slice(0, 1000),
+      })
+      return false
+    }
+    return true
+  } catch (err) {
+    log('warn', 'checkpoint post failed', { task_id: taskId, err: String(err) })
+    return false
+  }
+}
+
+function readLatestLocalBlockedCheckpoint(workspaceHostPath) {
+  if (!workspaceHostPath) return null
+  const checkpointsPath = path.join(workspaceHostPath, '.mc', 'checkpoints.jsonl')
+  let raw
+  try {
+    raw = fs.readFileSync(checkpointsPath, 'utf8')
+  } catch {
+    return null
+  }
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    try {
+      const checkpoint = JSON.parse(lines[i])
+      if (checkpoint?.status !== 'blocked') continue
+      const blockerReason = String(checkpoint.blocker_reason || '').trim()
+      if (!blockerReason) continue
+      return {
+        step: String(checkpoint.step || 'recipe-agent'),
+        status: 'blocked',
+        summary: String(checkpoint.summary || blockerReason).slice(0, 2000),
+        blocker_reason: blockerReason.slice(0, 4000),
+        ...(checkpoint.next_step ? { next_step: String(checkpoint.next_step).slice(0, 1000) } : {}),
+        ...(Array.isArray(checkpoint.artifacts) ? { artifacts: checkpoint.artifacts } : {}),
+      }
+    } catch {
+      // Ignore malformed local audit lines and keep scanning older entries.
+    }
+  }
+  return null
+}
+
+async function surfaceLocalBlockedCheckpoint(taskId, workspaceHostPath) {
+  const checkpoint = readLatestLocalBlockedCheckpoint(workspaceHostPath)
+  if (!checkpoint) return false
+  const posted = await postRunnerCheckpoint(taskId, checkpoint)
+  if (posted) {
+    log('info', 'surfaced local blocked checkpoint after container exit', {
+      task_id: taskId,
+      step: checkpoint.step,
+    })
+  }
+  return posted
 }
 
 /**
@@ -889,7 +1031,7 @@ function loadRecipeSecrets(secretNames) {
  * The adopt path sets a default reason='crash' on unexpected exit because we
  * don't carry the timeout state across restart.
  */
-async function watchContainerExit(taskId, containerId, attempt, logPaths, envFilePath) {
+async function watchContainerExit(taskId, containerId, attempt, logPaths, envFilePath, workspaceHostPath) {
   // Pipe docker logs -f to stdout/stderr log files.
   let stdoutFd, stderrFd, logsProc
   try {
@@ -909,7 +1051,8 @@ async function watchContainerExit(taskId, containerId, attempt, logPaths, envFil
 
   // Block on docker wait. spawnSync blocks this async function until exit.
   const waitR = spawnSync('docker', ['wait', containerId], { encoding: 'utf8' })
-  const exitCode = Number((waitR.stdout || '').trim())
+  const rawExitCode = (waitR.stdout || '').trim()
+  const exitCode = rawExitCode === '' ? Number.NaN : Number(rawExitCode)
   const tracked = activeTasks.get(taskId)
   const timeoutFired = tracked ? tracked.timeoutFired : false
   if (tracked && tracked.timeoutHandle) clearTimeout(tracked.timeoutHandle)
@@ -923,9 +1066,12 @@ async function watchContainerExit(taskId, containerId, attempt, logPaths, envFil
 
   let stderrTail
   try {
-    stderrTail = fs.readFileSync(logPaths.stderrLog, 'utf8').slice(-16_000)
+    const dockerWaitStderr = waitR.stderr
+      ? `\n[docker wait stderr]\n${waitR.stderr}`
+      : ''
+    stderrTail = `${fs.readFileSync(logPaths.stderrLog, 'utf8')}${dockerWaitStderr}`.slice(-16_000)
   } catch {
-    stderrTail = undefined
+    stderrTail = waitR.stderr ? `[docker wait stderr]\n${waitR.stderr}`.slice(-16_000) : undefined
   }
 
   finalizeMeta(logPaths, {
@@ -940,6 +1086,14 @@ async function watchContainerExit(taskId, containerId, attempt, logPaths, envFil
 
   if (envFilePath) cleanupEnvFile(envFilePath)
 
+  // The in-container recipe agent writes local checkpoints before attempting
+  // the Mission Control API call. If that API call fails, preserve the user's
+  // review loop by having the host runner submit the latest local blocker with
+  // the runner secret before runner-exit evaluates retry/fail state.
+  if (!(Number.isFinite(exitCode) && exitCode === 0 && reason === 'exit')) {
+    await surfaceLocalBlockedCheckpoint(taskId, workspaceHostPath)
+  }
+
   await postRunnerExit(
     taskId,
     attempt,
@@ -947,6 +1101,21 @@ async function watchContainerExit(taskId, containerId, attempt, logPaths, envFil
     reason,
     stderrTail,
   )
+
+  // Containers are launched without --rm so `docker wait` can reliably read
+  // the real exit code before Docker deletes the container object.
+  try {
+    const rmR = spawnSync('docker', ['rm', '-f', containerId], { encoding: 'utf8' })
+    if (rmR.status !== 0) {
+      log('warn', 'docker rm failed', {
+        task_id: taskId,
+        container_id: containerId,
+        stderr_tail: (rmR.stderr || '').slice(-1000),
+      })
+    }
+  } catch (err) {
+    log('warn', 'docker rm threw', { task_id: taskId, container_id: containerId, err: String(err) })
+  }
 
   activeTasks.delete(taskId)
 }
@@ -982,6 +1151,7 @@ async function runContainer(dispatch) {
 
   // Step 3: git worktree add or reuse.
   const worktreePath = path.join(DATA_DIR, 'runner', 'worktrees', `task-${taskId}`)
+  let workspaceHostPath = worktreePath
   try {
     const fetchR = spawnSync('git', ['-C', repoPath, 'fetch', '--all', '--prune'], {
       stdio: 'ignore',
@@ -989,16 +1159,30 @@ async function runContainer(dispatch) {
     if (fetchR.status !== 0) {
       log('warn', 'git fetch non-zero (continuing)', { task_id: taskId, repo: repoPath })
     }
+    pruneGitWorktrees(repoPath)
     if (!fs.existsSync(worktreePath)) {
       const baseRef = task.workspace_source?.base_ref || 'main'
-      const addR = spawnSync(
+      const branchName = taskBranchName(taskId)
+      const hasBranch = spawnSync(
         'git',
-        ['-C', repoPath, 'worktree', 'add', worktreePath, baseRef],
-        { stdio: 'inherit' },
-      )
-      if (addR.status !== 0) {
-        throw new Error(`git worktree add exited ${addR.status}`)
+        ['-C', repoPath, 'show-ref', '--verify', '--quiet', `refs/heads/${branchName}`],
+        { stdio: 'ignore' },
+      ).status === 0
+      if (hasBranch) {
+        refreshEmptyTaskBranch(repoPath, baseRef, branchName, taskId)
       }
+      const args = hasBranch
+        ? ['-C', repoPath, 'worktree', 'add', worktreePath, branchName]
+        : ['-C', repoPath, 'worktree', 'add', '-b', branchName, worktreePath, baseRef]
+      const addR = spawnSync('git', args, { encoding: 'utf8' })
+      if (addR.status !== 0) {
+        throw new Error(`git worktree add exited ${addR.status}: ${(addR.stderr || addR.stdout || '').slice(-4000)}`)
+      }
+    }
+    const workspaceSubpath = firmVaultCaseWorkspaceSubpath(task)
+    workspaceHostPath = workspaceSubpath ? path.join(worktreePath, workspaceSubpath) : worktreePath
+    if (!fs.existsSync(workspaceHostPath)) {
+      throw new Error(`workspace mount path does not exist: ${workspaceHostPath}`)
     }
   } catch (err) {
     await postRunnerExit(taskId, attempt, null, 'worktree_create_failed', String(err))
@@ -1012,9 +1196,14 @@ async function runContainer(dispatch) {
   // first attempts and resumes-without-prior-blocker arrive as null.
   try {
     seedMcDir(
-      worktreePath,
+      workspaceHostPath,
       {
         task_id: String(taskId),
+        title: task.title ?? null,
+        description: task.description ?? null,
+        tags: task.tags ?? null,
+        metadata: task.metadata ?? null,
+        workspace_source: task.workspace_source ?? null,
         recipe_slug: task.recipe_slug,
         attempt,
         is_resuming: Boolean(task.is_resuming),
@@ -1057,7 +1246,19 @@ async function runContainer(dispatch) {
   // Step 6: env-file.
   // Merge recipe-declared secrets from .data/runner/secrets/<NAME>.
   const secretEnv = loadRecipeSecrets(recipe.secrets || [])
-  const fullEnv = { ...env, ...secretEnv }
+  if (secretEnv.missing.length > 0) {
+    const missingList = secretEnv.missing.join(', ')
+    const message = `Recipe ${task.recipe_slug} cannot start because required runner secret(s) are missing or empty: ${missingList}. Add each secret as a file under ${path.join(DATA_DIR, 'runner', 'secrets')} and move the task back to assigned.`
+    await postRunnerCheckpoint(taskId, {
+      step: 'runner-secret-preflight',
+      status: 'blocked',
+      summary: `Missing runner secret(s): ${missingList}`,
+      blocker_reason: message,
+    })
+    await postRunnerExit(taskId, attempt, null, 'docker_error', message)
+    return
+  }
+  const fullEnv = { ...env, ...secretEnv.values }
   const envFilePath = path.join(DATA_DIR, 'runner', 'env', `task-${taskId}-a${attempt}.env`)
   try {
     writeEnvFile(fullEnv, envFilePath)
@@ -1066,7 +1267,7 @@ async function runContainer(dispatch) {
     return
   }
 
-  // Step 7: docker run --rm -d.
+  // Step 7: docker run -d.
   const argv = buildDockerRunArgs({
     image: recipe.image,
     taskId,
@@ -1076,12 +1277,19 @@ async function runContainer(dispatch) {
     runnerStartedAtIso,
     containerName: container_name_prefix,
     worktreePath,
+    workspaceMountPath: workspaceHostPath,
     recipeStagePath: stageDir,
-    readOnlyMounts: task.read_only_mounts || [],
+    readOnlyMounts: [
+      ...(firmVaultCaseWorkspaceSubpath(task)
+        ? [{ host_path: worktreePath, container_path: '/refs/firmvault-root', label: 'FirmVault Root' }]
+        : []),
+      ...(task.read_only_mounts || []),
+    ],
     extraSkills: task.extra_skills || [],
     envFilePath,
     memory: resource_limits.memory,
     cpus: resource_limits.cpus,
+    workspaceReadOnly: env.MC_RUNNER_MODE === 'review',
   })
 
   const runR = spawnSync('docker', argv, { encoding: 'utf8' })
@@ -1137,7 +1345,7 @@ async function runContainer(dispatch) {
   activeTasks.set(taskId, tracked)
 
   // Step 11: watch for exit (async — returns when container exits).
-  await watchContainerExit(taskId, containerId, attempt, logPaths, envFilePath)
+  await watchContainerExit(taskId, containerId, attempt, logPaths, envFilePath, workspaceHostPath)
 }
 
 // ======================================================

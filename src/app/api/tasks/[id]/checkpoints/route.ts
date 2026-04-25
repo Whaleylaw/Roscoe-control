@@ -54,12 +54,14 @@ export async function POST(
   }
 
   // LOCKED 15-CONTEXT.md § Checkpoint Endpoint Auth Path:
-  // POST /api/tasks/:id/checkpoints MUST be runner-token authenticated.
+  // POST /api/tasks/:id/checkpoints MUST be runner authenticated.
   // Allowlist entry added in Plan 15-01 (runner-tokens.ts #7);
   // auth.ts prefix filter also extended in 15-01.
-  if (auth.user.id !== -2000) {
+  // The daemon runner-secret principal (-1000) is also allowed so the host
+  // runner can surface preflight blockers before a container exists.
+  if (auth.user.id !== -2000 && auth.user.id !== -1000) {
     return NextResponse.json(
-      { error: 'runner-token principal required' },
+      { error: 'runner principal required' },
       { status: 403 },
     )
   }
@@ -74,7 +76,7 @@ export async function POST(
   // (src/lib/auth.ts getUserFromRequest) already verifies the bearer's
   // embedded task_id matches the path :id — but a breakage upstream
   // must not silently permit cross-task writes.
-  if (auth.user.runner_token_task_id !== taskId) {
+  if (auth.user.id === -2000 && auth.user.runner_token_task_id !== taskId) {
     return NextResponse.json(
       { error: 'cross-task access forbidden' },
       { status: 403 },
@@ -105,7 +107,7 @@ export async function POST(
   const db = getDatabase()
   const task = db
     .prepare(
-      `SELECT id, status, worktree_path, runner_attempts, workspace_id
+      `SELECT id, status, worktree_path, runner_attempts, workspace_id, recipe_slug
        FROM tasks WHERE id = ?`,
     )
     .get(taskId) as
@@ -115,6 +117,7 @@ export async function POST(
         worktree_path: string | null
         runner_attempts: number
         workspace_id: number
+        recipe_slug: string | null
       }
     | undefined
 
@@ -148,13 +151,21 @@ export async function POST(
   const attempt = task.runner_attempts
 
   // Plan 15-05 CP-03: blocker branch. When the agent POSTs status='blocked',
-  // atomically flip tasks.status='in_progress' → 'awaiting_owner' AND write a
-  // system-authored comment referencing the blocker_reason and attempt number.
+  // atomically flip tasks.status='in_progress' and write a system-authored
+  // comment referencing the blocker_reason and attempt number.
+  //
+  // Recipe tasks are review handoffs, not runtime failures. The agent has
+  // produced findings/work product and needs the user to approve, correct, or
+  // supply missing facts in the task thread. Non-recipe tasks keep the legacy
+  // awaiting_owner pause state.
   // The Zod refine in CheckpointBodySchema guarantees blocker_reason is
   // non-empty when status==='blocked' — we can dereference it safely.
+  const blockedStatus = task.recipe_slug ? 'review' : 'awaiting_owner'
   const systemCommentContent =
     body.status === 'blocked'
-      ? `Task blocked at attempt ${attempt}.\n\nReason: ${body.blocker_reason}\n\nMove the task back to \`assigned\` to resume execution. The runner will preserve the worktree and resume from the last checkpoint.`
+      ? task.recipe_slug
+        ? `Task moved to review at attempt ${attempt}.\n\nQuestion or blocker: ${body.blocker_reason}\n\nReply in this task thread with the missing direction, approval, or correction. If additional runner work is needed afterward, move the task back to \`assigned\`; the runner will preserve the worktree and resume from the last checkpoint.`
+        : `Task blocked at attempt ${attempt}.\n\nQuestion or blocker: ${body.blocker_reason}\n\nReply in this task thread with the missing direction, then move the task back to \`assigned\` to resume execution. The runner will preserve the worktree and resume from the last checkpoint.`
       : null
 
   let inserted: { id: number; attempt: number; ts: string; nowUnix: number }
@@ -171,12 +182,15 @@ export async function POST(
         const upd = txDb
           .prepare(
             `UPDATE tasks
-               SET status = 'awaiting_owner',
+               SET status = ?,
+                   container_id = NULL,
+                   runner_started_at = NULL,
                    runner_last_failure_reason = ?,
                    updated_at = ?
              WHERE id = ? AND status = 'in_progress'`,
           )
           .run(
+            blockedStatus,
             `blocked:${body.blocker_reason!.slice(0, 200)}`,
             nowUnix,
             taskId,
@@ -237,7 +251,8 @@ export async function POST(
   if (body.status === 'blocked') {
     eventBus.broadcast('task.status_changed', {
       id: taskId,
-      status: 'awaiting_owner',
+      task_id: taskId,
+      status: blockedStatus,
       previous_status: 'in_progress',
       reason: 'blocked_checkpoint',
       workspace_id: task.workspace_id,
@@ -266,7 +281,7 @@ export async function POST(
       workspace_id: task.workspace_id,
       direction: 'paused',
       previous_status: 'in_progress',
-      status: 'awaiting_owner',
+      status: blockedStatus,
       blocker_reason: body.blocker_reason!.trim(),
       blocker_kind: null,
       resume_hint: null,

@@ -204,8 +204,11 @@ export function proxy(request: NextRequest) {
     // Agent-scoped keys are validated in route auth (DB-backed) and should be
     // allowed to pass through proxy auth gate.
     const looksLikeAgentApiKey = /^mca_[a-f0-9]{48}$/i.test(apiKey)
+    const isRunnerTokenScopedPath =
+      /^\/api\/runner\/tasks\/\d+\/(?:checkpoints|submit|review|fail|status|comments)?\/?$/.test(pathname)
+      || /^\/api\/tasks\/\d+\/checkpoints\/?$/.test(pathname)
 
-    if (sessionToken || hasValidApiKey || looksLikeAgentApiKey) {
+    if (sessionToken || hasValidApiKey || looksLikeAgentApiKey || (apiKey && isRunnerTokenScopedPath)) {
       const { response, nonce } = nextResponseWithNonce(request)
       return addSecurityHeaders(response, request, nonce)
     }

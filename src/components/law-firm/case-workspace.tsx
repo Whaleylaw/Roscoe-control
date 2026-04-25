@@ -34,6 +34,41 @@ type CaseDetail = {
   files: Array<{ name: string; kind: 'markdown' | 'directory' | 'other' }>
 }
 
+type WorkflowPreview = {
+  ready_items: Array<{
+    workflow_key: string
+    phase_name: string
+    landmark_name: string
+    priority: string
+    status: string
+    blocked_by: string[]
+  }>
+  workflows: Array<{
+    workflow_id: string
+    name: string
+    goal: string
+    phase_id: string
+    source: string | null
+    enabled: boolean
+    status: 'active' | 'complete' | 'not_started' | 'blocked'
+    completed_steps: number
+    total_steps: number
+    active_steps: number
+    blocked_by: string[]
+    steps: Array<{
+      id: string
+      type: 'recipe' | 'wait' | 'human_review' | 'code'
+      landmark_id: string
+      recipe_slug: string | null
+      status: 'ready' | 'complete' | 'blocked' | 'waiting' | 'skipped'
+      depends_on: string[]
+      blocked_by: string[]
+      wait_days: number | null
+      skip_when: string[]
+    }>
+  }>
+}
+
 const VIEWS = ['dashboard', 'tasks', 'workflow', 'activity', 'files'] as const
 
 export function LawFirmCaseWorkspace() {
@@ -53,6 +88,10 @@ export function LawFirmCaseWorkspace() {
   const [phaseDraft, setPhaseDraft] = useState('')
   const [landmarkDraft, setLandmarkDraft] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
+  const [workflowPreview, setWorkflowPreview] = useState<WorkflowPreview | null>(null)
+  const [workflowLoading, setWorkflowLoading] = useState(false)
+  const [workflowMaterializing, setWorkflowMaterializing] = useState(false)
+  const [workflowOverriding, setWorkflowOverriding] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
 
   const loadDetail = useCallback(async () => {
@@ -76,6 +115,28 @@ export function LawFirmCaseWorkspace() {
   useEffect(() => {
     if (slug) void loadDetail()
   }, [loadDetail, slug])
+
+  const loadWorkflowPreview = useCallback(async () => {
+    if (!slug) return
+    setWorkflowLoading(true)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, { cache: 'no-store' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview({
+        ready_items: Array.isArray(body.ready_items) ? body.ready_items : [],
+        workflows: Array.isArray(body.workflows) ? body.workflows : [],
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowLoading(false)
+    }
+  }, [slug, t])
+
+  useEffect(() => {
+    if (slug && view === 'workflow') void loadWorkflowPreview()
+  }, [loadWorkflowPreview, slug, view])
 
   const navigate = (nextView: string) => {
     const href = nextView === 'dashboard'
@@ -111,6 +172,54 @@ export function LawFirmCaseWorkspace() {
       setSaving(false)
     }
   }, [detail, landmarkDraft, phaseDraft, saving, slug, t])
+
+  const materializeWorkflow = useCallback(async () => {
+    if (workflowMaterializing) return
+    setWorkflowMaterializing(true)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowMaterializeError'))
+      setFeedback(t('workflowMaterializeSuccess', {
+        created: Array.isArray(body.created) ? body.created.length : 0,
+        skipped: Array.isArray(body.skipped) ? body.skipped.length : 0,
+      }))
+      await loadWorkflowPreview()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowMaterializeError'))
+    } finally {
+      setWorkflowMaterializing(false)
+    }
+  }, [loadWorkflowPreview, slug, t, workflowMaterializing])
+
+  const updateWorkflowOverride = useCallback(async (workflowId: string, action: 'activate' | 'close') => {
+    if (workflowOverriding) return
+    setWorkflowOverriding(`${workflowId}:${action}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: workflowId, action }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        ready_items: prev?.ready_items ?? [],
+        workflows: Array.isArray(body.workflows) ? body.workflows : prev?.workflows ?? [],
+      }))
+      setFeedback(action === 'activate' ? 'Workflow activated' : 'Workflow closed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowOverriding(null)
+    }
+  }, [slug, t, workflowOverriding])
 
   if (loading && !detail) {
     return <div className="p-6 text-sm text-muted-foreground">{t('detailLoading')}</div>
@@ -170,13 +279,12 @@ export function LawFirmCaseWorkspace() {
       {view === 'tasks' && <CaseTasksView slug={slug} />}
       {view === 'workflow' && (
         <WorkflowView
-          detail={detail}
-          phaseDraft={phaseDraft}
-          landmarkDraft={landmarkDraft}
-          saving={saving}
-          onPhaseChange={setPhaseDraft}
-          onLandmarkChange={(key, value) => setLandmarkDraft((prev) => ({ ...prev, [key]: value }))}
-          onSave={saveWorkflow}
+          workflowPreview={workflowPreview}
+          workflowLoading={workflowLoading}
+          workflowMaterializing={workflowMaterializing}
+          workflowOverriding={workflowOverriding}
+          onMaterialize={materializeWorkflow}
+          onWorkflowOverride={updateWorkflowOverride}
         />
       )}
       {view === 'activity' && <ActivityView detail={detail} />}
@@ -278,56 +386,149 @@ function CaseDashboard({ detail }: { detail: CaseDetail }) {
 }
 
 function WorkflowView({
-  detail,
-  phaseDraft,
-  landmarkDraft,
-  saving,
-  onPhaseChange,
-  onLandmarkChange,
-  onSave,
+  workflowPreview,
+  workflowLoading,
+  workflowMaterializing,
+  workflowOverriding,
+  onMaterialize,
+  onWorkflowOverride,
 }: {
-  detail: CaseDetail
-  phaseDraft: string
-  landmarkDraft: Record<string, boolean>
-  saving: boolean
-  onPhaseChange: (value: string) => void
-  onLandmarkChange: (key: string, value: boolean) => void
-  onSave: () => void
+  workflowPreview: WorkflowPreview | null
+  workflowLoading: boolean
+  workflowMaterializing: boolean
+  workflowOverriding: string | null
+  onMaterialize: () => void
+  onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
 }) {
   const t = useTranslations('lawFirm')
+  const readyItems = workflowPreview?.ready_items ?? []
+  const workflows = workflowPreview?.workflows ?? []
+  const grouped = {
+    active: workflows.filter((workflow) => workflow.status === 'active' || workflow.status === 'blocked'),
+    not_started: workflows.filter((workflow) => workflow.status === 'not_started'),
+    complete: workflows.filter((workflow) => workflow.status === 'complete'),
+  }
   return (
     <div className="p-6 space-y-4">
-      <label className="block max-w-md space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">{t('currentPhase')}</span>
-        <select
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-          value={phaseDraft}
-          onChange={(event) => onPhaseChange(event.target.value)}
-        >
-          {detail.state.phases.map((phase) => (
-            <option key={phase.key} value={phase.key}>{phase.label}</option>
-          ))}
-        </select>
-      </label>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {detail.state.landmarks.map((landmark) => (
-          <label key={landmark.key} className="flex items-start gap-2 rounded border bg-card p-3 text-sm">
-            <input
-              className="mt-1"
-              type="checkbox"
-              checked={Boolean(landmarkDraft[landmark.key])}
-              onChange={(event) => onLandmarkChange(landmark.key, event.target.checked)}
-            />
-            <span>
-              <span className="block text-foreground">{landmark.label}</span>
-              {landmark.satisfied_at && <span className="text-xs text-muted-foreground">{t('satisfiedAt')}: {landmark.satisfied_at}</span>}
-            </span>
-          </label>
-        ))}
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{t('workflowTasksTitle')}</h2>
+            <p className="text-sm text-muted-foreground">
+              {workflowLoading ? t('workflowPreviewLoading') : t('workflowTasksSummary', { count: readyItems.length })}
+            </p>
+          </div>
+          <Button onClick={onMaterialize} disabled={workflowMaterializing || workflowLoading}>
+            {workflowMaterializing ? t('workflowMaterializing') : t('materializeWorkflow')}
+          </Button>
+        </div>
+        {readyItems.length > 0 && (
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {readyItems.slice(0, 6).map((item) => (
+              <div key={item.workflow_key} className="rounded border bg-background p-3 text-sm">
+                <div className="font-medium text-foreground">{item.landmark_name}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{item.phase_name} · {item.priority} · {item.status}</div>
+                {item.blocked_by.length > 0 && (
+                  <div className="mt-1 text-xs text-amber-500">{t('blockedBy')}: {item.blocked_by.join(', ')}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      <Button onClick={onSave} disabled={saving}>{saving ? t('saving') : t('saveWorkflow')}</Button>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <WorkflowColumn title="Active" workflows={grouped.active} empty="No active workflows" workflowOverriding={workflowOverriding} onWorkflowOverride={onWorkflowOverride} />
+        <WorkflowColumn title="Not Started" workflows={grouped.not_started} empty="No hidden workflows are ready yet" workflowOverriding={workflowOverriding} onWorkflowOverride={onWorkflowOverride} />
+        <WorkflowColumn title="Complete" workflows={grouped.complete} empty="No completed workflows" workflowOverriding={workflowOverriding} onWorkflowOverride={onWorkflowOverride} />
+      </div>
     </div>
   )
+}
+
+function WorkflowColumn({
+  title,
+  workflows,
+  empty,
+  workflowOverriding,
+  onWorkflowOverride,
+}: {
+  title: string
+  workflows: NonNullable<WorkflowPreview['workflows']>
+  empty: string
+  workflowOverriding: string | null
+  onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
+}) {
+  return (
+    <section className="min-w-0">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <span className="rounded border px-2 py-0.5 text-xs text-muted-foreground">{workflows.length}</span>
+      </div>
+      <div className="space-y-3">
+        {workflows.length === 0 ? (
+          <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">{empty}</p>
+        ) : workflows.map((workflow) => (
+          <article key={workflow.workflow_id} className="rounded-md border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-foreground">{workflow.name}</h4>
+                <p className="mt-1 text-xs text-muted-foreground">{workflow.goal}</p>
+              </div>
+              <span className="shrink-0 rounded border px-2 py-0.5 text-[11px] text-muted-foreground">
+                {workflow.completed_steps}/{workflow.total_steps}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {workflow.steps.map((step) => (
+                <div key={step.id} className="rounded border bg-background p-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-medium text-foreground">{formatLabel(step.id)}</span>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 ${workflowStepTone(step.status)}`}>{formatLabel(step.status)}</span>
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    {step.type}{step.recipe_slug ? ` · ${step.recipe_slug}` : ''}{step.wait_days ? ` · wait ${step.wait_days} days` : ''}
+                  </div>
+                  {step.blocked_by.length > 0 && (
+                    <div className="mt-1 text-amber-500">Blocked by: {step.blocked_by.join(', ')}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {!workflow.enabled && (
+              <div className="mt-3 rounded border border-dashed px-2 py-1 text-xs text-muted-foreground">
+                Cataloged from FirmVault SOPs; not enabled for task materialization yet.
+              </div>
+            )}
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onWorkflowOverride(workflow.workflow_id, 'activate')}
+                disabled={workflow.status === 'active' || workflowOverriding !== null}
+              >
+                Activate
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onWorkflowOverride(workflow.workflow_id, 'close')}
+                disabled={workflow.status === 'complete' || workflowOverriding !== null}
+              >
+                Close
+              </Button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function workflowStepTone(status: WorkflowPreview['workflows'][number]['steps'][number]['status']): string {
+  if (status === 'complete' || status === 'skipped') return 'bg-green-500/10 text-green-500'
+  if (status === 'ready') return 'bg-blue-500/10 text-blue-500'
+  if (status === 'waiting') return 'bg-purple-500/10 text-purple-500'
+  return 'bg-amber-500/10 text-amber-500'
 }
 
 function ActivityView({ detail }: { detail: CaseDetail }) {

@@ -190,9 +190,47 @@ describe('POST /api/runner/tasks/:task_id/submit — Phase 17 D-01 review gate',
       task_id: 5,
       status: 'review',
       previous_status: 'in_progress',
-      workspace_id: null,
+      workspace_id: 1,
       at: expect.any(Number),
     })
+  })
+
+  it('adds the runner resolution as a task comment when submitting for review', async () => {
+    seedTask(testDb, 9, 'in_progress', { recipe_slug: 'firmvault-pip-confirm-approval' })
+    const { token } = issueRunnerToken(testDb, 9, 1, 300)
+
+    const res = await submit(9, token, {
+      status: 'done',
+      resolution: [
+        'Confirmed the PIP claim is not approved yet.',
+        'Reviewed case insurance notes and found missing carrier acknowledgement.',
+        'No vault files were changed.',
+      ].join('\n'),
+    })
+    expect(res.status).toBe(204)
+
+    const comment = testDb
+      .prepare(
+        `SELECT task_id, author, content, workspace_id
+           FROM comments
+          WHERE task_id = ?
+          ORDER BY id DESC
+          LIMIT 1`,
+      )
+      .get(9) as {
+      task_id: number
+      author: string
+      content: string
+      workspace_id: number
+    }
+
+    expect(comment).toMatchObject({
+      task_id: 9,
+      author: 'recipe-runner',
+      workspace_id: 1,
+    })
+    expect(comment.content).toContain('Confirmed the PIP claim is not approved yet.')
+    expect(comment.content).toContain('No vault files were changed.')
   })
 
   it('rejects with 403 when token taskId does not match path taskId', async () => {

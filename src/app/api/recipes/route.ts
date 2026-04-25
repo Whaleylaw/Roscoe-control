@@ -89,6 +89,7 @@ export function mapRow(row: Record<string, unknown>): Record<string, unknown> {
     version: row.version,
     dir_sha: row.dir_sha,
     soul_md: row.soul_md ?? null,
+    review_md: row.review_md ?? null,
     workspace_id: row.workspace_id,
     tenant_id: row.tenant_id,
     created_at: row.created_at,
@@ -117,6 +118,7 @@ const postBodySchema = z.object({
     .max(64),
   recipe_yaml: z.string().min(1),
   soul_md: z.string().default(''),
+  review_md: z.string().default(''),
 })
 
 /**
@@ -162,7 +164,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { slug, recipe_yaml, soul_md } = parsed.data
+  const { slug, recipe_yaml, soul_md, review_md } = parsed.data
   const recipesRoot = getRecipesRoot()
   const targetDir = join(recipesRoot, slug)
 
@@ -215,6 +217,7 @@ export async function POST(request: NextRequest) {
     await mkdir(tempDir, { recursive: true })
     await writeFile(join(tempDir, 'recipe.yaml'), recipe_yaml, 'utf8')
     if (soul_md) await writeFile(join(tempDir, 'SOUL.md'), soul_md, 'utf8')
+    if (review_md) await writeFile(join(tempDir, 'REVIEW.md'), review_md, 'utf8')
 
     // Atomic rename from temp to target. When tmpdir is on a different filesystem
     // than recipesRoot (common in CI containers and test setups that put tmpdir

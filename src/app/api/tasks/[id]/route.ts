@@ -15,6 +15,7 @@ import { revokeTokensForTask } from '@/lib/runner-tokens';
 import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer';
 import { getMountsCap, getExtraSkillsCap } from '@/lib/task-runtime-settings';
 import { isKnownModel, MODEL_IDS } from '@/lib/model-registry';
+import { bypassLawFirmCaseLandmark } from '@/lib/law-firm';
 import {
   validateHostPathAgainstAllowlist,
   buildAggregatedValidationResponse,
@@ -79,6 +80,28 @@ function hasAegisApproval(
     LIMIT 1
   `).get(taskId, workspaceId) as { status?: string } | undefined
   return review?.status === 'approved'
+}
+
+function parseTaskMetadata(raw: unknown): Record<string, unknown> {
+  if (!raw) return {}
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
+  if (typeof raw !== 'string') return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function stringValue(value: unknown): string | null {
+  if (value == null) return null
+  const str = String(value).trim()
+  return str || null
 }
 
 /**
@@ -229,6 +252,100 @@ export async function PUT(
     }
 
     const previousDescriptionMentionRecipients = resolveMentionRecipients(currentTask.description || '', db, workspaceId).recipients;
+
+    if (rawBody.bypass_not_applicable === true) {
+      const metadataObject = parseTaskMetadata(currentTask.metadata)
+      const lawFirm = objectRecord(metadataObject.law_firm)
+      const caseSlug = stringValue(lawFirm.case_slug)
+      const landmark = stringValue(lawFirm.landmark)
+      if (!caseSlug || !landmark) {
+        return NextResponse.json(
+          { error: 'Bypass Not Applicable is only available for FirmVault workflow tasks with case and landmark metadata.' },
+          { status: 400 },
+        )
+      }
+
+      const actor = auth.user.display_name || auth.user.username || 'mission-control'
+      const bypassReason = stringValue(rawBody.bypass_reason)
+        || 'Marked not applicable in Mission Control.'
+      const bypassReasonSentence = bypassReason.replace(/[.!?]+$/, '')
+      const bypass = {
+        status: 'not_applicable',
+        reason: bypassReason,
+        task_id: taskId,
+        created_at: now,
+        created_by: actor,
+      }
+      const nextMetadata = {
+        ...metadataObject,
+        law_firm: {
+          ...lawFirm,
+          workflow_bypass: bypass,
+        },
+      }
+      const nextResolution = `Marked not applicable by ${actor}: ${bypassReasonSentence}. The FirmVault workflow item is complete, but no factual landmark such as an exhausted-benefits finding was asserted.`
+
+      await bypassLawFirmCaseLandmark(caseSlug, landmark, bypassReason, actor, taskId)
+
+      db.transaction(() => {
+        db.prepare(`
+          UPDATE tasks
+          SET status = 'done',
+              outcome = 'success',
+              resolution = ?,
+              metadata = ?,
+              error_message = NULL,
+              container_id = NULL,
+              completed_at = COALESCE(completed_at, ?),
+              updated_at = ?
+          WHERE id = ? AND workspace_id = ?
+        `).run(nextResolution, JSON.stringify(nextMetadata), now, now, taskId, workspaceId)
+
+        db.prepare(`
+          INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+          VALUES (?, 'system', ?, ?, ?)
+        `).run(taskId, `Bypass Not Applicable applied. ${nextResolution}`, now, workspaceId)
+
+        db.prepare(`
+          INSERT INTO quality_reviews (task_id, reviewer, status, notes, created_at, workspace_id)
+          VALUES (?, 'owner', 'approved', ?, ?, ?)
+        `).run(taskId, `Owner-approved not-applicable bypass: ${bypassReason}`, now, workspaceId)
+
+        revokeTokensForTask(db, taskId)
+      })()
+
+      db_helpers.logActivity(
+        'task_updated',
+        'task',
+        taskId,
+        auth.user.username,
+        `Task bypassed as not applicable: ${currentTask.status} → done`,
+        {
+          changes: ['bypass_not_applicable', `status: ${currentTask.status} → done`],
+          law_firm: { case_slug: caseSlug, landmark },
+        },
+        workspaceId,
+      )
+
+      const updatedTask = db.prepare(`
+        SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+        FROM tasks t
+        LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
+        WHERE t.id = ? AND t.workspace_id = ?
+      `).get(taskId, workspaceId) as Task
+      const parsedTask = mapTaskRow(updatedTask)
+      syncTaskOutbound(updatedTask as any, workspaceId)
+      eventBus.broadcast('task.updated', parsedTask)
+
+      return NextResponse.json({
+        task: parsedTask,
+        bypass: {
+          case_slug: caseSlug,
+          landmark,
+          status: 'not_applicable',
+        },
+      })
+    }
 
     // ---------------------------------------------------------------------------
     // Phase 13 — runtime-context business rules (TCTX-01..06).
@@ -426,7 +543,11 @@ export async function PUT(
         }, { status: 403 })
       }
 
-      if (normalizedStatus === 'done' && !hasAegisApproval(db, taskId, workspaceId)) {
+      if (
+        normalizedStatus === 'done' &&
+        !currentRecipeSlug &&
+        !hasAegisApproval(db, taskId, workspaceId)
+      ) {
         return NextResponse.json(
           { error: 'Aegis approval is required to move task to done.' },
           { status: 403 }
@@ -724,6 +845,9 @@ export async function PUT(
     if (error_message !== undefined) {
       fieldsToUpdate.push('error_message = ?');
       updateParams.push(error_message);
+    } else if (normalizedStatus === 'quality_review' && currentTask.status !== 'quality_review') {
+      fieldsToUpdate.push('error_message = ?');
+      updateParams.push(null);
     }
     if (resolution !== undefined) {
       fieldsToUpdate.push('resolution = ?');
@@ -925,6 +1049,36 @@ export async function PUT(
 
     // Broadcast to SSE clients
     eventBus.broadcast('task.updated', parsedTask);
+
+    if (
+      currentTask.status !== 'assigned' &&
+      normalizedStatus === 'assigned' &&
+      (currentTask as unknown as { recipe_slug: string | null }).recipe_slug != null &&
+      (currentTask as unknown as { recipe_slug: string }).recipe_slug !== ''
+    ) {
+      eventBus.broadcast('task.runner_requested', {
+        task_id: taskId,
+        recipe_slug: (currentTask as unknown as { recipe_slug: string }).recipe_slug,
+        workspace_id: workspaceId,
+      })
+    }
+
+    if (
+      currentTask.status !== 'quality_review' &&
+      normalizedStatus === 'quality_review' &&
+      (currentTask as unknown as { recipe_slug: string | null }).recipe_slug != null &&
+      (currentTask as unknown as { recipe_slug: string }).recipe_slug !== ''
+    ) {
+      const recipe = getIndexedRecipeBySlug((currentTask as unknown as { recipe_slug: string }).recipe_slug)
+      if (recipe && recipe.error_message === null && recipe.review_md) {
+        eventBus.broadcast('task.runner_requested', {
+          task_id: taskId,
+          recipe_slug: (currentTask as unknown as { recipe_slug: string }).recipe_slug,
+          runner_mode: 'review',
+          workspace_id: workspaceId,
+        })
+      }
+    }
 
     // Plan 20-03 ROUTE-02 — recipe resume detection (Site 4).
     // Only the awaiting_owner → assigned flip on a recipe-tagged task emits

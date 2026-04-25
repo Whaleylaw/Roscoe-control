@@ -1,0 +1,26 @@
+slug: firmvault-pip-confirm-approval
+name: FirmVault PIP Confirm Approval
+description: Confirms whether a Kentucky PIP claim is approved or active for one FirmVault case, normalizes the masked claim shadow when supported, and blocks with a precise handoff when approval evidence is missing.
+when_to_use: Use for FirmVault workflow step insurance_pip_claim.confirm_approval and the pip_approved landmark.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - write_file
+  - run_shell
+tags:
+  - law-firm
+  - firmvault
+  - pip
+  - insurance
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

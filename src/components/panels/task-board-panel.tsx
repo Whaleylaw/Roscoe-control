@@ -25,6 +25,18 @@ import { AdvancedSection } from './task-form/advanced-section'
 
 const log = createClientLogger('TaskBoard')
 
+function isTaskDetailFormActive(): boolean {
+  if (typeof document === 'undefined') return false
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement)) return false
+  if (!active.closest('[data-task-detail-modal="true"]')) return false
+  return ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(active.tagName)
+}
+
+function recipeOwnerLabel(task: { recipe_slug?: string | null }): string | null {
+  return task.recipe_slug ? 'Recipe Runner' : null
+}
+
 interface Task {
   id: number
   title: string
@@ -496,7 +508,9 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
     }))
 
   // Fetch tasks, agents, and projects
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (options: { force?: boolean } = {}) => {
+    if (!options.force && isTaskDetailFormActive()) return
+
     try {
       setError(null)
 
@@ -615,6 +629,32 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
   // Poll as SSE fallback — pauses when SSE is delivering events
   useSmartPoll(fetchData, 30000, { pauseWhenSseConnected: true })
 
+  // Runner lifecycle events can update narrow fields in the global store, but
+  // the board also needs derived counts, comments, and attempt metadata. Use a
+  // short debounced refresh so the board feels live without hammering the API
+  // during bursty claim/start/exit sequences.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const schedule = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        void fetchData()
+      }, 750)
+    }
+    window.addEventListener('mc:task-runner-requested', schedule)
+    window.addEventListener('mc:task-container-started', schedule)
+    window.addEventListener('mc:task-container-exited', schedule)
+    window.addEventListener('mc:checkpoint-added', schedule)
+    return () => {
+      window.removeEventListener('mc:task-runner-requested', schedule)
+      window.removeEventListener('mc:task-container-started', schedule)
+      window.removeEventListener('mc:task-container-exited', schedule)
+      window.removeEventListener('mc:checkpoint-added', schedule)
+      if (timer) clearTimeout(timer)
+    }
+  }, [fetchData])
+
   // Group tasks by status, overriding for awaiting_owner detection
   const tasksByStatus = statusColumns.reduce((acc, column) => {
     acc[column.key] = tasks.filter(task => {
@@ -663,7 +703,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
     const previousStatus = draggedTask.status
 
     try {
-      if (newStatus === 'done') {
+      if (newStatus === 'done' && !draggedTask.recipe_slug) {
         const reviewResponse = await fetch(`/api/quality-review?taskId=${draggedTask.id}`)
         if (!reviewResponse.ok) {
           throw new Error('Unable to verify Aegis approval')
@@ -904,7 +944,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
           <Button onClick={() => setShowCreateModal(true)}>
             {t('newTask')}
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={fetchData} title={t('refresh')}>
+          <Button variant="ghost" size="icon-sm" onClick={() => fetchData({ force: true })} title={t('refresh')}>
             <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M1.5 8a6.5 6.5 0 0 1 11.25-4.5M14.5 8a6.5 6.5 0 0 1-11.25 4.5" />
               <path d="M13.5 2v3h-3M2.5 14v-3h3" />
@@ -1144,7 +1184,9 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
                   {/* Footer: assignee, priority, timestamp */}
                   <div className="flex items-center justify-between gap-2 ml-5.5 mt-auto pt-2 border-t border-border/20">
                     <span className="flex items-center gap-1.5 min-w-0 text-xs text-muted-foreground">
-                      {task.assigned_to ? (
+                      {recipeOwnerLabel(task) ? (
+                        <span className="truncate max-w-[8rem]">{recipeOwnerLabel(task)}</span>
+                      ) : task.assigned_to ? (
                         <>
                           <AgentAvatar name={getAgentName(task.assigned_to)} size="xs" />
                           <span className="truncate max-w-[8rem]">{getAgentName(task.assigned_to)}</span>
@@ -1244,7 +1286,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
             setSelectedTask(null)
             updateTaskUrl(null, 'replace')
           }}
-          onDelete={fetchData}
+          onDelete={() => fetchData({ force: true })}
         />
       )}
 
@@ -1266,14 +1308,14 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
           agents={agents}
           projects={projects}
           onClose={() => setEditingTask(null)}
-          onUpdated={() => { fetchData(); setEditingTask(null) }}
+          onUpdated={() => { fetchData({ force: true }); setEditingTask(null) }}
         />
       )}
 
       {showProjectManager && (
         <ProjectManagerModal
           onClose={() => setShowProjectManager(false)}
-          onChanged={fetchData}
+          onChanged={() => fetchData({ force: true })}
         />
       )}
     </div>
@@ -1308,6 +1350,10 @@ function TaskDetailModal({
   const [comments, setComments] = useState<Comment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
   const [commentText, setCommentText] = useState('')
+  const [pendingComments, setPendingComments] = useState<string[]>([])
+  const [pendingStatus, setPendingStatus] = useState<Task['status']>(task.status)
+  const [bypassNotApplicable, setBypassNotApplicable] = useState(false)
+  const [savingModal, setSavingModal] = useState(false)
   const [commentError, setCommentError] = useState<string | null>(null)
   const [broadcastMessage, setBroadcastMessage] = useState('')
   const [broadcastStatus, setBroadcastStatus] = useState<string | null>(null)
@@ -1319,6 +1365,7 @@ function TaskDetailModal({
   const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'quality' | 'session' | 'progress'>('details')
   const progressT = useTranslations('taskBoard.progressTab')
   const [reviewer, setReviewer] = useState('aegis')
+  const lastTaskIdRef = useRef(task.id)
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -1331,7 +1378,19 @@ function TaskDetailModal({
     }
   }, [task.id])
 
-  const fetchComments = useCallback(async () => {
+  useEffect(() => {
+    if (lastTaskIdRef.current !== task.id) {
+      lastTaskIdRef.current = task.id
+      setPendingStatus(task.status)
+      setBypassNotApplicable(false)
+      setPendingComments([])
+      setCommentText('')
+      setCommentError(null)
+    }
+  }, [task.id, task.status])
+
+  const fetchComments = useCallback(async (options: { force?: boolean } = {}) => {
+    if (!options.force && isTaskDetailFormActive()) return
     try {
       setLoadingComments(true)
       const response = await fetch(`/api/tasks/${task.id}/comments`)
@@ -1346,34 +1405,72 @@ function TaskDetailModal({
   }, [task.id])
 
   useEffect(() => {
-    fetchComments()
+    fetchComments({ force: true })
   }, [fetchComments])
   useEffect(() => {
     fetchReviews()
   }, [fetchReviews])
-  
-  useSmartPoll(fetchComments, 15000)
-
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!commentText.trim()) return
+    const text = commentText.trim()
+    if (!text) return
 
+    setPendingComments((prev) => [...prev, text])
+    setCommentText('')
+    setCommentError(null)
+  }
+
+  const handleSaveAndClose = async () => {
     try {
+      setSavingModal(true)
       setCommentError(null)
-      const response = await fetch(`/api/tasks/${task.id}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          author: commentAuthor || 'system',
-          content: commentText
+      const commentsToPost = [
+        ...pendingComments,
+        ...(commentText.trim() ? [commentText.trim()] : []),
+      ]
+      for (const content of commentsToPost) {
+        const response = await fetch(`/api/tasks/${task.id}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author: commentAuthor || 'system',
+            content,
+          })
         })
-      })
-      if (!response.ok) throw new Error('Failed to add comment')
-      setCommentText('')
-      await fetchComments()
-      onUpdate() // refreshes task data (picks up auto-assignment from @mention)
+        if (!response.ok) throw new Error('Failed to add comment')
+      }
+
+      if (bypassNotApplicable) {
+        const response = await fetch(`/api/tasks/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bypass_not_applicable: true,
+            bypass_reason: commentsToPost.join('\n\n') || 'Marked not applicable by owner.',
+          }),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => null)
+          throw new Error(data?.error || 'Failed to bypass task as not applicable')
+        }
+      } else if (pendingStatus !== task.status) {
+        const response = await fetch(`/api/tasks/${task.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: pendingStatus }),
+        })
+        if (!response.ok) {
+          const data = await response.json().catch(() => null)
+          throw new Error(data?.error || `Failed to move task to ${pendingStatus}`)
+        }
+      }
+
+      await onUpdate()
+      onClose()
     } catch (error) {
-      setCommentError('Failed to add comment')
+      setCommentError(error instanceof Error ? error.message : 'Failed to save task changes')
+    } finally {
+      setSavingModal(false)
     }
   }
 
@@ -1517,7 +1614,7 @@ function TaskDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="task-detail-title" className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/30">
+      <div ref={dialogRef} data-task-detail-modal="true" role="dialog" aria-modal="true" aria-labelledby="task-detail-title" className="bg-card border border-border rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/30">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-border/50">
           <div className="flex justify-between items-start gap-4">
@@ -1542,6 +1639,14 @@ function TaskDetailModal({
               <h3 id="task-detail-title" className="text-lg font-semibold text-foreground leading-tight">{task.title}</h3>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <Button
+                size="sm"
+                onClick={handleSaveAndClose}
+                disabled={savingModal}
+                className="text-xs"
+              >
+                {savingModal ? 'Saving...' : 'Save & Close'}
+              </Button>
               <Button variant="ghost" size="icon-sm" onClick={() => onEdit(task)} className="text-muted-foreground hover:text-foreground" aria-label={t('edit')}>
                 <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M11.5 1.5l3 3-9 9H2.5v-3z" /><path d="M9.5 3.5l3 3" /></svg>
               </Button>
@@ -1610,6 +1715,52 @@ function TaskDetailModal({
 
         {/* Content */}
         <div className="px-6 py-4">
+          <div className="mb-4 rounded-lg border border-border/50 bg-secondary/20 p-3">
+            <label className="block text-xs font-medium text-foreground mb-1">Send task to</label>
+            <select
+              value={pendingStatus}
+              onChange={(e) => {
+                setBypassNotApplicable(false)
+                setPendingStatus(e.target.value as Task['status'])
+              }}
+              disabled={bypassNotApplicable}
+              className="w-full text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground cursor-pointer focus:ring-1 focus:ring-primary/50 focus:border-primary/50 outline-none"
+            >
+              <option value="backlog">{t('colBacklog')}</option>
+              <option value="inbox">{t('colInbox')}</option>
+              <option value="assigned">{t('colAssigned')}</option>
+              <option value="awaiting_owner">{t('colAwaitingOwner')}</option>
+              <option value="in_progress">{t('colInProgress')}</option>
+              <option value="review">{t('colReview')}</option>
+              <option value="quality_review">{t('colQualityReview')}</option>
+              <option value="done">{t('colDone')}</option>
+              <option value="failed">{t('colFailed')}</option>
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Changes are staged while this task is open. Click Save & Close to post staged comments and move the task.
+            </p>
+            {task.metadata?.law_firm?.landmark && (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !bypassNotApplicable
+                  setBypassNotApplicable(next)
+                  if (next) setPendingStatus('done')
+                  else setPendingStatus(task.status)
+                }}
+                className={`mt-3 w-full rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                  bypassNotApplicable
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                    : 'border-border/70 bg-card/70 text-muted-foreground hover:text-foreground hover:bg-secondary/40'
+                }`}
+              >
+                <span className="block font-medium text-foreground">Bypass: Not Applicable</span>
+                <span className="mt-0.5 block leading-snug">
+                  Marks this workflow item done, records an owner-approved not-applicable bypass, and prevents rematerializing this landmark.
+                </span>
+              </button>
+            )}
+          </div>
           <div className="flex gap-1.5 mb-4" role="tablist" aria-label={t('taskDetailTabs')}>
             {(['details', 'comments', 'quality'] as const).map(tab => (
               <button
@@ -1674,30 +1825,39 @@ function TaskDetailModal({
               {/* Assignment row */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 border border-border/30">
                 <span className="text-xs text-muted-foreground shrink-0">{t('assignedTo')}</span>
-                <select
-                  className="flex-1 text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground cursor-pointer focus:ring-1 focus:ring-primary/50 focus:border-primary/50 outline-none transition-colors"
-                  value={task.assigned_to || ''}
-                  onChange={async (e) => {
-                    const newAssignee = e.target.value || null
-                    try {
-                      const res = await fetch(`/api/tasks/${task.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ assigned_to: newAssignee }),
-                      })
-                      if (!res.ok) throw new Error('Failed to assign')
-                      onUpdate()
-                    } catch {
-                      // silently fail — onUpdate will refresh state
-                    }
-                  }}
-                >
-                  <option value="">{t('unassigned')}</option>
-                  {agents.map((agent) => (
-                    <option key={agent.id} value={agent.name}>{agent.name}</option>
-                  ))}
-                </select>
-                {task.assigned_to && <AgentAvatar name={task.assigned_to} size="xs" />}
+                {task.recipe_slug ? (
+                  <div className="flex-1 text-xs text-foreground">
+                    Recipe Runner
+                    <span className="ml-2 text-muted-foreground">configured by {task.recipe_slug}</span>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      className="flex-1 text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground cursor-pointer focus:ring-1 focus:ring-primary/50 focus:border-primary/50 outline-none transition-colors"
+                      value={task.assigned_to || ''}
+                      onChange={async (e) => {
+                        const newAssignee = e.target.value || null
+                        try {
+                          const res = await fetch(`/api/tasks/${task.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ assigned_to: newAssignee }),
+                          })
+                          if (!res.ok) throw new Error('Failed to assign')
+                          onUpdate()
+                        } catch {
+                          // silently fail — onUpdate will refresh state
+                        }
+                      }}
+                    >
+                      <option value="">{t('unassigned')}</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.name}>{agent.name}</option>
+                      ))}
+                    </select>
+                    {task.assigned_to && <AgentAvatar name={task.assigned_to} size="xs" />}
+                  </>
+                )}
               </div>
 
               {/* Metadata grid */}
@@ -1806,7 +1966,7 @@ function TaskDetailModal({
             <div id="tabpanel-comments" role="tabpanel" aria-label={t('tabComments')} className="mt-6">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-lg font-semibold text-foreground">{t('tabComments')}</h4>
-              <Button variant="link" size="xs" onClick={fetchComments} className="text-blue-400 hover:text-blue-300">
+              <Button variant="link" size="xs" onClick={() => fetchComments({ force: true })} className="text-blue-400 hover:text-blue-300">
                 {t('refresh')}
               </Button>
             </div>
@@ -1824,6 +1984,23 @@ function TaskDetailModal({
             ) : (
               <div className="space-y-4">
                 {comments.map(comment => renderComment(comment))}
+              </div>
+            )}
+            {pendingComments.length > 0 && (
+              <div className="mt-4 rounded-md border border-primary/25 bg-primary/5 p-3 space-y-2">
+                <div className="text-xs font-medium text-primary">Staged comments</div>
+                {pendingComments.map((content, index) => (
+                  <div key={`${index}-${content.slice(0, 12)}`} className="flex items-start justify-between gap-3 text-xs text-foreground/90">
+                    <div className="whitespace-pre-wrap break-words">{content}</div>
+                    <button
+                      type="button"
+                      onClick={() => setPendingComments((prev) => prev.filter((_, i) => i !== index))}
+                      className="text-muted-foreground hover:text-red-400"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -1844,8 +2021,8 @@ function TaskDetailModal({
                 <p className="text-[11px] text-muted-foreground mt-1">Use <span className="font-mono">@</span> to mention users and agents.</p>
               </div>
               <div className="flex justify-end">
-                <Button type="submit">
-                  {t('addComment')}
+                <Button type="submit" disabled={!commentText.trim()}>
+                  Stage Comment
                 </Button>
               </div>
             </form>

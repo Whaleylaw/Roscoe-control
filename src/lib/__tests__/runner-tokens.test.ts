@@ -206,8 +206,8 @@ describe('runner-tokens module', () => {
   })
 
   describe('RUNNER_TOKEN_ALLOWLIST', () => {
-    it('contains exactly the seven allowlist entries (six RAUTH-06 + Phase 15 checkpoints)', () => {
-      expect(RUNNER_TOKEN_ALLOWLIST.length).toBe(7)
+    it('contains exactly the eight allowlist entries', () => {
+      expect(RUNNER_TOKEN_ALLOWLIST.length).toBe(8)
     })
 
     it('each entry has method and pathPattern', () => {
@@ -226,14 +226,18 @@ describe('runner-tokens module', () => {
       expect(m[1]).toBe('42')
     })
 
-    it('matches POST /api/runner/tasks/1/submit and /fail', () => {
+    it('matches POST /api/runner/tasks/1/submit, /review, and /fail', () => {
       const submit = RUNNER_TOKEN_ALLOWLIST.find(
         (r) => r.method === 'POST' && r.pathPattern.test('/api/runner/tasks/1/submit')
+      )
+      const review = RUNNER_TOKEN_ALLOWLIST.find(
+        (r) => r.method === 'POST' && r.pathPattern.test('/api/runner/tasks/1/review')
       )
       const fail = RUNNER_TOKEN_ALLOWLIST.find(
         (r) => r.method === 'POST' && r.pathPattern.test('/api/runner/tasks/1/fail')
       )
       expect(submit).toBeDefined()
+      expect(review).toBeDefined()
       expect(fail).toBeDefined()
     })
 

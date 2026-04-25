@@ -5,6 +5,7 @@ import { eventBus } from './event-bus'
 import { logger } from './logger'
 import { config } from './config'
 import { syncTaskOutbound } from './github-sync-engine'
+import { promoteApprovedWorktree } from './worktree-promotion'
 
 /** Sync task to GitHub/GNAP and broadcast escalation if task failed */
 function syncAndEscalateIfFailed(task: { id: number; title: string; status: string; priority: string; project_id?: number | null; workspace_id: number; description?: string | null }, newStatus: string, errorMsg?: string, dispatchAttempts?: number): void {
@@ -417,6 +418,10 @@ interface ReviewableTask {
   agent_config: string | null
   workspace_id: number
   project_id: number | null
+  recipe_slug: string | null
+  recipe_review_md: string | null
+  worktree_path: string | null
+  workspace_source: string | null
   ticket_prefix: string | null
   project_ticket_no: number | null
 }
@@ -438,10 +443,16 @@ function buildReviewPrompt(task: ReviewableTask): string {
 
   const lines = [
     'You are Aegis, the quality reviewer for Mission Control.',
-    'Review the following completed task and its resolution.',
+    task.recipe_review_md
+      ? 'Review the completed task under the recipe-specific review instructions below.'
+      : 'Review the following completed task and its resolution.',
     '',
     `**[${ticket}] ${task.title}**`,
   ]
+
+  if (task.recipe_review_md) {
+    lines.push('', '## Recipe Review Instructions', task.recipe_review_md)
+  }
 
   if (task.description) {
     lines.push('', '## Task Description', task.description)
@@ -478,7 +489,7 @@ function parseReviewVerdict(text: string): { status: 'approved' | 'rejected'; no
 }
 
 /**
- * Run Aegis quality reviews on tasks in 'review' status.
+ * Run Aegis quality reviews on tasks in 'review' or 'quality_review' status.
  * Uses an agent to evaluate the task resolution, then approves or rejects.
  */
 export async function runAegisReviews(): Promise<{ ok: boolean; message: string }> {
@@ -486,11 +497,28 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
 
   const tasks = db.prepare(`
     SELECT t.id, t.title, t.description, t.status, t.priority, t.resolution, t.assigned_to, t.workspace_id,
-           t.project_id, p.ticket_prefix, t.project_ticket_no, a.config as agent_config
+           t.project_id, t.recipe_slug, t.worktree_path, t.workspace_source,
+           p.ticket_prefix, t.project_ticket_no, a.config as agent_config,
+           r.review_md as recipe_review_md
     FROM tasks t
     LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
     LEFT JOIN agents a ON a.name = t.assigned_to AND a.workspace_id = t.workspace_id
-    WHERE t.status = 'review'
+    LEFT JOIN recipes r ON r.slug = t.recipe_slug AND r.workspace_id = t.workspace_id AND r.error_message IS NULL
+    WHERE t.status IN ('review', 'quality_review')
+      AND NOT (
+        t.status = 'review'
+        AND t.recipe_slug IS NOT NULL
+      )
+      AND NOT (
+        t.status = 'quality_review'
+        AND t.recipe_slug IS NOT NULL
+        AND r.review_md IS NOT NULL
+        AND r.review_md <> ''
+      )
+      AND NOT (
+        t.status = 'quality_review'
+        AND t.error_message LIKE 'Aegis review error:%'
+      )
     ORDER BY t.updated_at ASC
     LIMIT 3
   `).all() as ReviewableTask[]
@@ -502,15 +530,18 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
   const results: Array<{ id: number; verdict: string; error?: string }> = []
 
   for (const task of tasks) {
-    // Move to quality_review to prevent re-processing
-    db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?')
-      .run('quality_review', Math.floor(Date.now() / 1000), task.id)
+    // Move review tasks to quality_review to show the gate is active. Tasks
+    // already moved there by an owner approval action are processed in place.
+    if (task.status !== 'quality_review') {
+      db.prepare('UPDATE tasks SET status = ?, error_message = NULL, updated_at = ? WHERE id = ?')
+        .run('quality_review', Math.floor(Date.now() / 1000), task.id)
 
-    eventBus.broadcast('task.status_changed', {
-      id: task.id,
-      status: 'quality_review',
-      previous_status: 'review',
-    })
+      eventBus.broadcast('task.status_changed', {
+        id: task.id,
+        status: 'quality_review',
+        previous_status: task.status,
+      })
+    }
 
     try {
       const prompt = buildReviewPrompt(task)
@@ -564,13 +595,43 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
       `).run(task.id, verdict.status, verdict.notes, task.workspace_id)
 
       if (verdict.status === 'approved') {
-        db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?')
+        let promotionResult: ReturnType<typeof promoteApprovedWorktree> | null = null
+        try {
+          promotionResult = promoteApprovedWorktree(task)
+        } catch (promotionErr: any) {
+          const now = Math.floor(Date.now() / 1000)
+          const message = promotionErr?.message || String(promotionErr)
+          db.prepare('UPDATE tasks SET status = ?, error_message = ?, updated_at = ? WHERE id = ?')
+            .run('awaiting_owner', `Worktree promotion failed: ${message}`, now, task.id)
+          db.prepare(`
+            INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+            VALUES (?, 'runner', ?, ?, ?)
+          `).run(
+            task.id,
+            `Worktree promotion failed after quality approval:\n${message}\n\nThe task worktree was left intact for inspection. The base repository was not marked done.`,
+            now,
+            task.workspace_id,
+          )
+          eventBus.broadcast('task.status_changed', {
+            id: task.id,
+            status: 'awaiting_owner',
+            previous_status: 'quality_review',
+            error_message: `Worktree promotion failed: ${message.substring(0, 300)}`,
+            reason: 'worktree_promotion_failed',
+          })
+          results.push({ id: task.id, verdict: 'error', error: message.substring(0, 100) })
+          logger.error({ taskId: task.id, err: promotionErr }, 'Worktree promotion failed after Aegis approval')
+          continue
+        }
+
+        db.prepare('UPDATE tasks SET status = ?, error_message = NULL, updated_at = ? WHERE id = ?')
           .run('done', Math.floor(Date.now() / 1000), task.id)
 
         eventBus.broadcast('task.status_changed', {
           id: task.id,
           status: 'done',
           previous_status: 'quality_review',
+          promotion: promotionResult,
         })
         syncAndEscalateIfFailed(task, 'done')
       } else {
@@ -631,14 +692,28 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
       const errorMsg = err.message || 'Unknown error'
       logger.error({ taskId: task.id, err }, 'Aegis review failed')
 
-      // Revert to review so it can be retried
-      db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?')
-        .run('review', Math.floor(Date.now() / 1000), task.id)
+      // Keep the task in the quality gate. Moving it back to review makes an
+      // owner-approved handoff look like it was silently undone.
+      const now = Math.floor(Date.now() / 1000)
+      const taskError = `Aegis review error: ${errorMsg}`
+      db.prepare('UPDATE tasks SET status = ?, error_message = ?, updated_at = ? WHERE id = ?')
+        .run('quality_review', taskError, now, task.id)
+      db.prepare(`
+        INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+        VALUES (?, 'aegis', ?, ?, ?)
+      `).run(
+        task.id,
+        `Quality Review could not complete:\n${errorMsg}\n\nThe task is still in Quality Review. Fix the review configuration or move the task to another column to continue.`,
+        now,
+        task.workspace_id
+      )
 
       eventBus.broadcast('task.status_changed', {
         id: task.id,
-        status: 'review',
+        status: 'quality_review',
         previous_status: 'quality_review',
+        error_message: taskError.substring(0, 300),
+        reason: 'aegis_review_error',
       })
 
       results.push({ id: task.id, verdict: 'error', error: errorMsg.substring(0, 100) })
@@ -1156,54 +1231,20 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
   const db = getDatabase()
 
   // -------------------------------------------------------------------------
-  // Phase 15 SCHED-01: recipe-tagged fast path.
-  // Recipe-tagged tasks skip the legacy affinity scoring entirely. They move
-  // `inbox → assigned` atomically and emit `task.runner_requested` so the
-  // runner daemon claims them via the Phase 14 claim route. The concurrent-
-  // modification guard (WHERE status = 'inbox' AND recipe_slug IS NOT NULL)
-  // in the UPDATE ensures we never re-emit for a row another tick already
-  // flipped.
-  // -------------------------------------------------------------------------
-  const recipeInboxTasks = db.prepare(`
-    SELECT id, recipe_slug, workspace_id
-    FROM tasks
-    WHERE status = 'inbox' AND recipe_slug IS NOT NULL
-  `).all() as Array<{ id: number; recipe_slug: string; workspace_id: number }>
-
-  const nowSec = Math.floor(Date.now() / 1000)
-  let recipeRouted = 0
-  for (const t of recipeInboxTasks) {
-    const res = db.prepare(`
-      UPDATE tasks
-      SET status = 'assigned', updated_at = ?
-      WHERE id = ? AND status = 'inbox' AND recipe_slug IS NOT NULL
-    `).run(nowSec, t.id)
-    if (res.changes > 0) {
-      recipeRouted++
-      eventBus.broadcast('task.runner_requested', {
-        task_id: t.id,
-        recipe_slug: t.recipe_slug,
-        workspace_id: t.workspace_id,
-      })
-      eventBus.broadcast('task.status_changed', {
-        id: t.id,
-        status: 'assigned',
-        previous_status: 'inbox',
-        reason: 'auto_route_recipe',
-      })
-    }
-  }
-
-  // -------------------------------------------------------------------------
   // Legacy path — affinity-scored inbox tasks (recipe-tagged rows excluded).
+  //
+  // Recipe-backed tasks are intentionally manual-start only. They remain in
+  // inbox/backlog until a user moves them to assigned; at that point the runner
+  // can claim them via GET /api/runner/ready-tasks or task.runner_requested.
+  // This keeps hydrated workflow tasks inspectable and prevents turning the
+  // runner on from consuming every recipe task at once.
   //
   // Phase 20 / ROUTE-01: two-pass lane-aware preference.
   //   Pass 1 (lane-scoped): legacy inbox rows linked to any gsd_plan whose
   //           status = 'in_progress'. Emitted with reason 'auto_route_lane_scoped'.
   //   Pass 2 (unscoped fallback): the remaining inbox rows (LIMIT 5 - pass1_rows).
   //           Emitted with reason 'auto_route_legacy_fallback'.
-  // The combined batch cap is 5/tick (v1.2 parity). The recipe fast-path above
-  // is BYTE-FOR-BYTE unchanged (COMPAT-02 lock).
+  // The combined batch cap is 5/tick (v1.2 parity).
   // -------------------------------------------------------------------------
   const activePlanRows = db.prepare(
     `SELECT id FROM gsd_plans WHERE status = 'in_progress'`,
@@ -1277,9 +1318,6 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
 
   const candidateCount = laneRows.length + unscopedRows.length
   if (candidateCount === 0) {
-    if (recipeRouted > 0) {
-      return { ok: true, message: `Routed ${recipeRouted} recipe-tagged task(s); no legacy inbox tasks to route` }
-    }
     return { ok: true, message: 'No inbox tasks to route' }
   }
 
@@ -1292,8 +1330,7 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
   `).all() as Array<{ id: number; name: string; role: string; status: string; config: string | null }>
 
   if (agents.length === 0) {
-    const prefix = recipeRouted > 0 ? `Routed ${recipeRouted} recipe-tagged; ` : ''
-    return { ok: true, message: `${prefix}${candidateCount} inbox task(s) but no available agents` }
+    return { ok: true, message: `${candidateCount} inbox task(s) but no available agents` }
   }
 
   let routed = 0
@@ -1382,13 +1419,9 @@ export async function autoRouteInboxTasks(): Promise<{ ok: boolean; message: str
 
   return {
     ok: true,
-    message: recipeRouted > 0
-      ? (routed > 0
-        ? `Routed ${recipeRouted} recipe-tagged + ${routed}/${candidateCount} legacy inbox task(s)${legacyBreakdown}`
-        : `Routed ${recipeRouted} recipe-tagged; ${candidateCount} legacy inbox task(s), no suitable agents found`)
-      : (routed > 0
-        ? `Auto-routed ${routed}/${candidateCount} inbox task(s)${legacyBreakdown}`
-        : `${candidateCount} inbox task(s), no suitable agents found`),
+    message: routed > 0
+      ? `Auto-routed ${routed}/${candidateCount} inbox task(s)${legacyBreakdown}`
+      : `${candidateCount} inbox task(s), no suitable agents found`,
   }
 }
 

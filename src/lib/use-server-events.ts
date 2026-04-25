@@ -109,10 +109,16 @@ export function useServerEvents() {
           }
           break
         case 'task.status_changed':
-          if (event.data?.id) {
-            updateTask(event.data.id, {
+          if (event.data?.id || event.data?.task_id) {
+            const taskId = event.data.id ?? event.data.task_id
+            updateTask(taskId, {
               status: event.data.status,
-              updated_at: event.data.updated_at,
+              updated_at: event.data.updated_at ?? event.data.at,
+              ...(event.data.container_id !== undefined ? { container_id: event.data.container_id } : {}),
+              ...(event.data.runner_started_at !== undefined ? { runner_started_at: event.data.runner_started_at } : {}),
+              ...(event.data.runner_attempts !== undefined ? { runner_attempts: event.data.runner_attempts } : {}),
+              ...(event.data.worktree_path !== undefined ? { worktree_path: event.data.worktree_path } : {}),
+              ...(event.data.runner_last_failure_reason !== undefined ? { runner_last_failure_reason: event.data.runner_last_failure_reason } : {}),
             })
           }
           break
@@ -203,6 +209,13 @@ export function useServerEvents() {
           }
           break
         case 'task.container_started':
+          if (event.data?.id || event.data?.task_id) {
+            const taskId = event.data.id ?? event.data.task_id
+            updateTask(taskId, {
+              container_id: event.data.container_id,
+              runner_attempts: event.data.attempt,
+            })
+          }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent('mc:task-container-started', { detail: event.data }),
@@ -210,6 +223,13 @@ export function useServerEvents() {
           }
           break
         case 'task.container_exited':
+          if (event.data?.id || event.data?.task_id) {
+            const taskId = event.data.id ?? event.data.task_id
+            updateTask(taskId, {
+              container_id: null,
+              runner_exit_code: event.data.exit_code,
+            })
+          }
           if (typeof window !== 'undefined') {
             window.dispatchEvent(
               new CustomEvent('mc:task-container-exited', { detail: event.data }),

@@ -460,23 +460,26 @@ export function getUserFromRequest(request: Request): User | null {
     }
   }
 
-  // Runner principal — auto-generated .data/runner.secret, strictly scoped to /api/runner/*.
+  const url = new URL(request.url)
+  const isRunnerPath = url.pathname.startsWith('/api/runner/')
+  const isCheckpointsTaskPath = /^\/api\/tasks\/\d+\/checkpoints\/?$/.test(url.pathname)
+
+  // Runner principal — auto-generated .data/runner.secret, scoped to /api/runner/*
+  // plus POST /api/tasks/:id/checkpoints for daemon-side preflight blockers.
   // See RAUTH-01 + .planning/phases/11-runtime-foundation-v1-2/11-CONTEXT.md.
   //
-  // IMPORTANT: the url.pathname.startsWith('/api/runner/') gate is the ONLY check —
-  // if it fails, we never compare the bearer against the runner secret at all. A
-  // request hitting /api/tasks with the runner secret presented as a bearer falls
-  // through to the session-cookie / API-key / agent-key branches below and will
-  // be rejected there (because none of those will match the runner secret).
-  const url = new URL(request.url)
-  if (url.pathname.startsWith('/api/runner/')) {
+  // IMPORTANT: the path gate below is the ONLY check —
+  // if it fails, we never compare the bearer against the runner secret at all.
+  // The only /api/tasks exception is POST /api/tasks/:id/checkpoints, used by
+  // the daemon to surface pre-container blockers.
+  if (isRunnerPath || (isCheckpointsTaskPath && request.method === 'POST')) {
     const bearer = extractApiKeyFromHeaders(request.headers)
     const runnerSecret = getRunnerSecret()
     const configuredApiKey = resolveActiveApiKey()
     const isRunnerPrincipal = Boolean(
       bearer && (
         (runnerSecret && safeCompare(bearer, runnerSecret)) ||
-        (configuredApiKey && safeCompare(bearer, configuredApiKey))
+        (isRunnerPath && configuredApiKey && safeCompare(bearer, configuredApiKey))
       ),
     )
     if (isRunnerPrincipal) {
@@ -537,8 +540,6 @@ export function getUserFromRequest(request: Request): User | null {
   // runner-tokens.ts is the single source of truth for method+path pairs;
   // this gate is just the cheap prefix filter that decides whether to run
   // the allowlist matcher at all. DO NOT broaden — see 15-CONTEXT.md § post-research lock.
-  const isRunnerPath = url.pathname.startsWith('/api/runner/')
-  const isCheckpointsTaskPath = /^\/api\/tasks\/\d+\/checkpoints\/?$/.test(url.pathname)
   if (isRunnerPath || isCheckpointsTaskPath) {
     const bearer = extractApiKeyFromHeaders(request.headers)
     if (bearer) {

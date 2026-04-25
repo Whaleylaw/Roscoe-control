@@ -47,6 +47,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth'
 import { config } from '@/lib/config'
 import { getDatabase } from '@/lib/db'
+import { eventBus } from '@/lib/event-bus'
 import { logger } from '@/lib/logger'
 import {
   TASK_RUNTIME_ERROR_CODES,
@@ -78,6 +79,10 @@ const DEFAULT_RUNNER_MAX_ATTEMPTS = 3
 
 interface TaskRow {
   id: number
+  title: string
+  description: string | null
+  tags: string | null
+  metadata: string | null
   recipe_slug: string | null
   model_override: string | null
   workspace_source: string | null
@@ -87,6 +92,8 @@ interface TaskRow {
   container_id: string | null
   runner_attempts: number
   runner_max_attempts: number | null
+  workspace_id: number
+  runner_mode?: 'work' | 'review'
 }
 
 function parseJsonColumn<T>(raw: string | null, fallback: T): T {
@@ -127,7 +134,8 @@ export async function POST(
   const task = db
     .prepare(
       `SELECT id, recipe_slug, model_override, workspace_source, read_only_mounts,
-              extra_skills, status, container_id, runner_attempts, runner_max_attempts
+              extra_skills, status, container_id, runner_attempts, runner_max_attempts,
+              workspace_id, title, description, tags, metadata
        FROM tasks
        WHERE id = ?`,
     )
@@ -167,6 +175,14 @@ export async function POST(
     ])
   }
 
+  const runnerMode: 'work' | 'review' = task.status === 'quality_review' ? 'review' : 'work'
+  if (runnerMode === 'review' && !recipe.review_md) {
+    return NextResponse.json(
+      { error: `recipe '${task.recipe_slug}' does not define REVIEW.md` },
+      { status: 400 },
+    )
+  }
+
   // 5. Re-validate mounts + skills against the allowlist (defense-in-depth).
   const mounts = parseJsonColumn<Array<{ host_path: string; container_path: string; label: string }>>(
     task.read_only_mounts,
@@ -174,6 +190,8 @@ export async function POST(
   )
   const skills = parseJsonColumn<string[]>(task.extra_skills, [])
   const workspaceSource = task.workspace_source ? parseJsonColumn<unknown>(task.workspace_source, null) : null
+  const taskTags = parseJsonColumn<unknown[]>(task.tags, [])
+  const taskMetadata = parseJsonColumn<Record<string, unknown>>(task.metadata, {})
 
   const allowlistIssues: TaskRuntimeValidationIssue[] = []
   for (let i = 0; i < mounts.length; i++) {
@@ -274,14 +292,16 @@ export async function POST(
       const result = db
         .prepare(
           `UPDATE tasks
-           SET status = 'in_progress',
+           SET status = CASE WHEN status = 'quality_review' THEN 'quality_review' ELSE 'in_progress' END,
                container_id = ?,
                runner_started_at = ?,
                runner_attempts = runner_attempts + 1,
+               runner_exit_code = NULL,
+               runner_last_failure_reason = NULL,
                worktree_path = ?,
                updated_at = ?
            WHERE id = ?
-             AND status = 'assigned'
+             AND status IN ('assigned', 'quality_review')
              AND container_id IS NULL
              AND recipe_slug IS NOT NULL`,
         )
@@ -316,6 +336,20 @@ export async function POST(
       { status: 409 },
     )
   }
+
+  eventBus.broadcast('task.status_changed', {
+    id: taskId,
+    task_id: taskId,
+    status: runnerMode === 'review' ? 'quality_review' : 'in_progress',
+    runner_mode: runnerMode,
+    previous_status: task.status,
+    container_id: placeholder,
+    runner_started_at: nowUnix,
+    runner_attempts: nextAttempt,
+    worktree_path: worktreePath,
+    workspace_id: task.workspace_id,
+    at: nowUnix,
+  })
 
   // 9. Read prior attempts (exclude the one we just inserted).
   const allAttempts = readPriorAttempts(db, taskId)
@@ -355,6 +389,7 @@ export async function POST(
     // preserves the "secrets never touch HTTP" property.
     recipeSecrets: undefined,
   })
+  env.MC_RUNNER_MODE = runnerMode
 
   // 12. Build dispatch payload.
   // Phase 15 CP-04: query the most-recent blocked checkpoint and attach the
@@ -366,6 +401,10 @@ export async function POST(
 
   const taskPayload = buildDispatchPayload({
     taskId,
+    title: task.title,
+    description: task.description,
+    tags: taskTags,
+    metadata: taskMetadata,
     recipeSlug: task.recipe_slug,
     workspaceSource,
     readOnlyMounts: mounts,
@@ -375,6 +414,7 @@ export async function POST(
     runnerMaxAttempts: resolvedMaxAttempts,
     resumeMarker,
   })
+  ;(taskPayload as unknown as Record<string, unknown>).runner_mode = runnerMode
 
   return NextResponse.json({
     task: taskPayload,

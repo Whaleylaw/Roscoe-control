@@ -1,13 +1,9 @@
 /**
- * Phase 15 Plan 15-02 Task 2: unit tests for autoRouteInboxTasks recipe fast-path.
+ * Unit tests for autoRouteInboxTasks.
  *
- * Covers:
- *   - Recipe-tagged inbox task flips inbox→assigned and emits task.runner_requested
- *     (+ task.status_changed) exactly once.
- *   - Legacy inbox task (recipe_slug IS NULL) is filtered out of the recipe fast-path
- *     SELECT and still runs through the existing affinity-scoring loop.
- *   - Mixed inbox (recipe + legacy) routes BOTH lanes correctly.
- *   - Concurrent modification (row already flipped) is a no-op — no duplicate emit.
+ * Recipe-backed tasks are manual-start only: auto-routing must leave them in
+ * inbox so a user can inspect hydrated workflow tasks and deliberately move one
+ * to assigned before the recipe runner claims it.
  */
 
 import Database from 'better-sqlite3'
@@ -48,13 +44,14 @@ function insertInboxTask(opts: {
   assigned_to?: string | null
   workspace_id?: number
   priority?: string
+  metadata?: Record<string, unknown>
 }): number {
   const now = Math.floor(Date.now() / 1000)
   const projectRow = testDb.prepare(`SELECT id FROM projects WHERE workspace_id = ? LIMIT 1`).get(opts.workspace_id ?? 1) as { id: number } | undefined
   const projectId = projectRow?.id ?? 1
   const res = testDb.prepare(`
     INSERT INTO tasks (title, status, priority, project_id, created_at, updated_at, workspace_id, recipe_slug, assigned_to, tags, metadata)
-    VALUES (?, 'inbox', ?, ?, ?, ?, ?, ?, ?, '[]', '{}')
+    VALUES (?, 'inbox', ?, ?, ?, ?, ?, ?, ?, '[]', ?)
   `).run(
     opts.title,
     opts.priority ?? 'medium',
@@ -64,6 +61,7 @@ function insertInboxTask(opts: {
     opts.workspace_id ?? 1,
     opts.recipe_slug ?? null,
     opts.assigned_to ?? null,
+    JSON.stringify(opts.metadata ?? {}),
   )
   return Number(res.lastInsertRowid)
 }
@@ -182,104 +180,72 @@ afterEach(() => {
   testDb.close()
 })
 
-describe('autoRouteInboxTasks — recipe-tagged fast path (SCHED-01)', () => {
-  it('flips a recipe-tagged inbox task inbox→assigned and emits task.runner_requested', async () => {
+describe('autoRouteInboxTasks — recipe tasks are manual-start only', () => {
+  it('leaves recipe-tagged inbox tasks in inbox and emits no runner request', async () => {
     const id = insertInboxTask({ title: 'hello', recipe_slug: 'hello-world' })
 
     const result = await autoRouteInboxTasks()
     expect(result.ok).toBe(true)
 
-    expect(taskStatus(id)).toBe('assigned')
+    expect(taskStatus(id)).toBe('inbox')
 
     const runnerRequested = broadcast.mock.calls.filter((c) => c[0] === 'task.runner_requested')
-    expect(runnerRequested).toHaveLength(1)
-    expect(runnerRequested[0][1]).toMatchObject({
-      task_id: id,
-      recipe_slug: 'hello-world',
-      workspace_id: 1,
-    })
+    expect(runnerRequested).toHaveLength(0)
 
     const statusChanged = broadcast.mock.calls.filter((c) => c[0] === 'task.status_changed')
-    expect(statusChanged.some((c) => (c[1] as { id: number }).id === id && (c[1] as { reason: string }).reason === 'auto_route_recipe')).toBe(true)
+    expect(statusChanged.some((c) => (c[1] as { id: number }).id === id)).toBe(false)
   })
 
-  it('skips affinity scoring for recipe-tagged tasks (no agent required, no assigned_to written)', async () => {
-    // Seed no agents at all — legacy path would early-return with
-    // "no available agents", but the recipe fast-path must still run.
-    // (runMigrations seeds some agents; delete them defensively.)
+  it('does not route recipe-tagged tasks even when runner_auto_route is true', async () => {
     testDb.prepare(`DELETE FROM agents`).run()
 
-    const id = insertInboxTask({ title: 'ship', recipe_slug: 'hello-world' })
+    const id = insertInboxTask({
+      title: 'manual recipe task',
+      recipe_slug: 'firmvault-workflow-task',
+      metadata: { runner_auto_route: true },
+    })
 
     const result = await autoRouteInboxTasks()
     expect(result.ok).toBe(true)
 
-    expect(taskStatus(id)).toBe('assigned')
+    expect(taskStatus(id)).toBe('inbox')
     const row = testDb.prepare(`SELECT assigned_to FROM tasks WHERE id = ?`).get(id) as { assigned_to: string | null }
     expect(row.assigned_to).toBeNull()
   })
 
-  it('leaves a legacy inbox task (recipe_slug NULL) to the affinity-scoring loop', async () => {
-    const id = insertInboxTask({ title: 'simple legacy task', recipe_slug: null })
+  it('leaves recipe-tagged inbox tasks alone when runner_auto_route is false', async () => {
+    const id = insertInboxTask({
+      title: 'manual recipe task',
+      recipe_slug: 'firmvault-workflow-task',
+      metadata: { runner_auto_route: false },
+    })
 
-    await autoRouteInboxTasks()
+    const result = await autoRouteInboxTasks()
+    expect(result.ok).toBe(true)
 
-    // No task.runner_requested emission for legacy rows.
+    expect(taskStatus(id)).toBe('inbox')
     const runnerRequested = broadcast.mock.calls.filter((c) => c[0] === 'task.runner_requested')
     expect(runnerRequested).toHaveLength(0)
-
-    // Status may have been updated by the affinity-scoring loop if any matching
-    // agent was seeded; at minimum, the row was NOT assigned via the recipe path.
-    const row = testDb.prepare(`SELECT status, assigned_to, recipe_slug FROM tasks WHERE id = ?`).get(id) as { status: string; assigned_to: string | null; recipe_slug: string | null }
-    expect(row.recipe_slug).toBeNull()
   })
 
-  it('processes mixed inbox: recipe rows fast-path, legacy rows go through scoring', async () => {
+  it('ignores recipe rows while still routing legacy inbox tasks', async () => {
+    seedAgent('agent-1')
     const recipeIds = [
       insertInboxTask({ title: 'r1', recipe_slug: 'hello-world' }),
       insertInboxTask({ title: 'r2', recipe_slug: 'hello-world' }),
       insertInboxTask({ title: 'r3', recipe_slug: 'another-recipe' }),
     ]
-    insertInboxTask({ title: 'legacy-a', recipe_slug: null })
-    insertInboxTask({ title: 'legacy-b', recipe_slug: null })
-
-    await autoRouteInboxTasks()
-
-    // Three recipe emissions; none duplicated.
-    const runnerRequested = broadcast.mock.calls.filter((c) => c[0] === 'task.runner_requested')
-    expect(runnerRequested).toHaveLength(3)
-    const emittedIds = runnerRequested.map((c) => (c[1] as { task_id: number }).task_id).sort((a, b) => a - b)
-    expect(emittedIds).toEqual([...recipeIds].sort((a, b) => a - b))
-
-    // Every recipe task flipped.
-    for (const id of recipeIds) {
-      expect(taskStatus(id)).toBe('assigned')
-    }
-  })
-
-  it('does NOT emit when the UPDATE affects 0 rows (concurrent modification safety)', async () => {
-    // Insert a recipe row, then IMMEDIATELY flip it out of inbox state before
-    // the autoRouteInboxTasks UPDATE can fire. Simulate by pre-advancing the
-    // row to 'backlog'. The SELECT in autoRoute picked it up at t0, but the
-    // UPDATE guard (status = 'inbox') rejects — res.changes = 0, no emit.
-    const id = insertInboxTask({ title: 'race', recipe_slug: 'hello-world' })
-    testDb.prepare(`UPDATE tasks SET status = 'backlog' WHERE id = ?`).run(id)
+    const legacyId = insertInboxTask({ title: 'legacy-a', recipe_slug: null })
 
     await autoRouteInboxTasks()
 
     const runnerRequested = broadcast.mock.calls.filter((c) => c[0] === 'task.runner_requested')
     expect(runnerRequested).toHaveLength(0)
 
-    // Row was NOT flipped by autoRoute (stayed 'backlog').
-    expect(taskStatus(id)).toBe('backlog')
-  })
-
-  it('returns message mentioning recipe-tagged count when fast-path routes rows', async () => {
-    insertInboxTask({ title: 'r-only', recipe_slug: 'hello-world' })
-
-    const result = await autoRouteInboxTasks()
-    expect(result.ok).toBe(true)
-    expect(result.message).toMatch(/Routed\s+1\s+recipe-tagged/i)
+    for (const id of recipeIds) {
+      expect(taskStatus(id)).toBe('inbox')
+    }
+    expect(taskStatus(legacyId)).toBe('assigned')
   })
 })
 
@@ -420,7 +386,7 @@ describe('autoRouteInboxTasks — lane-aware legacy routing (ROUTE-01)', () => {
     expect(taskStatus(id)).toBe('backlog')
   })
 
-  it('recipe fast-path regression — byte-identical emissions when lane-scoped rows also present', async () => {
+  it('manual-start recipe regression — recipe rows stay inbox when lane-scoped rows also route', async () => {
     seedAgent('agent-1')
     const { plan_id } = insertPlanHierarchy({ status: 'in_progress' })
     const recipeId = insertInboxTask({ title: 'recipe-row', recipe_slug: 'hello-world' })
@@ -428,22 +394,11 @@ describe('autoRouteInboxTasks — lane-aware legacy routing (ROUTE-01)', () => {
 
     await autoRouteInboxTasks()
 
-    // Recipe task: exactly ONE task.runner_requested AND ONE task.status_changed
-    // with reason 'auto_route_recipe'. NO lane-scoped or fallback reasons on the
-    // recipe row.
     const recipeRunnerRequested = broadcastsForTask(recipeId, 'task.runner_requested')
-    expect(recipeRunnerRequested).toHaveLength(1)
-    expect(recipeRunnerRequested[0]).toMatchObject({
-      task_id: recipeId,
-      recipe_slug: 'hello-world',
-      workspace_id: 1,
-    })
-
+    expect(recipeRunnerRequested).toHaveLength(0)
     const recipeStatusChanged = broadcastsForTask(recipeId, 'task.status_changed')
-    expect(recipeStatusChanged).toHaveLength(1)
-    expect(recipeStatusChanged[0].reason).toBe('auto_route_recipe')
-    expect(recipeStatusChanged[0].reason).not.toBe('auto_route_lane_scoped')
-    expect(recipeStatusChanged[0].reason).not.toBe('auto_route_legacy_fallback')
+    expect(recipeStatusChanged).toHaveLength(0)
+    expect(taskStatus(recipeId)).toBe('inbox')
 
     // Lane task: emits lane-scoped reason.
     const lanePayloads = broadcastsForTask(laneId, 'task.status_changed')

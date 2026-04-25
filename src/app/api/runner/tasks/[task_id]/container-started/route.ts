@@ -107,14 +107,14 @@ export async function POST(
 
     const nowUnix = Math.floor(Date.now() / 1000)
 
-    // Guarded swap: only while status is in_progress AND container_id is
+    // Guarded swap: only while status is in_progress/quality_review AND container_id is
     // either NULL or a pending placeholder. Anything else (terminal status,
     // someone else stole the row, task reset to assigned) → 409.
     const res = db.prepare(`
       UPDATE tasks
       SET container_id = ?, updated_at = ?
       WHERE id = ?
-        AND status = 'in_progress'
+        AND status IN ('in_progress', 'quality_review')
         AND (container_id LIKE 'pending:%' OR container_id IS NULL)
     `).run(body.container_id, nowUnix, taskId)
 

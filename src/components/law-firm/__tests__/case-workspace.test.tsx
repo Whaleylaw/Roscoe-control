@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { LawFirmCaseWorkspace } from '../case-workspace'
 
 const nav = vi.hoisted(() => ({
@@ -82,6 +82,50 @@ beforeEach(() => {
     if (href === '/api/law-firm/cases/colleen-colvin/task-project' && init?.method === 'POST') {
       return new Response(JSON.stringify({ project: { id: 42 } }))
     }
+    if (href === '/api/law-firm/cases/colleen-colvin/workflow') {
+      return new Response(JSON.stringify({
+        ready_items: [],
+        workflows: [
+          {
+            workflow_id: 'lien_resolution',
+            name: 'Lien Identification and Resolution',
+            goal: 'Identify, open, negotiate, and pay all liens before final distribution.',
+            phase_id: 'lien_track',
+            source: 'phase_6_lien/workflows/get_final_lien/workflow.md',
+            enabled: true,
+            status: 'active',
+            completed_steps: 0,
+            total_steps: 2,
+            active_steps: 1,
+            blocked_by: [],
+            steps: [
+              {
+                id: 'identify_liens',
+                type: 'recipe',
+                landmark_id: 'liens_identified',
+                recipe_slug: 'firmvault-workflow-task',
+                status: 'ready',
+                depends_on: [],
+                blocked_by: [],
+                wait_days: null,
+                skip_when: [],
+              },
+              {
+                id: 'open_liens',
+                type: 'recipe',
+                landmark_id: 'liens_opened',
+                recipe_slug: 'firmvault-workflow-task',
+                status: 'blocked',
+                depends_on: ['identify_liens'],
+                blocked_by: ['identify_liens'],
+                wait_days: null,
+                skip_when: [],
+              },
+            ],
+          },
+        ],
+      }))
+    }
     if (href === '/api/law-firm/cases/colleen-colvin' && init?.method === 'PATCH') {
       return new Response(JSON.stringify({ case: caseDetail }))
     }
@@ -106,25 +150,15 @@ describe('LawFirmCaseWorkspace', () => {
     expect(screen.getByText('Discussed treatment status.')).toBeTruthy()
   })
 
-  it('PATCHes workflow changes from the workflow tab', async () => {
+  it('renders workflow graph status from the workflow tab', async () => {
     nav.pathname = '/law-firm/case/colleen-colvin/workflow'
     render(<LawFirmCaseWorkspace />)
 
-    await waitFor(() => expect(screen.getByLabelText('currentPhase')).toBeTruthy())
-    fireEvent.change(screen.getByLabelText('currentPhase'), { target: { value: 'phase_2_treatment' } })
-    fireEvent.click(screen.getByLabelText('Demand Sent'))
-    fireEvent.click(screen.getByRole('button', { name: /^saveWorkflow$/i }))
+    await waitFor(() => expect(screen.getByText('Lien Identification and Resolution')).toBeTruthy())
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
-      '/api/law-firm/cases/colleen-colvin',
-      expect.objectContaining({ method: 'PATCH' }),
-    ))
-    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls
-    const patchCall = calls.find(([url, init]) => url === '/api/law-firm/cases/colleen-colvin' && init?.method === 'PATCH')
-    expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({
-      current_phase: 'phase_2_treatment',
-      landmarks: { demand_sent: true },
-    })
+    expect(screen.getByText('Active')).toBeTruthy()
+    expect(screen.getByText('identify liens')).toBeTruthy()
+    expect(screen.getByText('open liens')).toBeTruthy()
   })
 
   it('renders a task board scoped to the hidden case project', async () => {

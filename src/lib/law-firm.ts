@@ -152,6 +152,92 @@ export async function updateLawFirmCaseState(
   return readLawFirmCaseDetail(slug)
 }
 
+export async function bypassLawFirmCaseLandmark(
+  slug: string,
+  landmarkKey: string,
+  reason: string,
+  actor: string,
+  taskId: number,
+): Promise<LawFirmCaseDetail> {
+  assertSafeCaseSlug(slug)
+  if (!/^[a-zA-Z0-9_:-]+$/.test(landmarkKey)) throw new Error('Invalid landmark key')
+
+  const caseDir = join(getLawFirmCasesRoot(), slug)
+  const now = new Date().toISOString()
+  const normalizedReason = reason.trim() || 'Marked not applicable in Mission Control.'
+  const evidence = `Bypassed as not applicable by ${actor}: ${normalizedReason}`
+
+  await Promise.all([
+    upsertStateLandmarkBypass(caseDir, landmarkKey, now, actor, evidence, taskId),
+    upsertCaseFrontmatterBypass(caseDir, slug, landmarkKey, now, actor, normalizedReason, taskId),
+  ])
+
+  return readLawFirmCaseDetail(slug)
+}
+
+async function upsertStateLandmarkBypass(
+  caseDir: string,
+  landmarkKey: string,
+  now: string,
+  actor: string,
+  evidence: string,
+  taskId: number,
+): Promise<void> {
+  const statePath = join(caseDir, 'state.yaml')
+  const raw = await readFile(statePath, 'utf8')
+  const parsed = parseYaml(raw)
+  const state = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+
+  const landmarks = objectRecord(state.landmarks)
+  const existing = objectRecord(landmarks[landmarkKey])
+  landmarks[landmarkKey] = {
+    ...existing,
+    satisfied: true,
+    satisfied_at: stringValue(existing.satisfied_at) || now,
+    satisfied_by: stringValue(existing.satisfied_by) || actor || 'mission-control',
+    evidence,
+    bypassed: true,
+    bypass_reason: evidence,
+    bypass_task_id: taskId,
+  }
+  state.landmarks = landmarks
+  await writeFile(statePath, stringifyYaml(state), 'utf8')
+}
+
+async function upsertCaseFrontmatterBypass(
+  caseDir: string,
+  slug: string,
+  landmarkKey: string,
+  now: string,
+  actor: string,
+  reason: string,
+  taskId: number,
+): Promise<void> {
+  const casePath = join(caseDir, `${slug}.md`)
+  const raw = await readFile(casePath, 'utf8')
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n?/)
+  if (!match) throw new Error('Case file is missing YAML frontmatter')
+
+  const parsed = parseYaml(match[1])
+  const frontmatter = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+  const bypasses = objectRecord(frontmatter.workflow_bypasses)
+  bypasses[landmarkKey] = {
+    status: 'not_applicable',
+    reason,
+    task_id: taskId,
+    created_at: now,
+    created_by: actor || 'mission-control',
+  }
+  frontmatter.workflow_bypasses = bypasses
+
+  const next = `---\n${stringifyYaml(frontmatter)}---\n\n${raw.slice(match[0].length).replace(/^\n+/, '')}`
+  await writeFile(casePath, next, 'utf8')
+}
+
 export async function ensureLawFirmCaseProject(
   db: Database,
   workspaceId: number,
@@ -388,6 +474,10 @@ function assertSafeCaseSlug(slug: string) {
   if (!/^[a-z0-9][a-z0-9._-]*$/.test(slug) || slug.includes('..') || slug.startsWith('.')) {
     throw new Error('Invalid case slug')
   }
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
 function stringValue(value: unknown): string | null {
