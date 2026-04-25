@@ -60,6 +60,7 @@ The law-firm/FirmVault workflows are the first production use case, but the engi
 - Tool registry baseline.
 - Workflow definition registry/sync from `workflows/*.yaml`.
 - Quality-review approval advances workflow nodes and materializes next ready recipe tasks.
+- Workflow timer scheduler task advances due timer dependencies without OpenClaw cron.
 
 ## Active Design Decisions
 
@@ -119,7 +120,7 @@ Goal: wait nodes and timer dependencies wake up automatically at the right time.
 - Ensure timers can be cancelled or bypassed if records arrive early.
 - Add tests for due timer, not-yet-due timer, and early condition cancellation.
 
-Status: high priority.
+Status: implemented through Mission Control's internal scheduler. OpenClaw cron remains a separate legacy/operator surface and is not used for workflow timers.
 
 ### 5. Case Workflow Controls
 
@@ -205,4 +206,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Wire the timer scheduler path so due wait/timer dependencies wake workflows and materialize the next eligible node automatically**.
+Current recommended next step: **Add case Workflow controls for activate, cancel, bypass/not applicable, blockers, and timer visibility**.

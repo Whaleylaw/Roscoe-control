@@ -1387,70 +1387,78 @@ function promoteEligibleWorkflowNodesInTransaction(
   workflowInstanceId: number,
   now: number,
 ): string[] {
-  scheduleSelfTimersForDependencyReadyNodes(db, workflowInstanceId, now)
-  const rows = db.prepare(`
-    SELECT wni.id, wni.node_key, wni.node_type, wni.status, wi.workspace_id
-    FROM workflow_node_instances wni
-    JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
-    WHERE wni.workflow_instance_id = ?
-      AND wni.status IN ('pending', 'blocked', 'waiting')
-      AND NOT EXISTS (
-        SELECT 1
-        FROM workflow_node_dependencies wnd
-        WHERE wnd.node_instance_id = wni.id
-          AND wnd.dependency_semantics IN ('blocks', 'waits_for_all', 'conditional_on_failure')
-          AND wnd.status != 'satisfied'
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM workflow_node_dependencies any_dep
-        WHERE any_dep.node_instance_id = wni.id
-          AND any_dep.dependency_semantics = 'waits_for_any'
-        GROUP BY COALESCE(any_dep.dependency_group, any_dep.dependency_key)
-        HAVING SUM(CASE WHEN any_dep.status = 'satisfied' THEN 1 ELSE 0 END) = 0
-      )
-    ORDER BY wni.id ASC
-  `).all(workflowInstanceId) as Array<{
-    id: number
-    node_key: string
-    node_type: WorkflowNodeType
-    status: WorkflowNodeStatus
-    workspace_id: number
-  }>
-
   const promoted: string[] = []
-  for (const row of rows) {
-    const nextStatus: WorkflowNodeStatus = ['wait', 'gateway', 'gate'].includes(row.node_type) ? 'complete' : 'ready'
-    const updated = db.prepare(`
-      UPDATE workflow_node_instances
-      SET status = ?, completed_at = CASE WHEN ? = 'complete' THEN COALESCE(completed_at, ?) ELSE completed_at END,
-          blocked_by_json = '[]', updated_at = ?
-      WHERE id = ? AND status IN ('pending', 'blocked', 'waiting')
-    `).run(nextStatus, nextStatus, now, now, row.id)
-    if (updated.changes === 0) continue
-    promoted.push(row.node_key)
-    writeWorkflowEvent(db, {
-      workflowInstanceId,
-      nodeInstanceId: row.id,
-      nodeKey: row.node_key,
-      eventType: nextStatus === 'complete' ? 'node.completed' : 'node.ready',
-      actorType: 'system',
-      actorId: 'workflow-engine',
-      payload: { node_key: row.node_key, node_type: row.node_type },
-      workspaceId: row.workspace_id,
-      createdAt: now,
-    })
-    if (nextStatus === 'complete') {
-      satisfyNodeDependencyInTransaction(db, {
+  let workspaceId = 1
+  for (;;) {
+    scheduleSelfTimersForDependencyReadyNodes(db, workflowInstanceId, now)
+    const rows = db.prepare(`
+      SELECT wni.id, wni.node_key, wni.node_type, wni.status, wi.workspace_id
+      FROM workflow_node_instances wni
+      JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
+      WHERE wni.workflow_instance_id = ?
+        AND wni.status IN ('pending', 'blocked', 'waiting')
+        AND NOT EXISTS (
+          SELECT 1
+          FROM workflow_node_dependencies wnd
+          WHERE wnd.node_instance_id = wni.id
+            AND wnd.dependency_semantics IN ('blocks', 'waits_for_all', 'conditional_on_failure')
+            AND wnd.status != 'satisfied'
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM workflow_node_dependencies any_dep
+          WHERE any_dep.node_instance_id = wni.id
+            AND any_dep.dependency_semantics = 'waits_for_any'
+          GROUP BY COALESCE(any_dep.dependency_group, any_dep.dependency_key)
+          HAVING SUM(CASE WHEN any_dep.status = 'satisfied' THEN 1 ELSE 0 END) = 0
+        )
+      ORDER BY wni.id ASC
+    `).all(workflowInstanceId) as Array<{
+      id: number
+      node_key: string
+      node_type: WorkflowNodeType
+      status: WorkflowNodeStatus
+      workspace_id: number
+    }>
+    if (rows.length === 0) break
+
+    let completedAutomaticNode = false
+    for (const row of rows) {
+      workspaceId = row.workspace_id
+      const nextStatus: WorkflowNodeStatus = ['wait', 'gateway', 'gate'].includes(row.node_type) ? 'complete' : 'ready'
+      const updated = db.prepare(`
+        UPDATE workflow_node_instances
+        SET status = ?, completed_at = CASE WHEN ? = 'complete' THEN COALESCE(completed_at, ?) ELSE completed_at END,
+            blocked_by_json = '[]', updated_at = ?
+        WHERE id = ? AND status IN ('pending', 'blocked', 'waiting')
+      `).run(nextStatus, nextStatus, now, now, row.id)
+      if (updated.changes === 0) continue
+      promoted.push(row.node_key)
+      writeWorkflowEvent(db, {
         workflowInstanceId,
+        nodeInstanceId: row.id,
         nodeKey: row.node_key,
-        actor: 'workflow-engine',
-        payload: { reason: 'wait_node_complete' },
-        now,
+        eventType: nextStatus === 'complete' ? 'node.completed' : 'node.ready',
+        actorType: 'system',
+        actorId: 'workflow-engine',
+        payload: { node_key: row.node_key, node_type: row.node_type },
+        workspaceId: row.workspace_id,
+        createdAt: now,
       })
+      if (nextStatus === 'complete') {
+        completedAutomaticNode = true
+        satisfyNodeDependencyInTransaction(db, {
+          workflowInstanceId,
+          nodeKey: row.node_key,
+          actor: 'workflow-engine',
+          payload: { reason: 'wait_node_complete' },
+          now,
+        })
+      }
     }
+    if (!completedAutomaticNode) break
   }
-  updateWorkflowInstanceCompletionInTransaction(db, workflowInstanceId, rows[0]?.workspace_id ?? 1, 'workflow-engine', now)
+  updateWorkflowInstanceCompletionInTransaction(db, workflowInstanceId, workspaceId, 'workflow-engine', now)
   return promoted
 }
 

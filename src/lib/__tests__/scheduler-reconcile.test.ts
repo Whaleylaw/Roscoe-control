@@ -43,10 +43,17 @@ vi.mock('@/lib/sessions', () => ({
 vi.mock('@/lib/skill-sync', () => ({ syncSkillsFromDisk: vi.fn(() => Promise.resolve({ ok: true, message: 'skill stub' })) }))
 vi.mock('@/lib/local-agent-sync', () => ({ syncLocalAgents: vi.fn(() => Promise.resolve({ ok: true, message: 'local stub' })) }))
 vi.mock('@/lib/recurring-tasks', () => ({ spawnRecurringTasks: vi.fn(() => Promise.resolve({ ok: true, message: 'rec stub' })) }))
+vi.mock('@/lib/workflow-engine', () => ({
+  advanceDueWorkflowTimers: vi.fn(() => ({
+    completed: [{ workflow_instance_id: 1, node_instance_id: 2, node_key: 'wait' }],
+    materialized: [{ workflow_instance_id: 1, created: [{ task_id: 3, node_key: 'follow_up', title: 'Follow up' }], skipped: [] }],
+  })),
+}))
 vi.mock('@/lib/event-bus', () => ({ eventBus: { broadcast: vi.fn() } }))
 
 import { initScheduler, stopScheduler, triggerTask, getSchedulerStatus } from '@/lib/scheduler'
 import { reconcileRunnerHeartbeat } from '@/lib/task-dispatch'
+import { advanceDueWorkflowTimers } from '@/lib/workflow-engine'
 
 describe('scheduler — Phase 15 reconcile_runner_heartbeat tick (SCHED-04)', () => {
   beforeEach(() => {
@@ -95,6 +102,28 @@ describe('scheduler — Phase 15 reconcile_runner_heartbeat tick (SCHED-04)', ()
     expect(result.message).toBe('reconcile stub')
   })
 
+  it('triggerTask("workflow_timer_advance") calls advanceDueWorkflowTimers without OpenClaw cron', async () => {
+    initScheduler()
+    const result = await triggerTask('workflow_timer_advance')
+    expect(advanceDueWorkflowTimers).toHaveBeenCalledTimes(1)
+    expect(advanceDueWorkflowTimers).toHaveBeenCalledWith(expect.anything(), {
+      actor: 'workflow-timer',
+      limit: 500,
+      status: 'inbox',
+    })
+    expect(result.ok).toBe(true)
+    expect(result.message).toBe('Advanced 1 workflow timer(s); materialized 1 task(s)')
+  })
+
+  it('workflow_timer_advance is registered and enabled by default', () => {
+    initScheduler()
+    const entry = getSchedulerStatus().find((s) => s.id === 'workflow_timer_advance')
+    expect(entry).toBeDefined()
+    expect(entry!.name).toBe('Workflow Timer Advance')
+    expect(entry!.enabled).toBe(true)
+    expect(entry!.running).toBe(false)
+  })
+
   it('triggerTask rejects unknown tasks (regression guard for ladder)', async () => {
     initScheduler()
     const result = await triggerTask('not_a_real_task')
@@ -107,6 +136,7 @@ describe('scheduler — Phase 15 reconcile_runner_heartbeat tick (SCHED-04)', ()
     const ids = getSchedulerStatus().map((s) => s.id).sort()
     // This list must include the new entry alongside every pre-Phase-15 entry.
     expect(ids).toContain('reconcile_runner_heartbeat')
+    expect(ids).toContain('workflow_timer_advance')
     expect(ids).toContain('task_dispatch')
     expect(ids).toContain('stale_task_requeue')
     expect(ids).toContain('aegis_review')

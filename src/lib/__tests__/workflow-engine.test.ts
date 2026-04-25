@@ -5,6 +5,7 @@ import Database from 'better-sqlite3'
 import { runMigrations } from '../migrations'
 import {
   advanceWorkflowAfterTaskApproval,
+  advanceDueWorkflowTimers,
   createWorkflowDefinition,
   durationToSeconds,
   listWorkflowActivity,
@@ -567,6 +568,89 @@ nodes:
         ORDER BY id DESC
         LIMIT 1
       `).get(instance.instance_id)).toMatchObject({ event_type: 'workflow.completed' })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('advances due workflow timers without scanning unrelated workflow work', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`
+        SELECT id FROM projects
+        WHERE workspace_id = 1 AND slug = 'general'
+        LIMIT 1
+      `).get() as { id: number } | undefined
+      expect(project).toBeTruthy()
+
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: timer-advancement
+name: Timer Advancement
+subject_type: law_firm_case
+nodes:
+  send_request:
+    type: recipe
+    recipe: hello-world
+  wait_30_seconds:
+    type: wait
+    duration: 30s
+    depends_on:
+      - send_request
+  follow_up:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      - wait_30_seconds
+`, 'tester', 1, 1)
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 1000,
+      })
+      const firstMaterialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project!.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 1001,
+      })
+
+      advanceWorkflowAfterTaskApproval(db, {
+        taskId: firstMaterialized.created[0].task_id,
+        actor: 'aegis',
+        payload: { source: 'quality_review' },
+        now: 1010,
+      })
+
+      expect(db.prepare(`
+        SELECT status, due_at FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'wait_30_seconds'
+      `).get(instance.instance_id)).toMatchObject({ status: 'waiting', due_at: 1040 })
+
+      const early = advanceDueWorkflowTimers(db, {
+        actor: 'workflow-timer',
+        workspaceId: 1,
+        now: 1039,
+      })
+      expect(early.completed).toHaveLength(0)
+
+      const due = advanceDueWorkflowTimers(db, {
+        actor: 'workflow-timer',
+        workspaceId: 1,
+        now: 1040,
+      })
+      expect(due.completed).toMatchObject([{ node_key: 'wait_30_seconds' }])
+      expect(due.materialized[0].created).toMatchObject([{ node_key: 'follow_up' }])
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'follow_up'
+      `).get(instance.instance_id)).toMatchObject({ status: 'running' })
     } finally {
       db.close()
     }

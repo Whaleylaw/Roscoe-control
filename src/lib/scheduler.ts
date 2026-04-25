@@ -12,6 +12,7 @@ import { syncSkillsFromDisk } from './skill-sync'
 import { syncLocalAgents } from './local-agent-sync'
 import { dispatchAssignedTasks, runAegisReviews, requeueStaleTasks, autoRouteInboxTasks, reconcileRunnerHeartbeat } from './task-dispatch'
 import { spawnRecurringTasks } from './recurring-tasks'
+import { advanceDueWorkflowTimers } from './workflow-engine'
 
 const BACKUP_DIR = join(dirname(config.dbPath), 'backups')
 
@@ -271,6 +272,27 @@ async function syncAgentLiveStatuses(): Promise<number> {
   return refreshed
 }
 
+async function runWorkflowTimerAdvance(): Promise<{ ok: boolean; message: string }> {
+  try {
+    const db = getDatabase()
+    const result = advanceDueWorkflowTimers(db, {
+      actor: 'workflow-timer',
+      limit: 500,
+      status: 'inbox',
+    })
+    const materializedCount = result.materialized.reduce((sum, item) => sum + item.created.length, 0)
+    if (result.completed.length === 0 && materializedCount === 0) {
+      return { ok: true, message: 'No workflow timers due' }
+    }
+    return {
+      ok: true,
+      message: `Advanced ${result.completed.length} workflow timer(s); materialized ${materializedCount} task(s)`,
+    }
+  } catch (err: any) {
+    return { ok: false, message: `Workflow timer advance failed: ${err.message}` }
+  }
+}
+
 const DAILY_MS = 24 * 60 * 60 * 1000
 const FIVE_MINUTES_MS = 5 * 60 * 1000
 // Phase 15 SCHED-04: reduced from 60s to 30s to honor the LOCKED 90s stale window (3× tick).
@@ -408,9 +430,18 @@ export function initScheduler() {
     running: false,
   })
 
+  tasks.set('workflow_timer_advance', {
+    name: 'Workflow Timer Advance',
+    intervalMs: TICK_MS,
+    lastRun: null,
+    nextRun: now + 20_000,
+    enabled: true,
+    running: false,
+  })
+
   // Start the tick loop
   tickInterval = setInterval(tick, TICK_MS)
-  logger.info('Scheduler initialized - backup at ~3AM, cleanup at ~4AM, heartbeat every 5m, webhook/claude/skill/local-agent/gateway-agent sync every 30s, runner reconcile every 30s')
+  logger.info('Scheduler initialized - backup at ~3AM, cleanup at ~4AM, heartbeat every 5m, webhook/claude/skill/local-agent/gateway-agent sync every 30s, runner reconcile every 30s, workflow timers every 30s')
 }
 
 /** Calculate ms until next occurrence of a given hour (UTC) */
@@ -444,8 +475,9 @@ async function tick() {
       : id === 'recurring_task_spawn' ? 'general.recurring_task_spawn'
       : id === 'stale_task_requeue' ? 'general.stale_task_requeue'
       : id === 'reconcile_runner_heartbeat' ? 'general.reconcile_runner_heartbeat'
+      : id === 'workflow_timer_advance' ? 'general.workflow_timer_advance'
       : 'general.agent_heartbeat'
-    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue' || id === 'reconcile_runner_heartbeat'
+    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue' || id === 'reconcile_runner_heartbeat' || id === 'workflow_timer_advance'
     if (!isSettingEnabled(settingKey, defaultEnabled)) continue
 
     task.running = true
@@ -469,6 +501,7 @@ async function tick() {
         : id === 'recurring_task_spawn' ? await spawnRecurringTasks()
         : id === 'stale_task_requeue' ? await requeueStaleTasks()
         : id === 'reconcile_runner_heartbeat' ? await reconcileRunnerHeartbeat()
+        : id === 'workflow_timer_advance' ? await runWorkflowTimerAdvance()
         : await runCleanup()
       task.lastResult = { ...result, timestamp: now }
     } catch (err: any) {
@@ -506,8 +539,9 @@ export function getSchedulerStatus() {
       : id === 'recurring_task_spawn' ? 'general.recurring_task_spawn'
       : id === 'stale_task_requeue' ? 'general.stale_task_requeue'
       : id === 'reconcile_runner_heartbeat' ? 'general.reconcile_runner_heartbeat'
+      : id === 'workflow_timer_advance' ? 'general.workflow_timer_advance'
       : 'general.agent_heartbeat'
-    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue' || id === 'reconcile_runner_heartbeat'
+    const defaultEnabled = id === 'agent_heartbeat' || id === 'webhook_retry' || id === 'claude_session_scan' || id === 'skill_sync' || id === 'local_agent_sync' || id === 'gateway_agent_sync' || id === 'task_dispatch' || id === 'aegis_review' || id === 'recurring_task_spawn' || id === 'stale_task_requeue' || id === 'reconcile_runner_heartbeat' || id === 'workflow_timer_advance'
     result.push({
       id,
       name: task.name,
@@ -537,6 +571,7 @@ export async function triggerTask(taskId: string): Promise<{ ok: boolean; messag
   if (taskId === 'recurring_task_spawn') return spawnRecurringTasks()
   if (taskId === 'stale_task_requeue') return requeueStaleTasks()
   if (taskId === 'reconcile_runner_heartbeat') return reconcileRunnerHeartbeat()
+  if (taskId === 'workflow_timer_advance') return runWorkflowTimerAdvance()
   return { ok: false, message: `Unknown task: ${taskId}` }
 }
 
