@@ -80,16 +80,40 @@ nodes:
     type: recipe
     recipe: firmvault-request-final-liens
     depends_on:
-      - wait_for_treatment_complete
+      nodes:
+        - open_liens
+      conditions:
+        - law_firm.landmarks.treatment_complete == true
 
   follow_up_after_30_days:
-    type: wait
+    type: recipe
+    recipe: firmvault-follow-up-final-liens
     depends_on:
-      - request_final_amounts
-    duration: 30d
-    exit_when:
-      condition: law_firm.landmarks.final_amounts_received == true
+      nodes:
+        - request_final_amounts
+      timers:
+        - after: request_final_amounts
+          duration: 30d
+      conditions:
+        - law_firm.landmarks.final_amounts_received != true
 ```
+
+`depends_on` can be the legacy shorthand list of node keys or the expanded
+object form:
+
+```yaml
+depends_on:
+  nodes:
+    - identify_lien
+  conditions:
+    - law_firm.landmarks.treatment_complete == true
+  timers:
+    - after: send_medical_records_request
+      duration: 30d
+```
+
+The expanded form creates runtime dependency rows. Those rows are the mutable
+state; the YAML remains the reusable blueprint.
 
 ## Node Types
 
@@ -118,8 +142,10 @@ flowchart TD
   K --> L["workflow.completed"]
 ```
 
-Nothing starts the next step directly. Every change emits an event. The evaluator
-then recomputes which nodes are ready.
+Nothing starts the next step directly. Every change emits an event. The
+dependency index updates only the workflow nodes waiting on that dependency.
+When all dependency rows for a node are satisfied, that node becomes ready and
+the materializer can create the task.
 
 When a linked recipe task passes quality review, the approval path completes the
 workflow node, records `node.completed`, reevaluates the workflow, and
@@ -128,11 +154,18 @@ materialized follow-up tasks default to the inbox unless the workflow caller
 explicitly assigns them, so a runner does not pick up downstream work until a
 human or orchestrator intentionally moves it forward.
 
-Timer nodes are advanced by `POST /api/workflow-timers/run`. The timer poller
-finds active `wait` nodes whose `due_at` has passed, completes each wait node,
-records `node.completed` with `reason: timer_due`, reevaluates dependencies, and
-materializes any newly ready recipe nodes. This is deterministic and idempotent:
-once a wait node is complete, later timer runs ignore it.
+Timer dependencies are advanced by `POST /api/workflow-timers/run`. The timer
+poller uses an indexed `due_at` lookup, not a full workflow scan. It finds
+scheduled timer dependencies whose `due_at` has passed, marks those dependencies
+satisfied, promotes any nodes whose remaining dependencies are now satisfied,
+and materializes newly ready recipe nodes. This is deterministic and idempotent:
+once a timer dependency is satisfied, later timer runs ignore it.
+
+Condition dependencies are pushed through
+`POST /api/workflow-dependencies/satisfy`. For example, when a case updates
+`treatment_complete`, the case layer can satisfy
+`law_firm.landmarks.treatment_complete == true`; the dependency engine then
+updates only nodes waiting on that exact condition for that subject.
 
 ## Audit Trail
 
@@ -157,6 +190,7 @@ v1 creates the generic runtime substrate:
 - `workflow_definitions`
 - `workflow_instances`
 - `workflow_node_instances`
+- `workflow_node_dependencies`
 - `workflow_events`
 - YAML parser and validator
 - workflow instance starter
@@ -168,9 +202,10 @@ v1 creates the generic runtime substrate:
   recipe nodes
 - APIs for registering definitions and starting instances:
   - `POST /api/workflow-definitions`
-  - `POST /api/workflow-instances`
-  - `POST /api/workflow-instances/:id/materialize`
-  - `POST /api/workflow-timers/run`
+- `POST /api/workflow-instances`
+- `POST /api/workflow-instances/:id/materialize`
+- `POST /api/workflow-dependencies/satisfy`
+- `POST /api/workflow-timers/run`
 - event writer
 
 Review-loop orchestration builds on top of this substrate.

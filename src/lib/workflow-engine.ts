@@ -5,11 +5,26 @@ import { eventBus } from '@/lib/event-bus'
 
 const durationPattern = /^(\d+)(s|m|h|d)$/
 
+const dependencyTimerSchema = z.object({
+  after: z.string().min(1),
+  duration: z.string().regex(durationPattern),
+  key: z.string().min(1).optional(),
+})
+
+const dependsOnSchema = z.union([
+  z.array(z.string().min(1)),
+  z.object({
+    nodes: z.array(z.string().min(1)).default([]),
+    conditions: z.array(z.string().min(1)).default([]),
+    timers: z.array(dependencyTimerSchema).default([]),
+  }),
+]).default([])
+
 const workflowNodeSchema = z.object({
   type: z.enum(['recipe', 'review', 'wait', 'code', 'gateway']),
   name: z.string().min(1).max(200).optional(),
   recipe: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
-  depends_on: z.array(z.string().min(1)).default([]),
+  depends_on: dependsOnSchema,
   blockers: z.array(z.string().min(1)).default([]),
   duration: z.string().regex(durationPattern).optional(),
   until: z.object({ condition: z.string().min(1) }).optional(),
@@ -52,6 +67,12 @@ export type WorkflowDefinition = z.infer<typeof workflowDefinitionSchema>
 export type WorkflowDefinitionNode = WorkflowDefinition['nodes'][string]
 export type WorkflowNodeStatus = 'pending' | 'ready' | 'running' | 'waiting' | 'blocked' | 'complete' | 'failed' | 'skipped' | 'cancelled'
 export type WorkflowInstanceStatus = 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
+export type WorkflowNodeDependencyStatus = 'pending' | 'scheduled' | 'satisfied' | 'cancelled'
+export type NormalizedWorkflowDependencies = {
+  nodes: string[]
+  conditions: string[]
+  timers: Array<{ after: string; duration: string; key?: string }>
+}
 
 export type WorkflowRuntimeNode = {
   node_key: string
@@ -127,6 +148,24 @@ export type AdvanceDueWorkflowTimersResult = {
   materialized: MaterializeReadyWorkflowNodesResult[]
 }
 
+export type SatisfyWorkflowConditionInput = {
+  subjectType: string
+  subjectId: string
+  condition: string
+  actor: string
+  workspaceId: number
+  payload?: Record<string, unknown>
+  status?: 'inbox' | 'assigned'
+  now?: number
+}
+
+export type SatisfyWorkflowConditionResult = {
+  dependency_key: string
+  satisfied_dependencies: number
+  promoted_nodes: Array<{ workflow_instance_id: number; node_instance_id: number; node_key: string; status: WorkflowNodeStatus }>
+  materialized: MaterializeReadyWorkflowNodesResult[]
+}
+
 export function parseWorkflowDefinition(raw: string): WorkflowDefinition {
   const parsed = parseYaml(raw)
   const result = workflowDefinitionSchema.safeParse(parsed)
@@ -162,7 +201,7 @@ export function readyNodeKeys(
   for (const [nodeKey, node] of Object.entries(definition.nodes)) {
     const runtime = runtimeByKey.get(nodeKey)
     if (!runtime || !['pending', 'blocked', 'waiting'].includes(runtime.status)) continue
-    const dependencies = node.depends_on ?? []
+    const dependencies = normalizeDependsOn(node.depends_on).nodes
     const incomplete = dependencies.filter((dependency) => runtimeByKey.get(dependency)?.status !== 'complete')
     if (incomplete.length > 0) continue
     if (node.type === 'wait' && runtime.status === 'waiting') continue
@@ -240,6 +279,15 @@ export function startWorkflowInstance(
       )
     }
 
+    seedWorkflowDependencies(db, {
+      workflowInstanceId: instanceId,
+      definition,
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      workspaceId: input.workspaceId,
+      now,
+    })
+
     writeWorkflowEvent(db, {
       workflowInstanceId: instanceId,
       eventType: 'workflow.started',
@@ -268,29 +316,7 @@ function evaluateWorkflowInstanceInTransaction(
   workflowInstanceId: number,
   now: number,
 ): string[] {
-  const loaded = loadWorkflowForEvaluation(db, workflowInstanceId)
-  const readyKeys = readyNodeKeys(loaded.definition, loaded.nodes, now)
-  for (const nodeKey of readyKeys) {
-    const definitionNode = loaded.definition.nodes[nodeKey]
-    const dueAt = definitionNode.type === 'wait' && definitionNode.duration ? now + durationToSeconds(definitionNode.duration) : null
-    const nextStatus: WorkflowNodeStatus = definitionNode.type === 'wait' && dueAt != null ? 'waiting' : 'ready'
-    db.prepare(`
-      UPDATE workflow_node_instances
-      SET status = ?, due_at = COALESCE(due_at, ?), blocked_by_json = '[]', updated_at = ?
-      WHERE workflow_instance_id = ? AND node_key = ? AND status IN ('pending', 'blocked', 'waiting')
-    `).run(nextStatus, dueAt, now, workflowInstanceId, nodeKey)
-    writeWorkflowEvent(db, {
-      workflowInstanceId,
-      eventType: nextStatus === 'waiting' ? 'node.waiting' : 'node.ready',
-      actorType: 'system',
-      actorId: 'workflow-engine',
-      nodeKey,
-      payload: { node_key: nodeKey, node_type: definitionNode.type, due_at: dueAt },
-      workspaceId: loaded.workspaceId,
-      createdAt: now,
-    })
-  }
-  return readyKeys
+  return promoteEligibleWorkflowNodesInTransaction(db, workflowInstanceId, now)
 }
 
 export function completeWorkflowNodeForTask(
@@ -333,6 +359,13 @@ export function completeWorkflowNodeForTask(
         payload,
         workspaceId: node.workspace_id,
         createdAt: now,
+      })
+      satisfyNodeDependencyInTransaction(db, {
+        workflowInstanceId: node.workflow_instance_id,
+        nodeKey: node.node_key,
+        actor,
+        payload: { source_task_id: taskId, ...payload },
+        now,
       })
     }
     const readyNodes = evaluateWorkflowInstanceInTransaction(db, node.workflow_instance_id, now)
@@ -388,20 +421,21 @@ export function advanceDueWorkflowTimers(
 
   db.transaction(() => {
     const rows = db.prepare(`
-      SELECT wni.id, wni.workflow_instance_id, wni.node_key, wni.due_at, wi.workspace_id
-      FROM workflow_node_instances wni
-      JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
-      WHERE wni.node_type = 'wait'
-        AND wni.status = 'waiting'
-        AND wni.due_at IS NOT NULL
-        AND wni.due_at <= ?
+      SELECT wnd.id, wnd.workflow_instance_id, wnd.node_instance_id, wnd.node_key, wnd.due_at, wnd.workspace_id
+      FROM workflow_node_dependencies wnd
+      JOIN workflow_instances wi ON wi.id = wnd.workflow_instance_id
+      WHERE wnd.dependency_type = 'timer'
+        AND wnd.status = 'scheduled'
+        AND wnd.due_at IS NOT NULL
+        AND wnd.due_at <= ?
         AND wi.status = 'active'
-        ${input.workspaceId ? 'AND wi.workspace_id = ?' : ''}
-      ORDER BY wni.due_at ASC, wni.id ASC
+        ${input.workspaceId ? 'AND wnd.workspace_id = ?' : ''}
+      ORDER BY wnd.due_at ASC, wnd.id ASC
       LIMIT ?
     `).all(...(input.workspaceId ? [now, input.workspaceId, limit] : [now, limit])) as Array<{
       id: number
       workflow_instance_id: number
+      node_instance_id: number
       node_key: string
       due_at: number
       workspace_id: number
@@ -409,26 +443,26 @@ export function advanceDueWorkflowTimers(
 
     for (const row of rows) {
       const updated = db.prepare(`
-        UPDATE workflow_node_instances
-        SET status = 'complete', completed_at = COALESCE(completed_at, ?), output_json = ?, updated_at = ?
-        WHERE id = ? AND status = 'waiting' AND due_at IS NOT NULL AND due_at <= ?
+        UPDATE workflow_node_dependencies
+        SET status = 'satisfied', satisfied_at = COALESCE(satisfied_at, ?), payload_json = ?, updated_at = ?
+        WHERE id = ? AND status = 'scheduled' AND due_at IS NOT NULL AND due_at <= ?
       `).run(now, JSON.stringify({ reason: 'timer_due', due_at: row.due_at }), now, row.id, now)
       if (updated.changes === 0) continue
 
       writeWorkflowEvent(db, {
         workflowInstanceId: row.workflow_instance_id,
-        nodeInstanceId: row.id,
+        nodeInstanceId: row.node_instance_id,
         nodeKey: row.node_key,
-        eventType: 'node.completed',
+        eventType: 'dependency.satisfied',
         actorType: 'system',
         actorId: actor,
-        payload: { reason: 'timer_due', due_at: row.due_at },
+        payload: { dependency_type: 'timer', reason: 'timer_due', due_at: row.due_at },
         workspaceId: row.workspace_id,
         createdAt: now,
       })
       completed.push({
         workflow_instance_id: row.workflow_instance_id,
-        node_instance_id: row.id,
+        node_instance_id: row.node_instance_id,
         node_key: row.node_key,
       })
       workflowIds.add(row.workflow_instance_id)
@@ -452,6 +486,89 @@ export function advanceDueWorkflowTimers(
   }
 
   return { completed, materialized }
+}
+
+export function satisfyWorkflowCondition(
+  db: Database.Database,
+  input: SatisfyWorkflowConditionInput,
+): SatisfyWorkflowConditionResult {
+  const now = input.now ?? Math.floor(Date.now() / 1000)
+  const dependencyKey = conditionDependencyKey(input.subjectType, input.subjectId, input.condition)
+  const promotedNodes: SatisfyWorkflowConditionResult['promoted_nodes'] = []
+  const workflowIds = new Set<number>()
+  let satisfiedDependencies = 0
+
+  db.transaction(() => {
+    const rows = db.prepare(`
+      SELECT id, workflow_instance_id, node_instance_id, node_key, workspace_id
+      FROM workflow_node_dependencies
+      WHERE workspace_id = ?
+        AND dependency_type = 'condition'
+        AND dependency_key = ?
+        AND status IN ('pending', 'scheduled')
+    `).all(input.workspaceId, dependencyKey) as Array<{
+      id: number
+      workflow_instance_id: number
+      node_instance_id: number
+      node_key: string
+      workspace_id: number
+    }>
+
+    for (const row of rows) {
+      const updated = db.prepare(`
+        UPDATE workflow_node_dependencies
+        SET status = 'satisfied', satisfied_at = COALESCE(satisfied_at, ?), payload_json = ?, updated_at = ?
+        WHERE id = ? AND status IN ('pending', 'scheduled')
+      `).run(now, JSON.stringify(input.payload ?? {}), now, row.id)
+      if (updated.changes === 0) continue
+      satisfiedDependencies += 1
+      writeWorkflowEvent(db, {
+        workflowInstanceId: row.workflow_instance_id,
+        nodeInstanceId: row.node_instance_id,
+        nodeKey: row.node_key,
+        eventType: 'dependency.satisfied',
+        actorType: 'system',
+        actorId: input.actor,
+        payload: { dependency_type: 'condition', dependency_key: dependencyKey, condition: input.condition, ...(input.payload ?? {}) },
+        workspaceId: row.workspace_id,
+        createdAt: now,
+      })
+      workflowIds.add(row.workflow_instance_id)
+    }
+
+    for (const workflowInstanceId of workflowIds) {
+      const ready = promoteEligibleWorkflowNodesInTransaction(db, workflowInstanceId, now)
+      for (const nodeKey of ready) {
+        const node = db.prepare(`
+          SELECT id, status FROM workflow_node_instances
+          WHERE workflow_instance_id = ? AND node_key = ?
+        `).get(workflowInstanceId, nodeKey) as { id: number; status: WorkflowNodeStatus } | undefined
+        if (node) promotedNodes.push({ workflow_instance_id: workflowInstanceId, node_instance_id: node.id, node_key: nodeKey, status: node.status })
+      }
+    }
+  })()
+
+  const materialized: MaterializeReadyWorkflowNodesResult[] = []
+  for (const workflowInstanceId of workflowIds) {
+    const context = materializationContextForWorkflow(db, workflowInstanceId)
+    if (!context) continue
+    materialized.push(materializeReadyWorkflowNodes(db, {
+      workflowInstanceId,
+      projectId: context.project_id,
+      workspaceId: context.workspace_id,
+      actor: input.actor,
+      baseRef: baseRefFromWorkspaceSource(context.workspace_source),
+      status: input.status ?? 'inbox',
+      now,
+    }))
+  }
+
+  return {
+    dependency_key: dependencyKey,
+    satisfied_dependencies: satisfiedDependencies,
+    promoted_nodes: promotedNodes,
+    materialized,
+  }
 }
 
 export function materializeReadyWorkflowNodes(
@@ -651,6 +768,327 @@ export function linkWorkflowNodeToTask(
   })()
 }
 
+function seedWorkflowDependencies(
+  db: Database.Database,
+  input: {
+    workflowInstanceId: number
+    definition: WorkflowDefinition
+    subjectType: string
+    subjectId: string
+    workspaceId: number
+    now: number
+  },
+): void {
+  const nodeRows = db.prepare(`
+    SELECT id, node_key
+    FROM workflow_node_instances
+    WHERE workflow_instance_id = ?
+  `).all(input.workflowInstanceId) as Array<{ id: number; node_key: string }>
+  const nodeIdByKey = new Map(nodeRows.map((row) => [row.node_key, row.id]))
+
+  for (const [nodeKey, node] of Object.entries(input.definition.nodes)) {
+    const nodeInstanceId = nodeIdByKey.get(nodeKey)
+    if (!nodeInstanceId) continue
+    const dependencies = normalizeDependsOn(node.depends_on)
+    const timerDependencies = [...dependencies.timers]
+    if (node.type === 'wait' && node.duration) {
+      timerDependencies.push({ after: nodeKey, duration: node.duration, key: 'wait-duration' })
+    }
+
+    for (const dependency of dependencies.nodes) {
+      insertWorkflowDependency(db, {
+        workflowInstanceId: input.workflowInstanceId,
+        nodeInstanceId,
+        nodeKey,
+        dependencyType: 'node',
+        dependencyKey: nodeDependencyKey(dependency),
+        sourceNodeKey: dependency,
+        workspaceId: input.workspaceId,
+        now: input.now,
+      })
+    }
+
+    for (const condition of dependencies.conditions) {
+      insertWorkflowDependency(db, {
+        workflowInstanceId: input.workflowInstanceId,
+        nodeInstanceId,
+        nodeKey,
+        dependencyType: 'condition',
+        dependencyKey: conditionDependencyKey(input.subjectType, input.subjectId, condition),
+        workspaceId: input.workspaceId,
+        now: input.now,
+      })
+    }
+
+    for (const timer of timerDependencies) {
+      insertWorkflowDependency(db, {
+        workflowInstanceId: input.workflowInstanceId,
+        nodeInstanceId,
+        nodeKey,
+        dependencyType: 'timer',
+        dependencyKey: timerDependencyKey(input.workflowInstanceId, nodeKey, timer),
+        sourceNodeKey: timer.after === nodeKey ? null : timer.after,
+        durationSeconds: durationToSeconds(timer.duration),
+        workspaceId: input.workspaceId,
+        now: input.now,
+      })
+    }
+  }
+}
+
+function insertWorkflowDependency(
+  db: Database.Database,
+  input: {
+    workflowInstanceId: number
+    nodeInstanceId: number
+    nodeKey: string
+    dependencyType: 'node' | 'condition' | 'timer'
+    dependencyKey: string
+    sourceNodeKey?: string | null
+    durationSeconds?: number | null
+    workspaceId: number
+    now: number
+  },
+): void {
+  db.prepare(`
+    INSERT OR IGNORE INTO workflow_node_dependencies (
+      workflow_instance_id, node_instance_id, node_key, dependency_type, dependency_key,
+      source_node_key, duration_seconds, workspace_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    input.workflowInstanceId,
+    input.nodeInstanceId,
+    input.nodeKey,
+    input.dependencyType,
+    input.dependencyKey,
+    input.sourceNodeKey ?? null,
+    input.durationSeconds ?? null,
+    input.workspaceId,
+    input.now,
+    input.now,
+  )
+}
+
+function satisfyNodeDependencyInTransaction(
+  db: Database.Database,
+  input: {
+    workflowInstanceId: number
+    nodeKey: string
+    actor: string
+    payload: Record<string, unknown>
+    now: number
+  },
+): void {
+  const rows = db.prepare(`
+    SELECT id, node_instance_id, node_key, workspace_id
+    FROM workflow_node_dependencies
+    WHERE workflow_instance_id = ?
+      AND dependency_type = 'node'
+      AND dependency_key = ?
+      AND status IN ('pending', 'scheduled')
+  `).all(input.workflowInstanceId, nodeDependencyKey(input.nodeKey)) as Array<{
+    id: number
+    node_instance_id: number
+    node_key: string
+    workspace_id: number
+  }>
+
+  for (const row of rows) {
+    const updated = db.prepare(`
+      UPDATE workflow_node_dependencies
+      SET status = 'satisfied', satisfied_at = COALESCE(satisfied_at, ?), payload_json = ?, updated_at = ?
+      WHERE id = ? AND status IN ('pending', 'scheduled')
+    `).run(input.now, JSON.stringify(input.payload), input.now, row.id)
+    if (updated.changes === 0) continue
+    writeWorkflowEvent(db, {
+      workflowInstanceId: input.workflowInstanceId,
+      nodeInstanceId: row.node_instance_id,
+      nodeKey: row.node_key,
+      eventType: 'dependency.satisfied',
+      actorType: 'system',
+      actorId: input.actor,
+      payload: { dependency_type: 'node', source_node_key: input.nodeKey, ...input.payload },
+      workspaceId: row.workspace_id,
+      createdAt: input.now,
+    })
+  }
+
+  scheduleTimerDependenciesForSourceNode(db, {
+    workflowInstanceId: input.workflowInstanceId,
+    sourceNodeKey: input.nodeKey,
+    referenceAt: input.now,
+    actor: input.actor,
+    now: input.now,
+  })
+}
+
+function scheduleTimerDependenciesForSourceNode(
+  db: Database.Database,
+  input: {
+    workflowInstanceId: number
+    sourceNodeKey: string
+    referenceAt: number
+    actor: string
+    now: number
+  },
+): void {
+  const rows = db.prepare(`
+    SELECT id, node_instance_id, node_key, duration_seconds, workspace_id
+    FROM workflow_node_dependencies
+    WHERE workflow_instance_id = ?
+      AND dependency_type = 'timer'
+      AND source_node_key = ?
+      AND status = 'pending'
+  `).all(input.workflowInstanceId, input.sourceNodeKey) as Array<{
+    id: number
+    node_instance_id: number
+    node_key: string
+    duration_seconds: number | null
+    workspace_id: number
+  }>
+
+  for (const row of rows) {
+    if (!row.duration_seconds) continue
+    const dueAt = input.referenceAt + row.duration_seconds
+    const updated = db.prepare(`
+      UPDATE workflow_node_dependencies
+      SET status = 'scheduled', reference_at = COALESCE(reference_at, ?), due_at = COALESCE(due_at, ?), updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `).run(input.referenceAt, dueAt, input.now, row.id)
+    if (updated.changes === 0) continue
+    writeWorkflowEvent(db, {
+      workflowInstanceId: input.workflowInstanceId,
+      nodeInstanceId: row.node_instance_id,
+      nodeKey: row.node_key,
+      eventType: 'dependency.timer_scheduled',
+      actorType: 'system',
+      actorId: input.actor,
+      payload: { source_node_key: input.sourceNodeKey, reference_at: input.referenceAt, due_at: dueAt, duration_seconds: row.duration_seconds },
+      workspaceId: row.workspace_id,
+      createdAt: input.now,
+    })
+  }
+}
+
+function scheduleSelfTimersForDependencyReadyNodes(
+  db: Database.Database,
+  workflowInstanceId: number,
+  now: number,
+): void {
+  const rows = db.prepare(`
+    SELECT wnd.id, wnd.node_instance_id, wnd.node_key, wnd.duration_seconds, wnd.workspace_id
+    FROM workflow_node_dependencies wnd
+    JOIN workflow_node_instances wni ON wni.id = wnd.node_instance_id
+    WHERE wnd.workflow_instance_id = ?
+      AND wnd.dependency_type = 'timer'
+      AND wnd.source_node_key IS NULL
+      AND wnd.status = 'pending'
+      AND wni.status IN ('pending', 'blocked')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM workflow_node_dependencies other
+        WHERE other.node_instance_id = wnd.node_instance_id
+          AND other.id != wnd.id
+          AND other.status != 'satisfied'
+      )
+  `).all(workflowInstanceId) as Array<{
+    id: number
+    node_instance_id: number
+    node_key: string
+    duration_seconds: number | null
+    workspace_id: number
+  }>
+
+  for (const row of rows) {
+    if (!row.duration_seconds) continue
+    const dueAt = now + row.duration_seconds
+    const updated = db.prepare(`
+      UPDATE workflow_node_dependencies
+      SET status = 'scheduled', reference_at = COALESCE(reference_at, ?), due_at = COALESCE(due_at, ?), updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `).run(now, dueAt, now, row.id)
+    if (updated.changes === 0) continue
+    db.prepare(`
+      UPDATE workflow_node_instances
+      SET status = 'waiting', due_at = COALESCE(due_at, ?), updated_at = ?
+      WHERE id = ? AND status IN ('pending', 'blocked')
+    `).run(dueAt, now, row.node_instance_id)
+    writeWorkflowEvent(db, {
+      workflowInstanceId,
+      nodeInstanceId: row.node_instance_id,
+      nodeKey: row.node_key,
+      eventType: 'node.waiting',
+      actorType: 'system',
+      actorId: 'workflow-engine',
+      payload: { due_at: dueAt, duration_seconds: row.duration_seconds },
+      workspaceId: row.workspace_id,
+      createdAt: now,
+    })
+  }
+}
+
+function promoteEligibleWorkflowNodesInTransaction(
+  db: Database.Database,
+  workflowInstanceId: number,
+  now: number,
+): string[] {
+  scheduleSelfTimersForDependencyReadyNodes(db, workflowInstanceId, now)
+  const rows = db.prepare(`
+    SELECT wni.id, wni.node_key, wni.node_type, wni.status, wi.workspace_id
+    FROM workflow_node_instances wni
+    JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
+    WHERE wni.workflow_instance_id = ?
+      AND wni.status IN ('pending', 'blocked', 'waiting')
+      AND NOT EXISTS (
+        SELECT 1
+        FROM workflow_node_dependencies wnd
+        WHERE wnd.node_instance_id = wni.id
+          AND wnd.status != 'satisfied'
+      )
+    ORDER BY wni.id ASC
+  `).all(workflowInstanceId) as Array<{
+    id: number
+    node_key: string
+    node_type: WorkflowNodeType
+    status: WorkflowNodeStatus
+    workspace_id: number
+  }>
+
+  const promoted: string[] = []
+  for (const row of rows) {
+    const nextStatus: WorkflowNodeStatus = row.node_type === 'wait' ? 'complete' : 'ready'
+    const updated = db.prepare(`
+      UPDATE workflow_node_instances
+      SET status = ?, completed_at = CASE WHEN ? = 'complete' THEN COALESCE(completed_at, ?) ELSE completed_at END,
+          blocked_by_json = '[]', updated_at = ?
+      WHERE id = ? AND status IN ('pending', 'blocked', 'waiting')
+    `).run(nextStatus, nextStatus, now, now, row.id)
+    if (updated.changes === 0) continue
+    promoted.push(row.node_key)
+    writeWorkflowEvent(db, {
+      workflowInstanceId,
+      nodeInstanceId: row.id,
+      nodeKey: row.node_key,
+      eventType: nextStatus === 'complete' ? 'node.completed' : 'node.ready',
+      actorType: 'system',
+      actorId: 'workflow-engine',
+      payload: { node_key: row.node_key, node_type: row.node_type },
+      workspaceId: row.workspace_id,
+      createdAt: now,
+    })
+    if (nextStatus === 'complete') {
+      satisfyNodeDependencyInTransaction(db, {
+        workflowInstanceId,
+        nodeKey: row.node_key,
+        actor: 'workflow-engine',
+        payload: { reason: 'wait_node_complete' },
+        now,
+      })
+    }
+  }
+  return promoted
+}
+
 function loadWorkflowForEvaluation(db: Database.Database, workflowInstanceId: number): {
   definition: WorkflowDefinition
   nodes: WorkflowRuntimeNode[]
@@ -726,8 +1164,12 @@ function writeWorkflowEvent(
 function assertWorkflowGraph(definition: WorkflowDefinition): void {
   const nodeKeys = new Set(Object.keys(definition.nodes))
   for (const [nodeKey, node] of Object.entries(definition.nodes)) {
-    for (const dependency of node.depends_on ?? []) {
+    const dependencies = normalizeDependsOn(node.depends_on)
+    for (const dependency of dependencies.nodes) {
       if (!nodeKeys.has(dependency)) throw new Error(`Workflow node '${nodeKey}' depends on unknown node '${dependency}'`)
+    }
+    for (const timer of dependencies.timers) {
+      if (!nodeKeys.has(timer.after)) throw new Error(`Workflow node '${nodeKey}' timer depends on unknown node '${timer.after}'`)
     }
   }
   assertAcyclic(definition)
@@ -740,11 +1182,38 @@ function assertAcyclic(definition: WorkflowDefinition): void {
     if (visited.has(nodeKey)) return
     if (visiting.has(nodeKey)) throw new Error(`Workflow dependency cycle includes '${nodeKey}'`)
     visiting.add(nodeKey)
-    for (const dependency of definition.nodes[nodeKey]?.depends_on ?? []) visit(dependency)
+    for (const dependency of normalizeDependsOn(definition.nodes[nodeKey]?.depends_on).nodes) visit(dependency)
+    for (const timer of normalizeDependsOn(definition.nodes[nodeKey]?.depends_on).timers) visit(timer.after)
     visiting.delete(nodeKey)
     visited.add(nodeKey)
   }
   for (const nodeKey of Object.keys(definition.nodes)) visit(nodeKey)
+}
+
+function normalizeDependsOn(value: WorkflowDefinitionNode['depends_on'] | undefined): NormalizedWorkflowDependencies {
+  if (!value) return { nodes: [], conditions: [], timers: [] }
+  if (Array.isArray(value)) return { nodes: value, conditions: [], timers: [] }
+  return {
+    nodes: value.nodes ?? [],
+    conditions: value.conditions ?? [],
+    timers: value.timers ?? [],
+  }
+}
+
+function nodeDependencyKey(nodeKey: string): string {
+  return `node:${nodeKey}`
+}
+
+function conditionDependencyKey(subjectType: string, subjectId: string, condition: string): string {
+  return `condition:${subjectType}:${subjectId}:${condition}`
+}
+
+function timerDependencyKey(
+  workflowInstanceId: number,
+  nodeKey: string,
+  timer: { after: string; duration: string; key?: string },
+): string {
+  return `timer:${workflowInstanceId}:${nodeKey}:${timer.key ?? timer.after}:${timer.duration}`
 }
 
 function parseStringArray(raw: string | null): string[] {

@@ -1872,6 +1872,43 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_workflow_events_task ON workflow_events(task_id, created_at);
       `)
     }
+  },
+  {
+    id: '064_workflow_dependency_index',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workflow_node_dependencies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workflow_instance_id INTEGER NOT NULL,
+          node_instance_id INTEGER NOT NULL,
+          node_key TEXT NOT NULL,
+          dependency_type TEXT NOT NULL,
+          dependency_key TEXT NOT NULL,
+          source_node_key TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          duration_seconds INTEGER,
+          reference_at INTEGER,
+          due_at INTEGER,
+          satisfied_at INTEGER,
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+          FOREIGN KEY (node_instance_id) REFERENCES workflow_node_instances(id) ON DELETE CASCADE,
+          UNIQUE (node_instance_id, dependency_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_key_status
+          ON workflow_node_dependencies(workspace_id, dependency_type, dependency_key, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_node_status
+          ON workflow_node_dependencies(node_instance_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_due
+          ON workflow_node_dependencies(workspace_id, dependency_type, status, due_at);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_source
+          ON workflow_node_dependencies(workflow_instance_id, source_node_key, dependency_type, status);
+      `)
+    }
   }
 ]
 

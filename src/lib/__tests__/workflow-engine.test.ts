@@ -36,6 +36,34 @@ describe('workflow-engine', () => {
     expect(definition.nodes.wait_30_days.duration).toBe('30d')
   })
 
+  it('parses node, condition, and timer dependencies', () => {
+    const definition = parseWorkflowDefinition(`
+schema_version: 1
+id: final-lien-request
+name: Final Lien Request
+nodes:
+  identify_lien:
+    type: recipe
+    recipe: firmvault-identify-liens
+  request_final_amount:
+    type: recipe
+    recipe: firmvault-request-final-lien
+    depends_on:
+      nodes:
+        - identify_lien
+      conditions:
+        - law_firm.landmarks.treatment_complete == true
+      timers:
+        - after: identify_lien
+          duration: 30d
+`)
+    expect(definition.nodes.request_final_amount.depends_on).toEqual({
+      nodes: ['identify_lien'],
+      conditions: ['law_firm.landmarks.treatment_complete == true'],
+      timers: [{ after: 'identify_lien', duration: '30d' }],
+    })
+  })
+
   it('rejects unknown dependencies', () => {
     expect(() => parseWorkflowDefinition(`
 schema_version: 1
@@ -47,6 +75,22 @@ nodes:
     recipe: hello-world
     depends_on: [missing]
 `)).toThrow(/unknown node/)
+  })
+
+  it('rejects unknown timer source nodes', () => {
+    expect(() => parseWorkflowDefinition(`
+schema_version: 1
+id: bad-timer-workflow
+name: Bad Timer Workflow
+nodes:
+  follow_up:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      timers:
+        - after: missing
+          duration: 30d
+`)).toThrow(/timer depends on unknown node/)
   })
 
   it('rejects dependency cycles', () => {
