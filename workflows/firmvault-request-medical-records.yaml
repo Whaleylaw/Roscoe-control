@@ -1,0 +1,102 @@
+schema_version: 1
+id: firmvault-request-medical-records
+name: FirmVault Request Medical Records and Bills
+version: 1
+subject_type: law_firm_case
+
+trigger:
+  type: condition
+  condition: law_firm.landmarks.treatment_complete == true
+
+nodes:
+  verify_medical_authorization:
+    type: recipe
+    name: Verify HIPAA Authorization
+    recipe: firmvault-workflow-task
+    depends_on:
+      conditions:
+        - law_firm.landmarks.providers_setup == true
+        - law_firm.landmarks.treatment_complete == true
+    completes:
+      - law_firm.landmarks.medical_auth_verified
+    config:
+      task_goal: Confirm whether a signed HIPAA/medical authorization exists and identify any missing authorization issue before records are requested.
+
+  prepare_records_request:
+    type: recipe
+    name: Prepare Records and Bills Request
+    recipe: firmvault-workflow-task
+    depends_on:
+      nodes:
+        - verify_medical_authorization
+      conditions:
+        - law_firm.landmarks.medical_auth_signed == true
+    completes:
+      - law_firm.landmarks.records_request_packet_prepared
+    config:
+      task_goal: Prepare the provider-specific request packet, including provider details, treatment date range, requested records, requested bills, and authorization attachment checklist.
+
+  send_records_request:
+    type: recipe
+    name: Send Medical Records and Bills Request
+    recipe: firmvault-workflow-task
+    depends_on:
+      nodes:
+        - prepare_records_request
+    completes:
+      - law_firm.landmarks.records_requested_all_providers
+    config:
+      task_goal: Confirm the request packet is ready for human transmission or document that records and bills were already requested.
+
+  first_follow_up_records_request:
+    type: recipe
+    name: First Follow-Up on Medical Records and Bills
+    recipe: firmvault-workflow-task
+    depends_on:
+      nodes:
+        - send_records_request
+      timers:
+        - after: send_records_request
+          duration: 14d
+    config:
+      task_goal: If records or bills have not arrived 14 days after the request, call or resend the request, document provider status, and set the next follow-up expectation.
+
+  second_follow_up_records_request:
+    type: recipe
+    name: Second Follow-Up on Medical Records and Bills
+    recipe: firmvault-workflow-task
+    depends_on:
+      nodes:
+        - first_follow_up_records_request
+      timers:
+        - after: first_follow_up_records_request
+          duration: 7d
+    config:
+      task_goal: If records or bills remain outstanding 21 days after the original request, perform the second follow-up and document the provider's response, fee issue, HIPAA issue, or expected production date.
+
+  escalate_records_request:
+    type: recipe
+    name: Escalate Delayed Medical Records and Bills
+    recipe: firmvault-workflow-task
+    depends_on:
+      nodes:
+        - second_follow_up_records_request
+      timers:
+        - after: second_follow_up_records_request
+          duration: 9d
+    config:
+      task_goal: If records or bills are still missing 30 days after the original request, escalate to office manager/compliance, prepare formal demand or attorney-review handoff, and document the delay reason.
+
+  confirm_records_and_bills_received:
+    type: review
+    name: Confirm Records and Bills Received
+    depends_on:
+      conditions:
+        - law_firm.landmarks.all_records_received == true
+        - law_firm.landmarks.all_bills_received == true
+    review:
+      mode: human
+      max_rounds: 1
+      fallback: human
+    completes:
+      - law_firm.landmarks.medical_records_request_workflow_complete

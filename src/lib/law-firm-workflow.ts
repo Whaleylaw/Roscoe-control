@@ -357,7 +357,7 @@ async function readWorkflowPlans(options: { includeDisabled?: boolean } = {}): P
               type,
               landmark_id: landmarkId || stepId,
               recipe_slug: stringValue(step.recipe_slug) || undefined,
-              depends_on: Array.isArray(step.depends_on) ? step.depends_on.map((item) => String(item)) : [],
+              depends_on: workflowDependsOnList(step.depends_on),
               skip_when: Array.isArray(step.skip_when) ? step.skip_when.map((item) => String(item)) : [],
               wait_days: waitDaysFromStep(step),
               function: stringValue(step.function),
@@ -385,6 +385,15 @@ function workflowStepType(value: unknown): WorkflowPlan['steps'][number]['type']
   if (value === 'human_review') return 'human_review'
   if (value === 'code') return 'code'
   return 'recipe'
+}
+
+function workflowDependsOnList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item))
+  const dependency = objectValue(value)
+  return [
+    ...arrayOfStrings(dependency.nodes),
+    ...arrayOfStrings(dependency.conditions),
+  ]
 }
 
 function buildWorkflowStatuses(caseData: CaseFrontmatter, workflowPlans: WorkflowPlan[]): LawFirmWorkflowStatus[] {
@@ -663,6 +672,11 @@ function isWorkflowDependencySatisfied(
   dependencyId: string,
   frontmatter: Record<string, unknown>,
 ): boolean {
+  const landmarkCondition = dependencyId.match(/^law_firm\.landmarks\.([a-zA-Z0-9_:-]+)\s*(==|!=)\s*true$/)
+  if (landmarkCondition) {
+    const satisfied = isLandmarkSatisfied(frontmatter, { id: landmarkCondition[1] })
+    return landmarkCondition[2] === '==' ? satisfied : !satisfied
+  }
   const step = workflowStepById(workflowPlans, phaseId, dependencyId)
   if (!step) return isLandmarkSatisfied(frontmatter, { id: dependencyId })
   if (step.skip_when?.some((landmarkId) => isLandmarkSatisfied(frontmatter, { id: landmarkId }))) return true
@@ -1041,6 +1055,10 @@ function hasClaimType(body: string, type: string): boolean {
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function arrayOfStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : []
 }
 
 function booleanValue(value: unknown): boolean {

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 import { durationToSeconds, parseWorkflowDefinition, readyNodeKeys, type WorkflowRuntimeNode } from '../workflow-engine'
 
 const sample = `
@@ -149,5 +151,19 @@ nodes:
     expect(durationToSeconds('5m')).toBe(300)
     expect(durationToSeconds('2h')).toBe(7200)
     expect(durationToSeconds('3d')).toBe(259200)
+  })
+
+  it('parses the FirmVault request-medical-records workflow definition', async () => {
+    const raw = await readFile(join(process.cwd(), 'workflows', 'firmvault-request-medical-records.yaml'), 'utf8')
+    const definition = parseWorkflowDefinition(raw)
+    expect(definition.id).toBe('firmvault-request-medical-records')
+    expect(definition.nodes.first_follow_up_records_request.depends_on).toMatchObject({
+      nodes: ['send_records_request'],
+      timers: [{ after: 'send_records_request', duration: '14d' }],
+    })
+    expect(definition.nodes.escalate_records_request.depends_on).toMatchObject({
+      nodes: ['second_follow_up_records_request'],
+      timers: [{ after: 'second_follow_up_records_request', duration: '9d' }],
+    })
   })
 })

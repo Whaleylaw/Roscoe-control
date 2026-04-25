@@ -370,38 +370,89 @@ workflows:
         depends_on: [coordinate_appointment]
 
   request_records_bills:
-    enabled: false
+    enabled: true
     source: phase_2_treatment/workflows/request_records_bills/workflow.md
     phase_id: phase_2_treatment
     name: Medical Records and Bills Request
-    goal: Request records and bills, wait for production, follow up, then file and summarize received materials.
+    goal: After treatment is complete, verify authorization, request records and bills, wait for production, follow up, then confirm receipt.
     trigger:
-      active_when: providers_setup
+      active_when: treatment_complete
     steps:
+      - id: verify_medical_authorization
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medical_auth_signed
+        depends_on:
+          conditions:
+            - law_firm.landmarks.providers_setup == true
+            - law_firm.landmarks.treatment_complete == true
       - id: send_initial_request
         type: recipe
         recipe_slug: firmvault-workflow-task
         landmark_id: records_requested_all_providers
         depends_on:
-          - providers_setup
-          - medical_auth_signed
-      - id: wait_for_records
+          nodes:
+            - verify_medical_authorization
+          conditions:
+            - law_firm.landmarks.medical_auth_signed == true
+      - id: wait_for_first_followup
         type: wait
-        wait: { days: 30 }
-        depends_on: [send_initial_request]
+        wait: { days: 14 }
+        duration: 14d
+        depends_on:
+          nodes:
+            - send_initial_request
         skip_when:
           - all_records_received
           - all_bills_received
-      - id: follow_up_request
+      - id: first_follow_up_request
         type: recipe
         recipe_slug: firmvault-workflow-task
         landmark_id: records_requested_all_providers
-        depends_on: [wait_for_records]
+        depends_on:
+          nodes:
+            - wait_for_first_followup
+      - id: wait_for_second_followup
+        type: wait
+        wait: { days: 7 }
+        duration: 7d
+        depends_on:
+          nodes:
+            - first_follow_up_request
+        skip_when:
+          - all_records_received
+          - all_bills_received
+      - id: second_follow_up_request
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - wait_for_second_followup
+      - id: wait_for_escalation
+        type: wait
+        wait: { days: 9 }
+        duration: 9d
+        depends_on:
+          nodes:
+            - second_follow_up_request
+        skip_when:
+          - all_records_received
+          - all_bills_received
+      - id: escalate_delayed_records
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - wait_for_escalation
       - id: human_review_records
         type: human_review
         landmark_id: all_records_received
         depends_on:
-          - all_records_received
+          conditions:
+            - law_firm.landmarks.all_records_received == true
+            - law_firm.landmarks.all_bills_received == true
 
   gather_demand_materials:
     enabled: false
