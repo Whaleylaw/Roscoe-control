@@ -190,7 +190,7 @@ export async function resyncRecipes(opts?: {
 
 /**
  * Known recipe filenames that trigger reindexing. Anything outside these
- * (and the tools/** / skills/** subtrees handled below) is ignored — this
+ * (and the tools/** / skills/** / references/** subtrees handled below) is ignored — this
  * is CONTEXT.md's "watch only the known recipe filenames" requirement.
  */
 const WATCHED_ROOT_FILES = ['recipe.yaml', 'SOUL.md', 'README.md'] as const
@@ -276,7 +276,7 @@ export interface StartWatcherOptions {
  *      boot per CONTEXT.md — traffic should not open until the DB matches disk).
  *   2. chokidar.watch(root, { ignoreInitial: true }) — step 1 already handled
  *      the initial state.
- *   3. Filter events to only the known recipe filenames + tools/** / skills/**
+ *   3. Filter events to only the known recipe filenames + tools/** / skills/** / references/**
  *      subtrees. Ignore .swp, ~, .tmp, .DS_Store.
  *   4. On any relevant event, debounce per-slug for DEBOUNCE_MS then call
  *      indexRecipe (add/change) or re-check via indexRecipe (unlink — handler
@@ -322,12 +322,12 @@ export async function startRecipeWatcher(opts: StartWatcherOptions = {}): Promis
     if (!slug) return
     // Determine which part of the recipe directory the event touched. We only
     // react to files that contribute to dir_sha (recipe.yaml, SOUL.md,
-    // README.md, tools/**, skills/**). Anything else is skipped.
+    // README.md, tools/**, skills/**, references/**). Anything else is skipped.
     const recipeDir = resolve(join(root, slug))
     const relInsideRecipe = resolve(eventPath).slice(recipeDir.length + 1)
     const firstSegment = relInsideRecipe.split(/[\\/]/)[0]
     const isWatchedRoot = WATCHED_ROOT_FILES.some((f) => f === firstSegment)
-    const isWatchedSub = firstSegment === 'tools' || firstSegment === 'skills'
+    const isWatchedSub = firstSegment === 'tools' || firstSegment === 'skills' || firstSegment === 'references'
     if (!isWatchedRoot && !isWatchedSub) return
     scheduleReindex(slug, join(root, slug), kind)
   }

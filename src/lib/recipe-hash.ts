@@ -10,7 +10,7 @@
  * The hash is produced over the raw bytes of the files that semantically make
  * up a recipe:
  *   - `recipe.yaml`, `SOUL.md`, `REVIEW.md`, `README.md` at the recipe root (each optional)
- *   - Every file recursively under `tools/` and `skills/` (all extensions)
+ *   - Every file recursively under `tools/`, `skills/`, and `references/` (all extensions)
  *
  * Path ordering is normalised (POSIX separators, lexicographic sort) so the
  * same files produce the same hash regardless of the directory-walk order the
@@ -33,7 +33,7 @@ const ROOT_FILES = ['recipe.yaml', 'SOUL.md', 'REVIEW.md', 'README.md']
  * Subdirectories recursively walked for `dir_sha`. Anything outside these
  * (temp files, editor swap files, node_modules) is ignored.
  */
-const WALKED_DIRS = ['tools', 'skills']
+const WALKED_DIRS = ['tools', 'skills', 'references']
 
 /**
  * Compute SHA-256 over the recipe directory's contributing contents.
@@ -41,7 +41,7 @@ const WALKED_DIRS = ['tools', 'skills']
  * Algorithm (deterministic across platforms):
  *   1. Discover contributing files:
  *      - `recipe.yaml`, `SOUL.md`, `REVIEW.md`, `README.md` at the root (each optional)
- *      - Every file recursively under `tools/` and `skills/` (no extension filter)
+ *      - Every file recursively under `tools/`, `skills/`, and `references/` (no extension filter)
  *   2. Normalise each path to POSIX-style (forward slashes) relative to `absDir`
  *   3. Sort the path list lexicographically (UTF-8 byte order)
  *   4. For each sorted path, append to the hash:

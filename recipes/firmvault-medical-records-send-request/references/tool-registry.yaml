@@ -1,0 +1,49 @@
+version: 1
+description: >
+  Registry of tools that recipe cards may request. Capability tools are exposed
+  directly by the generic recipe-agent image. Legacy source tools are preserved
+  as reference material until they are wrapped behind constrained runtime tools.
+
+capability_tools:
+  - id: read_file
+    status: available
+    scope: read-only
+    description: Read UTF-8 text files from /workspace, /recipe, /refs, or /skills.
+  - id: list_dir
+    status: available
+    scope: read-only
+    description: List directory entries under /workspace, /recipe, /refs, or /skills.
+  - id: grep_files
+    status: available
+    scope: read-only
+    description: Search text files under /workspace, /recipe, /refs, or /skills without shell access.
+  - id: write_file
+    status: available
+    scope: workspace-write
+    description: Write UTF-8 text files under /workspace only.
+  - id: run_shell
+    status: restricted
+    scope: workspace-shell
+    description: Broad shell execution. Do not grant to legal workflow recipes unless a recipe has a specific reviewed need.
+
+legacy_source_tools:
+  - id: request_records_bills.medical_request_generator
+    source_path: workflows/phase_2_treatment/workflows/request_records_bills/tools/medical_request_generator.py
+    status: legacy_reference
+    exposed_to_recipe_agent: false
+    reason: Uses old ROSCOE-style project paths and needs a FirmVault vault-contract adapter before execution.
+  - id: request_records_bills.generate_document
+    source_path: workflows/phase_2_treatment/workflows/request_records_bills/tools/generate_document.py
+    status: legacy_reference
+    exposed_to_recipe_agent: false
+    reason: Wraps the old document-generation toolchain and is not yet constrained to the task worktree.
+  - id: request_records_bills.skill_generate_document
+    source_path: workflows/phase_2_treatment/workflows/request_records_bills/skills/medical-records-request/tools/generate_document.py
+    status: legacy_reference
+    exposed_to_recipe_agent: false
+    reason: Delegates to old document-generation paths and should become a deterministic recipe tool only after path and PHI handling review.
+  - id: request_records_bills.read_pdf
+    source_path: workflows/phase_2_treatment/workflows/request_records_bills/tools/read_pdf.py
+    status: legacy_reference
+    exposed_to_recipe_agent: false
+    reason: Needs a safe PDF/text extraction wrapper and dependency review before being granted to recipe agents.

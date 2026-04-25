@@ -49,7 +49,7 @@ export interface RecipeRow {
   max_concurrent: number
   env: Record<string, string>
   secrets: string[]
-  tools?: Array<'read_file' | 'list_dir' | 'write_file' | 'run_shell'>
+  tools?: Array<'read_file' | 'list_dir' | 'grep_files' | 'write_file' | 'run_shell'>
   tags: string[]
   model: RecipeModel
   version: number

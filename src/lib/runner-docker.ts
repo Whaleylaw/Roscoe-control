@@ -159,7 +159,7 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
  * re-index the staged copy — tested at the callsite, not here.
  *
  * fs.promises.cp (Node 20+; stable in 22+) handles recursive directory copy
- * including nested tools/ and skills/. We write PREAMBLE.md AFTER cp so even
+ * including nested tools/, skills/, and references/. We write PREAMBLE.md AFTER cp so even
  * if a recipe author ships their own PREAMBLE.md the runner's version
  * overwrites it (the agent reads /recipe/PREAMBLE.md — the runner owns it).
  */

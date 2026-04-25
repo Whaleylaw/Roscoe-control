@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process'
 const AGENT = 'recipe-agent'
 const MAX_TOOL_ROUNDS = Number.parseInt(process.env.MC_AGENT_MAX_TOOL_ROUNDS || '20', 10)
 const MAX_READ_CHARS = Number.parseInt(process.env.MC_AGENT_MAX_READ_CHARS || '50000', 10)
-const CAPABILITY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'write_file', 'run_shell'])
+const CAPABILITY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'grep_files', 'write_file', 'run_shell'])
+const SKIPPED_SEARCH_DIRS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage'])
 
 function log(level, msg, ctx = {}) {
   console.log(JSON.stringify({ level, ts: new Date().toISOString(), agent: AGENT, msg, ...ctx }))
@@ -142,6 +143,87 @@ function isWorkspacePath(filePath) {
   return filePath === '/workspace' || filePath.startsWith('/workspace/')
 }
 
+function isProbablyTextFile(filePath) {
+  const textExtensions = new Set([
+    '.cjs',
+    '.css',
+    '.csv',
+    '.js',
+    '.json',
+    '.jsx',
+    '.mjs',
+    '.md',
+    '.mdx',
+    '.py',
+    '.sh',
+    '.ts',
+    '.tsx',
+    '.txt',
+    '.xml',
+    '.yaml',
+    '.yml',
+  ])
+  const ext = path.extname(filePath).toLowerCase()
+  return textExtensions.has(ext) || ext === ''
+}
+
+function walkSearchFiles(root, files = []) {
+  const entries = fs.readdirSync(root, { withFileTypes: true })
+  for (const entry of entries) {
+    if (SKIPPED_SEARCH_DIRS.has(entry.name)) continue
+    const entryPath = path.join(root, entry.name)
+    if (entry.isDirectory()) {
+      walkSearchFiles(entryPath, files)
+      continue
+    }
+    if (entry.isFile() && isProbablyTextFile(entryPath)) files.push(entryPath)
+  }
+  return files
+}
+
+function grepFiles(input) {
+  const rootPath = resolveInsideContainer(input.root || '.')
+  if (!isReadablePath(rootPath)) throw new Error(`grep denied outside allowed mounts: ${rootPath}`)
+  if (!fs.existsSync(rootPath)) throw new Error(`grep root does not exist: ${rootPath}`)
+  const needleRaw = String(input.pattern || '')
+  if (!needleRaw.trim()) throw new Error('pattern is required')
+  const maxResults = Math.max(1, Math.min(Number(input.max_results || 100), 500))
+  const caseSensitive = Boolean(input.case_sensitive)
+  const needle = caseSensitive ? needleRaw : needleRaw.toLowerCase()
+  const stat = fs.statSync(rootPath)
+  const files = stat.isDirectory() ? walkSearchFiles(rootPath) : [rootPath]
+  const matches = []
+
+  for (const filePath of files) {
+    if (matches.length >= maxResults) break
+    if (!isProbablyTextFile(filePath)) continue
+    const fileStat = fs.statSync(filePath)
+    if (fileStat.size > 250000) continue
+    const content = fs.readFileSync(filePath, 'utf8')
+    const lines = content.split(/\r?\n/)
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index]
+      const haystack = caseSensitive ? line : line.toLowerCase()
+      if (!haystack.includes(needle)) continue
+      matches.push({
+        path: filePath,
+        line_number: index + 1,
+        line: line.slice(0, 1000),
+      })
+      if (matches.length >= maxResults) break
+    }
+  }
+
+  return {
+    ok: true,
+    root: rootPath,
+    pattern: needleRaw,
+    case_sensitive: caseSensitive,
+    matches,
+    truncated: matches.length >= maxResults,
+  }
+}
+
 function recipeToolAllowlist() {
   const recipeYaml = readOptional(path.join(process.env.MC_RECIPE_PATH || '/recipe', 'recipe.yaml'), 12000)
   const configured = parseRecipeTools(recipeYaml)
@@ -199,6 +281,20 @@ function allToolDefinitions() {
           path: { type: 'string' },
         },
         required: ['path'],
+      },
+    },
+    {
+      name: 'grep_files',
+      description: 'Search text files under /workspace, /recipe, /refs, or /skills without shell access. Use this to find case facts, recipe references, or vault paths.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          root: { type: 'string', description: 'Directory or file to search. Defaults to /workspace for relative paths.' },
+          pattern: { type: 'string', description: 'Literal text to search for.' },
+          max_results: { type: 'number', description: 'Maximum matches to return, capped at 500.' },
+          case_sensitive: { type: 'boolean' },
+        },
+        required: ['pattern'],
       },
     },
     {
@@ -300,6 +396,7 @@ async function handleTool(name, input) {
       }))
       return { ok: true, path: dirPath, entries }
     }
+    if (name === 'grep_files') return grepFiles(input)
     if (name === 'write_file') {
       const filePath = resolveInsideContainer(input.path)
       if (!isWorkspacePath(filePath)) throw new Error(`write denied outside /workspace: ${filePath}`)
