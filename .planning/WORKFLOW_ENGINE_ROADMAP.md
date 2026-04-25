@@ -58,6 +58,7 @@ The law-firm/FirmVault workflows are the first production use case, but the engi
 - Initial FirmVault request-medical-records workflow YAML.
 - Initial FirmVault request-medical-records recipe set.
 - Tool registry baseline.
+- Workflow definition registry/sync from `workflows/*.yaml`.
 
 ## Active Design Decisions
 
@@ -93,7 +94,7 @@ Goal: installed YAML workflows should be first-class, repeatable, and updatable.
 - Add a CLI, script, or admin API endpoint for sync.
 - Add tests proving sync creates and updates definitions deterministically.
 
-Status: high priority after source reconciliation.
+Status: implemented with an admin API sync path and deterministic registry tests.
 
 ### 3. Quality Review to Workflow Advancement
 
@@ -203,4 +204,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Add workflow definition registry/sync, then install the reconciled `firmvault-request-medical-records` definition through that path**.
+Current recommended next step: **Connect quality-review approval to workflow advancement so approved recipe tasks complete their workflow node and materialize the next eligible node**.
