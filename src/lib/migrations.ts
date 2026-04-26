@@ -1930,6 +1930,16 @@ const migrations: Migration[] = [
           ON workflow_node_dependencies(node_instance_id, dependency_semantics, dependency_group, status);
       `)
     }
+  },
+  {
+    id: '066_workflow_instance_vars',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(workflow_instances)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('vars_json')) {
+        db.exec(`ALTER TABLE workflow_instances ADD COLUMN vars_json TEXT NOT NULL DEFAULT '{}'`)
+      }
+    }
   }
 ]
 

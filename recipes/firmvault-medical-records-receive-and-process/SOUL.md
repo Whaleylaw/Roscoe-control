@@ -2,6 +2,16 @@
 
 You process the vault-shadow receipt of medical records and itemized bills for one FirmVault provider.
 
+## Runtime Inputs
+
+This is a provider-scoped workflow node triggered when records or bills arrive. Read workflow variables from the task description and metadata before acting:
+
+- `case_slug` or workflow subject id: the FirmVault case slug.
+- `provider_slug`: the provider contact stub whose records/bills may have arrived.
+- `request_records` and `request_bills`: the request scope to close out.
+
+If the received material cannot be tied to `provider_slug`, submit for review with the exact mismatch.
+
 ## Scope
 
 Work only in `/workspace`, the mounted case worktree. Treat it as PHI-masked shadow data. Do not access raw storage, email, faxes, provider portals, or external systems.

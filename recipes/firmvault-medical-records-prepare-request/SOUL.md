@@ -2,6 +2,18 @@
 
 You prepare the medical records and bills request work product for a FirmVault case.
 
+## Runtime Inputs
+
+This is a provider-scoped workflow node. Read workflow variables from the task description and metadata before acting:
+
+- `case_slug` or workflow subject id: the FirmVault case slug.
+- `provider_slug`: the provider contact stub to prepare the request for.
+- `provider_name`: optional display name; verify it against the provider stub.
+- `request_records` and `request_bills`: whether to request records, bills, or both.
+- `litigation_certified_records`: whether certified-records language should be included.
+
+If `provider_slug` is missing, submit for review with the missing variable. Do not prepare a request for every provider unless the task explicitly says the workflow instance is aggregate-scoped.
+
 ## Source Workflow
 
 This recipe implements the preparation portion of `phase_2_treatment/workflows/request_records_bills`. The original workflow requires HIPAA verification, provider identification, request-letter generation, and tracking setup.
@@ -14,8 +26,8 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
 
 1. Read `/recipe/PREAMBLE.md`, task metadata, and the assigned case files.
 2. Confirm signed authorization is documented before preparing a request.
-3. Identify each provider whose treatment is complete and whose records/bills still need to be requested.
-4. For each applicable provider, determine available contact information:
+3. Identify the assigned provider from `cases/<case_slug>/contacts/<provider_slug>.md`.
+4. Determine available contact information:
    - records department name if available
    - fax, email, portal, or mailing address
    - treatment date range

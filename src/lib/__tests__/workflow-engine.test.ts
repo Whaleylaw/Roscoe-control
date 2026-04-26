@@ -445,6 +445,153 @@ nodes:
     }
   })
 
+  it('stores workflow variables and passes them into materialized task metadata and instructions', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`
+        SELECT id FROM projects
+        WHERE workspace_id = 1 AND slug = 'general'
+        LIMIT 1
+      `).get() as { id: number } | undefined
+      expect(project).toBeTruthy()
+
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: variable-materialization
+name: Variable Materialization
+subject_type: law_firm_case
+vars:
+  provider_slug:
+    required: true
+    type: string
+  request_bills:
+    default: true
+    type: boolean
+nodes:
+  prepare_request:
+    type: recipe
+    recipe: hello-world
+    config:
+      task_goal: Prepare records request for {{provider_slug}}.
+      request_bills: "{{request_bills}}"
+`, 'tester', 1, 1)
+
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        vars: { provider_slug: 'bluegrass-orthopedics' },
+        now: 6000,
+      })
+      expect(instance.vars).toEqual({ provider_slug: 'bluegrass-orthopedics', request_bills: true })
+
+      const materialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project!.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 6001,
+      })
+      expect(materialized.created).toMatchObject([{ node_key: 'prepare_request' }])
+      const task = db.prepare(`
+        SELECT description, metadata
+        FROM tasks
+        WHERE id = ?
+      `).get(materialized.created[0].task_id) as { description: string; metadata: string }
+      expect(task.description).toContain('- provider_slug: bluegrass-orthopedics')
+      expect(task.description).toContain('- request_bills: true')
+      expect(task.description).toContain('Goal: Prepare records request for bluegrass-orthopedics.')
+      expect(JSON.parse(task.metadata)).toMatchObject({
+        workflow: {
+          vars: { provider_slug: 'bluegrass-orthopedics', request_bills: true },
+        },
+      })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('rejects starting a workflow when a required variable is missing', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: missing-required-variable
+name: Missing Required Variable
+subject_type: law_firm_case
+vars:
+  provider_slug:
+    required: true
+    type: string
+nodes:
+  prepare_request:
+    type: recipe
+    recipe: hello-world
+`, 'tester', 1, 1)
+
+      expect(() => startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 6100,
+      })).toThrow(/requires variable 'provider_slug'/)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('skips triggered workflows with missing required variables instead of failing the whole trigger pass', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      createWorkflowDefinition(db, `
+schema_version: 1
+id: trigger-missing-required-variable
+name: Trigger Missing Required Variable
+subject_type: law_firm_case
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.treatment_complete == true
+vars:
+  provider_slug:
+    required: true
+    type: string
+nodes:
+  prepare_request:
+    type: recipe
+    recipe: hello-world
+`, 'tester', 1, 1)
+
+      const result = runWorkflowTriggers(db, {
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        triggerType: 'condition',
+        condition: 'law_firm.landmarks.treatment_complete == true',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 6200,
+      })
+
+      expect(result.started).toHaveLength(0)
+      expect(result.skipped[0]).toMatchObject({
+        definition_slug: 'trigger-missing-required-variable',
+      })
+      expect(result.skipped[0].reason).toContain('invalid_vars:')
+      expect(result.skipped[0].reason).toContain("requires variable 'provider_slug'")
+    } finally {
+      db.close()
+    }
+  })
+
   it('advances workflow nodes after task approval and materializes the next ready task', () => {
     const db = new Database(':memory:')
     try {

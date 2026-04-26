@@ -61,6 +61,7 @@ const workflowTriggerSchema = z.object({
 })
 
 const workflowVarValueSchema = z.union([z.string(), z.number(), z.boolean()])
+export type WorkflowVarRuntimeValue = string | number | boolean | null | Record<string, unknown> | unknown[]
 
 const workflowVarSchema = z.union([
   workflowVarValueSchema,
@@ -148,6 +149,7 @@ export type StartWorkflowInput = {
   subjectType: string
   subjectId: string
   workflowKey?: string
+  vars?: Record<string, unknown>
   actor: string
   workspaceId: number
   tenantId?: number
@@ -157,6 +159,7 @@ export type StartWorkflowInput = {
 export type StartWorkflowResult = {
   instance_id: number
   ready_nodes: string[]
+  vars: Record<string, WorkflowVarRuntimeValue>
 }
 
 export type MaterializeReadyWorkflowNodesInput = {
@@ -261,6 +264,7 @@ export type RunWorkflowTriggersInput = {
   triggerType: 'condition' | 'event' | 'cooldown' | 'cron'
   condition?: string
   event?: string
+  vars?: Record<string, unknown>
   projectId?: number
   baseRef?: string
   assignedTo?: string | null
@@ -287,6 +291,7 @@ export type WorkflowActivity = {
   definition_version: number
   subject_type: string
   subject_id: string
+  vars: Record<string, WorkflowVarRuntimeValue>
   status: WorkflowInstanceStatus
   started_by: string
   started_at: number
@@ -443,7 +448,18 @@ export function runWorkflowTriggers(
     const definition = parseWorkflowDefinition(row.definition_yaml)
     if (!definition.triggers.some((trigger) => workflowTriggerMatches(trigger, input))) continue
     matched += 1
-    const workflowKey = `${definition.id}:${input.subjectType}:${input.subjectId}`
+    let vars: Record<string, WorkflowVarRuntimeValue>
+    try {
+      vars = resolveWorkflowVars(definition, defaultWorkflowVars(definition, input.subjectId, input.vars))
+    } catch (error) {
+      skipped.push({
+        definition_id: row.id,
+        definition_slug: row.slug,
+        reason: `invalid_vars:${error instanceof Error ? error.message : String(error)}`,
+      })
+      continue
+    }
+    const workflowKey = workflowKeyForTrigger(definition.id, input.subjectType, input.subjectId, vars)
     const existing = db.prepare(`
       SELECT id, status
       FROM workflow_instances
@@ -464,6 +480,7 @@ export function runWorkflowTriggers(
       actor: input.actor,
       workspaceId: input.workspaceId,
       tenantId: input.tenantId,
+      vars,
       now,
     })
     started.push({
@@ -501,7 +518,7 @@ export function listWorkflowActivity(
   const limit = Math.max(1, Math.min(input.limit ?? 50, 200))
   const rows = db.prepare(`
     SELECT wi.id, wi.workflow_key, wi.definition_id, wi.subject_type, wi.subject_id,
-           wi.status, wi.started_by, wi.started_at, wi.completed_at, wi.updated_at,
+           wi.vars_json, wi.status, wi.started_by, wi.started_at, wi.completed_at, wi.updated_at,
            wd.slug AS definition_slug, wd.name AS definition_name, wd.version AS definition_version
     FROM workflow_instances wi
     JOIN workflow_definitions wd ON wd.id = wi.definition_id
@@ -516,6 +533,7 @@ export function listWorkflowActivity(
     definition_id: number
     subject_type: string
     subject_id: string
+    vars_json: string | null
     status: WorkflowInstanceStatus
     started_by: string
     started_at: number
@@ -591,6 +609,7 @@ export function listWorkflowActivity(
       definition_version: row.definition_version,
       subject_type: row.subject_type,
       subject_id: row.subject_id,
+      vars: parseWorkflowRuntimeVars(row.vars_json),
       status: row.status,
       started_by: row.started_by,
       started_at: row.started_at,
@@ -629,7 +648,8 @@ export function startWorkflowInstance(
   if (!definitionRow) throw new Error(`Workflow definition ${input.definitionId} not found`)
 
   const definition = parseWorkflowDefinition(definitionRow.definition_yaml)
-  const workflowKey = input.workflowKey ?? `${definition.id}:${input.subjectType}:${input.subjectId}:${now}`
+  const vars = resolveWorkflowVars(definition, defaultWorkflowVars(definition, input.subjectId, input.vars))
+  const workflowKey = input.workflowKey ?? workflowKeyForTrigger(definition.id, input.subjectType, input.subjectId, vars, now)
   let instanceId = 0
   let ready: string[] = []
 
@@ -637,9 +657,9 @@ export function startWorkflowInstance(
     const instance = db.prepare(`
       INSERT INTO workflow_instances (
         definition_id, workflow_key, subject_type, subject_id, status, started_by,
-        workspace_id, tenant_id, started_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
-    `).run(input.definitionId, workflowKey, input.subjectType, input.subjectId, input.actor, input.workspaceId, input.tenantId ?? 1, now, now)
+        vars_json, workspace_id, tenant_id, started_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+    `).run(input.definitionId, workflowKey, input.subjectType, input.subjectId, input.actor, JSON.stringify(vars), input.workspaceId, input.tenantId ?? 1, now, now)
     instanceId = Number(instance.lastInsertRowid)
 
     for (const [nodeKey, node] of Object.entries(definition.nodes)) {
@@ -654,7 +674,7 @@ export function startWorkflowInstance(
         node.type,
         node.recipe ?? null,
         JSON.stringify(node.depends_on ?? []),
-        JSON.stringify({
+        JSON.stringify(resolveWorkflowTemplateValues({
           ...node.config,
           description: node.description ?? null,
           description_file: node.description_file ?? null,
@@ -663,7 +683,7 @@ export function startWorkflowInstance(
           until: node.until ?? null,
           exit_when: node.exit_when ?? null,
           completes: node.completes ?? [],
-        }),
+        }, vars)),
         now,
         now,
       )
@@ -683,14 +703,14 @@ export function startWorkflowInstance(
       eventType: 'workflow.started',
       actorType: 'human',
       actorId: input.actor,
-      payload: { definition_id: input.definitionId, workflow_key: workflowKey, subject_type: input.subjectType, subject_id: input.subjectId },
+      payload: { definition_id: input.definitionId, workflow_key: workflowKey, subject_type: input.subjectType, subject_id: input.subjectId, vars },
       workspaceId: input.workspaceId,
       createdAt: now,
     })
     ready = evaluateWorkflowInstanceInTransaction(db, instanceId, now)
   })()
 
-  return { instance_id: instanceId, ready_nodes: ready }
+  return { instance_id: instanceId, ready_nodes: ready, vars }
 }
 
 export function evaluateWorkflowInstance(
@@ -1116,7 +1136,7 @@ export function materializeReadyWorkflowNodes(
 
   db.transaction(() => {
     const context = db.prepare(`
-      SELECT wi.id, wi.workflow_key, wi.subject_type, wi.subject_id, wi.workspace_id,
+      SELECT wi.id, wi.workflow_key, wi.subject_type, wi.subject_id, wi.vars_json, wi.workspace_id,
              wd.slug AS definition_slug, wd.name AS definition_name, wd.version AS definition_version
       FROM workflow_instances wi
       JOIN workflow_definitions wd ON wd.id = wi.definition_id
@@ -1126,6 +1146,7 @@ export function materializeReadyWorkflowNodes(
       workflow_key: string
       subject_type: string
       subject_id: string
+      vars_json: string | null
       workspace_id: number
       definition_slug: string
       definition_name: string
@@ -1178,6 +1199,7 @@ export function materializeReadyWorkflowNodes(
       `).get(input.projectId, input.workspaceId) as { ticket_counter: number } | undefined
       if (!ticket?.ticket_counter) throw new Error('Failed to allocate project ticket number')
 
+      const vars = parseWorkflowRuntimeVars(context.vars_json)
       const title = `[Workflow] ${context.definition_name}: ${titleFromNodeKey(node.node_key)}`
       const metadata = {
         workflow: {
@@ -1187,6 +1209,7 @@ export function materializeReadyWorkflowNodes(
           definition_version: context.definition_version,
           subject_type: context.subject_type,
           subject_id: context.subject_id,
+          vars,
           node_instance_id: node.id,
           node_key: node.node_key,
           node_type: node.node_type,
@@ -1202,7 +1225,7 @@ export function materializeReadyWorkflowNodes(
         ) VALUES (?, ?, ?, 'medium', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, NULL)
       `).run(
         title,
-        workflowTaskDescription(context, node),
+        workflowTaskDescription({ ...context, vars }, node),
         finalStatus,
         input.projectId,
         ticket.ticket_counter,
@@ -1892,6 +1915,7 @@ function workflowTaskDescription(
     workflow_key: string
     subject_type: string
     subject_id: string
+    vars: Record<string, WorkflowVarRuntimeValue>
     definition_slug: string
     definition_name: string
     definition_version: number
@@ -1911,6 +1935,13 @@ function workflowTaskDescription(
     `Node: ${node.node_key} (${node.node_type})`,
     `Recipe: ${node.recipe_slug ?? 'not set'}`,
   ]
+  const vars = Object.entries(context.vars)
+  if (vars.length > 0) {
+    lines.push('', 'Workflow variables:')
+    for (const [key, value] of vars) {
+      lines.push(`- ${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`)
+    }
+  }
   if (taskGoal || description || descriptionFile) {
     lines.push('', 'Node instructions:')
     if (taskGoal) lines.push(`Goal: ${taskGoal}`)
@@ -1936,6 +1967,132 @@ function parseObject(raw: string | null | undefined): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+function parseWorkflowRuntimeVars(raw: string | null | undefined): Record<string, WorkflowVarRuntimeValue> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return parsed as Record<string, WorkflowVarRuntimeValue>
+  } catch {
+    return {}
+  }
+}
+
+function resolveWorkflowVars(
+  definition: WorkflowDefinition,
+  input: Record<string, unknown>,
+): Record<string, WorkflowVarRuntimeValue> {
+  const resolved: Record<string, WorkflowVarRuntimeValue> = {}
+  for (const [key, rawSpec] of Object.entries(definition.vars)) {
+    const spec = workflowVarSpec(rawSpec)
+    const supplied = Object.prototype.hasOwnProperty.call(input, key)
+    const rawValue = supplied ? input[key] : spec.default
+    if (rawValue === undefined) {
+      if (spec.required) throw new Error(`Workflow '${definition.id}' requires variable '${key}'`)
+      continue
+    }
+    const value = validateWorkflowVarValue(definition.id, key, spec, rawValue)
+    resolved[key] = value
+  }
+  for (const [key, value] of Object.entries(input)) {
+    if (Object.prototype.hasOwnProperty.call(resolved, key) || Object.prototype.hasOwnProperty.call(definition.vars, key)) continue
+    resolved[key] = value as WorkflowVarRuntimeValue
+  }
+  return resolved
+}
+
+function defaultWorkflowVars(
+  definition: WorkflowDefinition,
+  subjectId: string,
+  input: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  return definition.vars.case_slug ? { case_slug: subjectId, ...(input ?? {}) } : input ?? {}
+}
+
+function workflowVarSpec(raw: WorkflowDefinition['vars'][string]): {
+  default?: unknown
+  required: boolean
+  enum?: Array<string | number | boolean>
+  pattern?: string
+  type: 'string' | 'number' | 'boolean' | 'json'
+} {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const spec = raw as {
+      default?: unknown
+      required?: boolean
+      enum?: Array<string | number | boolean>
+      pattern?: string
+      type?: 'string' | 'number' | 'boolean' | 'json'
+    }
+    return {
+      default: spec.default,
+      required: spec.required ?? false,
+      enum: spec.enum,
+      pattern: spec.pattern,
+      type: spec.type ?? 'string',
+    }
+  }
+  return { default: raw, required: false, type: typeof raw === 'number' ? 'number' : typeof raw === 'boolean' ? 'boolean' : 'string' }
+}
+
+function validateWorkflowVarValue(
+  workflowId: string,
+  key: string,
+  spec: ReturnType<typeof workflowVarSpec>,
+  rawValue: unknown,
+): WorkflowVarRuntimeValue {
+  if (spec.type === 'string' && typeof rawValue !== 'string') throw new Error(`Workflow '${workflowId}' variable '${key}' must be a string`)
+  if (spec.type === 'number' && typeof rawValue !== 'number') throw new Error(`Workflow '${workflowId}' variable '${key}' must be a number`)
+  if (spec.type === 'boolean' && typeof rawValue !== 'boolean') throw new Error(`Workflow '${workflowId}' variable '${key}' must be a boolean`)
+  if (spec.enum && !spec.enum.some((item) => item === rawValue)) {
+    throw new Error(`Workflow '${workflowId}' variable '${key}' must be one of: ${spec.enum.join(', ')}`)
+  }
+  if (spec.pattern && typeof rawValue === 'string' && !new RegExp(spec.pattern).test(rawValue)) {
+    throw new Error(`Workflow '${workflowId}' variable '${key}' does not match required pattern`)
+  }
+  if (rawValue === null || typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean' || Array.isArray(rawValue)) {
+    return rawValue as WorkflowVarRuntimeValue
+  }
+  if (typeof rawValue === 'object') return rawValue as Record<string, unknown>
+  throw new Error(`Workflow '${workflowId}' variable '${key}' is not JSON-serializable`)
+}
+
+function resolveWorkflowTemplateValues(value: unknown, vars: Record<string, WorkflowVarRuntimeValue>): unknown {
+  if (typeof value === 'string') {
+    const exact = value.match(/^{{\s*([a-zA-Z0-9_.-]+)\s*}}$/)
+    if (exact) return vars[exact[1]] ?? value
+    return value.replace(/{{\s*([a-zA-Z0-9_.-]+)\s*}}/g, (match, key: string) => {
+      const replacement = vars[key]
+      if (replacement === undefined || replacement === null) return match
+      if (typeof replacement === 'object') return JSON.stringify(replacement)
+      return String(replacement)
+    })
+  }
+  if (Array.isArray(value)) return value.map((item) => resolveWorkflowTemplateValues(item, vars))
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, resolveWorkflowTemplateValues(child, vars)]))
+  }
+  return value
+}
+
+function workflowKeyForTrigger(
+  definitionId: string,
+  subjectType: string,
+  subjectId: string,
+  vars: Record<string, WorkflowVarRuntimeValue>,
+  fallbackNow?: number,
+): string {
+  const base = `${definitionId}:${subjectType}:${subjectId}`
+  const entries = Object.entries(vars).sort(([a], [b]) => a.localeCompare(b))
+  if (entries.length === 0) return fallbackNow ? `${base}:${fallbackNow}` : base
+  const varsKey = entries.map(([key, value]) => `${safeWorkflowKeyPart(key)}=${safeWorkflowKeyPart(JSON.stringify(value))}`).join(',')
+  return `${base}:${varsKey}`
+}
+
+function safeWorkflowKeyPart(value: string): string {
+  return value.replace(/^"|"$/g, '').replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '') || 'value'
 }
 
 function materializationContextForWorkflow(db: Database.Database, workflowInstanceId: number): {

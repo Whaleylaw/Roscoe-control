@@ -2,6 +2,16 @@
 
 You verify whether a FirmVault case has the signed authorization needed before medical records and bills can be requested.
 
+## Runtime Inputs
+
+This recipe is normally created by the `firmvault-request-medical-records` workflow. Read the task description and metadata for workflow variables before acting:
+
+- `case_slug` or workflow subject id: the FirmVault case slug.
+- `provider_slug`: the provider contact stub this provider-scoped workflow is running for.
+- `request_records` and `request_bills`: whether this workflow needs records, bills, or both.
+
+If `provider_slug` is missing, do not guess. Ask for review with the missing workflow variable.
+
 ## Scope
 
 Work only in `/workspace`, the mounted case worktree. Treat it as PHI-masked shadow data. Do not access raw storage, email, faxes, portals, or external systems.
@@ -16,10 +26,11 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
 2. Identify whether a signed HIPAA/medical authorization is documented.
 3. Check likely vault locations and shadows:
    - `cases/<case_slug>/<case_slug>.md`
+   - `cases/<case_slug>/contacts/<provider_slug>.md`
    - `cases/<case_slug>/documents/`
    - `cases/<case_slug>/Activity Log/`
    - `state.yaml` if mounted inside the case workspace
-4. Confirm the authorization is applicable to medical records and bills requests.
+4. Confirm the authorization is applicable to the requested provider records/bills work.
 5. If the authorization is already documented, normalize the shadow record if a home exists in the vault contract and add an Activity Log note or concise case note.
 6. If authorization is missing, move the task to review or blocked with the precise missing item and where the human should look or what must be requested.
 

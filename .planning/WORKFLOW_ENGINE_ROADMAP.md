@@ -150,7 +150,7 @@ Goal: make the first real FirmVault workflow production-usable.
 - Confirm required variables such as provider, case slug, authorization status, and request target.
 - Test on Abby Sitgraves or a fixture case.
 
-Status: active law-firm conversion track.
+Status: in progress. The workflow now has concrete recipe nodes, bundled reference materials, provider-scoped SOUL/REVIEW guidance, validated recipe cards, and runtime workflow variables passed into materialized tasks. Remaining work: add a provider-scoped activation/materialization path from the case UI or materializer so `provider_slug` instances can be started for real providers, then test on Abby Sitgraves or a fixture case.
 
 ### 7. Additional FirmVault Workflow Conversion
 
@@ -207,4 +207,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Complete Request Medical Records Workflow recipes and recipe assets**.
+Current recommended next step: **Add provider-scoped activation for the Request Medical Records workflow and test it on Abby Sitgraves or a fixture case**.

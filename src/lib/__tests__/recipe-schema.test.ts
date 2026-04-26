@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readdirSync, readFileSync } from 'fs'
+import { join } from 'path'
 import { parseRecipeYaml } from '../recipe-schema'
 
 const minimalValid = `
@@ -108,5 +110,18 @@ version: 2
     expect(result.value.secrets).toEqual(['ANTHROPIC_API_KEY', 'GITHUB_TOKEN'])
     expect(result.value.model.fallback).toBe('claude-sonnet-4-6')
     expect(result.value.model.params?.max_tokens).toBe(8000)
+  })
+
+  it('accepts all FirmVault medical records recipe cards', () => {
+    const recipesRoot = join(process.cwd(), 'recipes')
+    const recipeDirs = readdirSync(recipesRoot)
+      .filter((name) => name.startsWith('firmvault-medical-records-'))
+      .sort()
+    expect(recipeDirs.length).toBeGreaterThan(0)
+    for (const recipeDir of recipeDirs) {
+      const raw = readFileSync(join(recipesRoot, recipeDir, 'recipe.yaml'), 'utf8')
+      const result = parseRecipeYaml(raw)
+      expect(result, recipeDir).toMatchObject({ ok: true })
+    }
   })
 })
