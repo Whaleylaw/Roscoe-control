@@ -23,7 +23,8 @@ Send records and billing requests to a treating provider once the client has sig
 
 - `cases/<slug>/<slug>.md` — client name, DOB (from linked client card), date of incident, provider list under `## Medical Providers`
 - `cases/<slug>/contacts/<provider-slug>.md` — provider name, address, fax, records contact; links through to `Contacts/Medical/<slug>.md` for the master card
-- `cases/<slug>/documents/` — signed HIPAA authorization (expected filename contains `hipaa` or `medical-authorization`); skill blocks if missing
+- `cases/<slug>/client/authorizations.md` — signed HIPAA or medical authorization ledger
+- `cases/<slug>/documents/shadows/client/hipaa-authorization-signed.md` or `cases/<slug>/documents/shadows/client/medical-authorization-signed.md` — canonical signed authorization shadow; skill blocks if the ledger and canonical shadow do not support authorization
 
 ## Templates
 
@@ -41,7 +42,7 @@ Placeholder fields and where their values come from are in `references/template-
 
 ## Flow
 
-Confirm HIPAA is on file under `cases/<slug>/documents/`. Read the provider stub to pull name, address, fax, and treatment dates. Pick the template matching the case type (standard vs. WC) and the request type (records, billing, or both). Fill the placeholders from the vault, write the filled output to `cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.docx` (and `.pdf` sibling for billing), then merge the signed HIPAA PDF before sending. Fax is the preferred channel; see `references/sending-methods.md` for the fallback order. After sending, update the provider stub frontmatter (`records_requested: <date>` and/or `bills_requested: <date>`), write an activity log entry per `DATA_CONTRACT.md` §5, and queue a 14-day follow-up (see `references/follow-up-process.md`).
+Confirm HIPAA or medical authorization is recorded in `client/authorizations.md` and linked to a canonical signed authorization shadow. Read the provider ledger to pull name, address, fax, and treatment dates. Pick the template matching the case type (standard vs. WC) and the request type (records, billing, or both). Fill the placeholders from the vault and write request shadows to `medical-providers/<provider-slug>/requests/<YYYY-MM-DD>-records-request.md` and/or `medical-providers/<provider-slug>/requests/<YYYY-MM-DD>-bills-request.md`. If a rendered packet is available, record it under the deterministic generated/sent document locations defined by `DATA_CONTRACT.md`. Fax is the preferred channel; see `references/sending-methods.md` for the fallback order. After sending is confirmed, update `medical-providers/<provider-slug>/records-bills.md`, write an activity log entry per `DATA_CONTRACT.md`, and queue the follow-up configured by the workflow.
 
 ## Landmark production
 
@@ -53,9 +54,9 @@ Missing HIPAA, missing provider fax, missing treatment dates, and fax send failu
 
 ## Outputs
 
-- Filled request document(s) at `cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.{docx,pdf}`
+- Request shadow(s) at `medical-providers/<provider-slug>/requests/<YYYY-MM-DD>-records-request.md` and/or `medical-providers/<provider-slug>/requests/<YYYY-MM-DD>-bills-request.md`
 - Merged request+HIPAA PDF sent (fax or email) or queued for manual send
-- Updated provider stub frontmatter in `cases/<slug>/contacts/<provider-slug>.md` (`records_requested`, `bills_requested`, `request_method`, `fax_confirmation`, `follow_up_date`)
+- Updated provider request ledger in `medical-providers/<provider-slug>/records-bills.md` (`records_requested`, `bills_requested`, `request_method`, confirmation, `follow_up_date`)
 - Activity log entry at `cases/<slug>/activity/<YYYY-MM-DD-HHMM>-correspondence.md`
 - 14-day follow-up scheduled
 

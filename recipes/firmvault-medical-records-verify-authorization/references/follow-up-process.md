@@ -35,11 +35,11 @@ And write an activity log entry under `cases/<slug>/activity/` with category `ph
 
 ## Marking records/bills received
 
-When the documents arrive, drop them into `cases/<slug>/documents/` (filename `<YYYY-MM-DD> - <client> - Medical Records - <provider>.pdf` per the case-file-organization naming convention), update the provider stub:
+When the documents arrive, file the masked shadows under `medical-providers/<provider-slug>/documents/records.md` and/or `medical-providers/<provider-slug>/documents/bills.md`, then update `medical-providers/<provider-slug>/records-bills.md`:
 
 ```yaml
 records_received: "YYYY-MM-DD"
-records_path: "cases/<slug>/documents/<filename>.pdf"
+records_path: "medical-providers/<provider-slug>/documents/records.md"
 records_pages: <count>
 ```
 

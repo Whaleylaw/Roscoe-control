@@ -16,13 +16,13 @@ Preferred template slugs are listed in `Templates/INDEX.md`:
 
 Write generated or drafted request material under:
 
-`cases/<case_slug>/documents/`
+`medical-providers/<provider-slug>/requests/`
 
 Use a descriptive filename such as:
 
-`<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.docx`
+`<YYYY-MM-DD>-records-request.md` and/or `<YYYY-MM-DD>-bills-request.md`
 
-If the worker only prepares a handoff because no deterministic document tool is available, record the intended output path and exact sending instructions in the task result and activity/.
+If the worker only prepares a handoff because no deterministic document tool is available, record the intended rendered output path and exact sending instructions in the task result and activity/.
 
 ## Letter Components
 
@@ -61,7 +61,7 @@ Use the vault contract, not deprecated JSON files:
 | Provider address | provider contact stub or linked medical master card |
 | Provider fax/email | provider contact stub or linked medical master card |
 | Treatment dates | provider contact stub fields, treatment table shadow, or activity/ evidence |
-| Signed authorization | `cases/<case_slug>/documents/` filename containing `hipaa` or `medical-authorization` |
+| Signed authorization | `client/authorizations.md` plus `documents/shadows/client/hipaa-authorization-signed.md` or `documents/shadows/client/medical-authorization-signed.md` |
 
 ## Privacy Handling
 

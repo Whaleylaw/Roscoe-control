@@ -4,7 +4,7 @@ The theme: do not fabricate data. When a required field is missing, surface the 
 
 ## Pre-send validation
 
-**No signed HIPAA.** Records request cannot proceed. Expected under `cases/<slug>/documents/` with a filename containing `hipaa` or `medical-authorization`. If missing, the caller needs to finish Phase 0 document collection before this skill can run.
+**No signed HIPAA or medical authorization.** Records request cannot proceed. Expected in `client/authorizations.md` with linked evidence to `documents/shadows/client/hipaa-authorization-signed.md` or `documents/shadows/client/medical-authorization-signed.md`. If missing, the caller needs to finish Phase 0 document collection before this skill can run. Broad search is only a repair fallback when the ledger says a signed authorization exists but the canonical shadow was filed incorrectly.
 
 **Missing provider fax.** Provider stub has no `fax` value and the master card has no `fax` either. Either look it up and add it to the master card (`Contacts/Medical/<slug>.md`), fall back to email/mail, or queue for manual send.
 

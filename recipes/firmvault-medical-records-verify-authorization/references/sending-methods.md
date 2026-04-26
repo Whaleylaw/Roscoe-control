@@ -11,10 +11,10 @@ from merge_pdfs import merge_pdfs
 
 merged = merge_pdfs(
     input_files=[
-        "cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.pdf",
-        "cases/<slug>/documents/<signed-hipaa>.pdf",
+        "medical-providers/<provider-slug>/requests/<YYYY-MM-DD>-records-request.pdf",
+        "documents/shadows/client/hipaa-authorization-signed.pdf",
     ],
-    output_path="cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider> - with HIPAA.pdf",
+    output_path="medical-providers/<provider-slug>/requests/<YYYY-MM-DD>-records-request-with-authorization.pdf",
 )
 ```
 
@@ -30,11 +30,11 @@ Last resort. Print the merged PDF, certified mail with return receipt.
 
 ## Manual
 
-If the worker cannot send automatically (no fax credentials, no email integration), write the merged PDF to `cases/<slug>/documents/` and queue a task for the paralegal, with provider contact info in the task body.
+If the worker cannot send automatically (no fax credentials, no email integration), write the prepared request shadow under `medical-providers/<provider-slug>/requests/` and queue a task for the paralegal, with provider contact info in the task body.
 
 ## Tracking after send
 
-Update the provider stub frontmatter in `cases/<slug>/contacts/<provider-slug>.md`:
+Update `medical-providers/<provider-slug>/records-bills.md`:
 
 ```yaml
 records_requested: "YYYY-MM-DD"

@@ -58,7 +58,15 @@ nodes:
     completes:
       - law_firm.landmarks.medical_auth_verified
     config:
-      task_goal: Confirm a signed HIPAA or medical authorization exists before provider-specific records and bills are requested. If missing, route to review with the precise missing authorization issue.
+      task_goal: >-
+        Confirm a signed HIPAA or medical authorization exists by checking the
+        canonical authorization ledger and shadows: client/authorizations.md,
+        documents/shadows/client/hipaa-authorization-signed.md, and
+        documents/shadows/client/medical-authorization-signed.md. Do not broadly
+        search for the document unless the ledger says it exists but the
+        canonical shadow is missing; in that case repair the filing defect
+        first, then rely on the canonical path. If missing, route to review with
+        the precise missing authorization issue.
       provider_scoped: true
       stale_sources_rejected:
         - deprecated per-case JSON files
@@ -77,7 +85,13 @@ nodes:
     completes:
       - law_firm.provider.records_request_packet_prepared
     config:
-      task_goal: Prepare the provider-specific request packet or request shadow using vault data only, including provider details, treatment date range, requested records, requested bills, and authorization attachment checklist.
+      task_goal: >-
+        Prepare the provider-specific request packet or request shadow using
+        vault data only, including provider details, treatment date range,
+        requested records, requested bills, and authorization attachment
+        checklist. The authorization attachment must come from the canonical
+        client authorization ledger and shadow paths, not a broad document
+        search.
       certified_records_if_litigation: "{{litigation_certified_records}}"
       provider_scoped: true
 

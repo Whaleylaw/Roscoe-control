@@ -382,6 +382,7 @@ workflows:
         type: recipe
         recipe_slug: firmvault-medical-records-verify-authorization
         landmark_id: medical_auth_signed
+        description: Deterministically verify the canonical authorization ledger and shadows; broad document search is only a repair fallback when canonical filing is broken.
         depends_on:
           conditions:
             - law_firm.landmarks.providers_setup == true

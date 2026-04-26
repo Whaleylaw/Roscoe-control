@@ -23,17 +23,26 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
 ## Required Checks
 
 1. Read `/recipe/PREAMBLE.md`, the task metadata, and the case files for the assigned case.
-2. Identify whether a signed HIPAA/medical authorization is documented.
-3. Check likely vault locations and shadows:
-   - `<case_slug>.md`
-   - `client/authorizations.md`
-   - `contacts/<provider_slug>.md`
-   - `documents/`
-   - `activity/`
-   - `state.yaml` if mounted inside the case workspace
-4. Confirm the authorization is applicable to the requested provider records/bills work.
-5. If the authorization is already documented, normalize the shadow record if a home exists in the vault contract and add an activity/ note or concise case note.
-6. If authorization is missing, move the task to review or blocked with the precise missing item and where the human should look or what must be requested.
+2. Read `/refs/firmvault-root/skills.tools.workflows/DATA_CONTRACT.md` and follow its canonical document locations.
+3. Deterministically check `client/authorizations.md`.
+4. Deterministically check the canonical signed authorization shadows:
+   - `documents/shadows/client/hipaa-authorization-signed.md`
+   - `documents/shadows/client/medical-authorization-signed.md`
+5. Confirm the ledger and canonical shadow agree that a signed HIPAA or medical authorization exists and applies generally to provider records/bills requests.
+6. If the ledger says the authorization is signed but the canonical shadow is missing, treat that as a filing defect. Search only enough to repair the defect, then normalize a masked shadow or pointer into the canonical path and update `client/authorizations.md` evidence to that path.
+7. If no signed authorization evidence exists, move the task to review or blocked with the precise missing item and the canonical path that should eventually contain it.
+
+## Output Boundary
+
+This node only verifies or repairs authorization evidence. It may update:
+
+- `client/authorizations.md`
+- `documents/shadows/client/hipaa-authorization-signed.md`
+- `documents/shadows/client/medical-authorization-signed.md`
+- `activity/`
+- `workflow-log/`
+
+It must not mark provider records or bills as requested, sent, received, or processed. Those facts belong to later records-request nodes.
 
 ## Do Not
 
@@ -41,7 +50,9 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
 - Do not claim a signed document exists without vault evidence or owner confirmation.
 - Do not write raw DOB, SSN, signatures, or unmasked personal identifiers.
 - Do not invent a vault path if `DATA_CONTRACT.md` does not define one.
+- Do not edit `medical-providers/<provider-slug>/provider.md` or `medical-providers/<provider-slug>/records-bills.md` from this authorization-verification node.
+- Do not set `records_requested`, `bills_requested`, request method, request sent date, or follow-up date.
 
 ## Completion
 
-Submit `done` only when the authorization status is supported and the case shadow clearly reflects the result. Submit `blocked` when the authorization cannot be verified.
+Submit `done` only when the authorization status is supported by `client/authorizations.md` and the canonical authorization shadow path. Submit `blocked` when the authorization cannot be verified or cannot be normalized into the canonical path.
