@@ -62,6 +62,7 @@ The law-firm/FirmVault workflows are the first production use case, but the engi
 - Quality-review approval advances workflow nodes and materializes next ready recipe tasks.
 - Workflow timer scheduler task advances due timer dependencies without OpenClaw cron.
 - Case Workflow tab can cancel active workflow instances and show timer due dates.
+- Provider-scoped activation for the Request Medical Records workflow from the case Workflow tab.
 
 ## Active Design Decisions
 
@@ -150,7 +151,7 @@ Goal: make the first real FirmVault workflow production-usable.
 - Confirm required variables such as provider, case slug, authorization status, and request target.
 - Test on Abby Sitgraves or a fixture case.
 
-Status: in progress. The workflow now has concrete recipe nodes, bundled reference materials, provider-scoped SOUL/REVIEW guidance, validated recipe cards, and runtime workflow variables passed into materialized tasks. Remaining work: add a provider-scoped activation/materialization path from the case UI or materializer so `provider_slug` instances can be started for real providers, then test on Abby Sitgraves or a fixture case.
+Status: fixture-tested. The workflow now has concrete recipe nodes, bundled reference materials, provider-scoped SOUL/REVIEW guidance, validated recipe cards, runtime workflow variables passed into materialized tasks, and a provider-scoped activation path from the case Workflow tab. Remaining work: run it against Abby Sitgraves in the local FirmVault mirror and make any case-data adjustments exposed by that production-shaped test.
 
 ### 7. Additional FirmVault Workflow Conversion
 
@@ -207,4 +208,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Add provider-scoped activation for the Request Medical Records workflow and test it on Abby Sitgraves or a fixture case**.
+Current recommended next step: **Run the provider-scoped Request Medical Records workflow against Abby Sitgraves in the local FirmVault mirror, then either adjust the case-data mapping or start converting the next FirmVault workflow**.

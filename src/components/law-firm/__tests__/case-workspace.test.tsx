@@ -52,6 +52,22 @@ const caseDetail = {
         status: 'open',
       },
     ],
+    medical_providers: [
+      {
+        slug: 'uofl-orthopedics',
+        name: 'UofL Orthopedics',
+        role: 'treating_provider',
+        treatment_status: 'Treatment Complete',
+        records_requested: false,
+        records_received: false,
+        bills_requested: false,
+        bills_received: false,
+        records_requested_date: null,
+        records_received_date: null,
+        bills_requested_date: null,
+        bills_received_date: null,
+      },
+    ],
     recent_activity: [
       {
         file: 'Activity Log/2024-02-01-call.md',
@@ -85,6 +101,40 @@ beforeEach(() => {
       return new Response(JSON.stringify({ project: { id: 42 } }))
     }
     if (href === '/api/law-firm/cases/colleen-colvin/workflow') {
+      if (init?.method === 'POST') {
+        return new Response(JSON.stringify({
+          result: {
+            started: [{ workflow_instance_id: 9, definition_slug: 'firmvault-request-medical-records' }],
+            skipped: [],
+            materialized: [{ created: [{ task_id: 99, node_key: 'verify_medical_authorization' }] }],
+          },
+          workflow_instances: [
+            {
+              workflow_instance_id: 9,
+              workflow_key: 'firmvault-request-medical-records:law_firm_case:colleen-colvin:provider_slug=uofl-orthopedics',
+              definition_slug: 'firmvault-request-medical-records',
+              definition_name: 'Request Medical Records',
+              definition_version: 2,
+              vars: { provider_slug: 'uofl-orthopedics', provider_name: 'UofL Orthopedics' },
+              status: 'active',
+              started_by: 'tester',
+              started_at: 1000,
+              completed_at: null,
+              updated_at: 1000,
+              total_nodes: 2,
+              ready_nodes: 0,
+              running_nodes: 1,
+              waiting_nodes: 0,
+              blocked_nodes: 0,
+              complete_nodes: 0,
+              failed_nodes: 0,
+              task_count: 1,
+              nodes: [],
+            },
+          ],
+          medical_providers: caseDetail.dashboard.medical_providers,
+        }), { status: 201 })
+      }
       if (init?.method === 'PATCH') {
         const requestBody = JSON.parse(String(init.body || '{}')) as { action?: string }
         if (requestBody.action === 'bypass_node') {
@@ -160,6 +210,7 @@ beforeEach(() => {
             definition_slug: 'firmvault-request-medical-records',
             definition_name: 'Request Medical Records',
             definition_version: 2,
+            vars: { provider_slug: 'foundation-radiology', provider_name: 'Foundation Radiology' },
             status: 'active',
             started_by: 'tester',
             started_at: 1000,
@@ -188,6 +239,7 @@ beforeEach(() => {
             ],
           },
         ],
+        medical_providers: caseDetail.dashboard.medical_providers,
         ready_items: [],
         workflows: [
           {
@@ -260,12 +312,30 @@ describe('LawFirmCaseWorkspace', () => {
 
     await waitFor(() => expect(screen.getByText('Lien Identification and Resolution')).toBeTruthy())
 
-    expect(screen.getByText('Active')).toBeTruthy()
+    expect(screen.getAllByText('Active').length).toBeGreaterThan(0)
     expect(screen.getByText('Request Medical Records')).toBeTruthy()
     expect(document.body.textContent).toContain('due')
     expect(document.body.textContent).toContain('Blocked by: timer due 2023-11-14T22:13:20.000Z')
     expect(screen.getByText('identify liens')).toBeTruthy()
     expect(screen.getByText('open liens')).toBeTruthy()
+  })
+
+  it('can start the provider-scoped medical records workflow from the workflow tab', async () => {
+    nav.pathname = '/law-firm/case/colleen-colvin/workflow'
+    render(<LawFirmCaseWorkspace />)
+
+    await waitFor(() => expect(screen.getByText('UofL Orthopedics')).toBeTruthy())
+    fireEvent.click(screen.getByText('Start Records'))
+
+    await waitFor(() => expect(document.body.textContent).toContain('Medical records workflow started'))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/law-firm/cases/colleen-colvin/workflow',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('start_provider_medical_records'),
+      }),
+    )
+    expect(document.body.textContent).toContain('Provider: UofL Orthopedics')
   })
 
   it('can cancel an active workflow instance from the workflow tab', async () => {

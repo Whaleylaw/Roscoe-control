@@ -51,6 +51,24 @@ landmarks:
     satisfied_by: null
     evidence: null
 `, 'utf8')
+    await mkdir(join(caseDir, 'contacts'), { recursive: true })
+    await writeFile(join(caseDir, 'contacts', 'uofl-orthopedics.md'), `---
+role: treating_provider
+treatment_status: complete
+records_requested: true
+records_received: false
+bills_requested: true
+bills_received: true
+records_requested_date: 2024-02-01
+bills_received_date: 2024-02-10
+---
+# UofL Orthopedics
+`, 'utf8')
+    await writeFile(join(caseDir, 'contacts', 'example-adjuster.md'), `---
+role: insurance_adjuster
+---
+# Example Adjuster
+`, 'utf8')
 
     const cases = await listLawFirmCases()
     expect(cases).toHaveLength(1)
@@ -63,6 +81,20 @@ landmarks:
 
     const detail = await readLawFirmCaseDetail('alpha-case')
     expect(detail.state.phases.map((phase) => phase.key)).toEqual(['phase_2_treatment', 'phase_3_demand'])
+    expect(detail.dashboard.medical_providers).toEqual([
+      expect.objectContaining({
+        slug: 'uofl-orthopedics',
+        name: 'UofL Orthopedics',
+        role: 'treating_provider',
+        treatment_status: 'complete',
+        records_requested: true,
+        records_received: false,
+        bills_requested: true,
+        bills_received: true,
+        records_requested_date: '2024-02-01',
+        bills_received_date: '2024-02-10',
+      }),
+    ])
 
     await updateLawFirmCaseState('alpha-case', {
       current_phase: 'phase_3_demand',

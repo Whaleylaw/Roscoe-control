@@ -36,6 +36,7 @@ export type LawFirmCaseDetail = {
   summary: LawFirmCaseSummary
   dashboard: {
     claims: Array<Record<string, string>>
+    medical_providers: LawFirmMedicalProvider[]
     recent_activity: Array<{ file: string; date: string | null; category: string | null; title: string; excerpt: string }>
   }
   state: {
@@ -44,6 +45,21 @@ export type LawFirmCaseDetail = {
     landmarks: LawFirmLandmark[]
   }
   files: Array<{ name: string; kind: 'markdown' | 'directory' | 'other' }>
+}
+
+export type LawFirmMedicalProvider = {
+  slug: string
+  name: string
+  role: string | null
+  treatment_status: string | null
+  records_requested: boolean | null
+  records_received: boolean | null
+  bills_requested: boolean | null
+  bills_received: boolean | null
+  records_requested_date: string | null
+  records_received_date: string | null
+  bills_requested_date: string | null
+  bills_received_date: string | null
 }
 
 export type LawFirmCaseProject = {
@@ -90,8 +106,9 @@ export async function readLawFirmCaseDetail(slug: string): Promise<LawFirmCaseDe
     readState(caseDir),
     readCaseFiles(caseDir),
   ])
-  const [claims, recentActivity] = await Promise.all([
+  const [claims, medicalProviders, recentActivity] = await Promise.all([
     readClaims(caseDir),
+    readMedicalProviders(caseDir),
     readRecentActivity(caseDir),
   ])
 
@@ -99,6 +116,7 @@ export async function readLawFirmCaseDetail(slug: string): Promise<LawFirmCaseDe
     summary,
     dashboard: {
       claims,
+      medical_providers: medicalProviders,
       recent_activity: recentActivity,
     },
     state: {
@@ -384,6 +402,43 @@ async function readClaims(caseDir: string): Promise<Array<Record<string, string>
     ))
 }
 
+async function readMedicalProviders(caseDir: string): Promise<LawFirmMedicalProvider[]> {
+  const contactsDir = join(caseDir, 'contacts')
+  try {
+    const entries = await readdir(contactsDir, { withFileTypes: true })
+    const providers = await Promise.all(entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.'))
+      .map(async (entry): Promise<LawFirmMedicalProvider | null> => {
+        const raw = await readFile(join(contactsDir, entry.name), 'utf8')
+        const frontmatter = parseMarkdownFrontmatter(raw)
+        const role = stringValue(frontmatter.role)
+        const tags = Array.isArray(frontmatter.tags) ? frontmatter.tags.map((tag) => String(tag)) : []
+        const isProvider = role === 'treating_provider' || tags.some((tag) => tag.includes('medical-provider'))
+        if (!isProvider) return null
+        const slug = entry.name.replace(/\.md$/, '')
+        return {
+          slug,
+          name: markdownTitle(raw) || titleFromSlug(slug),
+          role,
+          treatment_status: stringValue(frontmatter.treatment_status),
+          records_requested: booleanOrNull(frontmatter.records_requested),
+          records_received: booleanOrNull(frontmatter.records_received),
+          bills_requested: booleanOrNull(frontmatter.bills_requested),
+          bills_received: booleanOrNull(frontmatter.bills_received),
+          records_requested_date: stringValue(frontmatter.records_requested_date),
+          records_received_date: stringValue(frontmatter.records_received_date),
+          bills_requested_date: stringValue(frontmatter.bills_requested_date),
+          bills_received_date: stringValue(frontmatter.bills_received_date),
+        }
+      }))
+    return providers
+      .filter((provider): provider is LawFirmMedicalProvider => provider !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  } catch {
+    return []
+  }
+}
+
 async function readRecentActivity(caseDir: string): Promise<LawFirmCaseDetail['dashboard']['recent_activity']> {
   const activityDir = join(caseDir, 'Activity Log')
   try {
@@ -485,6 +540,20 @@ function stringValue(value: unknown): string | null {
   if (value instanceof Date) return value.toISOString().slice(0, 10)
   const str = String(value).trim()
   return str || null
+}
+
+function booleanOrNull(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', 'yes', '1'].includes(normalized)) return true
+    if (['false', 'no', '0'].includes(normalized)) return false
+  }
+  return null
+}
+
+function markdownTitle(raw: string): string | null {
+  return raw.replace(/^---\n[\s\S]*?\n---\n?/, '').match(/^#\s+(.+)$/m)?.[1]?.trim() || null
 }
 
 function normalizePhase(value: string | null): string | null {

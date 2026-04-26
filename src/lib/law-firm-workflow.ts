@@ -949,7 +949,7 @@ function taskMetadata(
   }
 }
 
-function ensureProjectRepoMapEntry(db: Database, projectId: number, repoPath: string): void {
+export function ensureProjectRepoMapEntry(db: Database, projectId: number, repoPath: string): void {
   const key = 'runtime.project_repo_map'
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
   let map: Record<string, string> = {}
