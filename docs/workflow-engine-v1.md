@@ -289,6 +289,19 @@ Condition dependencies are pushed through
 `law_firm.landmarks.treatment_complete == true`; the dependency engine then
 updates only nodes waiting on that exact condition for that subject.
 
+## FirmVault Test Ladder
+
+FirmVault workflow tests use synthetic cases under the normal FirmVault
+`cases/` tree. These cases use the reserved `test-ladder-*` slug prefix and
+frontmatter `workflow_test: true`, so Mission Control and the vault see them as
+ordinary cases while operators can still distinguish them from real matters.
+
+Global FirmVault workflow automation remains disabled while Phase 0 is under
+test. Tests and operators manually start workflow instances for specific
+synthetic case slugs, then call the normal materialization path. This exercises
+the same workflow instance, node, task, recipe, and review machinery used by
+real cases without scanning or materializing work for the rest of the vault.
+
 ## Audit Trail
 
 The append-only `workflow_events` table answers:
