@@ -51,6 +51,22 @@ landmarks:
     satisfied_by: null
     evidence: null
 `, 'utf8')
+    await writeFile(join(caseDir, 'alpha-case.md'), `---
+schema_version: 2
+client_name: Alpha Case
+---
+# Alpha Case
+
+## Medical Providers
+- [[contacts/uofl-orthopedics|UofL Orthopedics]]
+
+<!-- roscoe-medical-start -->
+### Treatment Details (Roscoe)
+| Provider | Status | Start | End | Billed | Bills Req | Bills Rec | Records Req | Records Rec |
+|----------|--------|-------|-----|--------|-----------|-----------|-------------|-------------|
+| UofL Orthopedics | Treatment Complete | 2024-01-03 | 2024-01-04 | $100.00 | 2024-02-02 | 2024-02-10 | 2024-02-01 | 2024-02-09 |
+<!-- roscoe-medical-end -->
+`, 'utf8')
     await mkdir(join(caseDir, 'contacts'), { recursive: true })
     await writeFile(join(caseDir, 'contacts', 'uofl-orthopedics.md'), `---
 role: treating_provider
@@ -86,12 +102,14 @@ role: insurance_adjuster
         slug: 'uofl-orthopedics',
         name: 'UofL Orthopedics',
         role: 'treating_provider',
-        treatment_status: 'complete',
+        treatment_status: 'Treatment Complete',
         records_requested: true,
-        records_received: false,
+        records_received: true,
         bills_requested: true,
         bills_received: true,
         records_requested_date: '2024-02-01',
+        records_received_date: '2024-02-09',
+        bills_requested_date: '2024-02-02',
         bills_received_date: '2024-02-10',
       }),
     ])

@@ -1,6 +1,6 @@
 import { readdir, readFile, stat, writeFile } from 'fs/promises'
 import { createHash } from 'crypto'
-import { join } from 'path'
+import { basename, join } from 'path'
 import type { Database } from 'better-sqlite3'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
@@ -60,6 +60,15 @@ export type LawFirmMedicalProvider = {
   records_received_date: string | null
   bills_requested_date: string | null
   bills_received_date: string | null
+}
+
+type RoscoeMedicalRow = {
+  provider: string
+  status: string | null
+  bills_requested_date: string | null
+  bills_received_date: string | null
+  records_requested_date: string | null
+  records_received_date: string | null
 }
 
 export type LawFirmCaseProject = {
@@ -405,6 +414,7 @@ async function readClaims(caseDir: string): Promise<Array<Record<string, string>
 async function readMedicalProviders(caseDir: string): Promise<LawFirmMedicalProvider[]> {
   const contactsDir = join(caseDir, 'contacts')
   try {
+    const medicalRows = await readRoscoeMedicalRows(caseDir)
     const entries = await readdir(contactsDir, { withFileTypes: true })
     const providers = await Promise.all(entries
       .filter((entry) => entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.'))
@@ -416,19 +426,21 @@ async function readMedicalProviders(caseDir: string): Promise<LawFirmMedicalProv
         const isProvider = role === 'treating_provider' || tags.some((tag) => tag.includes('medical-provider'))
         if (!isProvider) return null
         const slug = entry.name.replace(/\.md$/, '')
+        const name = markdownTitle(raw) || titleFromSlug(slug)
+        const medicalRow = medicalRows.get(providerMatchKey(name)) ?? medicalRows.get(providerMatchKey(slug))
         return {
           slug,
-          name: markdownTitle(raw) || titleFromSlug(slug),
+          name,
           role,
-          treatment_status: stringValue(frontmatter.treatment_status),
-          records_requested: booleanOrNull(frontmatter.records_requested),
-          records_received: booleanOrNull(frontmatter.records_received),
-          bills_requested: booleanOrNull(frontmatter.bills_requested),
-          bills_received: booleanOrNull(frontmatter.bills_received),
-          records_requested_date: stringValue(frontmatter.records_requested_date),
-          records_received_date: stringValue(frontmatter.records_received_date),
-          bills_requested_date: stringValue(frontmatter.bills_requested_date),
-          bills_received_date: stringValue(frontmatter.bills_received_date),
+          treatment_status: medicalRow?.status ?? stringValue(frontmatter.treatment_status),
+          records_requested: medicalRow ? Boolean(medicalRow.records_requested_date) : booleanOrNull(frontmatter.records_requested),
+          records_received: medicalRow ? Boolean(medicalRow.records_received_date) : booleanOrNull(frontmatter.records_received),
+          bills_requested: medicalRow ? Boolean(medicalRow.bills_requested_date) : booleanOrNull(frontmatter.bills_requested),
+          bills_received: medicalRow ? Boolean(medicalRow.bills_received_date) : booleanOrNull(frontmatter.bills_received),
+          records_requested_date: medicalRow?.records_requested_date ?? stringValue(frontmatter.records_requested_date),
+          records_received_date: medicalRow?.records_received_date ?? stringValue(frontmatter.records_received_date),
+          bills_requested_date: medicalRow?.bills_requested_date ?? stringValue(frontmatter.bills_requested_date),
+          bills_received_date: medicalRow?.bills_received_date ?? stringValue(frontmatter.bills_received_date),
         }
       }))
     return providers
@@ -437,6 +449,29 @@ async function readMedicalProviders(caseDir: string): Promise<LawFirmMedicalProv
   } catch {
     return []
   }
+}
+
+async function readRoscoeMedicalRows(caseDir: string): Promise<Map<string, RoscoeMedicalRow>> {
+  const raw = await readOptionalFile(join(caseDir, `${basename(caseDir)}.md`))
+  const rows = new Map<string, RoscoeMedicalRow>()
+  if (!raw) return rows
+  const match = raw.match(/<!-- roscoe-medical-start -->([\s\S]*?)<!-- roscoe-medical-end -->/)
+  if (!match) return rows
+  const lines = match[1].split('\n').map((line) => line.trim()).filter((line) => line.startsWith('|'))
+  for (const line of lines) {
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim())
+    if (cells.length < 9 || cells[0] === 'Provider' || /^-+$/.test(cells[0])) continue
+    const row: RoscoeMedicalRow = {
+      provider: cells[0],
+      status: stringValue(cells[1]),
+      bills_requested_date: stringValue(cells[5]),
+      bills_received_date: stringValue(cells[6]),
+      records_requested_date: stringValue(cells[7]),
+      records_received_date: stringValue(cells[8]),
+    }
+    rows.set(providerMatchKey(row.provider), row)
+  }
+  return rows
 }
 
 async function readRecentActivity(caseDir: string): Promise<LawFirmCaseDetail['dashboard']['recent_activity']> {
@@ -554,6 +589,15 @@ function booleanOrNull(value: unknown): boolean | null {
 
 function markdownTitle(raw: string): string | null {
   return raw.replace(/^---\n[\s\S]*?\n---\n?/, '').match(/^#\s+(.+)$/m)?.[1]?.trim() || null
+}
+
+function providerMatchKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function normalizePhase(value: string | null): string | null {

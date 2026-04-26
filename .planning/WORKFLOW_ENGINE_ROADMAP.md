@@ -151,7 +151,7 @@ Goal: make the first real FirmVault workflow production-usable.
 - Confirm required variables such as provider, case slug, authorization status, and request target.
 - Test on Abby Sitgraves or a fixture case.
 
-Status: fixture-tested. The workflow now has concrete recipe nodes, bundled reference materials, provider-scoped SOUL/REVIEW guidance, validated recipe cards, runtime workflow variables passed into materialized tasks, and a provider-scoped activation path from the case Workflow tab. Remaining work: run it against Abby Sitgraves in the local FirmVault mirror and make any case-data adjustments exposed by that production-shaped test.
+Status: production-shaped Abby run complete. The workflow now has concrete recipe nodes, bundled reference materials, provider-scoped SOUL/REVIEW guidance, validated recipe cards, runtime workflow variables passed into materialized tasks, and a provider-scoped activation path from the case Workflow tab. The Abby run exposed that contact stubs alone are not enough for provider records/bills state, so the adapter now enriches provider cards from the canonical Roscoe medical table in the case file. Remaining work: make provider workflow activation state-aware so a provider with requests already sent can enter a follow-up/wait path instead of starting at the initial request path.
 
 ### 7. Additional FirmVault Workflow Conversion
 
@@ -208,4 +208,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Run the provider-scoped Request Medical Records workflow against Abby Sitgraves in the local FirmVault mirror, then either adjust the case-data mapping or start converting the next FirmVault workflow**.
+Current recommended next step: **Make Request Medical Records activation state-aware: complete providers should be disabled, already-requested providers should enter follow-up/wait behavior, and only unrequested providers should start at the initial authorization/request path**.
