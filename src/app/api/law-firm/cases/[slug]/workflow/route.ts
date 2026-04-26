@@ -5,7 +5,8 @@ import { requireRole } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
-import { cancelWorkflowInstance, listWorkflowActivity } from '@/lib/workflow-engine'
+import { ensureLawFirmCaseProject } from '@/lib/law-firm'
+import { bypassWorkflowNode, cancelWorkflowInstance, listWorkflowActivity, materializeReadyWorkflowNodes } from '@/lib/workflow-engine'
 import {
   materializeLawFirmWorkflowTasks,
   previewLawFirmWorkflowStatuses,
@@ -28,6 +29,12 @@ const patchSchema = z.union([
   z.object({
     action: z.literal('cancel_instance'),
     workflow_instance_id: z.number().int().positive(),
+    reason: z.string().max(1000).optional(),
+  }),
+  z.object({
+    action: z.literal('bypass_node'),
+    workflow_instance_id: z.number().int().positive(),
+    node_key: z.string().min(1).max(200),
     reason: z.string().max(1000).optional(),
   }),
 ])
@@ -146,6 +153,30 @@ export async function PATCH(
         workspaceId,
       })
       return NextResponse.json({ case_slug: slug, cancelled, workflow_instances: workflowInstances })
+    }
+    if (parsed.data.action === 'bypass_node') {
+      const bypassed = bypassWorkflowNode(db, {
+        workflowInstanceId: parsed.data.workflow_instance_id,
+        nodeKey: parsed.data.node_key,
+        actor,
+        workspaceId,
+        reason: parsed.data.reason ?? `Marked not applicable from case ${slug}`,
+      })
+      if (!bypassed) return NextResponse.json({ error: 'Workflow node not found' }, { status: 404 })
+      const project = await ensureLawFirmCaseProject(db, workspaceId, slug)
+      const materialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: parsed.data.workflow_instance_id,
+        projectId: project.id,
+        workspaceId,
+        actor,
+        status: 'inbox',
+      })
+      const workflowInstances = listWorkflowActivity(db, {
+        subjectType: 'law_firm_case',
+        subjectId: slug,
+        workspaceId,
+      })
+      return NextResponse.json({ case_slug: slug, bypassed, materialized, workflow_instances: workflowInstances })
     }
 
     const workflows = await updateLawFirmWorkflowOverride(slug, parsed.data.workflow_id, parsed.data.action, actor)

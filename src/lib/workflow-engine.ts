@@ -186,6 +186,22 @@ export type CancelWorkflowInstanceResult = {
   cancelled_nodes: number
 } | null
 
+export type BypassWorkflowNodeInput = {
+  workflowInstanceId: number
+  nodeKey: string
+  actor: string
+  workspaceId: number
+  reason?: string
+  now?: number
+}
+
+export type BypassWorkflowNodeResult = {
+  workflow_instance_id: number
+  node_instance_id: number
+  node_key: string
+  ready_nodes: string[]
+} | null
+
 export type AdvanceWorkflowAfterTaskApprovalInput = {
   taskId: number
   actor: string
@@ -516,6 +532,14 @@ export function listWorkflowActivity(
     WHERE workflow_instance_id = ?
     ORDER BY id ASC
   `)
+  const blockerStmt = db.prepare(`
+    SELECT node_instance_id, dependency_type, dependency_key, source_node_key, status, due_at
+    FROM workflow_node_dependencies
+    WHERE workflow_instance_id = ?
+      AND status IN ('pending', 'scheduled')
+      AND dependency_semantics IN ('blocks', 'waits_for_all', 'conditional_on_failure', 'waits_for_any')
+    ORDER BY id ASC
+  `)
 
   return rows.map((row) => {
     const nodes = nodeStmt.all(row.id) as Array<{
@@ -529,6 +553,21 @@ export function listWorkflowActivity(
       completed_at: number | null
       blocked_by_json: string | null
     }>
+    const blockers = blockerStmt.all(row.id) as Array<{
+      node_instance_id: number
+      dependency_type: 'node' | 'condition' | 'timer'
+      dependency_key: string
+      source_node_key: string | null
+      status: WorkflowNodeDependencyStatus
+      due_at: number | null
+    }>
+    const blockersByNode = new Map<number, string[]>()
+    for (const blocker of blockers) {
+      blockersByNode.set(blocker.node_instance_id, [
+        ...(blockersByNode.get(blocker.node_instance_id) ?? []),
+        workflowDependencyBlockerLabel(blocker),
+      ])
+    }
     const mappedNodes = nodes.map((node) => ({
       id: node.id,
       node_key: node.node_key,
@@ -538,7 +577,10 @@ export function listWorkflowActivity(
       task_id: node.task_id,
       due_at: node.due_at,
       completed_at: node.completed_at,
-      blocked_by: parseStringArray(node.blocked_by_json),
+      blocked_by: uniqueStrings([
+        ...parseStringArray(node.blocked_by_json),
+        ...(blockersByNode.get(node.id) ?? []),
+      ]),
     }))
     return {
       workflow_instance_id: row.id,
@@ -809,6 +851,90 @@ export function cancelWorkflowInstance(
     result = {
       workflow_instance_id: input.workflowInstanceId,
       cancelled_nodes: nodes.changes,
+    }
+  })()
+
+  return result
+}
+
+export function bypassWorkflowNode(
+  db: Database.Database,
+  input: BypassWorkflowNodeInput,
+): BypassWorkflowNodeResult {
+  const now = input.now ?? Math.floor(Date.now() / 1000)
+  let result: BypassWorkflowNodeResult = null
+
+  db.transaction(() => {
+    const node = db.prepare(`
+      SELECT wni.id, wni.workflow_instance_id, wni.node_key, wni.status, wi.workspace_id
+      FROM workflow_node_instances wni
+      JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
+      WHERE wni.workflow_instance_id = ?
+        AND wni.node_key = ?
+        AND wi.workspace_id = ?
+      LIMIT 1
+    `).get(input.workflowInstanceId, input.nodeKey, input.workspaceId) as {
+      id: number
+      workflow_instance_id: number
+      node_key: string
+      status: WorkflowNodeStatus
+      workspace_id: number
+    } | undefined
+    if (!node) return
+    if (['complete', 'skipped', 'cancelled'].includes(node.status)) {
+      result = {
+        workflow_instance_id: node.workflow_instance_id,
+        node_instance_id: node.id,
+        node_key: node.node_key,
+        ready_nodes: [],
+      }
+      return
+    }
+
+    const reason = input.reason ?? 'Marked not applicable.'
+    const updated = db.prepare(`
+      UPDATE workflow_node_instances
+      SET status = 'skipped',
+          completed_at = COALESCE(completed_at, ?),
+          output_json = ?,
+          updated_at = ?
+      WHERE id = ?
+        AND status NOT IN ('complete', 'skipped', 'cancelled')
+    `).run(now, JSON.stringify({ reason, bypassed_by: input.actor }), now, node.id)
+    if (updated.changes === 0) return
+
+    db.prepare(`
+      UPDATE workflow_node_dependencies
+      SET status = 'cancelled', updated_at = ?
+      WHERE node_instance_id = ?
+        AND status IN ('pending', 'scheduled')
+    `).run(now, node.id)
+
+    writeWorkflowEvent(db, {
+      workflowInstanceId: node.workflow_instance_id,
+      nodeInstanceId: node.id,
+      nodeKey: node.node_key,
+      eventType: 'node.skipped',
+      actorType: 'human',
+      actorId: input.actor,
+      payload: { reason },
+      workspaceId: node.workspace_id,
+      createdAt: now,
+    })
+    satisfyNodeDependencyInTransaction(db, {
+      workflowInstanceId: node.workflow_instance_id,
+      nodeKey: node.node_key,
+      actor: input.actor,
+      payload: { reason: 'node_bypassed', bypass_reason: reason },
+      now,
+    })
+    const readyNodes = evaluateWorkflowInstanceInTransaction(db, node.workflow_instance_id, now)
+    updateWorkflowInstanceCompletionInTransaction(db, node.workflow_instance_id, node.workspace_id, input.actor, now)
+    result = {
+      workflow_instance_id: node.workflow_instance_id,
+      node_instance_id: node.id,
+      node_key: node.node_key,
+      ready_nodes: readyNodes,
     }
   })()
 
@@ -1699,13 +1825,36 @@ function normalizedNodeDependenciesSatisfied(
       waitsForAnyByGroup.set(group, [...(waitsForAnyByGroup.get(group) ?? []), dependency])
       continue
     }
-    if (runtimeByKey.get(dependency.node)?.status !== 'complete') return false
+    const status = runtimeByKey.get(dependency.node)?.status
+    if (status !== 'complete' && status !== 'skipped') return false
   }
 
   for (const group of waitsForAnyByGroup.values()) {
-    if (!group.some((dependency) => runtimeByKey.get(dependency.node)?.status === 'complete')) return false
+    if (!group.some((dependency) => {
+      const status = runtimeByKey.get(dependency.node)?.status
+      return status === 'complete' || status === 'skipped'
+    })) return false
   }
   return true
+}
+
+function workflowDependencyBlockerLabel(input: {
+  dependency_type: 'node' | 'condition' | 'timer'
+  dependency_key: string
+  source_node_key: string | null
+  status: WorkflowNodeDependencyStatus
+  due_at: number | null
+}): string {
+  if (input.dependency_type === 'node') return input.source_node_key ?? input.dependency_key.replace(/^node:/, '')
+  if (input.dependency_type === 'timer') {
+    if (input.due_at) return `timer due ${new Date(input.due_at * 1000).toISOString()}`
+    return input.source_node_key ? `timer after ${input.source_node_key}` : 'timer pending'
+  }
+  return input.dependency_key.replace(/^condition:[^:]+:[^:]+:/, '')
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
 }
 
 function nodeDependencyKey(nodeKey: string): string {

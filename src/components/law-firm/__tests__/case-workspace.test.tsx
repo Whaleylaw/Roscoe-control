@@ -7,13 +7,15 @@ const nav = vi.hoisted(() => ({
   push: vi.fn(),
 }))
 
+const translate = vi.hoisted(() => (key: string) => key)
+
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
   useRouter: () => ({ push: nav.push }),
 }))
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => translate,
 }))
 
 vi.mock('@/components/panels/task-board-panel', () => ({
@@ -84,6 +86,46 @@ beforeEach(() => {
     }
     if (href === '/api/law-firm/cases/colleen-colvin/workflow') {
       if (init?.method === 'PATCH') {
+        const requestBody = JSON.parse(String(init.body || '{}')) as { action?: string }
+        if (requestBody.action === 'bypass_node') {
+          return new Response(JSON.stringify({
+            workflow_instances: [
+              {
+                workflow_instance_id: 7,
+                workflow_key: 'firmvault-request-medical-records:law_firm_case:colleen-colvin',
+                definition_slug: 'firmvault-request-medical-records',
+                definition_name: 'Request Medical Records',
+                definition_version: 2,
+                status: 'complete',
+                started_by: 'tester',
+                started_at: 1000,
+                completed_at: 1700000001,
+                updated_at: 1700000001,
+                total_nodes: 1,
+                ready_nodes: 0,
+                running_nodes: 0,
+                waiting_nodes: 0,
+                blocked_nodes: 0,
+                complete_nodes: 0,
+                failed_nodes: 0,
+                task_count: 1,
+                nodes: [
+                  {
+                    id: 71,
+                    node_key: 'wait_for_records',
+                    node_type: 'wait',
+                    status: 'skipped',
+                    recipe_slug: null,
+                    task_id: null,
+                    due_at: 1700000000,
+                    completed_at: 1700000001,
+                    blocked_by: [],
+                  },
+                ],
+              },
+            ],
+          }))
+        }
         return new Response(JSON.stringify({
           workflow_instances: [
             {
@@ -141,7 +183,7 @@ beforeEach(() => {
                 task_id: null,
                 due_at: 1700000000,
                 completed_at: null,
-                blocked_by: [],
+                blocked_by: ['timer due 2023-11-14T22:13:20.000Z'],
               },
             ],
           },
@@ -221,6 +263,7 @@ describe('LawFirmCaseWorkspace', () => {
     expect(screen.getByText('Active')).toBeTruthy()
     expect(screen.getByText('Request Medical Records')).toBeTruthy()
     expect(document.body.textContent).toContain('due')
+    expect(document.body.textContent).toContain('Blocked by: timer due 2023-11-14T22:13:20.000Z')
     expect(screen.getByText('identify liens')).toBeTruthy()
     expect(screen.getByText('open liens')).toBeTruthy()
   })
@@ -241,6 +284,24 @@ describe('LawFirmCaseWorkspace', () => {
       }),
     )
     expect(document.body.textContent).toContain('cancelled')
+  })
+
+  it('can mark an instance node not applicable from the workflow tab', async () => {
+    nav.pathname = '/law-firm/case/colleen-colvin/workflow'
+    render(<LawFirmCaseWorkspace />)
+
+    await waitFor(() => expect(screen.getByText('Request Medical Records')).toBeTruthy())
+    fireEvent.click(screen.getByText('Not Applicable'))
+
+    await waitFor(() => expect(document.body.textContent).toContain('Workflow node marked not applicable'))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/law-firm/cases/colleen-colvin/workflow',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.stringContaining('bypass_node'),
+      }),
+    )
+    await waitFor(() => expect(document.body.textContent).toContain('skipped'))
   })
 
   it('renders a task board scoped to the hidden case project', async () => {

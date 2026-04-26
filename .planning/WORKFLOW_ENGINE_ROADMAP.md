@@ -136,7 +136,7 @@ Goal: users can manage workflows directly from the case UI.
 - Keep execution tasks on the existing Tasks tab.
 - Add tests around action rendering and API behavior.
 
-Status: in progress. Activate/close exists for legacy FirmVault workflow plans; cancel and timer visibility now exist for engine workflow instances. Remaining work: bypass/not-applicable controls at workflow/node level and richer blocker display.
+Status: complete for the current pass. Activate/close exists for legacy FirmVault workflow plans; engine workflow instances now show cancel, node-level bypass/not-applicable, blocker labels, and timer due dates. Future refinement can add a richer bypass reason modal and law-firm-specific landmark updates where a skipped node is meant to satisfy a case landmark.
 
 ### 6. Complete Request Medical Records Workflow
 
@@ -207,4 +207,4 @@ Use this order:
 3. Read this roadmap.
 4. Recommend the first unfinished item in "Next Implementation Steps" unless the user has redirected priority.
 
-Current recommended next step: **Add case Workflow controls for activate, cancel, bypass/not applicable, blockers, and timer visibility**.
+Current recommended next step: **Complete Request Medical Records Workflow recipes and recipe assets**.

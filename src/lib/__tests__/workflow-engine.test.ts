@@ -6,6 +6,7 @@ import { runMigrations } from '../migrations'
 import {
   advanceWorkflowAfterTaskApproval,
   advanceDueWorkflowTimers,
+  bypassWorkflowNode,
   cancelWorkflowInstance,
   createWorkflowDefinition,
   durationToSeconds,
@@ -720,6 +721,117 @@ nodes:
         WHERE workflow_instance_id = ?
         ORDER BY id DESC LIMIT 1
       `).get(instance.instance_id)).toMatchObject({ event_type: 'workflow.cancelled' })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('bypasses a not-applicable node and promotes downstream work', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: bypass-example
+name: Bypass Example
+subject_type: law_firm_case
+nodes:
+  optional_step:
+    type: recipe
+    recipe: hello-world
+  downstream_step:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      - optional_step
+`, 'tester', 1, 1)
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 4000,
+      })
+
+      const bypassed = bypassWorkflowNode(db, {
+        workflowInstanceId: instance.instance_id,
+        nodeKey: 'optional_step',
+        actor: 'operator',
+        workspaceId: 1,
+        reason: 'No lien exists.',
+        now: 4001,
+      })
+
+      expect(bypassed).toMatchObject({
+        workflow_instance_id: instance.instance_id,
+        node_key: 'optional_step',
+        ready_nodes: ['downstream_step'],
+      })
+      expect(db.prepare(`
+        SELECT status, completed_at, output_json
+        FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'optional_step'
+      `).get(instance.instance_id)).toMatchObject({
+        status: 'skipped',
+        completed_at: 4001,
+        output_json: JSON.stringify({ reason: 'No lien exists.', bypassed_by: 'operator' }),
+      })
+      expect(db.prepare(`
+        SELECT status
+        FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'downstream_step'
+      `).get(instance.instance_id)).toMatchObject({ status: 'ready' })
+      expect(db.prepare(`
+        SELECT event_type
+        FROM workflow_events
+        WHERE workflow_instance_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `).get(instance.instance_id)).toMatchObject({ event_type: 'node.ready' })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('lists unresolved dependency blockers for workflow activity nodes', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: blocker-display
+name: Blocker Display
+subject_type: law_firm_case
+nodes:
+  request_final_amount:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      conditions:
+        - law_firm.landmarks.treatment_complete == true
+`, 'tester', 1, 1)
+      startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 5000,
+      })
+
+      const activity = listWorkflowActivity(db, {
+        subjectType: 'law_firm_case',
+        subjectId: 'abby-sitgraves',
+        workspaceId: 1,
+      })
+
+      expect(activity[0].nodes[0]).toMatchObject({
+        node_key: 'request_final_amount',
+        blocked_by: ['law_firm.landmarks.treatment_complete == true'],
+      })
     } finally {
       db.close()
     }

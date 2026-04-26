@@ -123,7 +123,7 @@ export function LawFirmCaseWorkspace() {
   const [workflowLoading, setWorkflowLoading] = useState(false)
   const [workflowMaterializing, setWorkflowMaterializing] = useState(false)
   const [workflowOverriding, setWorkflowOverriding] = useState<string | null>(null)
-  const [workflowInstanceUpdating, setWorkflowInstanceUpdating] = useState<number | null>(null)
+  const [workflowInstanceUpdating, setWorkflowInstanceUpdating] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
 
   const loadDetail = useCallback(async () => {
@@ -257,7 +257,7 @@ export function LawFirmCaseWorkspace() {
 
   const cancelWorkflowInstance = useCallback(async (workflowInstanceId: number) => {
     if (workflowInstanceUpdating !== null) return
-    setWorkflowInstanceUpdating(workflowInstanceId)
+    setWorkflowInstanceUpdating(`cancel:${workflowInstanceId}`)
     setFeedback(null)
     try {
       const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
@@ -277,6 +277,36 @@ export function LawFirmCaseWorkspace() {
         workflows: prev?.workflows ?? [],
       }))
       setFeedback('Workflow instance cancelled')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
+  const bypassWorkflowNode = useCallback(async (workflowInstanceId: number, nodeKey: string) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(`bypass:${workflowInstanceId}:${nodeKey}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'bypass_node',
+          workflow_instance_id: workflowInstanceId,
+          node_key: nodeKey,
+          reason: 'Marked not applicable from the case Workflow tab.',
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      setFeedback('Workflow node marked not applicable')
     } catch (err) {
       setError(err instanceof Error ? err.message : t('workflowPreviewError'))
     } finally {
@@ -350,6 +380,7 @@ export function LawFirmCaseWorkspace() {
           onMaterialize={materializeWorkflow}
           onWorkflowOverride={updateWorkflowOverride}
           onCancelWorkflowInstance={cancelWorkflowInstance}
+          onBypassWorkflowNode={bypassWorkflowNode}
         />
       )}
       {view === 'activity' && <ActivityView detail={detail} />}
@@ -459,15 +490,17 @@ function WorkflowView({
   onMaterialize,
   onWorkflowOverride,
   onCancelWorkflowInstance,
+  onBypassWorkflowNode,
 }: {
   workflowPreview: WorkflowPreview | null
   workflowLoading: boolean
   workflowMaterializing: boolean
   workflowOverriding: string | null
-  workflowInstanceUpdating: number | null
+  workflowInstanceUpdating: string | null
   onMaterialize: () => void
   onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
   onCancelWorkflowInstance: (workflowInstanceId: number) => void
+  onBypassWorkflowNode: (workflowInstanceId: number, nodeKey: string) => void
 }) {
   const t = useTranslations('lawFirm')
   const workflowInstances = workflowPreview?.workflow_instances ?? []
@@ -514,7 +547,7 @@ function WorkflowView({
                         onClick={() => onCancelWorkflowInstance(workflow.workflow_instance_id)}
                         disabled={workflowInstanceUpdating !== null}
                       >
-                        {workflowInstanceUpdating === workflow.workflow_instance_id ? 'Cancelling' : 'Cancel'}
+                        {workflowInstanceUpdating === `cancel:${workflow.workflow_instance_id}` ? 'Cancelling' : 'Cancel'}
                       </Button>
                     ) : null}
                   </div>
@@ -528,13 +561,30 @@ function WorkflowView({
                 </div>
                 <div className="mt-3 space-y-1.5">
                   {workflow.nodes.map((node) => (
-                    <div key={node.id} className="flex items-center justify-between gap-2 rounded border px-2 py-1 text-xs">
-                      <span className="min-w-0 truncate text-foreground">
-                        {formatLabel(node.node_key)}
-                        {node.task_id ? <span className="ml-1 text-muted-foreground">#{node.task_id}</span> : null}
-                        {node.due_at ? <span className="ml-1 text-purple-500">due {formatUnixTime(node.due_at)}</span> : null}
-                      </span>
-                      <span className={`shrink-0 rounded px-1.5 py-0.5 ${workflowNodeTone(node.status)}`}>{formatLabel(node.status)}</span>
+                    <div key={node.id} className="rounded border px-2 py-1 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-foreground">
+                          {formatLabel(node.node_key)}
+                          {node.task_id ? <span className="ml-1 text-muted-foreground">#{node.task_id}</span> : null}
+                          {node.due_at ? <span className="ml-1 text-purple-500">due {formatUnixTime(node.due_at)}</span> : null}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {canBypassWorkflowNode(node.status) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onBypassWorkflowNode(workflow.workflow_instance_id, node.node_key)}
+                              disabled={workflowInstanceUpdating !== null}
+                            >
+                              {workflowInstanceUpdating === `bypass:${workflow.workflow_instance_id}:${node.node_key}` ? 'Bypassing' : 'Not Applicable'}
+                            </Button>
+                          ) : null}
+                          <span className={`rounded px-1.5 py-0.5 ${workflowNodeTone(node.status)}`}>{formatLabel(node.status)}</span>
+                        </div>
+                      </div>
+                      {node.blocked_by.length > 0 && (
+                        <div className="mt-1 text-amber-500">Blocked by: {node.blocked_by.join(', ')}</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -679,6 +729,10 @@ function workflowNodeTone(status: WorkflowPreview['workflow_instances'][number][
   if (status === 'waiting') return 'bg-purple-500/10 text-purple-500'
   if (status === 'failed' || status === 'cancelled') return 'bg-red-500/10 text-red-500'
   return 'bg-amber-500/10 text-amber-500'
+}
+
+function canBypassWorkflowNode(status: WorkflowPreview['workflow_instances'][number]['nodes'][number]['status']): boolean {
+  return ['pending', 'ready', 'waiting', 'blocked'].includes(status)
 }
 
 function WorkflowMetric({ label, value }: { label: string; value: number | string }) {
