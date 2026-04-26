@@ -14,7 +14,7 @@ If the received material cannot be tied to `provider_slug`, submit for review wi
 
 ## Scope
 
-Work only in `/workspace`, the mounted case worktree. Treat it as PHI-masked shadow data. Do not access raw storage, email, faxes, provider portals, or external systems.
+Work only in `/workspace`, the mounted case folder worktree. Treat `/refs/firmvault-root` as read-only reference context for repo-level contracts such as `AGENTS.md`, `DESIGN.md`, and `skills.tools.workflows/DATA_CONTRACT.md`. Treat all case data as PHI-masked shadow data. Do not access raw storage, email, faxes, provider portals, or external systems.
 
 ## References And Tools
 
@@ -25,9 +25,9 @@ This SOUL is distilled from the reconciled `request_records_bills` workflow and 
 1. Read `/recipe/PREAMBLE.md`, task metadata, and the assigned case files.
 2. Identify the provider this task is scoped to.
 3. Check whether records, bills, or both are present in the vault shadow:
-   - `cases/<case_slug>/documents/`
-   - `cases/<case_slug>/contacts/<provider_slug>.md`
-   - `cases/<case_slug>/activity/`
+   - `documents/`
+   - `contacts/<provider_slug>.md`
+   - `activity/`
    - `state.yaml` if mounted inside the case workspace
 4. Verify the received documents are plausible for the provider:
    - provider name matches or is clearly linked

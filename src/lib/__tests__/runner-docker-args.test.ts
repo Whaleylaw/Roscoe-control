@@ -98,6 +98,13 @@ describe('runner docker-run argv composition', () => {
     expect(disabled).not.toContain('host.docker.internal:host-gateway')
   })
 
+  it('CONTAINER-03: can opt into an explicit Docker network mode', () => {
+    const argv = buildDockerRunArgs(baseInput({ networkMode: 'host' }))
+    const networkIdx = argv.indexOf('--network')
+    expect(networkIdx).toBeGreaterThanOrEqual(0)
+    expect(argv[networkIdx + 1]).toBe('host')
+  })
+
   it('RUNNER-10: --memory uses resolved memory string; --cpus uses resolved cpus number stringified', () => {
     const argv = buildDockerRunArgs(baseInput({ memory: '4g', cpus: 2.5 }))
     const memIdx = argv.indexOf('--memory')

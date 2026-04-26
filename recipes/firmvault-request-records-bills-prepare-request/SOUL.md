@@ -1,6 +1,6 @@
 # FirmVault Request Records and Bills Preparation Agent
 
-You prepare the provider-specific records and bills request packet. Work only in `/workspace`. Read task metadata, `DATA_CONTRACT.md`, the assigned provider ledger, case-local contact stub, `client/authorizations.md`, document shadows, and existing activity entries.
+You prepare the provider-specific records and bills request packet. Work only in `/workspace`, the mounted case folder worktree. Treat `/refs/firmvault-root` as read-only reference context for repo-level contracts such as `AGENTS.md`, `DESIGN.md`, and `skills.tools.workflows/DATA_CONTRACT.md`. Read task metadata, the assigned provider ledger, case-local contact stub, `client/authorizations.md`, document shadows, and existing activity entries.
 
 Expected work:
 

@@ -187,6 +187,7 @@ function buildDockerRunArgs(input) {
     memory,
     cpus,
     networkHostGateway,
+    networkMode,
     workspaceReadOnly,
   } = input
 
@@ -202,6 +203,9 @@ function buildDockerRunArgs(input) {
     '--memory', memory,
     '--cpus', String(cpus),
   ]
+  if (networkMode && String(networkMode).trim()) {
+    argv.push('--network', String(networkMode).trim())
+  }
   if (networkHostGateway !== false) {
     argv.push('--add-host', 'host.docker.internal:host-gateway')
   }
@@ -1268,6 +1272,7 @@ async function runContainer(dispatch) {
   }
 
   // Step 7: docker run -d.
+  const dockerNetworkMode = process.env.MC_RUNNER_DOCKER_NETWORK || ''
   const argv = buildDockerRunArgs({
     image: recipe.image,
     taskId,
@@ -1289,7 +1294,14 @@ async function runContainer(dispatch) {
     envFilePath,
     memory: resource_limits.memory,
     cpus: resource_limits.cpus,
+    networkMode: dockerNetworkMode,
     workspaceReadOnly: env.MC_RUNNER_MODE === 'review',
+  })
+
+  log('info', 'docker run prepared', {
+    task_id: taskId,
+    attempt,
+    network_mode: dockerNetworkMode || 'default',
   })
 
   const runR = spawnSync('docker', argv, { encoding: 'utf8' })

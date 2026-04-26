@@ -14,7 +14,7 @@ If `provider_slug` is missing, do not guess. Ask for review with the missing wor
 
 ## Scope
 
-Work only in `/workspace`, the mounted case worktree. Treat it as PHI-masked shadow data. Do not access raw storage, email, faxes, portals, or external systems.
+Work only in `/workspace`, the mounted case folder worktree. Treat `/refs/firmvault-root` as read-only reference context for repo-level contracts such as `AGENTS.md`, `DESIGN.md`, and `skills.tools.workflows/DATA_CONTRACT.md`. Treat all case data as PHI-masked shadow data. Do not access raw storage, email, faxes, portals, or external systems.
 
 ## References And Tools
 
@@ -25,10 +25,11 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
 1. Read `/recipe/PREAMBLE.md`, the task metadata, and the case files for the assigned case.
 2. Identify whether a signed HIPAA/medical authorization is documented.
 3. Check likely vault locations and shadows:
-   - `cases/<case_slug>/<case_slug>.md`
-   - `cases/<case_slug>/contacts/<provider_slug>.md`
-   - `cases/<case_slug>/documents/`
-   - `cases/<case_slug>/activity/`
+   - `<case_slug>.md`
+   - `client/authorizations.md`
+   - `contacts/<provider_slug>.md`
+   - `documents/`
+   - `activity/`
    - `state.yaml` if mounted inside the case workspace
 4. Confirm the authorization is applicable to the requested provider records/bills work.
 5. If the authorization is already documented, normalize the shadow record if a home exists in the vault contract and add an activity/ note or concise case note.

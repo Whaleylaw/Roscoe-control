@@ -45,6 +45,7 @@ export interface DockerRunInput {
   memory: string // '2g'
   cpus: number // 1.0
   networkHostGateway?: boolean // defaults true
+  networkMode?: string | null
 }
 
 export interface StageRecipeInput {
@@ -106,6 +107,7 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
     memory,
     cpus,
     networkHostGateway,
+    networkMode,
   } = input
 
   const argv: string[] = [
@@ -128,6 +130,10 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
     '--cpus',
     String(cpus),
   ]
+
+  if (networkMode && networkMode.trim()) {
+    argv.push('--network', networkMode.trim())
+  }
 
   if (networkHostGateway !== false) {
     argv.push('--add-host', 'host.docker.internal:host-gateway')

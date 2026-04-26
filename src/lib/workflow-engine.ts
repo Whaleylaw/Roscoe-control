@@ -1201,6 +1201,7 @@ export function materializeReadyWorkflowNodes(
 
       const vars = parseWorkflowRuntimeVars(context.vars_json)
       const title = `[Workflow] ${context.definition_name}: ${titleFromNodeKey(node.node_key)}`
+      const lawFirmMetadata = lawFirmTaskMetadata(context.subject_type, context.subject_id, vars)
       const metadata = {
         workflow: {
           workflow_instance_id: context.id,
@@ -1215,6 +1216,7 @@ export function materializeReadyWorkflowNodes(
           node_type: node.node_type,
           recipe_slug: node.recipe_slug,
         },
+        ...(lawFirmMetadata ? { law_firm: lawFirmMetadata } : {}),
       }
 
       const task = db.prepare(`
@@ -1935,6 +1937,12 @@ function workflowTaskDescription(
     `Node: ${node.node_key} (${node.node_type})`,
     `Recipe: ${node.recipe_slug ?? 'not set'}`,
   ]
+  if (context.subject_type === 'law_firm_case') {
+    lines.push(
+      `Case: ${context.subject_id}`,
+      `Case file: cases/${context.subject_id}/${context.subject_id}.md`,
+    )
+  }
   const vars = Object.entries(context.vars)
   if (vars.length > 0) {
     lines.push('', 'Workflow variables:')
@@ -1957,6 +1965,24 @@ function workflowTaskDescription(
     '- Submit the task through the recipe runner API when complete.',
   )
   return lines.join('\n')
+}
+
+function lawFirmTaskMetadata(
+  subjectType: string,
+  subjectId: string,
+  vars: Record<string, WorkflowVarRuntimeValue>,
+): Record<string, unknown> | null {
+  if (subjectType !== 'law_firm_case') return null
+  const metadata: Record<string, unknown> = { case_slug: subjectId }
+  const providerSlug = vars.provider_slug
+  const providerName = vars.provider_name
+  if (typeof providerSlug === 'string' && providerSlug.trim()) {
+    metadata.provider_slug = providerSlug.trim()
+  }
+  if (typeof providerName === 'string' && providerName.trim()) {
+    metadata.provider_name = providerName.trim()
+  }
+  return metadata
 }
 
 function parseObject(raw: string | null | undefined): Record<string, unknown> {

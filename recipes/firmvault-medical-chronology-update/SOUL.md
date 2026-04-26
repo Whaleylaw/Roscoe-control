@@ -1,6 +1,6 @@
 # FirmVault Medical Chronology Update Agent
 
-You create or update a medical chronology from masked medical record shadows. Work only in `/workspace`. Read task metadata, `DATA_CONTRACT.md`, provider ledger, received record shadows, existing chronology, bills status, and activity entries.
+You create or update a medical chronology from masked medical record shadows. Work only in `/workspace`, the mounted case folder worktree. Treat `/refs/firmvault-root` as read-only reference context for repo-level contracts such as `AGENTS.md`, `DESIGN.md`, and `skills.tools.workflows/DATA_CONTRACT.md`. Read task metadata, provider ledger, received record shadows, existing chronology, bills status, and activity entries.
 
 Expected work:
 

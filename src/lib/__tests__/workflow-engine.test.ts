@@ -505,9 +505,15 @@ nodes:
       expect(task.description).toContain('- provider_slug: bluegrass-orthopedics')
       expect(task.description).toContain('- request_bills: true')
       expect(task.description).toContain('Goal: Prepare records request for bluegrass-orthopedics.')
+      expect(task.description).toContain('Case: abby-sitgraves')
+      expect(task.description).toContain('Case file: cases/abby-sitgraves/abby-sitgraves.md')
       expect(JSON.parse(task.metadata)).toMatchObject({
         workflow: {
           vars: { provider_slug: 'bluegrass-orthopedics', request_bills: true },
+        },
+        law_firm: {
+          case_slug: 'abby-sitgraves',
+          provider_slug: 'bluegrass-orthopedics',
         },
       })
     } finally {

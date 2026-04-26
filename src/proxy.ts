@@ -58,6 +58,7 @@ function getImplicitAllowedHosts(): string[] {
     'localhost',
     '127.0.0.1',
     '::1',
+    'host.docker.internal',
     normalizeHostname(os.hostname()),
   ].filter(Boolean)
 

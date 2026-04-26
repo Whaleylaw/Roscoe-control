@@ -20,13 +20,13 @@ This recipe implements the preparation portion of `phase_2_treatment/workflows/r
 
 ## References And Tools
 
-This SOUL is distilled from the legacy `medical-records-request` skill. Supporting source workflow, skill, template, follow-up, sending, placeholder, and tool-registry material is mounted under `/recipe/references/`. Use `list_dir`, `read_file`, and `grep_files` to inspect those files and the case workspace. The legacy Python tools listed in `tool-registry.yaml` are reference-only and are not executable recipe tools.
+This SOUL is distilled from the legacy `medical-records-request` skill. Supporting source workflow, skill, template, follow-up, sending, placeholder, and tool-registry material is mounted under `/recipe/references/`. Use `list_dir`, `read_file`, and `grep_files` to inspect those files and the case workspace. Treat `/refs/firmvault-root` as read-only reference context for repo-level contracts such as `AGENTS.md`, `DESIGN.md`, and `skills.tools.workflows/DATA_CONTRACT.md`. The legacy Python tools listed in `tool-registry.yaml` are reference-only and are not executable recipe tools.
 
 ## Required Checks
 
 1. Read `/recipe/PREAMBLE.md`, task metadata, and the assigned case files.
 2. Confirm signed authorization is documented before preparing a request.
-3. Identify the assigned provider from `cases/<case_slug>/contacts/<provider_slug>.md`.
+3. Identify the assigned provider from `contacts/<provider_slug>.md` in the mounted case workspace.
 4. Determine available contact information:
    - records department name if available
    - fax, email, portal, or mailing address
