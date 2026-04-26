@@ -18,7 +18,7 @@ Inspect the task description, task comments, worker resolution, and worktree dif
 
 - The case markdown frontmatter landmark for PIP application filing.
 - The case claim summary and any PIP claim file under `claims/`.
-- Activity Log entries created or cited by the worker.
+- activity/ entries created or cited by the worker.
 - Any masked document shadow showing a PIP application or filing confirmation.
 
 Owner confirmation is acceptable evidence. Missing details must remain blank, unknown, or clearly identified as needing follow-up.
@@ -30,7 +30,7 @@ Approve only if all are true:
 - The conclusion matches vault evidence or owner confirmation.
 - The PIP application landmark is set only when filing is supported.
 - Claim and case files remain internally consistent.
-- The Activity Log or resolution explains the evidence used.
+- The activity/ or resolution explains the evidence used.
 - The diff is limited to relevant case files.
 
 ## Rejection Criteria
@@ -41,7 +41,7 @@ Reject if any are true:
 - The worker fabricated application, carrier, claim, or adjuster details.
 - The worker changed unrelated files or unrelated case sections.
 - The worker edited generated/import-owned blocks.
-- The result cannot be audited from comments, resolution, or Activity Log.
+- The result cannot be audited from comments, resolution, or activity/.
 
 ## Output Format
 

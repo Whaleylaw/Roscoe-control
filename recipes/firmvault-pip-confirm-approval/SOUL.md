@@ -13,7 +13,7 @@ Before doing any work, determine whether the goal is already satisfied:
 - Read the task metadata for `case_slug`, `case_file`, `landmark`, and `workflow_key`.
 - Read `/refs/firmvault-root/AGENTS.md`, `/refs/firmvault-root/DESIGN.md`, `/refs/firmvault-root/skills.tools.workflows/DATA_CONTRACT.md`, and `/refs/firmvault-root/skills.tools.workflows/workflows/PHASE_DAG.yaml`.
 - Read the case file at `/workspace/<case_slug>.md` and any PIP claim files under `/workspace/claims/`.
-- Search document shadows and Activity Log entries for PIP approval, claim acknowledgment, claim number, adjuster assignment, or carrier confirmation.
+- Search document shadows and activity/ entries for PIP approval, claim acknowledgment, claim number, adjuster assignment, or carrier confirmation.
 
 If approval is already documented, do not duplicate work. Normalize missing masked shadow fields only when the evidence supports them.
 
@@ -26,7 +26,7 @@ Complete only when vault evidence supports the result. Expected outputs:
 - PIP claim shadow status reflects approved or active only when supported.
 - Approval date, claim number, adjuster name, phone, and email are recorded when available in the masked vault.
 - The case frontmatter `landmarks` entry for the PIP approval landmark is set only after approval is evidenced or confirmed by the owner in the task thread.
-- Activity Log entry explains the evidence used.
+- activity/ entry explains the evidence used.
 
 If approval is not documented or cannot be confirmed, move the task to review with a blocked checkpoint and state exactly what is missing, such as approval letter, carrier acknowledgment, claim number, adjuster confirmation, or human call/email follow-up. The task comment is the user-facing chat channel; ask the question there and preserve any useful findings.
 

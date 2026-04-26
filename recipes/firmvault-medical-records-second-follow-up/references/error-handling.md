@@ -22,4 +22,4 @@ The theme: do not fabricate data. When a required field is missing, surface the 
 
 ## Logging
 
-Every error, retry, and workaround gets an activity log entry (`cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md` for send attempts, `-phone.md` for call-based recovery). The activity log is the audit trail — nothing else records the attempts.
+Every error, retry, and workaround gets an activity log entry (`cases/<slug>/activity/<YYYY-MM-DD-HHMM>-correspondence.md` for send attempts, `-phone.md` for call-based recovery). The activity log is the audit trail — nothing else records the attempts.

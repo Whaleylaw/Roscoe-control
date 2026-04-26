@@ -19,10 +19,10 @@ Inspect the task description, task comments, worker resolution, and worktree dif
 
 - The case markdown frontmatter and landmarks.
 - The case claim summary and any PIP claim file under `claims/`.
-- Masked billing, payment, ledger, EOB, or Activity Log entries.
+- Masked billing, payment, ledger, EOB, or activity/ entries.
 - Owner comments in the task thread.
 
-Owner confirmation is acceptable evidence for non-exhaustion or exhaustion. If the owner says PIP is not exhausted, the worker should not set `pip_benefits_exhausted` true. It may close the task with a clear Activity Log note or mark the claim/status in a way that reflects "not exhausted" without fabricating unsupported amounts.
+Owner confirmation is acceptable evidence for non-exhaustion or exhaustion. If the owner says PIP is not exhausted, the worker should not set `pip_benefits_exhausted` true. It may close the task with a clear activity/ note or mark the claim/status in a way that reflects "not exhausted" without fabricating unsupported amounts.
 
 ## Approval Criteria
 
@@ -32,7 +32,7 @@ Approve only if all are true:
 - `pip_benefits_exhausted` is set only when exhaustion is actually supported.
 - If PIP is not exhausted, the vault does not imply exhaustion.
 - Claim status and notes are internally consistent with the conclusion.
-- The Activity Log or resolution explains what evidence was used.
+- The activity/ or resolution explains what evidence was used.
 - The diff is limited to relevant case files.
 
 ## Rejection Criteria
@@ -44,7 +44,7 @@ Reject if any are true:
 - The worker fabricated ledger, payment, exhaustion, or bill details.
 - The worker left the claim shadow internally contradictory.
 - The worker changed unrelated files or edited generated/import-owned blocks.
-- The result cannot be audited from comments, resolution, or Activity Log.
+- The result cannot be audited from comments, resolution, or activity/.
 
 ## Output Format
 

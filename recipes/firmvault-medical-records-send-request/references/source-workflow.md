@@ -20,10 +20,7 @@ repeatable: true
 per_item: medical_providers
 ---
 
-> **Mission Control reconciliation warning:** This file is preserved only as legacy process source for workflow shape, timing, and common issue handling. Do not follow its FalkorDB, graph-query, JSON-file, or old project-path instructions. Runtime reads and writes must follow `source-skill-medical-records-request.md`, `template-placeholders.md`, and the mounted FirmVault vault contract.
-
-> **⚠️ Migration Note (Jan 2026):** This workflow has been updated to use the knowledge graph instead of JSON files.
-> Case data is now stored in FalkorDB and accessed via graph queries. See `KNOWLEDGE_GRAPH_SCHEMA.md` for entity types and relationships.
+> **Vault Contract:** This workflow reads and writes FirmVault markdown ledgers. It must not use graph queries or per-case JSON files. See `WORKFLOW_VAULT_CONTRACT.md`.
 
 
 # Request Records & Bills Workflow
@@ -36,14 +33,14 @@ This workflow handles requesting medical records and bills from healthcare provi
 **Phase:** `treatment` (also runs during `demand_in_progress`)  
 **Owner:** Agent/User (mixed)  
 **Repeatable:** Yes (per provider)  
-**Per Item:** Each entry in `medical_providers[]`
+**Per Item:** Each provider folder in `medical-providers/`
 
 ---
 
 ## Prerequisites
 
-- Provider exists in the graph (query Facility/Location nodes)
-- HIPAA authorization signed (`documents.hipaa.status == "signed"`)
+- Provider exists in `medical-providers/` and linked `contacts/`
+- HIPAA authorization signed in `client/authorizations.md`
 - Provider contact information available
 
 ---
@@ -65,10 +62,7 @@ This workflow is triggered when:
 **Owner:** Agent  
 **Automatable:** Yes
 
-**Condition Check:**
-```
-documents.hipaa.status == "signed"
-```
+**Condition Check:** `client/authorizations.md` shows HIPAA signed.
 
 If HIPAA not signed, cannot proceed. Flag for follow-up.
 
@@ -81,17 +75,17 @@ Generate HIPAA-compliant records request using unified document generation patte
 **Document Generation Pattern:**
 ```bash
 # Step 1: Copy template to provider folder (creates context)
-cp "/templates/2022 Whaley Medical Record Request (URR) (1).docx" \
-   "/{project}/Medical Providers/{provider_name}/Medical Records Request.docx"
+cp "Templates/2022 Whaley Medical Record Request (URR) (1).docx" \
+   "cases/<case-slug>/medical-providers/<provider-slug>/records-bills.md"
 
 # Step 2: Generate filled document (path tells tool which provider)
-python generate_document.py "/{project}/Medical Providers/{provider_name}/Medical Records Request.docx"
+python generate_document.py "cases/<case-slug>/medical-providers/<provider-slug>/records-bills.md"
 ```
 
 **Auto-filled from path context:**
-- Provider info from folder name → looks up in the graph (query Facility/Location nodes)
-- Client info from `overview.json`
-- Firm info from `firm_config.json`
+- Provider info from folder name → looks up in `medical-providers/` and linked `contacts/`
+- Client info from `<case-slug>.md` and `accident/accident.md`
+- Firm info from firm template defaults and `Templates/INDEX.md`
 
 **Request Should Include:**
 - Complete medical records
@@ -110,7 +104,7 @@ Request certified copies of all records for use in court proceedings.
 
 **Output:** Generated records request document
 
-**Saves To:** `Correspondence/Records_Requests/{{provider.name}}_{{date}}.docx`
+**Saves To:** `medical-providers/<provider-slug>/requests/records-request-{{date}}.md` plus generated copies under `documents/generated/`
 
 ---
 
@@ -134,16 +128,11 @@ Send the records request to the provider.
 **Agent Prompt to User:**
 > "Please send records request to {{provider.name}} via fax ({{provider.fax}}) or mail. Update when sent."
 
-**User Updates to the graph using write_entity():**
-```json
-{
-  "records": {
-    "requested_date": "{{today}}",
-    "request_method": "fax",
-    "fax_confirmation": "{{confirmation_number}}"
-  }
-}
-```
+**User Updates to FirmVault ledgers:**
+
+Update `medical-providers/<provider-slug>/records-bills.md` with the request
+date, method, confirmation number, generated request document, and first
+follow-up due date.
 
 ---
 
@@ -197,23 +186,11 @@ When records arrive, upload and process them.
 3. Extract key information
 4. Update provider entry
 
-**Updates to the graph using write_entity():**
-```json
-{
-  "records": {
-    "received_date": "{{today}}",
-    "file_path": "Medical Records/{{provider.name}}/records_{{date}}.pdf",
-    "page_count": {{count}},
-    "complete": true,
-    "missing_items": []
-  },
-  "bills": {
-    "received_date": "{{today}}",
-    "file_path": "Medical Records/{{provider.name}}/bills_{{date}}.pdf",
-    "amount": {{total_billed}}
-  }
-}
-```
+**Updates to FirmVault ledgers:**
+
+Update `medical-providers/<provider-slug>/records-bills.md` with received dates,
+document shadow paths, page count, completeness review, bill total, paid amounts,
+payor information, and any missing items.
 
 **Triggers:** `update_medical_chronology` (or skill invocation)
 
@@ -269,8 +246,8 @@ From itemized bills, capture:
 ## Completion Criteria (per provider)
 
 ### Required
-- `medical_providers[].records.received_date` populated
-- `medical_providers[].bills.received_date` populated
+- ``medical-providers/` ledgers.records.received_date` populated
+- ``medical-providers/` ledgers.bills.received_date` populated
 
 ### Quality Check
 - Records cover all treatment dates
@@ -281,7 +258,7 @@ From itemized bills, capture:
 
 ## State Updates
 
-After records received, update `case_state.json`:
+After records received, update canonical case frontmatter and workflow log:
 ```json
 {
   "providers_with_records": {{count}},

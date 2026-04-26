@@ -64,8 +64,8 @@ planned_constrained_tools:
   - id: record_provider_request_sent
     status: planned
     scope: workspace-write
-    description: Deterministically update provider request-sent frontmatter and write a corresponding Activity Log entry.
+    description: Deterministically update provider request-sent frontmatter and write a corresponding activity entry.
   - id: record_provider_documents_received
     status: planned
     scope: workspace-write
-    description: Deterministically update provider receipt frontmatter and write a corresponding Activity Log entry.
+    description: Deterministically update provider receipt frontmatter and write a corresponding activity entry.

@@ -27,12 +27,12 @@ workflows:
         landmark_id: case_setup_requested
       - id: gather_required_inputs
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-document-collection-review-intake
         landmark_id: client_info_received
         depends_on: [recognize_new_case]
       - id: create_case_workspace
-        type: code
-        function: create_case
+        type: recipe
+        recipe_slug: firmvault-case-setup-create-shell
         landmark_id: case_workspace_created
         depends_on: [gather_required_inputs]
       - id: confirm_case_setup
@@ -51,16 +51,16 @@ workflows:
     steps:
       - id: load_document_checklist
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-document-collection-review-intake
         landmark_id: onboarding_document_checklist_loaded
       - id: request_missing_documents
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-document-collection-review-intake
         landmark_id: onboarding_documents_requested
         depends_on: [load_document_checklist]
       - id: send_signature_packets
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-document-collection-review-intake
         landmark_id: onboarding_signature_packets_sent
         depends_on: [request_missing_documents]
       - id: wait_for_signed_documents
@@ -84,16 +84,16 @@ workflows:
     steps:
       - id: identify_reporting_agency
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-accident-report-analyze
         landmark_id: accident_reporting_agency_identified
       - id: get_report_number
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-accident-report-analyze
         landmark_id: accident_report_number_identified
         depends_on: [identify_reporting_agency]
       - id: request_accident_report
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-accident-report-analyze
         landmark_id: accident_report_requested
         depends_on: [get_report_number]
       - id: wait_for_accident_report
@@ -103,7 +103,7 @@ workflows:
         skip_when: [accident_report_obtained]
       - id: analyze_accident_report
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-accident-report-analyze
         landmark_id: accident_report_obtained
         depends_on: [accident_report_obtained]
 
@@ -118,16 +118,16 @@ workflows:
     steps:
       - id: identify_at_fault_insurance
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-insurance-bi-send-lor
         landmark_id: at_fault_insurance_identified
       - id: send_bi_lor
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-insurance-bi-send-lor
         landmark_id: bi_lor_sent
         depends_on: [identify_at_fault_insurance]
       - id: open_bi_claim
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-insurance-bi-send-lor
         landmark_id: insurance_claims_setup
         depends_on: [send_bi_lor]
 
@@ -142,7 +142,7 @@ workflows:
     steps:
       - id: run_pip_waterfall
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-insurance-pip-open-claim
         landmark_id: pip_carrier_identified
       - id: file_pip_application
         type: recipe
@@ -176,21 +176,21 @@ workflows:
     steps:
       - id: collect_provider_information
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-provider-create-ledger
         landmark_id: providers_setup
       - id: collect_treatment_dates
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-provider-create-ledger
         landmark_id: provider_treatment_dates_recorded
         depends_on: [collect_provider_information]
       - id: document_injuries_treated
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-medical-provider-create-ledger
         landmark_id: injury_summary_recorded
         depends_on: [collect_treatment_dates]
       - id: auto_send_initial_records_request
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-request-records-bills-prepare-request
         landmark_id: records_requested_all_providers
         depends_on: [medical_auth_signed, document_injuries_treated]
 

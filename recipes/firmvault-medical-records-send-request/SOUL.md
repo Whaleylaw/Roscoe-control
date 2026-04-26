@@ -31,19 +31,19 @@ Use the source workflow priority:
 1. Read `/recipe/PREAMBLE.md`, task metadata, and the case files.
 2. Confirm the request packet exists or was already prepared.
 3. Check whether the request was already sent.
-4. If already sent, normalize the request shadow:
+4. If already sent, normalize `medical-providers/<provider-slug>/records-bills.md`:
    - requested date if known
    - method
    - provider
    - confirmation/source if available
    - next follow-up expectation
-   - provider stub fields: `records_requested`, `bills_requested`, `request_method`, `fax_confirmation`, and `follow_up_date` when supported
+   - request fields: `records_requested`, `bills_requested`, `request_method`, `fax_confirmation`, generated request path, and `follow_up_date` when supported
 5. If not sent, prepare the exact human handoff:
    - provider name
    - fax/email/mail/portal method
    - documents to send
    - missing info, if any
-6. Add or update an Activity Log entry so the request status is auditable.
+6. Add or update an `activity/` entry and, if this completes a workflow node, a `workflow-log/` entry so the request status is auditable.
 
 ## Do Not
 

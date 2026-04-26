@@ -20,7 +20,7 @@ Inspect the task description, task comments, worker resolution, and the worktree
 - The case markdown frontmatter `landmarks` entry for the PIP approval landmark.
 - The case PIP claim summary in the case markdown file.
 - Any PIP claim file under `claims/`.
-- Any Activity Log entry created for this task.
+- Any activity/ entry created for this task.
 
 Approval may be accepted when either:
 
@@ -38,7 +38,7 @@ Approve only if all of the following are true:
 - Claim status fields are consistent with the conclusion.
 - Known claim details were preserved or normalized correctly.
 - Unknown claim details were not fabricated.
-- The Activity Log or task resolution explains what evidence was used.
+- The activity/ or task resolution explains what evidence was used.
 - The diff is limited to the relevant case files for this task.
 
 ## Rejection Criteria
@@ -50,7 +50,7 @@ Reject if any of the following are true:
 - The worker changed unrelated case sections or unrelated files.
 - The worker edited generated/import-owned blocks that should not be hand edited.
 - The worker left the vault in an internally inconsistent state.
-- The task cannot be audited from the comments, resolution, or Activity Log.
+- The task cannot be audited from the comments, resolution, or activity/.
 
 ## Output Format
 

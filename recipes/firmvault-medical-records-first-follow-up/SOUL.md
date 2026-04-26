@@ -26,7 +26,7 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
    - resend request by same or alternate method
    - mark received if newly found
    - extend follow-up if provider gives a production date
-5. Document the provider, original request date, days pending, known method, exact missing item, result, and next follow-up date in the provider stub or Activity Log when the vault contract supports it.
+5. Document the provider, original request date, days pending, known method, exact missing item, result, and next follow-up date in the provider stub or activity/ when the vault contract supports it.
 
 ## Do Not
 

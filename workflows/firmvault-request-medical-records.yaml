@@ -61,16 +61,16 @@ nodes:
       task_goal: Confirm a signed HIPAA or medical authorization exists before provider-specific records and bills are requested. If missing, route to review with the precise missing authorization issue.
       provider_scoped: true
       stale_sources_rejected:
-        - medical_providers.json
-        - case_state.json
-        - FalkorDB
-        - "${ROSCOE_ROOT}"
+        - deprecated per-case JSON files
+        - graph database state
+        - absolute-path scaffolding
+        - raw PHI storage
 
   prepare_records_request:
     type: recipe
     name: Prepare Records and Bills Request
-    recipe: firmvault-medical-records-prepare-request
-    description_file: recipes/firmvault-medical-records-prepare-request/references/source-skill-medical-records-request.md
+    recipe: firmvault-request-records-bills-prepare-request
+    description_file: recipes/firmvault-request-records-bills-prepare-request/references/README.md
     depends_on:
       nodes:
         - verify_medical_authorization
@@ -84,97 +84,123 @@ nodes:
   send_records_request:
     type: recipe
     name: Human Send Gateway for Medical Records and Bills Request
-    recipe: firmvault-medical-records-send-request
-    description_file: recipes/firmvault-medical-records-send-request/references/sending-methods.md
+    recipe: firmvault-request-records-bills-send-request
+    description_file: recipes/firmvault-request-records-bills-send-request/references/README.md
     depends_on:
       nodes:
         - prepare_records_request
     completes:
       - law_firm.provider.records_request_sent
     config:
-      task_goal: Confirm the request packet was sent by a human or prepare an exact human handoff. Record request method, confirmation if available, Activity Log entry, and 14-day follow-up date. Do not claim all-provider landmarks from this provider-scoped node.
+      task_goal: Confirm the request packet was sent by a human or prepare an exact human handoff. Record request method, confirmation if available, activity/ entry, and 15-day follow-up date. Do not claim all-provider landmarks from this provider-scoped node.
       human_gateway: true
       preferred_method: "{{send_method_preference}}"
       aggregate_landmarks_require_separate_check:
         - law_firm.landmarks.records_requested_all_providers
         - law_firm.landmarks.bills_requested_all_providers
 
-  wait_14_days_for_records:
+  wait_15_days_for_records:
     type: wait
-    name: Wait 14 Days for Records and Bills
-    duration: 14d
+    name: Wait 15 Days for Records and Bills
+    duration: 15d
     depends_on:
       nodes:
         - send_records_request
     exit_when:
       condition: law_firm.provider.records_and_bills_received == true
     config:
-      task_goal: Wait 14 days after request send unless the provider's records and bills arrive first.
+      task_goal: Wait 15 days after request send unless the provider's records and bills arrive first.
 
   first_follow_up_records_request:
     type: recipe
     name: First Follow-Up on Medical Records and Bills
-    recipe: firmvault-medical-records-first-follow-up
-    description_file: recipes/firmvault-medical-records-first-follow-up/references/follow-up-process.md
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
     depends_on:
       nodes:
-        - wait_14_days_for_records
+        - wait_15_days_for_records
     completes:
       - law_firm.provider.first_records_follow_up_complete
     config:
-      task_goal: If records or bills have not arrived 14 days after the request, prepare or document first follow-up, provider status, fee issue, HIPAA issue, wrong contact issue, or expected production date.
+      task_goal: If records or bills have not arrived 15 days after the request, check for receipt first, then prepare or document first follow-up, provider status, fee issue, HIPAA issue, wrong contact issue, or expected production date.
       provider_scoped: true
 
-  wait_7_days_for_second_follow_up:
+  wait_15_more_days_for_second_follow_up:
     type: wait
-    name: Wait 7 Days for Second Follow-Up
-    duration: 7d
+    name: Wait Until 30-Day Second Follow-Up
+    duration: 15d
     depends_on:
       nodes:
         - first_follow_up_records_request
     exit_when:
       condition: law_firm.provider.records_and_bills_received == true
     config:
-      task_goal: Wait 7 days after first follow-up unless the provider's records and bills arrive first.
+      task_goal: Wait 15 more days after first follow-up unless the provider's records and bills arrive first.
 
   second_follow_up_records_request:
     type: recipe
     name: Second Follow-Up on Medical Records and Bills
-    recipe: firmvault-medical-records-second-follow-up
-    description_file: recipes/firmvault-medical-records-second-follow-up/references/follow-up-process.md
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
     depends_on:
       nodes:
-        - wait_7_days_for_second_follow_up
+        - wait_15_more_days_for_second_follow_up
     completes:
       - law_firm.provider.second_records_follow_up_complete
     config:
-      task_goal: If records or bills remain outstanding 21 days after the original request, prepare or document the second follow-up and capture the provider's response, fee issue, HIPAA issue, or expected production date.
+      task_goal: If records or bills remain outstanding 30 days after the original request, check for receipt first, then prepare or document the second follow-up and capture the provider's response, fee issue, HIPAA issue, or expected production date.
       provider_scoped: true
 
-  wait_9_days_for_escalation:
+  wait_15_more_days_for_third_follow_up:
     type: wait
-    name: Wait 9 Days for Escalation
-    duration: 9d
+    name: Wait Until 45-Day Third Follow-Up
+    duration: 15d
     depends_on:
       nodes:
         - second_follow_up_records_request
     exit_when:
       condition: law_firm.provider.records_and_bills_received == true
     config:
-      task_goal: Wait 9 days after second follow-up unless the provider's records and bills arrive first.
+      task_goal: Wait 15 more days after the second follow-up unless the provider's records and bills arrive first.
+
+  third_follow_up_records_request:
+    type: recipe
+    name: Third Follow-Up on Medical Records and Bills
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
+    depends_on:
+      nodes:
+        - wait_15_more_days_for_third_follow_up
+    completes:
+      - law_firm.provider.third_records_follow_up_complete
+    config:
+      task_goal: If records or bills remain outstanding 45 days after the original request, check for receipt first, then prepare or document the third follow-up and identify whether provider delay, fee, HIPAA, wrong contact, or production-date issues explain the delay.
+      provider_scoped: true
+
+  wait_15_more_days_for_escalation:
+    type: wait
+    name: Wait Until 60-Day Escalation
+    duration: 15d
+    depends_on:
+      nodes:
+        - third_follow_up_records_request
+    exit_when:
+      condition: law_firm.provider.records_and_bills_received == true
+    config:
+      task_goal: Wait 15 more days after the third follow-up unless the provider's records and bills arrive first.
 
   escalate_records_request:
     type: recipe
     name: Escalate Delayed Medical Records and Bills
-    recipe: firmvault-medical-records-escalate-delay
-    description_file: recipes/firmvault-medical-records-escalate-delay/references/error-handling.md
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
     depends_on:
       nodes:
-        - wait_9_days_for_escalation
+        - wait_15_more_days_for_escalation
     completes:
       - law_firm.provider.records_request_escalated
     config:
-      task_goal: If records or bills are still missing 30 days after the original request, prepare escalation to office manager, compliance/privacy officer, formal demand, attorney review, or subpoena strategy if litigation is active.
+      task_goal: If records or bills are still missing 60 days after the original request, check for receipt first, then prepare attorney-review escalation to office manager, compliance/privacy officer, formal demand, subpoena strategy, or other legal intervention if litigation is active.
       provider_scoped: true
       attorney_review_if_legal_intervention_needed: true
 
@@ -189,19 +215,33 @@ nodes:
     completes:
       - law_firm.provider.records_and_bills_processed
     config:
-      task_goal: Confirm received records or bills are present in the vault shadow, verify completeness enough for case use, update provider receipt fields, write Activity Log entry, and trigger medical chronology work when appropriate.
+      task_goal: Confirm received records or bills are present in the vault shadow, verify completeness enough for case use, update provider receipt fields, write activity/ entry, and trigger medical chronology work when appropriate.
       provider_scoped: true
       aggregate_landmarks_require_separate_check:
         - law_firm.landmarks.all_records_received
         - law_firm.landmarks.all_bills_received
       downstream_workflow_trigger: firmvault-medical-chronology-update
 
+  update_medical_chronology:
+    type: recipe
+    name: Update Medical Chronology
+    recipe: firmvault-medical-chronology-update
+    description_file: recipes/firmvault-medical-chronology-update/references/README.md
+    depends_on:
+      nodes:
+        - receive_and_process_records_bills
+    completes:
+      - law_firm.provider.medical_chronology_updated
+    config:
+      task_goal: Create or update the provider medical chronology from received records shadows, documenting missing pages or unclear visits for review.
+      provider_scoped: true
+
   confirm_provider_records_workflow_complete:
     type: review
     name: Confirm Provider Records Workflow Complete
     depends_on:
       nodes:
-        - receive_and_process_records_bills
+        - update_medical_chronology
     review:
       mode: human
       max_rounds: 1

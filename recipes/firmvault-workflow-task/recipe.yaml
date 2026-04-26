@@ -1,7 +1,7 @@
 slug: firmvault-workflow-task
 name: FirmVault Workflow Task
-description: Executes one FirmVault v2 case workflow landmark inside Mission Control using the task metadata, PHASE_DAG.yaml, DATA_CONTRACT.md, and mounted FirmVault shadow vault.
-when_to_use: Use for law-firm case tasks materialized from FirmVault v2 phases, tracks, landmarks, and task templates.
+description: Executes one FirmVault native case workflow task inside Mission Control using task metadata, DATA_CONTRACT.md, PHASE_DAG.yaml, and the mounted FirmVault shadow vault.
+when_to_use: Use for law-firm case tasks materialized from FirmVault workflows, phases, landmarks, and task templates.
 image: mc-recipe-agent:latest
 workspace_mode: worktree
 timeout_seconds: 3600
@@ -12,8 +12,8 @@ secrets:
 tools:
   - read_file
   - list_dir
+  - grep_files
   - write_file
-  - run_shell
 tags:
   - law-firm
   - firmvault

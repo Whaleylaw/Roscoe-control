@@ -44,4 +44,4 @@ fax_confirmation: "Y" | ""
 follow_up_date: "YYYY-MM-DD"   # +14 days
 ```
 
-Then append an activity log entry at `cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md` per `DATA_CONTRACT.md` §5, body linking back to the case file and naming the provider and method.
+Then append an activity log entry at `cases/<slug>/activity/<YYYY-MM-DD-HHMM>-correspondence.md` per `DATA_CONTRACT.md` §5, body linking back to the case file and naming the provider and method.

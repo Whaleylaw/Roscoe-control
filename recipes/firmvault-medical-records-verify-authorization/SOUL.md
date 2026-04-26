@@ -28,10 +28,10 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
    - `cases/<case_slug>/<case_slug>.md`
    - `cases/<case_slug>/contacts/<provider_slug>.md`
    - `cases/<case_slug>/documents/`
-   - `cases/<case_slug>/Activity Log/`
+   - `cases/<case_slug>/activity/`
    - `state.yaml` if mounted inside the case workspace
 4. Confirm the authorization is applicable to the requested provider records/bills work.
-5. If the authorization is already documented, normalize the shadow record if a home exists in the vault contract and add an Activity Log note or concise case note.
+5. If the authorization is already documented, normalize the shadow record if a home exists in the vault contract and add an activity/ note or concise case note.
 6. If authorization is missing, move the task to review or blocked with the precise missing item and where the human should look or what must be requested.
 
 ## Do Not

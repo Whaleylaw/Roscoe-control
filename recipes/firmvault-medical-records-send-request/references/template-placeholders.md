@@ -7,7 +7,7 @@ Placeholder values for the records/billing request templates. Every value comes 
 | Placeholder | Vault source |
 |---|---|
 | `{{TODAY_LONG}}` | Current date, long form (e.g. `December 6, 2024`) |
-| `{{provider.name}}` | `cases/<slug>/contacts/<provider-slug>.md` frontmatter `name` (or linked `Contacts/Medical/<slug>.md`) |
+| `{{provider.name}}` | `cases/<slug>/medical-providers/<provider-slug>/provider.md` frontmatter `name` (or linked `Contacts/Medical/<slug>.md`) |
 | `{{provider.addressBlock}}` | Provider stub `address` / master card `address` |
 | `{{provider.fax}}` | Provider stub `fax` / master card `fax` |
 | `{{client.name}}` | `cases/<slug>/<slug>.md` frontmatter `client_name` |

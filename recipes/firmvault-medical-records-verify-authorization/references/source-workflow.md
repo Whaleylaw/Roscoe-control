@@ -20,10 +20,10 @@ repeatable: true
 per_item: medical_providers
 ---
 
-> **Mission Control reconciliation warning:** This file is preserved only as legacy process source for workflow shape, timing, and common issue handling. Do not follow its FalkorDB, graph-query, JSON-file, or old project-path instructions. Runtime reads and writes must follow `source-skill-medical-records-request.md`, `template-placeholders.md`, and the mounted FirmVault vault contract.
+> **Mission Control reconciliation warning:** This file is preserved only as legacy process source for workflow shape, timing, and common issue handling. Do not follow its native vault, graph-query, JSON-file, or old project-path instructions. Runtime reads and writes must follow `source-skill-medical-records-request.md`, `template-placeholders.md`, and the mounted FirmVault vault contract.
 
 > **⚠️ Migration Note (Jan 2026):** This workflow has been updated to use the knowledge graph instead of JSON files.
-> Case data is now stored in FalkorDB and accessed via graph queries. See `KNOWLEDGE_GRAPH_SCHEMA.md` for entity types and relationships.
+> Case data is now stored in native vault and accessed via graph queries. See `KNOWLEDGE_GRAPH_SCHEMA.md` for entity types and relationships.
 
 
 # Request Records & Bills Workflow
@@ -202,14 +202,14 @@ When records arrive, upload and process them.
 {
   "records": {
     "received_date": "{{today}}",
-    "file_path": "Medical Records/{{provider.name}}/records_{{date}}.pdf",
+    "file_path": "medical-providers/<provider-slug>/documents/{{provider.name}}/records_{{date}}.pdf",
     "page_count": {{count}},
     "complete": true,
     "missing_items": []
   },
   "bills": {
     "received_date": "{{today}}",
-    "file_path": "Medical Records/{{provider.name}}/bills_{{date}}.pdf",
+    "file_path": "medical-providers/<provider-slug>/documents/{{provider.name}}/bills_{{date}}.pdf",
     "amount": {{total_billed}}
   }
 }
@@ -281,7 +281,7 @@ From itemized bills, capture:
 
 ## State Updates
 
-After records received, update `case_state.json`:
+After records received, update `native case ledgers`:
 ```json
 {
   "providers_with_records": {{count}},

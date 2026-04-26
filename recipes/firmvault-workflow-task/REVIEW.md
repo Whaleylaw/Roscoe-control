@@ -18,7 +18,7 @@ Review only whether the specific workflow landmark in the task was handled corre
 Inspect the task description, task comments, worker resolution, and worktree diff. Relevant files depend on the landmark, but usually include:
 
 - `cases/<slug>/<slug>.md`
-- Case-specific claim, lien, provider, document, issue, or Activity Log files.
+- Case-specific insurance, lien, provider, document, activity, or workflow-log files.
 - `PHASE_DAG.yaml`, task metadata, or recipe instructions as needed.
 - Owner comments in the task thread.
 
@@ -32,7 +32,7 @@ Approve only if all are true:
 - The correct landmark or case status was updated, if any update was needed.
 - The vault remains internally consistent.
 - Unknown facts were not fabricated.
-- The Activity Log or resolution explains what evidence was used.
+- The `activity/`, `workflow-log/`, task comments, or resolution explains what evidence was used.
 - The diff is limited to relevant case files.
 
 ## Rejection Criteria
@@ -43,7 +43,7 @@ Reject if any are true:
 - The worker changed the wrong landmark, case, or workflow state.
 - The worker fabricated unsupported facts.
 - The worker changed unrelated files or edited generated/import-owned blocks.
-- The result cannot be audited from comments, resolution, or Activity Log.
+- The result cannot be audited from comments, resolution, `activity/`, or `workflow-log/`.
 
 ## Output Format
 

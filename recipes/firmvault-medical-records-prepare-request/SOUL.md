@@ -43,7 +43,7 @@ The request should ask for complete medical records, office notes, diagnostic re
 ## Do Not
 
 - Do not send the request externally.
-- Do not use deprecated JSON/FalkorDB paths.
+- Do not use deprecated JSON/native vault paths.
 - Do not create raw PHI or unmasked documents.
 - Do not invent provider contact information.
 

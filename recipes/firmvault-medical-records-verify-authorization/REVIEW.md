@@ -8,6 +8,6 @@ Check:
 - The worker checked document shadows and activity/case notes.
 - Any update is limited to the assigned case.
 - Missing authorization was handled as a blocker, not guessed.
-- The result is auditable from the task comments, resolution, or Activity Log.
+- The result is auditable from the task comments, resolution, or activity/.
 
 Reject if the worker marked authorization as signed without evidence, edited unrelated files, exposed raw PHI, or invented facts.

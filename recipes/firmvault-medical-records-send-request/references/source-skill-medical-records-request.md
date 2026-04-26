@@ -22,8 +22,9 @@ Send records and billing requests to a treating provider once the client has sig
 ## Inputs
 
 - `cases/<slug>/<slug>.md` — client name, DOB (from linked client card), date of incident, provider list under `## Medical Providers`
-- `cases/<slug>/contacts/<provider-slug>.md` — provider name, address, fax, records contact; links through to `Contacts/Medical/<slug>.md` for the master card
-- `cases/<slug>/documents/` — signed HIPAA authorization (expected filename contains `hipaa` or `medical-authorization`); skill blocks if missing
+- `cases/<slug>/medical-providers/<provider-slug>/provider.md` — provider name, address, fax, records contact; links through to `Contacts/Medical/<slug>.md` for the master card when available
+- `cases/<slug>/medical-providers/<provider-slug>/records-bills.md` — request, follow-up, receipt, bill, payor, and completeness state
+- `cases/<slug>/client/authorizations.md` — signed HIPAA authorization evidence; skill blocks if missing
 
 ## Templates
 
@@ -41,11 +42,11 @@ Placeholder fields and where their values come from are in `references/template-
 
 ## Flow
 
-Confirm HIPAA is on file under `cases/<slug>/documents/`. Read the provider stub to pull name, address, fax, and treatment dates. Pick the template matching the case type (standard vs. WC) and the request type (records, billing, or both). Fill the placeholders from the vault, write the filled output to `cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.docx` (and `.pdf` sibling for billing), then merge the signed HIPAA PDF before sending. Fax is the preferred channel; see `references/sending-methods.md` for the fallback order. After sending, update the provider stub frontmatter (`records_requested: <date>` and/or `bills_requested: <date>`), write an activity log entry per `DATA_CONTRACT.md` §5, and queue a 14-day follow-up (see `references/follow-up-process.md`).
+Confirm HIPAA is recorded in `client/authorizations.md`. Read the provider ledger to pull name, address, fax, and treatment dates. Pick the template matching the case type (standard vs. WC) and the request type (records, billing, or both). Fill the placeholders from the vault, write the draft request to `medical-providers/<provider-slug>/requests/records-request-<YYYY-MM-DD>.md` and any generated copy under `documents/generated/`, then prepare the HIPAA attachment checklist before sending or handoff. Fax is the preferred channel; see `references/sending-methods.md` for the fallback order. After sending is confirmed, update `records-bills.md`, write an activity entry per `DATA_CONTRACT.md`, and queue a 14-day follow-up (see `references/follow-up-process.md`).
 
 ## Landmark production
 
-Setting `records_requested` on every provider stub satisfies the PHASE_DAG landmark `records_requested_all_providers`. Setting `bills_requested` on every provider stub satisfies `bills_requested_all_providers`. Both are Phase 2 (Treatment) landmarks.
+Setting records requested on every provider ledger satisfies the records-requested landmark. Setting bills requested on every provider ledger satisfies the bills-requested landmark. Both are Phase 2 treatment landmarks.
 
 ## Error handling
 
@@ -53,10 +54,10 @@ Missing HIPAA, missing provider fax, missing treatment dates, and fax send failu
 
 ## Outputs
 
-- Filled request document(s) at `cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.{docx,pdf}`
+- Filled request draft at `cases/<slug>/medical-providers/<provider-slug>/requests/records-request-<YYYY-MM-DD>.md` and generated copies under `documents/generated/` when available
 - Merged request+HIPAA PDF sent (fax or email) or queued for manual send
-- Updated provider stub frontmatter in `cases/<slug>/contacts/<provider-slug>.md` (`records_requested`, `bills_requested`, `request_method`, `fax_confirmation`, `follow_up_date`)
-- Activity log entry at `cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md`
+- Updated provider records/bills ledger in `cases/<slug>/medical-providers/<provider-slug>/records-bills.md`
+- Activity entry at `cases/<slug>/activity/<YYYY-MM-DD-HHMM>-correspondence.md`
 - 14-day follow-up scheduled
 
 ## References

@@ -18,7 +18,7 @@ Inspect the task description, task comments, worker resolution, and worktree dif
 
 - PIP claim files under `claims/`.
 - Lien or reimbursement shadow files.
-- Masked Activity Log entries.
+- Masked activity/ entries.
 - Owner comments in the task thread.
 
 Owner confirmation is acceptable evidence. Unknown reimbursement details must remain blank, unknown, or clearly marked as needing follow-up.
@@ -31,7 +31,7 @@ Approve only if all are true:
 - Claim/lien/reimbursement statuses are internally consistent.
 - Known amounts and parties were preserved or normalized correctly.
 - Unknown amounts, dates, or parties were not fabricated.
-- The Activity Log or resolution explains what evidence was used.
+- The activity/ or resolution explains what evidence was used.
 - The diff is limited to relevant case files.
 
 ## Rejection Criteria
@@ -42,7 +42,7 @@ Reject if any are true:
 - The worker fabricated amounts, payees, dates, or lien details.
 - The worker overwrote better existing data with worse or blank data.
 - The worker changed unrelated files or edited generated/import-owned blocks.
-- The result cannot be audited from comments, resolution, or Activity Log.
+- The result cannot be audited from comments, resolution, or activity/.
 
 ## Output Format
 

@@ -16,13 +16,13 @@ Preferred template slugs are listed in `Templates/INDEX.md`:
 
 Write generated or drafted request material under:
 
-`cases/<case_slug>/documents/`
+`cases/<case_slug>/medical-providers/<provider_slug>/requests/`
 
 Use a descriptive filename such as:
 
-`<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.docx`
+`records-request-<YYYY-MM-DD>.md`
 
-If the worker only prepares a handoff because no deterministic document tool is available, record the intended output path and exact sending instructions in the task result and Activity Log.
+If the worker only prepares a handoff because no deterministic document tool is available, record the intended output path and exact sending instructions in the task result and `activity/`.
 
 ## Letter Components
 
@@ -57,11 +57,11 @@ Use the vault contract, not deprecated JSON files:
 | Client name | `cases/<case_slug>/<case_slug>.md` frontmatter `client_name` |
 | Client DOB | linked `Contacts/Clients/<client-slug>.md` frontmatter when available |
 | Date of incident | `cases/<case_slug>/<case_slug>.md` frontmatter `date_of_incident` |
-| Provider name | `cases/<case_slug>/contacts/<provider_slug>.md` or linked `Contacts/Medical/<slug>.md` |
-| Provider address | provider contact stub or linked medical master card |
-| Provider fax/email | provider contact stub or linked medical master card |
-| Treatment dates | provider contact stub fields, treatment table shadow, or Activity Log evidence |
-| Signed authorization | `cases/<case_slug>/documents/` filename containing `hipaa` or `medical-authorization` |
+| Provider name | `cases/<case_slug>/medical-providers/<provider_slug>/provider.md`, case contact stub, or linked `Contacts/Medical/<slug>.md` |
+| Provider address | provider ledger/contact or linked medical master card |
+| Provider fax/email | provider ledger/contact or linked medical master card |
+| Treatment dates | provider treatment ledger, treatment table shadow, or `activity/` evidence |
+| Signed authorization | `client/authorizations.md` and linked shadow document containing `hipaa` or `medical-authorization` |
 
 ## Privacy Handling
 

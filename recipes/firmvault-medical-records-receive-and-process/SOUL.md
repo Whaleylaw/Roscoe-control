@@ -27,7 +27,7 @@ This SOUL is distilled from the reconciled `request_records_bills` workflow and 
 3. Check whether records, bills, or both are present in the vault shadow:
    - `cases/<case_slug>/documents/`
    - `cases/<case_slug>/contacts/<provider_slug>.md`
-   - `cases/<case_slug>/Activity Log/`
+   - `cases/<case_slug>/activity/`
    - `state.yaml` if mounted inside the case workspace
 4. Verify the received documents are plausible for the provider:
    - provider name matches or is clearly linked
@@ -41,7 +41,7 @@ This SOUL is distilled from the reconciled `request_records_bills` workflow and 
    - `bills_received`
    - `bills_path`
    - billed amount, if safely available in existing shadow data
-6. Write an Activity Log entry describing what was received, where it is located, and what remains missing.
+6. Write an activity/ entry describing what was received, where it is located, and what remains missing.
 7. If records are usable for chronology, state that the medical chronology update workflow or recipe should be triggered.
 
 ## Aggregate Landmarks
@@ -58,4 +58,4 @@ Do not blindly mark all-provider landmarks. Only state that `all_records_receive
 
 ## Completion
 
-Submit `done` when the received records or bills are documented in the provider stub and Activity Log, or when the task clearly documents that the records were already processed. Submit `blocked` when the received material cannot be tied to the provider, belongs to the wrong patient, is missing from the vault shadow, or needs human review.
+Submit `done` when the received records or bills are documented in the provider stub and activity/, or when the task clearly documents that the records were already processed. Submit `blocked` when the received material cannot be tied to the provider, belongs to the wrong patient, is missing from the vault shadow, or needs human review.

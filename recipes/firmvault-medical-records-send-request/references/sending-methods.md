@@ -34,7 +34,7 @@ If the worker cannot send automatically (no fax credentials, no email integratio
 
 ## Tracking after send
 
-Update the provider stub frontmatter in `cases/<slug>/contacts/<provider-slug>.md`:
+Update `cases/<slug>/medical-providers/<provider-slug>/records-bills.md`:
 
 ```yaml
 records_requested: "YYYY-MM-DD"
@@ -44,4 +44,4 @@ fax_confirmation: "Y" | ""
 follow_up_date: "YYYY-MM-DD"   # +14 days
 ```
 
-Then append an activity log entry at `cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md` per `DATA_CONTRACT.md` §5, body linking back to the case file and naming the provider and method.
+Then append an activity entry at `cases/<slug>/activity/<YYYY-MM-DD-HHMM>-correspondence.md` per `DATA_CONTRACT.md`, body linking back to the case file and naming the provider and method.

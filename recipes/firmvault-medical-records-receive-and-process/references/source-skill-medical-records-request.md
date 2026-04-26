@@ -56,7 +56,7 @@ Missing HIPAA, missing provider fax, missing treatment dates, and fax send failu
 - Filled request document(s) at `cases/<slug>/documents/<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.{docx,pdf}`
 - Merged request+HIPAA PDF sent (fax or email) or queued for manual send
 - Updated provider stub frontmatter in `cases/<slug>/contacts/<provider-slug>.md` (`records_requested`, `bills_requested`, `request_method`, `fax_confirmation`, `follow_up_date`)
-- Activity log entry at `cases/<slug>/Activity Log/<YYYY-MM-DD-HHMM>-correspondence.md`
+- Activity log entry at `cases/<slug>/activity/<YYYY-MM-DD-HHMM>-correspondence.md`
 - 14-day follow-up scheduled
 
 ## References

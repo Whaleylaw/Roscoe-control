@@ -8,6 +8,6 @@ Check:
 - No external sending was performed by the agent.
 - Sent status is supported by vault evidence or owner confirmation.
 - Follow-up date or expectation is documented.
-- The Activity Log or task resolution explains what happened.
+- The `activity/`, `workflow-log/`, or task resolution explains what happened.
 
 Reject if the worker claims sending occurred without proof, invents contact details, or omits the human handoff details.

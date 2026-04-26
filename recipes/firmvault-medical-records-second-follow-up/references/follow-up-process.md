@@ -31,7 +31,7 @@ follow_ups:
     next_follow_up: "YYYY-MM-DD"
 ```
 
-And write an activity log entry under `cases/<slug>/Activity Log/` with category `phone` or `correspondence` depending on the method.
+And write an activity log entry under `cases/<slug>/activity/` with category `phone` or `correspondence` depending on the method.
 
 ## Marking records/bills received
 

@@ -32,7 +32,7 @@ This SOUL is distilled from the legacy `medical-records-request` skill. Supporti
    - formal written demand with deadline
    - attorney review if subpoena/litigation intervention may be needed
    - compliance contact research request
-5. Document the delay, prior attempts, current missing items, and recommended next action in an Activity Log entry or provider stub note.
+5. Document the delay, prior attempts, current missing items, and recommended next action in an activity/ entry or provider stub note.
 
 ## Do Not
 

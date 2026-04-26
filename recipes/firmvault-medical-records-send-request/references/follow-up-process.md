@@ -9,7 +9,7 @@
 
 ## 14-day check
 
-Read the provider stub; if `records_received` or `bills_received` is still blank, place a call to the records department using the script below, then update the stub with the result and the next follow-up date.
+Read `medical-providers/<provider-slug>/records-bills.md`; if records or bills receipt is still blank, place a call to the records department using the script below, then update the ledger with the result and the next follow-up date.
 
 ```
 Hi, I'm calling from <Firm> regarding a medical records request for
@@ -20,7 +20,7 @@ check status and whether there's a fee.
 
 ## Documenting a follow-up
 
-Append to the provider stub frontmatter:
+Append to the provider records/bills ledger:
 
 ```yaml
 follow_ups:
@@ -31,11 +31,11 @@ follow_ups:
     next_follow_up: "YYYY-MM-DD"
 ```
 
-And write an activity log entry under `cases/<slug>/Activity Log/` with category `phone` or `correspondence` depending on the method.
+And write an activity entry under `cases/<slug>/activity/` with category `phone` or `correspondence` depending on the method.
 
 ## Marking records/bills received
 
-When the documents arrive, drop them into `cases/<slug>/documents/` (filename `<YYYY-MM-DD> - <client> - Medical Records - <provider>.pdf` per the case-file-organization naming convention), update the provider stub:
+When the documents arrive, create or link the shadow under `cases/<slug>/medical-providers/<provider-slug>/documents/` and update `records-bills.md`:
 
 ```yaml
 records_received: "YYYY-MM-DD"
@@ -43,7 +43,7 @@ records_path: "cases/<slug>/documents/<filename>.pdf"
 records_pages: <count>
 ```
 
-And log the receipt as an activity log entry. When every provider has `records_received` set, the `all_records_received` landmark (PHASE_DAG Phase 3) flips true.
+And log the receipt as an activity entry. When every provider ledger has records received, the records-received landmark can be satisfied.
 
 ## Common delays
 

@@ -349,19 +349,19 @@ nodes:
       required: true,
       type: 'string',
     })
-    expect(definition.nodes.wait_14_days_for_records).toMatchObject({
+    expect(definition.nodes.wait_15_days_for_records).toMatchObject({
       type: 'wait',
-      duration: '14d',
+      duration: '15d',
       depends_on: { nodes: ['send_records_request'], conditions: [], timers: [] },
       exit_when: { condition: 'law_firm.provider.records_and_bills_received == true' },
     })
     expect(definition.nodes.first_follow_up_records_request.depends_on).toMatchObject({
-      nodes: ['wait_14_days_for_records'],
+      nodes: ['wait_15_days_for_records'],
     })
-    expect(definition.nodes.wait_9_days_for_escalation).toMatchObject({
+    expect(definition.nodes.wait_15_more_days_for_escalation).toMatchObject({
       type: 'wait',
-      duration: '9d',
-      depends_on: { nodes: ['second_follow_up_records_request'], conditions: [], timers: [] },
+      duration: '15d',
+      depends_on: { nodes: ['third_follow_up_records_request'], conditions: [], timers: [] },
     })
     expect(definition.nodes.receive_and_process_records_bills).toMatchObject({
       type: 'recipe',

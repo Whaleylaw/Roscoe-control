@@ -22,7 +22,7 @@ Use a descriptive filename such as:
 
 `<YYYY-MM-DD> - <client> - Medical Record Request - <provider>.docx`
 
-If the worker only prepares a handoff because no deterministic document tool is available, record the intended output path and exact sending instructions in the task result and Activity Log.
+If the worker only prepares a handoff because no deterministic document tool is available, record the intended output path and exact sending instructions in the task result and activity/.
 
 ## Letter Components
 
@@ -60,7 +60,7 @@ Use the vault contract, not deprecated JSON files:
 | Provider name | `cases/<case_slug>/contacts/<provider_slug>.md` or linked `Contacts/Medical/<slug>.md` |
 | Provider address | provider contact stub or linked medical master card |
 | Provider fax/email | provider contact stub or linked medical master card |
-| Treatment dates | provider contact stub fields, treatment table shadow, or Activity Log evidence |
+| Treatment dates | provider contact stub fields, treatment table shadow, or activity/ evidence |
 | Signed authorization | `cases/<case_slug>/documents/` filename containing `hipaa` or `medical-authorization` |
 
 ## Privacy Handling

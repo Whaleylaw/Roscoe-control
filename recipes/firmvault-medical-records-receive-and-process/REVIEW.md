@@ -7,7 +7,7 @@ Check:
 - The provider scope is clear.
 - The received document path or evidence is identified.
 - Provider stub receipt fields were updated only when supported.
-- The Activity Log explains what was received and what remains missing.
+- The activity/ explains what was received and what remains missing.
 - Any all-provider landmark claim is backed by an aggregate provider check.
 - Chronology follow-up is called out when records are usable.
 
