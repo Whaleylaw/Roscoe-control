@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import { eventBus } from '@/lib/event-bus'
 import { advanceWorkflowAfterTaskApproval } from '@/lib/workflow-engine'
 import { publishApprovedWorktreeForReview, type ReviewPrPublicationResult } from '@/lib/review-prs'
+import { revokeTokensForTask } from '@/lib/runner-tokens'
 
 export async function GET(request: NextRequest) {
   const auth = requireRole(request, 'viewer')
@@ -213,12 +214,20 @@ export async function POST(request: NextRequest) {
           { status, notes },
           workspaceId
         )
-        db.prepare(`
+        const transition = db.prepare(`
           UPDATE tasks
-          SET status = ?, completed_at = COALESCE(completed_at, unixepoch()), updated_at = unixepoch()
-          WHERE id = ? AND workspace_id = ?
+          SET status = ?,
+              container_id = NULL,
+              error_message = NULL,
+              completed_at = COALESCE(completed_at, unixepoch()),
+              updated_at = unixepoch()
+          WHERE id = ? AND workspace_id = ? AND status = 'quality_review'
         `)
           .run('done', taskId, workspaceId)
+        if (transition.changes !== 1) {
+          throw new Error('task is no longer in quality_review')
+        }
+        revokeTokensForTask(db, taskId, Math.floor(Date.now() / 1000))
         const advancement = advanceWorkflowAfterTaskApproval(db, {
           taskId,
           actor: reviewer,

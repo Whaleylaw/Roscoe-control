@@ -194,4 +194,34 @@ describe('POST /api/runner/tasks/:task_id/review PR gate', () => {
     expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 46`).get()).toMatchObject({ count: 0 })
     expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'done' }))
   })
+
+  it('does not advance a stale approval if the task leaves quality_review during publication', async () => {
+    authTaskId = 47
+    seedTask(47)
+    issueRunnerToken(testDb, 47, 1, 300)
+    vi.mocked(publishApprovedWorktreeForReview).mockImplementationOnce(async () => {
+      testDb.prepare(`UPDATE tasks SET status = 'review' WHERE id = 47`).run()
+      return { published: false, reason: 'no_changes' }
+    })
+
+    const response = await review(47)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 47
+    `).get()).toMatchObject({
+      status: 'review',
+      container_id: 'container-47',
+      error_message: null,
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 47
+    `).get()).toMatchObject({ revoked_at: null })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 47`).get()).toMatchObject({ count: 0 })
+    expect(advanceWorkflowAfterTaskApprovalMock).not.toHaveBeenCalled()
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'done' }))
+  })
 })

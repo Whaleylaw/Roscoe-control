@@ -333,6 +333,38 @@ nodes:
     expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'done' }))
   })
 
+  it('does not advance a stale approval if the task leaves quality_review during publication', async () => {
+    const inserted = testDb.prepare(`
+      INSERT INTO tasks (title, status, priority, workspace_id, container_id)
+      VALUES ('stale approval', 'quality_review', 'medium', 1, 'container-stale')
+    `).run()
+    const taskId = Number(inserted.lastInsertRowid)
+    vi.mocked(publishApprovedWorktreeForReview).mockImplementationOnce(async () => {
+      testDb.prepare(`UPDATE tasks SET status = 'review' WHERE id = ?`).run(taskId)
+      return { published: false, reason: 'no_changes' }
+    })
+
+    const response = await POST(new Request('http://localhost/api/quality-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        taskId,
+        reviewer: 'aegis',
+        status: 'approved',
+        notes: 'Looks correct.',
+      }),
+    }) as any)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`SELECT status, container_id, completed_at FROM tasks WHERE id = ?`).get(taskId)).toMatchObject({
+      status: 'review',
+      container_id: 'container-stale',
+      completed_at: null,
+    })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = ?`).get(taskId)).toMatchObject({ count: 0 })
+    expect(advanceWorkflowAfterTaskApproval).not.toHaveBeenCalled()
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'done' }))
+  })
+
   it('approval does not mark done or advance workflow when review PR publication fails', async () => {
     vi.mocked(publishApprovedWorktreeForReview).mockRejectedValueOnce(new Error('target repo has uncommitted changes'))
 

@@ -153,7 +153,7 @@ export async function POST(
           INSERT INTO comments (task_id, author, content, created_at, workspace_id)
           VALUES (?, 'recipe-reviewer', ?, ?, ?)
         `).run(taskId, `Quality Review Approved:\n${body.notes}`, now, task.workspace_id)
-        db.prepare(`
+        const transition = db.prepare(`
           UPDATE tasks
           SET status = 'done',
               container_id = NULL,
@@ -162,6 +162,9 @@ export async function POST(
               updated_at = ?
           WHERE id = ? AND status = 'quality_review'
         `).run(now, now, taskId)
+        if (transition.changes !== 1) {
+          throw new Error('task is no longer in quality_review')
+        }
         revokeTokensForTask(db, taskId, now)
         advanceWorkflowAfterTaskApproval(db, {
           taskId,
