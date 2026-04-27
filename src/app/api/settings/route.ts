@@ -240,7 +240,7 @@ export async function PUT(request: NextRequest) {
           : strValue
       changes[key] = {
         old: auditSettingValue(key, existing?.value),
-        new: auditSettingValue(key, storedValue),
+        new: auditSettingValue(key, storedValue) ?? '',
       }
 
       upsert.run(key, storedValue, description, category, auth.user.username)
