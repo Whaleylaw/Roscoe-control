@@ -44,6 +44,12 @@ const currentTask = {
   assigned_to: 'Aegis',
   tags: '[]',
   metadata: '{}',
+  review_pr: JSON.stringify({
+    provider: 'forgejo',
+    pr_number: 12,
+    pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+    state: 'open',
+  }),
   created_at: 1000,
   updated_at: 1000,
 }
@@ -70,7 +76,7 @@ describe('PUT /api/tasks/[id] no-op updates', () => {
     vi.clearAllMocks()
 
     prepareMock.mockImplementation((sql: string) => {
-      if (sql.includes('SELECT * FROM tasks WHERE id = ? AND workspace_id = ?')) {
+      if (/SELECT\s+t\.\*,/i.test(sql) && /FROM\s+tasks\s+t/i.test(sql) && /review_pr/i.test(sql)) {
         return { get: getMock }
       }
       if (/FROM\s+settings\s+WHERE\s+key/i.test(sql)) {
@@ -93,10 +99,19 @@ describe('PUT /api/tasks/[id] no-op updates', () => {
     })
 
     const response = await PUT(request, { params: Promise.resolve({ id: '7' }) })
-    const payload = await response.json() as { unchanged?: boolean; task?: { id: number } }
+    const payload = await response.json() as {
+      unchanged?: boolean
+      task?: { id: number; review_pr?: { provider: string; pr_number: number; pr_url: string; state: string } | null }
+    }
 
     expect(response.status).toBe(200)
     expect(payload.unchanged).toBe(true)
     expect(payload.task?.id).toBe(7)
+    expect(payload.task?.review_pr).toEqual({
+      provider: 'forgejo',
+      pr_number: 12,
+      pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'open',
+    })
   })
 })
