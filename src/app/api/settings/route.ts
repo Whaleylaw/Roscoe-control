@@ -5,6 +5,9 @@ import { config } from '@/lib/config'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { validateBody, updateSettingsSchema } from '@/lib/validation'
 
+const FORGEJO_TOKEN_KEY = 'runtime.forgejo_token'
+const MASKED_SECRET_VALUE = '********'
+
 interface SettingRow {
   key: string
   value: string
@@ -112,7 +115,7 @@ const settingDefinitions: Record<string, { category: string; description: string
     description: 'Base URL of the Forgejo/Gitea server used for review PR publication, e.g. http://localhost:3001.',
     default: '',
   },
-  'runtime.forgejo_token': {
+  [FORGEJO_TOKEN_KEY]: {
     category: 'runtime',
     description: 'Forgejo/Gitea API token used to create and inspect review pull requests.',
     default: '',
@@ -122,6 +125,16 @@ const settingDefinitions: Record<string, { category: string; description: string
     description: 'Whether approving task work should automatically create a review PR. Set exactly false to disable.',
     default: 'true',
   },
+}
+
+function displaySettingValue(key: string, value: string | undefined, defaultValue: string): string {
+  if (key !== FORGEJO_TOKEN_KEY) return value ?? defaultValue
+  return value ? MASKED_SECRET_VALUE : ''
+}
+
+function auditSettingValue(key: string, value: string | null | undefined): string | null {
+  if (key !== FORGEJO_TOKEN_KEY) return value ?? null
+  return value ? MASKED_SECRET_VALUE : ''
 }
 
 /**
@@ -150,7 +163,7 @@ export async function GET(request: NextRequest) {
     const row = stored.get(key)
     settings.push({
       key,
-      value: row?.value ?? def.default,
+      value: displaySettingValue(key, row?.value, def.default),
       description: row?.description ?? def.description,
       category: row?.category ?? def.category,
       updated_by: row?.updated_by ?? null,
@@ -221,9 +234,16 @@ export async function PUT(request: NextRequest) {
 
       // Get old value for audit
       const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
-      changes[key] = { old: existing?.value ?? null, new: strValue }
+      const storedValue =
+        key === FORGEJO_TOKEN_KEY && strValue === MASKED_SECRET_VALUE
+          ? existing?.value ?? ''
+          : strValue
+      changes[key] = {
+        old: auditSettingValue(key, existing?.value),
+        new: auditSettingValue(key, storedValue),
+      }
 
-      upsert.run(key, strValue, description, category, auth.user.username)
+      upsert.run(key, storedValue, description, category, auth.user.username)
       updated.push(key)
     }
   })
