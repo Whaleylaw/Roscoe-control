@@ -566,5 +566,38 @@ describe('TaskBoardPanel', () => {
 
       expect(screen.queryByText('Review PR #13')).toBeNull()
     })
+
+    it('merges returned review PR into an open modal after quality review submit', async () => {
+      mockSearchParams = new URLSearchParams('taskId=101')
+      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        const method = (init?.method || 'GET').toUpperCase()
+        if (url === '/api/quality-review' && method === 'POST') {
+          return new Response(JSON.stringify({
+            success: true,
+            review_pr: {
+              provider: 'forgejo',
+              pr_number: 14,
+              pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/14',
+              state: 'open',
+            },
+            workflow_advancement: null,
+          }), { status: 200 })
+        }
+        return makeFetchMock()(input, init)
+      }) as unknown as typeof fetch
+
+      await renderBoard()
+      await waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+      })
+      fireEvent.click(screen.getByRole('tab', { name: 'tabQualityReview' }))
+      fireEvent.change(screen.getByPlaceholderText('reviewNotesPlaceholder'), { target: { value: 'Approved.' } })
+      fireEvent.click(screen.getByText('submit'))
+
+      const links = await screen.findAllByText('Review PR #14')
+      expect(links.length).toBeGreaterThan(0)
+      expect(mockStoreState.selectedTask?.review_pr?.pr_number).toBe(14)
+    })
   })
 })

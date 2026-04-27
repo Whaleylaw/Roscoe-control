@@ -1315,6 +1315,11 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
             updateTaskUrl(null)
           }}
           onUpdate={fetchData}
+          onTaskPatch={(patch) => {
+            const patchedTask = { ...selectedTask, ...patch }
+            setSelectedTask(patchedTask)
+            storeSetTasks(storeTasks.map((item) => item.id === patchedTask.id ? { ...item, ...patch } : item))
+          }}
           onEdit={(taskToEdit) => {
             setEditingTask(taskToEdit)
             setSelectedTask(null)
@@ -1363,6 +1368,7 @@ function TaskDetailModal({
   projects,
   onClose,
   onUpdate,
+  onTaskPatch,
   onEdit,
   onDelete
 }: {
@@ -1371,6 +1377,7 @@ function TaskDetailModal({
   projects: Project[]
   onClose: () => void
   onUpdate: () => void
+  onTaskPatch: (patch: Partial<Task>) => void
   onEdit: (task: Task) => void
   onDelete: () => void
 }) {
@@ -1547,6 +1554,17 @@ function TaskDetailModal({
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to submit review')
+      const taskPatch: Partial<Task> = {}
+      if (data.review_pr) taskPatch.review_pr = data.review_pr
+      if (reviewStatus === 'approved' && data.review_pr) {
+        taskPatch.status = 'quality_review'
+      } else if (reviewStatus === 'approved') {
+        taskPatch.status = 'done'
+      } else if (reviewStatus === 'rejected') {
+        taskPatch.status = 'in_progress'
+        taskPatch.error_message = `Quality review rejected by ${reviewer}: ${reviewNotes}`
+      }
+      if (Object.keys(taskPatch).length > 0) onTaskPatch(taskPatch)
       setReviewNotes('')
       await fetchReviews()
       onUpdate()
