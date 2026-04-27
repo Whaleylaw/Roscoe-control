@@ -1942,7 +1942,7 @@ const migrations: Migration[] = [
     }
   },
   {
-    id: '065_task_review_prs',
+    id: '067_task_review_prs',
     up(db: Database.Database) {
       db.exec(`
         CREATE TABLE IF NOT EXISTS task_review_prs (
@@ -1973,7 +1973,7 @@ const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_task_review_prs_open
           ON task_review_prs(workspace_id, provider, state, last_checked_at);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_task_review_prs_unique_provider_pr
-          ON task_review_prs(workspace_id, provider, repo_owner, repo_name, pr_number);
+          ON task_review_prs(workspace_id, provider, remote_url, repo_owner, repo_name, pr_number);
       `)
     }
   }

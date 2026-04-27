@@ -30,6 +30,15 @@ describe('task_review_prs migration', () => {
         'last_checked_at',
         'metadata_json',
       ]))
+      const uniqueIndexCols = db.prepare(`PRAGMA index_info(idx_task_review_prs_unique_provider_pr)`).all() as Array<{ name: string }>
+      expect(uniqueIndexCols.map((col) => col.name)).toEqual([
+        'workspace_id',
+        'provider',
+        'remote_url',
+        'repo_owner',
+        'repo_name',
+        'pr_number',
+      ])
       db.prepare(`INSERT INTO tasks (id, title) VALUES (1, 'Review PR task')`).run()
       db.prepare(`
         INSERT INTO task_review_prs (
