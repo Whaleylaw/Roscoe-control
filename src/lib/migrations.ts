@@ -1972,6 +1972,7 @@ const migrations: Migration[] = [
           ON task_review_prs(task_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_task_review_prs_open
           ON task_review_prs(workspace_id, provider, state, last_checked_at);
+        DROP INDEX IF EXISTS idx_task_review_prs_unique_provider_pr;
         CREATE UNIQUE INDEX IF NOT EXISTS idx_task_review_prs_unique_provider_pr
           ON task_review_prs(workspace_id, provider, remote_url, repo_owner, repo_name, pr_number);
       `)

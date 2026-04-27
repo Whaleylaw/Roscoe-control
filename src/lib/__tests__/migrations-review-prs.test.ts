@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { runMigrations } from '@/lib/migrations'
 
+function taskReviewPrUniqueIndexColumns(db: Database.Database) {
+  const cols = db.prepare(`PRAGMA index_info(idx_task_review_prs_unique_provider_pr)`).all() as Array<{ name: string }>
+  return cols.map((col) => col.name)
+}
+
 describe('task_review_prs migration', () => {
   it('creates task_review_prs with audit fields and indexes', () => {
     const db = new Database(':memory:')
@@ -30,8 +35,7 @@ describe('task_review_prs migration', () => {
         'last_checked_at',
         'metadata_json',
       ]))
-      const uniqueIndexCols = db.prepare(`PRAGMA index_info(idx_task_review_prs_unique_provider_pr)`).all() as Array<{ name: string }>
-      expect(uniqueIndexCols.map((col) => col.name)).toEqual([
+      expect(taskReviewPrUniqueIndexColumns(db)).toEqual([
         'workspace_id',
         'provider',
         'remote_url',
@@ -51,6 +55,32 @@ describe('task_review_prs migration', () => {
       `).run()
       const row = db.prepare(`SELECT state, pr_number FROM task_review_prs WHERE task_id = 1`).get() as { state: string; pr_number: number }
       expect(row).toEqual({ state: 'open', pr_number: 5 })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('repairs the pre-067 unique index shape when rerun', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      db.exec(`
+        DROP INDEX IF EXISTS idx_task_review_prs_unique_provider_pr;
+        CREATE UNIQUE INDEX idx_task_review_prs_unique_provider_pr
+          ON task_review_prs(workspace_id, provider, repo_owner, repo_name, pr_number);
+        DELETE FROM schema_migrations WHERE id = '067_task_review_prs';
+      `)
+
+      runMigrations(db)
+
+      expect(taskReviewPrUniqueIndexColumns(db)).toEqual([
+        'workspace_id',
+        'provider',
+        'remote_url',
+        'repo_owner',
+        'repo_name',
+        'pr_number',
+      ])
     } finally {
       db.close()
     }
