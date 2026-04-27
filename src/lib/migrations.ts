@@ -1940,6 +1940,42 @@ const migrations: Migration[] = [
         db.exec(`ALTER TABLE workflow_instances ADD COLUMN vars_json TEXT NOT NULL DEFAULT '{}'`)
       }
     }
+  },
+  {
+    id: '065_task_review_prs',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_review_prs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          provider TEXT NOT NULL,
+          remote_name TEXT NOT NULL,
+          remote_url TEXT NOT NULL,
+          repo_owner TEXT NOT NULL,
+          repo_name TEXT NOT NULL,
+          base_ref TEXT NOT NULL,
+          head_ref TEXT NOT NULL,
+          branch_name TEXT NOT NULL,
+          pr_number INTEGER NOT NULL,
+          pr_url TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT 'open',
+          merge_commit_sha TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          last_checked_at INTEGER,
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_task_review_prs_task
+          ON task_review_prs(task_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_review_prs_open
+          ON task_review_prs(workspace_id, provider, state, last_checked_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_review_prs_unique_provider_pr
+          ON task_review_prs(workspace_id, provider, repo_owner, repo_name, pr_number);
+      `)
+    }
   }
 ]
 
