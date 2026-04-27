@@ -6,7 +6,7 @@ import { mutationLimiter } from '@/lib/rate-limit'
 import { revokeTokensForTask } from '@/lib/runner-tokens'
 import { eventBus } from '@/lib/event-bus'
 import { logger } from '@/lib/logger'
-import { promoteApprovedWorktree } from '@/lib/worktree-promotion'
+import { publishApprovedWorktreeForReview, type ReviewPrPublicationResult } from '@/lib/review-prs'
 import { advanceWorkflowAfterTaskApproval } from '@/lib/workflow-engine'
 
 const Body = z.object({
@@ -75,20 +75,20 @@ export async function POST(
     const now = Math.floor(Date.now() / 1000)
 
     if (body.verdict === 'approved') {
-      let promotion: ReturnType<typeof promoteApprovedWorktree> | null = null
+      let reviewPr: ReviewPrPublicationResult
       try {
-        promotion = promoteApprovedWorktree(task)
+        reviewPr = await publishApprovedWorktreeForReview(db, task)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         db.transaction(() => {
           db.prepare(`
             INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
             VALUES (?, 'recipe-reviewer', 'blocked', ?, ?)
-          `).run(taskId, `Worktree promotion failed after recipe review approval:\n${message}`, task.workspace_id)
+          `).run(taskId, `Review PR publication failed after recipe review approval:\n${message}`, task.workspace_id)
           db.prepare(`
             INSERT INTO comments (task_id, author, content, created_at, workspace_id)
             VALUES (?, 'recipe-reviewer', ?, ?, ?)
-          `).run(taskId, `Quality Review approved the work, but promotion failed:\n${message}`, now, task.workspace_id)
+          `).run(taskId, `Quality Review approved the work, but review PR publication failed:\n${message}`, now, task.workspace_id)
           db.prepare(`
             UPDATE tasks
             SET status = 'quality_review',
@@ -96,15 +96,48 @@ export async function POST(
                 error_message = ?,
                 updated_at = ?
             WHERE id = ?
-          `).run(`Worktree promotion failed: ${message}`, now, taskId)
+          `).run(`Review PR publication failed: ${message}`, now, taskId)
           revokeTokensForTask(db, taskId, now)
         })()
         eventBus.broadcast('task.status_changed', {
           task_id: taskId,
           status: 'quality_review',
           previous_status: 'quality_review',
-          reason: 'worktree_promotion_failed',
-          error_message: `Worktree promotion failed: ${message.substring(0, 300)}`,
+          reason: 'review_pr_publication_failed',
+          error_message: `Review PR publication failed: ${message.substring(0, 300)}`,
+          workspace_id: task.workspace_id,
+          at: now,
+        })
+        return new NextResponse(null, { status: 204 })
+      }
+
+      if (reviewPr.published) {
+        db.transaction(() => {
+          db.prepare(`
+            INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+            VALUES (?, 'recipe-reviewer', 'approved', ?, ?)
+          `).run(taskId, body.notes, task.workspace_id)
+          db.prepare(`
+            INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+            VALUES (?, 'recipe-reviewer', ?, ?, ?)
+          `).run(taskId, `Quality Review Approved:\n${body.notes}\n\nReview PR opened: ${reviewPr.pr_url}`, now, task.workspace_id)
+          db.prepare(`
+            UPDATE tasks
+            SET status = 'quality_review',
+                container_id = NULL,
+                error_message = NULL,
+                updated_at = ?
+            WHERE id = ? AND status = 'quality_review'
+          `).run(now, taskId)
+          revokeTokensForTask(db, taskId, now)
+        })()
+
+        eventBus.broadcast('task.status_changed', {
+          task_id: taskId,
+          status: 'quality_review',
+          previous_status: 'quality_review',
+          reason: 'review_pr_opened',
+          review_pr: reviewPr,
           workspace_id: task.workspace_id,
           at: now,
         })
@@ -136,7 +169,7 @@ export async function POST(
         task_id: taskId,
         status: 'done',
         previous_status: 'quality_review',
-        promotion,
+        review_pr: reviewPr,
         workspace_id: task.workspace_id,
         at: now,
       })
@@ -146,7 +179,7 @@ export async function POST(
         payload: {
           verdict: 'approved',
           notes: body.notes,
-          promotion,
+          review_pr: reviewPr,
         },
         now,
       })
