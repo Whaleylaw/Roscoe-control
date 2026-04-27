@@ -97,6 +97,31 @@ const settingDefinitions: Record<string, { category: string; description: string
     description: 'Days to preserve worktree + logs for tasks that reached `failed` before the runner GC tick destroys them. `done` and `cancelled` are destroyed immediately.',
     default: '7',
   },
+  'runtime.review_pr_provider': {
+    category: 'runtime',
+    description: 'Review PR provider used when approved task work is published for merge gating. Supported value: forgejo.',
+    default: 'forgejo',
+  },
+  'runtime.review_pr_remote_name': {
+    category: 'runtime',
+    description: 'Git remote name used for review PR publication.',
+    default: 'forgejo',
+  },
+  'runtime.forgejo_base_url': {
+    category: 'runtime',
+    description: 'Base URL of the Forgejo/Gitea server used for review PR publication, e.g. http://localhost:3001.',
+    default: '',
+  },
+  'runtime.forgejo_token': {
+    category: 'runtime',
+    description: 'Forgejo/Gitea API token used to create and inspect review pull requests.',
+    default: '',
+  },
+  'runtime.review_pr_auto_create': {
+    category: 'runtime',
+    description: 'Whether approving task work should automatically create a review PR. Set exactly false to disable.',
+    default: 'true',
+  },
 }
 
 /**
