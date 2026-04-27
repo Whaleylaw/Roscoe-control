@@ -478,4 +478,71 @@ nodes:
       WHERE metadata LIKE '%"node_key":"second_step"%'
     `).get()).toMatchObject({ count: 0 })
   })
+
+  it('does not record a stale blocker if PR publication fails after task leaves quality_review', async () => {
+    const inserted = testDb.prepare(`
+      INSERT INTO tasks (title, status, priority, workspace_id, container_id)
+      VALUES ('stale publication failure', 'quality_review', 'medium', 1, 'container-publication-failure')
+    `).run()
+    const taskId = Number(inserted.lastInsertRowid)
+    vi.mocked(publishApprovedWorktreeForReview).mockImplementationOnce(async () => {
+      testDb.prepare(`UPDATE tasks SET status = 'review' WHERE id = ?`).run(taskId)
+      throw new Error('forgejo unavailable')
+    })
+
+    const response = await POST(new Request('http://localhost/api/quality-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        taskId,
+        reviewer: 'aegis',
+        status: 'approved',
+        notes: 'Looks correct.',
+      }),
+    }) as any)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`SELECT status, container_id, completed_at FROM tasks WHERE id = ?`).get(taskId)).toMatchObject({
+      status: 'review',
+      container_id: 'container-publication-failure',
+      completed_at: null,
+    })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = ?`).get(taskId)).toMatchObject({ count: 0 })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = ?`).get(taskId)).toMatchObject({ count: 0 })
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'review_pr_publication_failed' }))
+  })
+
+  it('rolls back stale rejected reviews when the guarded transition cannot apply', async () => {
+    const inserted = testDb.prepare(`
+      INSERT INTO tasks (title, status, priority, workspace_id, container_id)
+      VALUES ('stale rejection', 'quality_review', 'medium', 1, 'container-rejection')
+    `).run()
+    const taskId = Number(inserted.lastInsertRowid)
+    testDb.exec(`
+      CREATE TRIGGER stale_quality_rejection
+      BEFORE INSERT ON quality_reviews
+      WHEN NEW.task_id = ${taskId}
+      BEGIN
+        UPDATE tasks SET status = 'review' WHERE id = ${taskId};
+      END;
+    `)
+
+    const response = await POST(new Request('http://localhost/api/quality-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        taskId,
+        reviewer: 'aegis',
+        status: 'rejected',
+        notes: 'Needs more work.',
+      }),
+    }) as any)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`SELECT status, container_id, completed_at FROM tasks WHERE id = ?`).get(taskId)).toMatchObject({
+      status: 'quality_review',
+      container_id: 'container-rejection',
+      completed_at: null,
+    })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = ?`).get(taskId)).toMatchObject({ count: 0 })
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'in_progress' }))
+  })
 })

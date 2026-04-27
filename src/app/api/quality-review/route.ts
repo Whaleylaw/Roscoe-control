@@ -105,35 +105,41 @@ export async function POST(request: NextRequest) {
       } catch (publicationErr: any) {
         const now = Math.floor(Date.now() / 1000)
         const message = publicationErr?.message || String(publicationErr)
-        const blockedReview = db.prepare(`
-          INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(taskId, reviewer, 'blocked', `Review PR publication failed after approval:\n${message}`, workspaceId)
-        reviewId = Number(blockedReview.lastInsertRowid)
-        db_helpers.logActivity(
-          'quality_review',
-          'task',
-          taskId,
-          reviewer,
-          `Quality review blocked for task: ${task.title}`,
-          { status: 'blocked', notes: `Review PR publication failed: ${message}` },
-          workspaceId
-        )
-        db.prepare(`
-          INSERT INTO comments (task_id, author, content, created_at, workspace_id)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(
-          taskId,
-          reviewer,
-          `Quality review approved the work, but review PR publication failed:\n${message}\n\nThe task worktree was left intact for inspection. The base repository was not marked done and downstream workflow nodes were not advanced.`,
-          now,
-          workspaceId,
-        )
-        db.prepare(`
-          UPDATE tasks
-          SET status = ?, error_message = ?, updated_at = ?
-          WHERE id = ? AND workspace_id = ?
-        `).run('quality_review', `Review PR publication failed: ${message}`, now, taskId, workspaceId)
+        reviewId = db.transaction(() => {
+          const blockedReview = db.prepare(`
+            INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(taskId, reviewer, 'blocked', `Review PR publication failed after approval:\n${message}`, workspaceId)
+          const insertedReviewId = Number(blockedReview.lastInsertRowid)
+          db_helpers.logActivity(
+            'quality_review',
+            'task',
+            taskId,
+            reviewer,
+            `Quality review blocked for task: ${task.title}`,
+            { status: 'blocked', notes: `Review PR publication failed: ${message}` },
+            workspaceId
+          )
+          db.prepare(`
+            INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(
+            taskId,
+            reviewer,
+            `Quality review approved the work, but review PR publication failed:\n${message}\n\nThe task worktree was left intact for inspection. The base repository was not marked done and downstream workflow nodes were not advanced.`,
+            now,
+            workspaceId,
+          )
+          const transition = db.prepare(`
+            UPDATE tasks
+            SET status = ?, error_message = ?, updated_at = ?
+            WHERE id = ? AND workspace_id = ? AND status = 'quality_review'
+          `).run('quality_review', `Review PR publication failed: ${message}`, now, taskId, workspaceId)
+          if (transition.changes !== 1) {
+            throw new Error('task is no longer in quality_review')
+          }
+          return insertedReviewId
+        })()
         eventBus.broadcast('task.status_changed', {
           id: taskId,
           status: 'quality_review',
@@ -260,23 +266,32 @@ export async function POST(request: NextRequest) {
         updated_at: Math.floor(Date.now() / 1000),
       })
     } else if (status === 'rejected') {
-      const result = db.prepare(`
-        INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(taskId, reviewer, status, notes, workspaceId)
-      reviewId = Number(result.lastInsertRowid)
-      db_helpers.logActivity(
-        'quality_review',
-        'task',
-        taskId,
-        reviewer,
-        `Quality review ${status} for task: ${task.title}`,
-        { status, notes },
-        workspaceId
-      )
-      // Rejected: push back to in_progress with the rejection notes as error_message
-      db.prepare('UPDATE tasks SET status = ?, error_message = ?, updated_at = unixepoch() WHERE id = ? AND workspace_id = ?')
-        .run('in_progress', `Quality review rejected by ${reviewer}: ${notes}`, taskId, workspaceId)
+      reviewId = db.transaction(() => {
+        const result = db.prepare(`
+          INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(taskId, reviewer, status, notes, workspaceId)
+        const insertedReviewId = Number(result.lastInsertRowid)
+        db_helpers.logActivity(
+          'quality_review',
+          'task',
+          taskId,
+          reviewer,
+          `Quality review ${status} for task: ${task.title}`,
+          { status, notes },
+          workspaceId
+        )
+        // Rejected: push back to in_progress with the rejection notes as error_message
+        const transition = db.prepare(`
+          UPDATE tasks
+          SET status = ?, error_message = ?, updated_at = unixepoch()
+          WHERE id = ? AND workspace_id = ? AND status = 'quality_review'
+        `).run('in_progress', `Quality review rejected by ${reviewer}: ${notes}`, taskId, workspaceId)
+        if (transition.changes !== 1) {
+          throw new Error('task is no longer in quality_review')
+        }
+        return insertedReviewId
+      })()
       eventBus.broadcast('task.status_changed', {
         id: taskId,
         status: 'in_progress',

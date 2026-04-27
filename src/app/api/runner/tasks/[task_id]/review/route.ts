@@ -89,14 +89,17 @@ export async function POST(
             INSERT INTO comments (task_id, author, content, created_at, workspace_id)
             VALUES (?, 'recipe-reviewer', ?, ?, ?)
           `).run(taskId, `Quality Review approved the work, but review PR publication failed:\n${message}`, now, task.workspace_id)
-          db.prepare(`
+          const transition = db.prepare(`
             UPDATE tasks
             SET status = 'quality_review',
                 container_id = NULL,
                 error_message = ?,
                 updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND status = 'quality_review'
           `).run(`Review PR publication failed: ${message}`, now, taskId)
+          if (transition.changes !== 1) {
+            throw new Error('task is no longer in quality_review')
+          }
           revokeTokensForTask(db, taskId, now)
         })()
         eventBus.broadcast('task.status_changed', {
@@ -202,7 +205,7 @@ export async function POST(
           INSERT INTO comments (task_id, author, content, created_at, workspace_id)
           VALUES (?, 'recipe-reviewer', ?, ?, ?)
         `).run(taskId, `Quality Review Rejected:\n${body.notes}`, now, task.workspace_id)
-        db.prepare(`
+        const transition = db.prepare(`
           UPDATE tasks
           SET status = 'assigned',
               container_id = NULL,
@@ -210,6 +213,9 @@ export async function POST(
               updated_at = ?
           WHERE id = ? AND status = 'quality_review'
         `).run(`Recipe review rejected: ${body.notes.slice(0, 1000)}`, now, taskId)
+        if (transition.changes !== 1) {
+          throw new Error('task is no longer in quality_review')
+        }
         revokeTokensForTask(db, taskId, now)
       })()
       eventBus.broadcast('task.status_changed', {
@@ -237,7 +243,7 @@ export async function POST(
         INSERT INTO comments (task_id, author, content, created_at, workspace_id)
         VALUES (?, 'recipe-reviewer', ?, ?, ?)
       `).run(taskId, `Quality Review Blocked:\n${body.notes}`, now, task.workspace_id)
-      db.prepare(`
+      const transition = db.prepare(`
         UPDATE tasks
         SET status = 'quality_review',
             container_id = NULL,
@@ -245,6 +251,9 @@ export async function POST(
             updated_at = ?
         WHERE id = ? AND status = 'quality_review'
       `).run(`Recipe review blocked: ${body.notes.slice(0, 1000)}`, now, taskId)
+      if (transition.changes !== 1) {
+        throw new Error('task is no longer in quality_review')
+      }
       revokeTokensForTask(db, taskId, now)
     })()
     eventBus.broadcast('task.status_changed', {

@@ -65,16 +65,18 @@ function seedTask(id: number): void {
   )
 }
 
-function reviewRequest(taskId: number): NextRequest {
+type ReviewBody = { verdict: 'approved' | 'rejected' | 'blocked'; notes: string }
+
+function reviewRequest(taskId: number, body: ReviewBody = { verdict: 'approved', notes: 'Looks correct.' }): NextRequest {
   return new NextRequest(`http://localhost/api/runner/tasks/${taskId}/review`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ verdict: 'approved', notes: 'Looks correct.' }),
+    body: JSON.stringify(body),
   })
 }
 
-async function review(taskId: number) {
-  return POST(reviewRequest(taskId), {
+async function review(taskId: number, body: ReviewBody = { verdict: 'approved', notes: 'Looks correct.' }) {
+  return POST(reviewRequest(taskId, body), {
     params: Promise.resolve({ task_id: String(taskId) }),
   })
 }
@@ -262,5 +264,103 @@ describe('POST /api/runner/tasks/:task_id/review PR gate', () => {
     expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 47`).get()).toMatchObject({ count: 0 })
     expect(advanceWorkflowAfterTaskApprovalMock).not.toHaveBeenCalled()
     expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'done' }))
+  })
+
+  it('does not record a stale blocker if PR publication fails after task leaves quality_review', async () => {
+    authTaskId = 49
+    seedTask(49)
+    issueRunnerToken(testDb, 49, 1, 300)
+    vi.mocked(publishApprovedWorktreeForReview).mockImplementationOnce(async () => {
+      testDb.prepare(`UPDATE tasks SET status = 'review' WHERE id = 49`).run()
+      throw new Error('forgejo unavailable')
+    })
+
+    const response = await review(49)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 49
+    `).get()).toMatchObject({
+      status: 'review',
+      container_id: 'container-49',
+      error_message: null,
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 49
+    `).get()).toMatchObject({ revoked_at: null })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 49`).get()).toMatchObject({ count: 0 })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = 49`).get()).toMatchObject({ count: 0 })
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'review_pr_publication_failed' }))
+  })
+
+  it('rolls back stale rejected reviews when the guarded transition cannot apply', async () => {
+    authTaskId = 50
+    seedTask(50)
+    issueRunnerToken(testDb, 50, 1, 300)
+    testDb.exec(`
+      CREATE TRIGGER stale_reject_review
+      BEFORE INSERT ON quality_reviews
+      WHEN NEW.task_id = 50
+      BEGIN
+        UPDATE tasks SET status = 'review' WHERE id = 50;
+      END;
+    `)
+
+    const response = await review(50, { verdict: 'rejected', notes: 'Needs more work.' })
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 50
+    `).get()).toMatchObject({
+      status: 'quality_review',
+      container_id: 'container-50',
+      error_message: null,
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 50
+    `).get()).toMatchObject({ revoked_at: null })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 50`).get()).toMatchObject({ count: 0 })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = 50`).get()).toMatchObject({ count: 0 })
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'recipe_review_rejected' }))
+  })
+
+  it('rolls back stale blocked reviews when the guarded transition cannot apply', async () => {
+    authTaskId = 51
+    seedTask(51)
+    issueRunnerToken(testDb, 51, 1, 300)
+    testDb.exec(`
+      CREATE TRIGGER stale_blocked_review
+      BEFORE INSERT ON quality_reviews
+      WHEN NEW.task_id = 51
+      BEGIN
+        UPDATE tasks SET status = 'review' WHERE id = 51;
+      END;
+    `)
+
+    const response = await review(51, { verdict: 'blocked', notes: 'Need human input.' })
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 51
+    `).get()).toMatchObject({
+      status: 'quality_review',
+      container_id: 'container-51',
+      error_message: null,
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 51
+    `).get()).toMatchObject({ revoked_at: null })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 51`).get()).toMatchObject({ count: 0 })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = 51`).get()).toMatchObject({ count: 0 })
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'recipe_review_blocked' }))
   })
 })
