@@ -165,4 +165,33 @@ describe('POST /api/runner/tasks/:task_id/review PR gate', () => {
       workspace_id: 1,
     }))
   })
+
+  it('does not leave the task done when direct workflow advancement fails', async () => {
+    authTaskId = 46
+    seedTask(46)
+    issueRunnerToken(testDb, 46, 1, 300)
+    vi.mocked(publishApprovedWorktreeForReview).mockResolvedValueOnce({ published: false, reason: 'no_changes' })
+    advanceWorkflowAfterTaskApprovalMock.mockImplementationOnce(() => {
+      throw new Error('workflow advancement failed')
+    })
+
+    const response = await review(46)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 46
+    `).get()).toMatchObject({
+      status: 'quality_review',
+      container_id: 'container-46',
+      error_message: null,
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 46
+    `).get()).toMatchObject({ revoked_at: null })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 46`).get()).toMatchObject({ count: 0 })
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ status: 'done' }))
+  })
 })

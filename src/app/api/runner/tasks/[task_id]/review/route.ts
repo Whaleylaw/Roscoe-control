@@ -163,6 +163,16 @@ export async function POST(
           WHERE id = ? AND status = 'quality_review'
         `).run(now, now, taskId)
         revokeTokensForTask(db, taskId, now)
+        advanceWorkflowAfterTaskApproval(db, {
+          taskId,
+          actor: 'recipe-reviewer',
+          payload: {
+            verdict: 'approved',
+            notes: body.notes,
+            review_pr: reviewPr,
+          },
+          now,
+        })
       })()
 
       eventBus.broadcast('task.status_changed', {
@@ -172,16 +182,6 @@ export async function POST(
         review_pr: reviewPr,
         workspace_id: task.workspace_id,
         at: now,
-      })
-      advanceWorkflowAfterTaskApproval(db, {
-        taskId,
-        actor: 'recipe-reviewer',
-        payload: {
-          verdict: 'approved',
-          notes: body.notes,
-          review_pr: reviewPr,
-        },
-        now,
       })
       return new NextResponse(null, { status: 204 })
     }

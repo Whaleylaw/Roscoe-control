@@ -90,6 +90,9 @@ export async function POST(request: NextRequest) {
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
+    if (task.status !== 'quality_review') {
+      return NextResponse.json({ error: `task is not in quality_review; current status is ${task.status}` }, { status: 409 })
+    }
 
     // Auto-advance task based on review outcome
     let workflowAdvancement = null
@@ -136,6 +139,7 @@ export async function POST(request: NextRequest) {
           previous_status: task.status,
           error_message: `Review PR publication failed: ${message.substring(0, 300)}`,
           reason: 'review_pr_publication_failed',
+          workspace_id: workspaceId,
           updated_at: now,
         })
         return NextResponse.json(
@@ -149,22 +153,22 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const result = db.prepare(`
-        INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(taskId, reviewer, status, notes, workspaceId)
-      reviewId = Number(result.lastInsertRowid)
-      db_helpers.logActivity(
-        'quality_review',
-        'task',
-        taskId,
-        reviewer,
-        `Quality review ${status} for task: ${task.title}`,
-        { status, notes },
-        workspaceId
-      )
       if (reviewPr.published) {
         const now = Math.floor(Date.now() / 1000)
+        const result = db.prepare(`
+          INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(taskId, reviewer, status, notes, workspaceId)
+        reviewId = Number(result.lastInsertRowid)
+        db_helpers.logActivity(
+          'quality_review',
+          'task',
+          taskId,
+          reviewer,
+          `Quality review ${status} for task: ${task.title}`,
+          { status, notes },
+          workspaceId
+        )
         db.prepare(`
           INSERT INTO comments (task_id, author, content, created_at, workspace_id)
           VALUES (?, ?, ?, ?, ?)
@@ -183,6 +187,7 @@ export async function POST(request: NextRequest) {
           previous_status: task.status,
           reason: 'review_pr_opened',
           review_pr: reviewPr,
+          workspace_id: workspaceId,
           updated_at: now,
         })
         return NextResponse.json({
@@ -193,29 +198,49 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      db.prepare(`
-        UPDATE tasks
-        SET status = ?, completed_at = COALESCE(completed_at, unixepoch()), updated_at = unixepoch()
-        WHERE id = ? AND workspace_id = ?
-      `)
-        .run('done', taskId, workspaceId)
-      workflowAdvancement = advanceWorkflowAfterTaskApproval(db, {
-        taskId,
-        actor: reviewer,
-        payload: {
-          source: 'quality_review',
-          quality_review_id: reviewId,
+      const directResult = db.transaction(() => {
+        const result = db.prepare(`
+          INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(taskId, reviewer, status, notes, workspaceId)
+        const insertedReviewId = Number(result.lastInsertRowid)
+        db_helpers.logActivity(
+          'quality_review',
+          'task',
+          taskId,
           reviewer,
-          status,
-          notes,
-          review_pr: reviewPr,
-        },
-        status: 'inbox',
-      })
+          `Quality review ${status} for task: ${task.title}`,
+          { status, notes },
+          workspaceId
+        )
+        db.prepare(`
+          UPDATE tasks
+          SET status = ?, completed_at = COALESCE(completed_at, unixepoch()), updated_at = unixepoch()
+          WHERE id = ? AND workspace_id = ?
+        `)
+          .run('done', taskId, workspaceId)
+        const advancement = advanceWorkflowAfterTaskApproval(db, {
+          taskId,
+          actor: reviewer,
+          payload: {
+            source: 'quality_review',
+            quality_review_id: insertedReviewId,
+            reviewer,
+            status,
+            notes,
+            review_pr: reviewPr,
+          },
+          status: 'inbox',
+        })
+        return { reviewId: insertedReviewId, workflowAdvancement: advancement }
+      })()
+      reviewId = directResult.reviewId
+      workflowAdvancement = directResult.workflowAdvancement
       eventBus.broadcast('task.status_changed', {
         id: taskId,
         status: 'done',
         previous_status: task.status,
+        workspace_id: workspaceId,
         updated_at: Math.floor(Date.now() / 1000),
       })
     } else if (status === 'rejected') {
@@ -240,6 +265,7 @@ export async function POST(request: NextRequest) {
         id: taskId,
         status: 'in_progress',
         previous_status: task.status,
+        workspace_id: workspaceId,
         updated_at: Math.floor(Date.now() / 1000),
       })
     }
