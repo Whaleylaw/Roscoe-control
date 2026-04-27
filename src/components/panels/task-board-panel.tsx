@@ -63,6 +63,7 @@ interface Task {
   github_branch?: string
   github_pr_number?: number
   github_pr_state?: string
+  review_pr?: { provider: string; pr_number: number; pr_url: string; state: string } | null
   comment_count?: number
   error_message?: string
   outcome?: 'success' | 'failed' | 'partial' | 'abandoned'
@@ -1160,6 +1161,23 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
                               PR #{task.github_pr_number}
                             </a>
                           )}
+                          {task.review_pr && (
+                            <a
+                              href={task.review_pr.pr_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 transition-colors ${
+                                task.review_pr.state === 'merged' ? 'bg-purple-500/20 text-purple-400' :
+                                task.review_pr.state === 'closed' ? 'bg-red-500/20 text-red-400' :
+                                'bg-indigo-500/20 text-indigo-300'
+                              }`}
+                              onClick={(e) => e.stopPropagation()}
+                              title={`Review PR #${task.review_pr.pr_number} (${task.review_pr.state})`}
+                            >
+                              <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                              Review PR #{task.review_pr.pr_number}
+                            </a>
+                          )}
                           {task.aegisApproved && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                               Aegis
@@ -1903,7 +1921,7 @@ function TaskDetailModal({
               )}
 
               {/* GitHub section */}
-              {(task.github_issue_number || task.github_branch || task.github_pr_number) && (
+              {(task.github_issue_number || task.github_branch || task.github_pr_number || task.review_pr) && (
                 <div className="pt-3 border-t border-border/30 space-y-2">
                   <span className="text-muted-foreground/60 uppercase tracking-wider text-[10px]">GitHub</span>
                   <div className="flex flex-wrap gap-2">
@@ -1931,6 +1949,22 @@ function TaskDetailModal({
                       >
                         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
                         PR #{task.github_pr_number}
+                      </a>
+                    )}
+                    {task.review_pr && (
+                      <a
+                        href={task.review_pr.pr_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border font-mono transition-colors ${
+                          task.review_pr.state === 'merged' ? 'bg-purple-500/10 border-purple-500/25 text-purple-400' :
+                          task.review_pr.state === 'closed' ? 'bg-red-500/10 border-red-500/25 text-red-400' :
+                          'bg-indigo-500/10 border-indigo-500/25 text-indigo-300'
+                        }`}
+                        title={`Review PR #${task.review_pr.pr_number} (${task.review_pr.state})`}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>
+                        Review PR #{task.review_pr.pr_number}
                       </a>
                     )}
                     {task.github_branch && (

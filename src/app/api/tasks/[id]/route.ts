@@ -57,6 +57,7 @@ function mapTaskRow(task: any): Task & {
   workspace_source: { project_id: number; base_ref: string } | null
   read_only_mounts: Array<{ host_path: string; container_path: string; label: string }>
   extra_skills: string[]
+  review_pr: { provider: string; pr_number: number; pr_url: string; state: string } | null
 } {
   return {
     ...task,
@@ -65,8 +66,22 @@ function mapTaskRow(task: any): Task & {
     workspace_source: task.workspace_source ? JSON.parse(task.workspace_source) : null,
     read_only_mounts: task.read_only_mounts ? JSON.parse(task.read_only_mounts) : [],
     extra_skills: task.extra_skills ? JSON.parse(task.extra_skills) : [],
+    review_pr: task.review_pr ? JSON.parse(task.review_pr) : null,
     ticket_ref: formatTicketRef(task.project_prefix, task.project_ticket_no),
   }
+}
+
+function reviewPrSelect(alias = 't'): string {
+  return `(SELECT json_object(
+    'provider', r.provider,
+    'pr_number', r.pr_number,
+    'pr_url', r.pr_url,
+    'state', r.state
+  )
+   FROM task_review_prs r
+   WHERE r.task_id = ${alias}.id AND r.workspace_id = ${alias}.workspace_id
+   ORDER BY r.created_at DESC, r.id DESC
+   LIMIT 1) as review_pr`
 }
 
 function hasAegisApproval(
@@ -126,7 +141,8 @@ export async function GET(
     }
     
     const stmt = db.prepare(`
-      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+        ${reviewPrSelect('t')}
       FROM tasks t
       LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
       WHERE t.id = ? AND t.workspace_id = ?
@@ -343,7 +359,8 @@ export async function PUT(
       )
 
       const updatedTask = db.prepare(`
-        SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+        SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+          ${reviewPrSelect('t')}
         FROM tasks t
         LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
         WHERE t.id = ? AND t.workspace_id = ?
@@ -658,7 +675,7 @@ export async function PUT(
         // Re-SELECT the fresh row (not currentTask) so the response reflects
         // the committed envelope + status.
         const freshRow = db.prepare(
-          'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
+          `SELECT t.*, ${reviewPrSelect('t')} FROM tasks t WHERE t.id = ? AND t.workspace_id = ?`,
         ).get(taskId, workspaceId) as Task
         const freshTask = mapTaskRow(freshRow)
 
@@ -757,7 +774,7 @@ export async function PUT(
         }
 
         const freshRow = db.prepare(
-          'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
+          `SELECT t.*, ${reviewPrSelect('t')} FROM tasks t WHERE t.id = ? AND t.workspace_id = ?`,
         ).get(taskId, workspaceId) as Task
         const freshTask = mapTaskRow(freshRow)
 
@@ -1050,7 +1067,8 @@ export async function PUT(
     
     // Fetch updated task
     const updatedTask = db.prepare(`
-      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+        ${reviewPrSelect('t')}
       FROM tasks t
       LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
       WHERE t.id = ? AND t.workspace_id = ?
