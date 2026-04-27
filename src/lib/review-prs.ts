@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import type Database from 'better-sqlite3'
 import { createForgejoClient } from './forgejo-client'
 import { getProjectRepoMap, getReviewPrSettings } from './task-runtime-settings'
+import { advanceWorkflowAfterTaskApproval } from './workflow-engine'
 import { taskBranchName } from './worktree-promotion'
 
 export type ReviewPrTask = {
@@ -56,6 +57,23 @@ type OpenForgejoPullRequest = {
   url: string
   head: string
   base: string
+}
+
+type ReviewPrReconcileRow = {
+  id: number
+  task_id: number
+  workspace_id: number
+  repo_owner: string
+  repo_name: string
+  pr_number: number
+  pr_url: string
+}
+
+export type ReviewPrReconcileResult = {
+  checked: number
+  merged: number[]
+  closed: number[]
+  errors: Array<{ task_id: number; error: string }>
 }
 
 export async function publishApprovedWorktreeForReview(
@@ -227,6 +245,133 @@ export async function publishApprovedWorktreeForReview(
     branch,
     base_ref: workspaceSource.base_ref,
   }
+}
+
+export async function reconcileOpenReviewPrs(
+  db: Database.Database,
+  input: { actor: string; now?: number; limit?: number },
+): Promise<ReviewPrReconcileResult> {
+  const now = input.now ?? unixNow()
+  const limit = input.limit ?? 25
+  const rows = db.prepare(`
+    SELECT id, task_id, workspace_id, repo_owner, repo_name, pr_number, pr_url
+    FROM task_review_prs
+    WHERE provider = 'forgejo'
+      AND state = 'open'
+    ORDER BY COALESCE(last_checked_at, 0) ASC, id ASC
+    LIMIT ?
+  `).all(limit) as ReviewPrReconcileRow[]
+
+  const merged: number[] = []
+  const closed: number[] = []
+  const errors: Array<{ task_id: number; error: string }> = []
+
+  for (const row of rows) {
+    try {
+      const settings = getReviewPrSettings()
+      const client = createForgejoClient({
+        baseUrl: settings.forgejoBaseUrl,
+        token: settings.forgejoToken,
+      })
+      const pr = await client.getPullRequest({
+        owner: row.repo_owner,
+        repo: row.repo_name,
+        number: row.pr_number,
+      })
+
+      if (pr.state === 'merged') {
+        const transitioned = db.transaction(() => {
+          db.prepare(`
+            UPDATE task_review_prs
+            SET state = 'merged',
+                merge_commit_sha = ?,
+                last_checked_at = ?,
+                updated_at = ?
+            WHERE id = ?
+          `).run(pr.mergeCommitSha, now, now, row.id)
+
+          const taskUpdate = db.prepare(`
+            UPDATE tasks
+            SET status = 'done',
+                container_id = NULL,
+                error_message = NULL,
+                completed_at = COALESCE(completed_at, ?),
+                github_pr_state = 'merged',
+                updated_at = ?
+            WHERE id = ?
+              AND status = 'quality_review'
+          `).run(now, now, row.task_id)
+
+          if (taskUpdate.changes === 0) {
+            db.prepare(`
+              UPDATE tasks
+              SET github_pr_state = 'merged',
+                  updated_at = ?
+              WHERE id = ?
+            `).run(now, row.task_id)
+            return false
+          }
+
+          advanceWorkflowAfterTaskApproval(db, {
+            taskId: row.task_id,
+            actor: input.actor,
+            payload: {
+              source: 'review_pr_merged',
+              review_pr_id: row.id,
+              pr_number: row.pr_number,
+              merge_commit_sha: pr.mergeCommitSha,
+            },
+            now,
+            status: 'inbox',
+          })
+          return true
+        })()
+
+        if (transitioned) merged.push(row.task_id)
+      } else if (pr.state === 'closed') {
+        db.transaction(() => {
+          db.prepare(`
+            UPDATE task_review_prs
+            SET state = 'closed',
+                last_checked_at = ?,
+                updated_at = ?
+            WHERE id = ?
+          `).run(now, now, row.id)
+          db.prepare(`
+            UPDATE tasks
+            SET github_pr_state = 'closed',
+                updated_at = ?
+            WHERE id = ?
+          `).run(now, row.task_id)
+          db.prepare(`
+            INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(
+            row.task_id,
+            input.actor,
+            `Review PR closed without merge: ${row.pr_url}`,
+            now,
+            row.workspace_id,
+          )
+        })()
+        closed.push(row.task_id)
+      } else {
+        db.prepare(`
+          UPDATE task_review_prs
+          SET last_checked_at = ?,
+              updated_at = ?
+          WHERE id = ?
+        `).run(now, now, row.id)
+      }
+    } catch (error) {
+      errors.push({
+        task_id: row.task_id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return { checked: rows.length, merged, closed, errors }
 }
 
 function persistReviewPr(
