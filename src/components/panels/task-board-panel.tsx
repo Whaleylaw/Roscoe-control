@@ -37,6 +37,16 @@ function recipeOwnerLabel(task: { recipe_slug?: string | null }): string | null 
   return task.recipe_slug ? 'Recipe Runner' : null
 }
 
+function safeReviewPrUrl(raw?: string | null): string | null {
+  if (!raw) return null
+  try {
+    const url = new URL(raw)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
 interface Task {
   id: number
   title: string
@@ -615,7 +625,13 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
 
     const match = tasks.find((task) => task.id === selectedTaskIdFromUrl)
     if (match) {
-      if (selectedTask?.id !== match.id) {
+      const selectedReviewPr = (selectedTask as Task | null)?.review_pr
+      const matchedReviewPr = match.review_pr
+      const reviewPrChanged =
+        selectedReviewPr?.pr_url !== matchedReviewPr?.pr_url ||
+        selectedReviewPr?.pr_number !== matchedReviewPr?.pr_number ||
+        selectedReviewPr?.state !== matchedReviewPr?.state
+      if (selectedTask?.id !== match.id || selectedTask?.updated_at !== match.updated_at || reviewPrChanged) {
         setSelectedTask(match)
       }
       return
@@ -1161,9 +1177,9 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
                               PR #{task.github_pr_number}
                             </a>
                           )}
-                          {task.review_pr && (
+                          {task.review_pr && safeReviewPrUrl(task.review_pr.pr_url) && (
                             <a
-                              href={task.review_pr.pr_url}
+                              href={safeReviewPrUrl(task.review_pr.pr_url)!}
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 transition-colors ${
@@ -1951,9 +1967,9 @@ function TaskDetailModal({
                         PR #{task.github_pr_number}
                       </a>
                     )}
-                    {task.review_pr && (
+                    {task.review_pr && safeReviewPrUrl(task.review_pr.pr_url) && (
                       <a
-                        href={task.review_pr.pr_url}
+                        href={safeReviewPrUrl(task.review_pr.pr_url)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border font-mono transition-colors ${

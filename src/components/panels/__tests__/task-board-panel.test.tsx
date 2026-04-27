@@ -66,6 +66,7 @@ interface MockTask {
   created_by: string
   created_at: number
   updated_at: number
+  review_pr?: { provider: string; pr_number: number; pr_url: string; state: string } | null
 }
 
 interface MockProject {
@@ -520,6 +521,50 @@ describe('TaskBoardPanel', () => {
           expect(lastTaskPutMethod).toBe('PUT')
         })
       }
+    })
+  })
+
+  describe('review PR links', () => {
+    it('renders safe review PR links on task cards', async () => {
+      mockStoreState = buildStoreState({
+        tasks: [
+          {
+            ...defaultTasks[0],
+            review_pr: {
+              provider: 'forgejo',
+              pr_number: 12,
+              pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+              state: 'open',
+            },
+          },
+        ],
+      })
+
+      await renderBoard()
+
+      const links = await screen.findAllByText('Review PR #12')
+      expect(links.length).toBeGreaterThan(0)
+      expect(links[0].closest('a')).toHaveAttribute('href', 'http://localhost:3001/aaron/FirmVault/pulls/12')
+    })
+
+    it('does not render unsafe review PR URLs', async () => {
+      mockStoreState = buildStoreState({
+        tasks: [
+          {
+            ...defaultTasks[0],
+            review_pr: {
+              provider: 'forgejo',
+              pr_number: 13,
+              pr_url: 'javascript:alert(1)',
+              state: 'open',
+            },
+          },
+        ],
+      })
+
+      await renderBoard()
+
+      expect(screen.queryByText('Review PR #13')).toBeNull()
     })
   })
 })

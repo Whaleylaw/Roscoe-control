@@ -223,7 +223,7 @@ export async function PUT(
     
     // Get current task for comparison
     const currentTask = db
-      .prepare('SELECT * FROM tasks WHERE id = ? AND workspace_id = ?')
+      .prepare(`SELECT t.*, ${reviewPrSelect('t')} FROM tasks t WHERE t.id = ? AND t.workspace_id = ?`)
       .get(taskId, workspaceId) as Task;
     
     if (!currentTask) {
