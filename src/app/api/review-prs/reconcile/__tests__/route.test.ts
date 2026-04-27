@@ -67,7 +67,7 @@ describe('POST /api/review-prs/reconcile', () => {
     expect(response.status).toBe(200)
     expect(routeMocks.requireRole).toHaveBeenCalledWith(req, 'operator')
     expect(routeMocks.mutationLimiter).toHaveBeenCalledWith(req)
-    expect(routeMocks.reconcileOpenReviewPrs).toHaveBeenCalledWith(routeMocks.db, { actor: 'operator' })
+    expect(routeMocks.reconcileOpenReviewPrs).toHaveBeenCalledWith(routeMocks.db, { actor: 'operator', workspaceId: 1 })
     expect(body).toEqual({
       success: true,
       checked: 3,

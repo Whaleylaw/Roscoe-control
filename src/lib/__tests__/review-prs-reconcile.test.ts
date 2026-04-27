@@ -312,4 +312,41 @@ describe('reconcileOpenReviewPrs', () => {
     expect(db.prepare(`SELECT last_checked_at FROM task_review_prs WHERE task_id = ?`).get(staleTaskId)).toMatchObject({ last_checked_at: 204 })
     expect(db.prepare(`SELECT last_checked_at FROM task_review_prs WHERE task_id = ?`).get(freshTaskId)).toMatchObject({ last_checked_at: 50 })
   })
+
+  it('scopes reconciliation to the requested workspace', async () => {
+    db.prepare(`
+      INSERT INTO workspaces (id, slug, name, tenant_id)
+      VALUES (2, 'other', 'Other Workspace', 1)
+    `).run()
+    const workspaceOneTaskId = createStandaloneReviewTask()
+    insertReviewPr(workspaceOneTaskId, { prNumber: 12 })
+    const workspaceTwoTaskId = Number(db.prepare(`
+      INSERT INTO tasks (title, status, priority, workspace_id, container_id)
+      VALUES ('Other workspace review PR task', 'quality_review', 'medium', 2, 'container-2')
+    `).run().lastInsertRowid)
+    db.prepare(`
+      INSERT INTO task_review_prs (
+        task_id, workspace_id, provider, remote_name, remote_url, repo_owner, repo_name,
+        base_ref, head_ref, branch_name, pr_number, pr_url, state
+      ) VALUES (?, 2, 'forgejo', 'forgejo', 'ssh://git@localhost:2222/aaron/FirmVault.git',
+        'aaron', 'FirmVault', 'main', 'mc/task-2', 'mc/task-2', 13,
+        'http://localhost:3001/aaron/FirmVault/pulls/13', 'open')
+    `).run(workspaceTwoTaskId)
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'open',
+      head: 'mc/task-1',
+      base: 'main',
+      mergeCommitSha: null,
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', workspaceId: 1, now: 205 })
+
+    expect(result.checked).toBe(1)
+    expect(forgejoMocks.getPullRequest).toHaveBeenCalledTimes(1)
+    expect(forgejoMocks.getPullRequest).toHaveBeenCalledWith(expect.objectContaining({ number: 12 }))
+    expect(db.prepare(`SELECT last_checked_at FROM task_review_prs WHERE task_id = ?`).get(workspaceOneTaskId)).toMatchObject({ last_checked_at: 205 })
+    expect(db.prepare(`SELECT last_checked_at FROM task_review_prs WHERE task_id = ?`).get(workspaceTwoTaskId)).toMatchObject({ last_checked_at: null })
+  })
 })

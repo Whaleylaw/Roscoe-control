@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const db = getDatabase()
     const result = await reconcileOpenReviewPrs(db, {
       actor: auth.user.username || 'operator',
+      workspaceId: auth.user.workspace_id ?? 1,
     })
     return NextResponse.json({ success: true, ...result })
   } catch (error) {

@@ -249,7 +249,7 @@ export async function publishApprovedWorktreeForReview(
 
 export async function reconcileOpenReviewPrs(
   db: Database.Database,
-  input: { actor: string; now?: number; limit?: number },
+  input: { actor: string; workspaceId?: number; now?: number; limit?: number },
 ): Promise<ReviewPrReconcileResult> {
   const now = input.now ?? unixNow()
   const limit = input.limit ?? 25
@@ -258,9 +258,10 @@ export async function reconcileOpenReviewPrs(
     FROM task_review_prs
     WHERE provider = 'forgejo'
       AND state = 'open'
+      AND (? IS NULL OR workspace_id = ?)
     ORDER BY COALESCE(last_checked_at, 0) ASC, id ASC
     LIMIT ?
-  `).all(limit) as ReviewPrReconcileRow[]
+  `).all(input.workspaceId ?? null, input.workspaceId ?? null, limit) as ReviewPrReconcileRow[]
 
   const merged: number[] = []
   const closed: number[] = []
