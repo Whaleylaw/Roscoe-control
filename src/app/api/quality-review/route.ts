@@ -156,32 +156,39 @@ export async function POST(request: NextRequest) {
 
       if (reviewPr.published) {
         const now = Math.floor(Date.now() / 1000)
-        const result = db.prepare(`
-          INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(taskId, reviewer, status, notes, workspaceId)
-        reviewId = Number(result.lastInsertRowid)
-        db_helpers.logActivity(
-          'quality_review',
-          'task',
-          taskId,
-          reviewer,
-          `Quality review ${status} for task: ${task.title}`,
-          { status, notes },
-          workspaceId
-        )
-        db.prepare(`
-          INSERT INTO comments (task_id, author, content, created_at, workspace_id)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(taskId, reviewer, `Review PR opened: ${reviewPr.pr_url}`, now, workspaceId)
-        db.prepare(`
-          UPDATE tasks
-          SET status = 'quality_review',
-              container_id = NULL,
-              error_message = NULL,
-              updated_at = ?
-          WHERE id = ? AND workspace_id = ?
-        `).run(now, taskId, workspaceId)
+        reviewId = db.transaction(() => {
+          const result = db.prepare(`
+            INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(taskId, reviewer, status, notes, workspaceId)
+          const insertedReviewId = Number(result.lastInsertRowid)
+          db_helpers.logActivity(
+            'quality_review',
+            'task',
+            taskId,
+            reviewer,
+            `Quality review ${status} for task: ${task.title}`,
+            { status, notes },
+            workspaceId
+          )
+          db.prepare(`
+            INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+            VALUES (?, ?, ?, ?, ?)
+          `).run(taskId, reviewer, `Review PR opened: ${reviewPr.pr_url}`, now, workspaceId)
+          const transition = db.prepare(`
+            UPDATE tasks
+            SET status = 'quality_review',
+                container_id = NULL,
+                error_message = NULL,
+                updated_at = ?
+            WHERE id = ? AND workspace_id = ? AND status = 'quality_review'
+          `).run(now, taskId, workspaceId)
+          if (transition.changes !== 1) {
+            throw new Error('task is no longer in quality_review')
+          }
+          revokeTokensForTask(db, taskId, now)
+          return insertedReviewId
+        })()
         eventBus.broadcast('task.status_changed', {
           id: taskId,
           status: 'quality_review',

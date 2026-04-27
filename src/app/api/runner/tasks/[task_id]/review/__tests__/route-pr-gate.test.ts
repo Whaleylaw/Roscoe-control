@@ -136,6 +136,45 @@ describe('POST /api/runner/tasks/:task_id/review PR gate', () => {
     }))
   })
 
+  it('does not record a stale approval if review PR publication succeeds after task leaves quality_review', async () => {
+    authTaskId = 48
+    seedTask(48)
+    issueRunnerToken(testDb, 48, 1, 300)
+    vi.mocked(publishApprovedWorktreeForReview).mockImplementationOnce(async () => {
+      testDb.prepare(`UPDATE tasks SET status = 'review' WHERE id = 48`).run()
+      return {
+        published: true,
+        provider: 'forgejo',
+        state: 'open',
+        pr_number: 12,
+        pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+        branch: 'mc/task-48',
+        base_ref: 'main',
+      }
+    })
+
+    const response = await review(48)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 48
+    `).get()).toMatchObject({
+      status: 'review',
+      container_id: 'container-48',
+      error_message: null,
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 48
+    `).get()).toMatchObject({ revoked_at: null })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = 48`).get()).toMatchObject({ count: 0 })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = 48`).get()).toMatchObject({ count: 0 })
+    expect(advanceWorkflowAfterTaskApprovalMock).not.toHaveBeenCalled()
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'review_pr_opened' }))
+  })
+
   it('marks done and advances workflow directly when publication reports no changes', async () => {
     authTaskId = 45
     seedTask(45)

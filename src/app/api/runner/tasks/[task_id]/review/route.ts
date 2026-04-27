@@ -121,7 +121,7 @@ export async function POST(
             INSERT INTO comments (task_id, author, content, created_at, workspace_id)
             VALUES (?, 'recipe-reviewer', ?, ?, ?)
           `).run(taskId, `Quality Review Approved:\n${body.notes}\n\nReview PR opened: ${reviewPr.pr_url}`, now, task.workspace_id)
-          db.prepare(`
+          const transition = db.prepare(`
             UPDATE tasks
             SET status = 'quality_review',
                 container_id = NULL,
@@ -129,6 +129,9 @@ export async function POST(
                 updated_at = ?
             WHERE id = ? AND status = 'quality_review'
           `).run(now, taskId)
+          if (transition.changes !== 1) {
+            throw new Error('task is no longer in quality_review')
+          }
           revokeTokensForTask(db, taskId, now)
         })()
 

@@ -266,6 +266,47 @@ nodes:
     }))
   })
 
+  it('does not record a stale approval if review PR publication succeeds after task leaves quality_review', async () => {
+    const inserted = testDb.prepare(`
+      INSERT INTO tasks (title, status, priority, workspace_id, container_id)
+      VALUES ('stale published approval', 'quality_review', 'medium', 1, 'container-published-stale')
+    `).run()
+    const taskId = Number(inserted.lastInsertRowid)
+    vi.mocked(publishApprovedWorktreeForReview).mockImplementationOnce(async () => {
+      testDb.prepare(`UPDATE tasks SET status = 'review' WHERE id = ?`).run(taskId)
+      return {
+        published: true,
+        provider: 'forgejo',
+        state: 'open',
+        pr_number: 12,
+        pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+        branch: 'mc/task-stale',
+        base_ref: 'main',
+      }
+    })
+
+    const response = await POST(new Request('http://localhost/api/quality-review', {
+      method: 'POST',
+      body: JSON.stringify({
+        taskId,
+        reviewer: 'aegis',
+        status: 'approved',
+        notes: 'Looks correct.',
+      }),
+    }) as any)
+
+    expect(response.status).toBe(500)
+    expect(testDb.prepare(`SELECT status, container_id, completed_at FROM tasks WHERE id = ?`).get(taskId)).toMatchObject({
+      status: 'review',
+      container_id: 'container-published-stale',
+      completed_at: null,
+    })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM quality_reviews WHERE task_id = ?`).get(taskId)).toMatchObject({ count: 0 })
+    expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = ?`).get(taskId)).toMatchObject({ count: 0 })
+    expect(advanceWorkflowAfterTaskApproval).not.toHaveBeenCalled()
+    expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'review_pr_opened' }))
+  })
+
   it('does not leave the task done when direct workflow advancement fails', async () => {
     vi.mocked(advanceWorkflowAfterTaskApproval).mockImplementationOnce(() => {
       throw new Error('workflow advancement failed')
