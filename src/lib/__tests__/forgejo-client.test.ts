@@ -34,7 +34,7 @@ vi.mock('@/lib/validation', async (importOriginal) => {
   }
 })
 
-import { GET, PUT } from '@/app/api/settings/route'
+import { DELETE, GET, PUT } from '@/app/api/settings/route'
 
 function createSettingsDb() {
   const db = new Database(':memory:')
@@ -211,5 +211,25 @@ describe('settings route Forgejo token handling', () => {
     })
     expect(JSON.stringify(auditPayload)).not.toContain('old-token-secret')
     expect(JSON.stringify(auditPayload)).not.toContain('new-token-secret')
+  })
+
+  it('masks Forgejo token values in DELETE reset audit details', async () => {
+    createSettingsDb()
+    seedSetting('runtime.forgejo_token', 'reset-token-secret')
+
+    const response = await DELETE(
+      new Request('http://localhost/api/settings', {
+        method: 'DELETE',
+        body: JSON.stringify({ key: 'runtime.forgejo_token' }),
+      }) as any,
+    )
+    expect(response.status).toBe(200)
+
+    const auditPayload = hoisted.auditSpy.mock.calls.at(-1)?.[0]
+    expect(auditPayload.detail).toEqual({
+      key: 'runtime.forgejo_token',
+      old_value: '********',
+    })
+    expect(JSON.stringify(auditPayload)).not.toContain('reset-token-secret')
   })
 })

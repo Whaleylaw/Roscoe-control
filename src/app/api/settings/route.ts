@@ -295,7 +295,7 @@ export async function DELETE(request: NextRequest) {
     action: 'settings_reset',
     actor: auth.user.username,
     actor_id: auth.user.id,
-    detail: { key, old_value: existing.value },
+    detail: { key, old_value: auditSettingValue(key, existing.value) },
     ip_address: ipAddress,
   })
 
