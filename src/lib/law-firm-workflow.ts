@@ -407,10 +407,10 @@ function buildWorkflowStatuses(caseData: CaseFrontmatter, workflowPlans: Workflo
         ? 'skipped'
         : complete
           ? 'complete'
-          : step.type === 'wait'
-            ? 'waiting'
-            : blockedBy.length > 0
-              ? 'blocked'
+          : blockedBy.length > 0
+            ? 'blocked'
+            : step.type === 'wait'
+              ? 'waiting'
               : 'ready'
       return {
         id: step.id,
@@ -687,12 +687,19 @@ function isWorkflowDependencySatisfied(
 function isLandmarkSatisfied(frontmatter: Record<string, unknown>, landmark: RawLandmark): boolean {
   if (isLandmarkBypassed(frontmatter, landmark.id)) return true
   const landmarks = objectValue(frontmatter.landmarks)
-  if (Object.prototype.hasOwnProperty.call(landmarks, landmark.id)) return Boolean(landmarks[landmark.id])
+  if (Object.prototype.hasOwnProperty.call(landmarks, landmark.id)) return landmarkValueSatisfied(landmarks[landmark.id])
   for (const alias of LANDMARK_ALIASES[landmark.id] ?? []) {
     if (isLandmarkBypassed(frontmatter, alias)) return true
-    if (Object.prototype.hasOwnProperty.call(landmarks, alias)) return Boolean(landmarks[alias])
+    if (Object.prototype.hasOwnProperty.call(landmarks, alias)) return landmarkValueSatisfied(landmarks[alias])
   }
   return evaluateSimpleCondition(landmark.condition, frontmatter)
+}
+
+function landmarkValueSatisfied(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  const landmark = objectValue(value)
+  if (Object.prototype.hasOwnProperty.call(landmark, 'satisfied')) return Boolean(landmark.satisfied)
+  return Boolean(value)
 }
 
 function isLandmarkBypassed(frontmatter: Record<string, unknown>, landmarkId: string): boolean {

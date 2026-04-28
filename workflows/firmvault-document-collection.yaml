@@ -1,0 +1,92 @@
+schema_version: 1
+id: firmvault-document-collection
+name: FirmVault Initial Document Collection
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as case_setup_complete, intake_upload, or manual.
+    default: case_setup_complete
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.case_setup_complete == true
+  - type: manual
+
+nodes:
+  load_document_checklist:
+    type: recipe
+    name: Load Onboarding Document Checklist
+    recipe: firmvault-document-collection-review-intake
+    depends_on:
+      conditions:
+        - law_firm.landmarks.case_setup_complete == true
+    completes:
+      - law_firm.landmarks.onboarding_document_checklist_loaded
+    config:
+      task_goal: >-
+        Check canonical onboarding document locations first. Verify whether
+        intake, fee agreement, HIPAA authorization, medical authorization, and
+        privacy authorization already exist. If a document is present outside a
+        canonical location, normalize its masked shadow and ledger evidence
+        before treating it as found. If a required document is missing, route to
+        review or waiting with the precise missing item.
+
+  request_missing_documents:
+    type: recipe
+    name: Request Missing Onboarding Documents
+    recipe: firmvault-document-collection-request-missing-documents
+    depends_on:
+      nodes:
+        - load_document_checklist
+    completes:
+      - law_firm.landmarks.onboarding_documents_requested
+    config:
+      task_goal: Prepare the client-facing request or handoff for any missing onboarding documents.
+
+  send_signature_packets:
+    type: recipe
+    name: Send Signature Packets
+    recipe: firmvault-document-collection-send-signature-packets
+    depends_on:
+      nodes:
+        - request_missing_documents
+    completes:
+      - law_firm.landmarks.onboarding_signature_packets_sent
+    config:
+      task_goal: Prepare the signature packet handoff and record the send/wait evidence in the vault.
+
+  wait_for_signed_documents:
+    type: wait
+    name: Wait for Signed Onboarding Documents
+    duration: 7d
+    depends_on:
+      nodes:
+        - send_signature_packets
+    exit_when:
+      condition: law_firm.landmarks.contract_signed == true && law_firm.landmarks.medical_auth_signed == true
+    config:
+      task_goal: Wait seven days for signed onboarding documents unless the canonical signed documents arrive first.
+
+  confirm_onboarding_documents:
+    type: review
+    name: Confirm Onboarding Documents
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - wait_for_signed_documents
+      conditions:
+        - law_firm.landmarks.contract_signed == true
+        - law_firm.landmarks.medical_auth_signed == true
+        - law_firm.landmarks.client_info_received == true
+    completes:
+      - law_firm.landmarks.full_intake_complete
+    config:
+      task_goal: Confirm Phase 0 onboarding documents are complete and downstream File Setup workflows may evaluate their own dependencies.

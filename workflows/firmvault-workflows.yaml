@@ -47,20 +47,23 @@ workflows:
     name: Initial Document Collection
     goal: Collect intake documents, fee agreement, HIPAA, and related onboarding paperwork.
     trigger:
-      active_when: case_workspace_created
+      active_when: case_setup_complete
     steps:
       - id: load_document_checklist
         type: recipe
         recipe_slug: firmvault-document-collection-review-intake
         landmark_id: onboarding_document_checklist_loaded
+        depends_on:
+          conditions:
+            - law_firm.landmarks.case_setup_complete == true
       - id: request_missing_documents
         type: recipe
-        recipe_slug: firmvault-document-collection-review-intake
+        recipe_slug: firmvault-document-collection-request-missing-documents
         landmark_id: onboarding_documents_requested
         depends_on: [load_document_checklist]
       - id: send_signature_packets
         type: recipe
-        recipe_slug: firmvault-document-collection-review-intake
+        recipe_slug: firmvault-document-collection-send-signature-packets
         landmark_id: onboarding_signature_packets_sent
         depends_on: [request_missing_documents]
       - id: wait_for_signed_documents

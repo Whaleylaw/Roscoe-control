@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { afterEach, describe, expect, it } from 'vitest'
-import { previewLawFirmWorkflowTasks } from '../law-firm-workflow'
+import { previewLawFirmWorkflowStatuses, previewLawFirmWorkflowTasks } from '../law-firm-workflow'
 
 const previousRoot = process.env.MISSION_CONTROL_LAW_FIRM_ROOT
 
@@ -122,6 +122,39 @@ body: |
       landmark_id: 'liens_identified',
       status: 'inbox',
       blocked_by: [],
+    })
+  })
+
+  it('blocks document collection until the case setup landmark is satisfied', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mc-law-firm-workflow-'))
+    process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+    await mkdir(join(root, 'cases', 'new-case'), { recursive: true })
+
+    await writeFile(join(root, 'cases', 'new-case', 'new-case.md'), `---
+schema_version: 3
+client_name: New Case
+case_type: auto_accident
+status: intake
+landmarks:
+  case_setup_complete:
+    satisfied: false
+    evidence: []
+  client_info_received:
+    satisfied: true
+    evidence:
+      - client/intake.md
+---
+# New Case
+`, 'utf8')
+
+    const statuses = await previewLawFirmWorkflowStatuses('new-case')
+    const documentCollection = statuses.find((workflow) => workflow.workflow_id === 'document_collection')
+    const loadChecklist = documentCollection?.steps.find((step) => step.id === 'load_document_checklist')
+
+    expect(documentCollection?.status).toBe('blocked')
+    expect(loadChecklist).toMatchObject({
+      status: 'blocked',
+      blocked_by: ['law_firm.landmarks.case_setup_complete == true'],
     })
   })
 })
