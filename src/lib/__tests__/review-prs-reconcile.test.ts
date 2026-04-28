@@ -183,7 +183,56 @@ describe('reconcileOpenReviewPrs', () => {
           review_pr_id: expect.any(Number),
           pr_number: 12,
           merge_commit_sha: 'abc123',
+          merge_detection: 'forgejo_merged',
         },
+      }),
+    )
+  })
+
+  it('treats an open PR as merged when the base ref already contains the head sha', async () => {
+    const taskId = createWorkflowReviewTask()
+    insertReviewPr(taskId)
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'open',
+      head: 'mc/task-1',
+      headSha: 'same-sha',
+      base: 'main',
+      baseSha: 'same-sha',
+      mergeCommitSha: null,
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', now: 206 })
+
+    expect(result).toEqual({ checked: 1, merged: [taskId], closed: [], errors: [] })
+    expect(db.prepare(`
+      SELECT status, completed_at, github_pr_state
+      FROM tasks WHERE id = ?
+    `).get(taskId)).toMatchObject({
+      status: 'done',
+      completed_at: 206,
+      github_pr_state: 'merged',
+    })
+    expect(db.prepare(`
+      SELECT state, merge_commit_sha, last_checked_at
+      FROM task_review_prs WHERE task_id = ?
+    `).get(taskId)).toMatchObject({
+      state: 'merged',
+      merge_commit_sha: 'same-sha',
+      last_checked_at: 206,
+    })
+    expect(advanceWorkflowAfterTaskApproval).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        taskId,
+        actor: 'test-reconciler',
+        now: 206,
+        status: 'inbox',
+        payload: expect.objectContaining({
+          merge_commit_sha: 'same-sha',
+          merge_detection: 'base_contains_head',
+        }),
       }),
     )
   })

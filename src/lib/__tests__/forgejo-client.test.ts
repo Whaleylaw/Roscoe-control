@@ -90,7 +90,9 @@ describe('forgejo client', () => {
       url: 'http://localhost:3001/aaron/FirmVault/pulls/7',
       state: 'open',
       head: 'mc/task-2112',
+      headSha: null,
       base: 'codex/complete-workflow-v2',
+      baseSha: null,
       mergeCommitSha: null,
     })
     expect(fetchMock).toHaveBeenCalledWith(

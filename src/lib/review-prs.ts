@@ -280,7 +280,12 @@ export async function reconcileOpenReviewPrs(
         number: row.pr_number,
       })
 
-      if (pr.state === 'merged') {
+      const baseAlreadyContainsHead = pr.state === 'open'
+        && Boolean(pr.headSha)
+        && pr.headSha === pr.baseSha
+
+      if (pr.state === 'merged' || baseAlreadyContainsHead) {
+        const mergeCommitSha = pr.mergeCommitSha ?? pr.baseSha
         const transitioned = db.transaction(() => {
           db.prepare(`
             UPDATE task_review_prs
@@ -289,7 +294,7 @@ export async function reconcileOpenReviewPrs(
                 last_checked_at = ?,
                 updated_at = ?
             WHERE id = ?
-          `).run(pr.mergeCommitSha, now, now, row.id)
+          `).run(mergeCommitSha, now, now, row.id)
 
           const taskUpdate = db.prepare(`
             UPDATE tasks
@@ -320,7 +325,8 @@ export async function reconcileOpenReviewPrs(
               source: 'review_pr_merged',
               review_pr_id: row.id,
               pr_number: row.pr_number,
-              merge_commit_sha: pr.mergeCommitSha,
+              merge_commit_sha: mergeCommitSha,
+              merge_detection: baseAlreadyContainsHead ? 'base_contains_head' : 'forgejo_merged',
             },
             now,
             status: 'inbox',

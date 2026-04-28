@@ -8,7 +8,9 @@ export type ForgejoPullRequest = {
   url: string
   state: 'open' | 'closed' | 'merged'
   head: string
+  headSha: string | null
   base: string
+  baseSha: string | null
   mergeCommitSha: string | null
 }
 
@@ -33,8 +35,8 @@ type ForgejoPullRequestJson = {
   url?: string
   state?: string
   merged?: boolean
-  head?: { ref?: string } | string
-  base?: { ref?: string } | string
+  head?: { ref?: string; sha?: string } | string
+  base?: { ref?: string; sha?: string } | string
   merge_commit_sha?: string | null
 }
 
@@ -59,13 +61,20 @@ function refName(ref: ForgejoPullRequestJson['head']): string {
   return ref?.ref ?? ''
 }
 
+function refSha(ref: ForgejoPullRequestJson['head']): string | null {
+  if (typeof ref === 'string') return null
+  return ref?.sha ?? null
+}
+
 function mapPullRequest(json: ForgejoPullRequestJson): ForgejoPullRequest {
   return {
     number: json.number,
     url: json.html_url ?? json.url ?? '',
     state: json.merged ? 'merged' : json.state === 'closed' ? 'closed' : 'open',
     head: refName(json.head),
+    headSha: refSha(json.head),
     base: refName(json.base),
+    baseSha: refSha(json.base),
     mergeCommitSha: json.merge_commit_sha ?? null,
   }
 }
