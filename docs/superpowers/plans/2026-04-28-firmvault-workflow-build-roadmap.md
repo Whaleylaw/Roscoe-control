@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- |
 | Case Setup | `firmvault-case-setup` | Live Tested | Workflow instance `25`; tasks `2163`, `2164`; Forgejo PR `#9` manually merged | Created canonical case scaffold and passed human review. |
 | Initial Document Collection | `firmvault-document-collection` | Live Tested | Workflow instance `26`; tasks `2165`-`2168`; Forgejo PRs `#10`-`#13` manually merged/closed as needed | Signed-document wait completed early from canonical shadows; final human review task `2168` approved. |
-| Accident Report | planned `firmvault-accident-report` | Next | Not started | Next recommended build/test target. |
+| Accident Report | `firmvault-accident-report` | Executable YAML | Definition and materialization tests added; live DB definition id `6` | Next recommended live-test target. |
 
 ## Status Key
 
@@ -54,7 +54,7 @@ These workflows become eligible once intake and signed authorizations are in pla
 
 | Workflow | Build status | Trigger / dependency gate | Output landmarks | Canonical FirmVault paths | Test state needed | Issues |
 | --- | --- | --- | --- | --- | --- | --- |
-| Accident Report | Not Started | `full_intake_complete == true` | `accident_reporting_agency_identified`, `accident_report_number_identified`, `accident_report_requested`, `accident_report_obtained` | `accident/police-report.md`, `accident/accident.md`, `accident/liability.md`, `documents/shadows/accident/`, defendant/contact stubs, insurance clues | Phase 0 complete case; optional accident report shadow for passive arrival test | Next recommended workflow. Current catalog uses one broad `firmvault-accident-report-analyze` recipe for all steps; split or refine before live test. |
+| Accident Report | Executable YAML | `full_intake_complete == true` | `accident_report_status_checked`, `accident_report_requested`, `accident_report_received`, `accident_report_obtained`, `accident_report_reviewed` | `accident/police-report.md`, `accident/accident.md`, `accident/liability.md`, `documents/shadows/accident/`, defendant/contact stubs, insurance clues | Phase 0 complete case; optional accident report shadow for passive arrival test | Next live-test target. Current v1 uses one node-aware `firmvault-accident-report-analyze` recipe for status, request, and analysis nodes; split later if live test shows the prompt is too broad. |
 | Medical Provider Setup | Not Started | `full_intake_complete == true`; provider facts from intake/report/client | `providers_setup`, `provider_treatment_dates_recorded`, `injury_summary_recorded` | `medical-providers/<provider-slug>/`, provider contact stubs, `client/intake.md`, `activity/` | Phase 0 complete case with provider facts | Can run in parallel with Accident Report if intake already has provider facts. |
 | Client Check-In Cadence | Not Started | Case active / full intake complete | `client_reachable`, `client_check_in_active`, possible `provider_referral_needed` | `client/check-ins.md`, `activity/`, provider notes | Phase 0 complete case | Catalog still uses generic `firmvault-workflow-task`; needs real recipes. |
 
@@ -138,7 +138,7 @@ Litigation is a separate branch, not part of the first non-litigation PI happy p
 
 - [x] Wave 0.1: Case Setup live test complete.
 - [x] Wave 0.2: Initial Document Collection live test complete.
-- [ ] Wave 1.1: Design and implement executable Accident Report workflow.
+- [x] Wave 1.1: Design and implement executable Accident Report workflow.
 - [ ] Wave 1.2: Live-test Accident Report on `test-ladder-006-template-tool` or a new `test-ladder-007-accident-report` state.
 - [ ] Wave 1.3: Design and implement Medical Provider Setup.
 - [ ] Wave 1.4: Live-test Medical Provider Setup.
@@ -184,4 +184,3 @@ Copy this checklist under the workflow section when actively working on it.
 - Mark a workflow `Live Tested` only after it has completed the actual Mission Control lifecycle through review/quality review and Forgejo PR gate when applicable.
 - Keep the next recommended workflow explicit. As of this version, it is **Accident Report**.
 - Do not enable broad materialization against real cases while the current test queue is active.
-

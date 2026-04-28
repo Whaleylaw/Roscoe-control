@@ -132,6 +132,32 @@ describe('FirmVault test ladder workflows', () => {
     ).toBe(true)
   })
 
+  it('defines executable accident report workflow after full intake completion', () => {
+    const accidentReport = parseWorkflowDefinition(readFileSync(join(WORKFLOWS_ROOT, 'firmvault-accident-report.yaml'), 'utf8'))
+
+    expect(accidentReport.id).toBe('firmvault-accident-report')
+    expect(accidentReport.nodes.identify_report_status.depends_on).toEqual({
+      nodes: [],
+      conditions: ['law_firm.landmarks.full_intake_complete == true'],
+      timers: [],
+    })
+    expect(accidentReport.nodes.identify_report_status.recipe).toBe('firmvault-accident-report-analyze')
+    expect(accidentReport.nodes.request_accident_report.recipe).toBe('firmvault-accident-report-analyze')
+    expect(accidentReport.nodes.wait_for_accident_report.exit_when).toMatchObject({
+      condition: 'law_firm.landmarks.accident_report_received == true',
+    })
+    expect(accidentReport.nodes.analyze_accident_report.completes).toContain(
+      'law_firm.landmarks.accident_report_obtained',
+    )
+    expect(accidentReport.nodes.confirm_accident_report.review).toMatchObject({ mode: 'human' })
+    expect(
+      existsSync(join(MISSION_CONTROL_ROOT, 'recipes', 'firmvault-accident-report-analyze', 'SOUL.md')),
+    ).toBe(true)
+    expect(
+      existsSync(join(MISSION_CONTROL_ROOT, 'recipes', 'firmvault-accident-report-analyze', 'REVIEW.md')),
+    ).toBe(true)
+  })
+
   it('defines the complete deterministic starter tree for every new personal-injury case', () => {
     expect(existsSync(join(BLANK_CASE_TEMPLATE, '_case-slug.md'))).toBe(true)
 
@@ -314,6 +340,74 @@ nodes:
       },
       law_firm: {
         case_slug: 'test-ladder-001-case-created',
+      },
+    })
+    expect(tasks[0].metadata).not.toContain('abby-sitgraves')
+  })
+
+  it('manually starts accident_report after full intake and materializes only its first task', () => {
+    const definitionId = createWorkflowDefinition(
+      db,
+      readFileSync(join(WORKFLOWS_ROOT, 'firmvault-accident-report.yaml'), 'utf8'),
+      'workflow-test',
+      1,
+      1,
+    )
+
+    const instance = startWorkflowInstance(db, {
+      definitionId,
+      subjectType: 'law_firm_case',
+      subjectId: 'test-ladder-006-template-tool',
+      actor: 'workflow-test',
+      workspaceId: 1,
+      tenantId: 1,
+      now: 3000,
+    })
+
+    expect(instance.ready_nodes).toEqual([])
+
+    const satisfied = satisfyWorkflowCondition(db, {
+      subjectType: 'law_firm_case',
+      subjectId: 'test-ladder-006-template-tool',
+      condition: 'law_firm.landmarks.full_intake_complete == true',
+      actor: 'workflow-test',
+      workspaceId: 1,
+      now: 3001,
+    })
+
+    expect(satisfied.promoted_nodes).toMatchObject([
+      { node_key: 'identify_report_status', status: 'ready' },
+    ])
+
+    const materialized = materializeReadyWorkflowNodes(db, {
+      workflowInstanceId: instance.instance_id,
+      projectId,
+      workspaceId: 1,
+      actor: 'workflow-test',
+      now: 3002,
+      status: 'inbox',
+    })
+
+    expect(materialized.created).toMatchObject([
+      { node_key: 'identify_report_status' },
+    ])
+
+    const tasks = taskRows()
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0]).toMatchObject({
+      status: 'inbox',
+      recipe_slug: 'firmvault-accident-report-analyze',
+    })
+    expect(JSON.parse(tasks[0].metadata ?? '{}')).toMatchObject({
+      workflow: {
+        definition_slug: 'firmvault-accident-report',
+        subject_type: 'law_firm_case',
+        subject_id: 'test-ladder-006-template-tool',
+        node_key: 'identify_report_status',
+        recipe_slug: 'firmvault-accident-report-analyze',
+      },
+      law_firm: {
+        case_slug: 'test-ladder-006-template-tool',
       },
     })
     expect(tasks[0].metadata).not.toContain('abby-sitgraves')
