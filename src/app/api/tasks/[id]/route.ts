@@ -16,7 +16,7 @@ import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer';
 import { getMountsCap, getExtraSkillsCap } from '@/lib/task-runtime-settings';
 import { isKnownModel, MODEL_IDS } from '@/lib/model-registry';
 import { bypassLawFirmCaseLandmark } from '@/lib/law-firm';
-import { satisfyWorkflowCondition } from '@/lib/workflow-engine';
+import { advanceWorkflowAfterTaskApproval, satisfyWorkflowCondition } from '@/lib/workflow-engine';
 import {
   validateHostPathAgainstAllowlist,
   buildAggregatedValidationResponse,
@@ -118,6 +118,14 @@ function stringValue(value: unknown): string | null {
   if (value == null) return null
   const str = String(value).trim()
   return str || null
+}
+
+function isHumanWorkflowReviewTask(task: Record<string, unknown>): boolean {
+  const metadata = parseTaskMetadata(task.metadata)
+  const workflow = objectRecord(metadata.workflow)
+  return workflow.node_type === 'review'
+    && !stringValue(workflow.recipe_slug)
+    && !stringValue(task.recipe_slug)
 }
 
 /**
@@ -558,6 +566,7 @@ export async function PUT(
       updateParams.push(description);
     }
     if (normalizedStatus !== undefined) {
+      const isHumanReviewGate = isHumanWorkflowReviewTask(currentTask as unknown as Record<string, unknown>)
       // Phase 09 — GSD-15, D-30, D-31, D-32: gate enforcement on forward motion
       //   D-31: only 'in_progress' and 'done' are gated; backward/sideways motion
       //         (backlog, review, awaiting_owner, inbox, assigned, etc.) bypasses.
@@ -578,6 +587,7 @@ export async function PUT(
       if (
         normalizedStatus === 'done' &&
         !currentRecipeSlug &&
+        !isHumanReviewGate &&
         !hasAegisApproval(db, taskId, workspaceId)
       ) {
         return NextResponse.json(
@@ -970,6 +980,20 @@ export async function PUT(
         revokeTokensForTask(db, taskId);
       }
     })();
+
+    const humanReviewWorkflowAdvancement = normalizedStatus === 'done'
+      && currentTask.status !== 'done'
+      && isHumanWorkflowReviewTask(currentTask as unknown as Record<string, unknown>)
+      ? advanceWorkflowAfterTaskApproval(db, {
+        taskId,
+        actor: auth.user.username,
+        payload: {
+          source: 'human_review',
+          reviewer: auth.user.username,
+        },
+        status: 'inbox',
+      })
+      : null
     
     // Track changes and log activities
     const changes: string[] = [];
@@ -1159,7 +1183,10 @@ export async function PUT(
       })
     }
 
-    return NextResponse.json({ task: parsedTask });
+    return NextResponse.json({
+      task: parsedTask,
+      ...(humanReviewWorkflowAdvancement ? { workflow_advancement: humanReviewWorkflowAdvancement } : {}),
+    });
   } catch (error) {
     logger.error({ err: error }, 'PUT /api/tasks/[id] error');
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });

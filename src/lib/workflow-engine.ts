@@ -182,6 +182,7 @@ export type MaterializeReadyWorkflowNodesResult = {
 export type CompleteWorkflowNodeResult = {
   workflow_instance_id: number
   ready_nodes: string[]
+  condition_workflow_instance_ids?: number[]
 } | null
 
 export type CancelWorkflowInstanceResult = {
@@ -225,6 +226,7 @@ export type CancelWorkflowInstanceInput = {
 export type AdvanceWorkflowAfterTaskApprovalResult = {
   completed: CompleteWorkflowNodeResult
   materialized: MaterializeReadyWorkflowNodesResult | null
+  condition_materialized?: MaterializeReadyWorkflowNodesResult[]
 }
 
 export type AdvanceDueWorkflowTimersInput = {
@@ -739,7 +741,8 @@ export function completeWorkflowNodeForTask(
   let result: CompleteWorkflowNodeResult = null
   db.transaction(() => {
     const node = db.prepare(`
-      SELECT wni.id, wni.workflow_instance_id, wni.node_key, wni.status, wi.workspace_id
+      SELECT wni.id, wni.workflow_instance_id, wni.node_key, wni.status, wni.config_json,
+             wi.workspace_id, wi.subject_type, wi.subject_id
       FROM workflow_node_instances wni
       JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
       WHERE wni.task_id = ?
@@ -749,7 +752,10 @@ export function completeWorkflowNodeForTask(
       workflow_instance_id: number
       node_key: string
       status: WorkflowNodeStatus
+      config_json: string | null
       workspace_id: number
+      subject_type: string
+      subject_id: string
     } | undefined
     if (!node) return
     const updated = db.prepare(`
@@ -778,9 +784,25 @@ export function completeWorkflowNodeForTask(
         now,
       })
     }
+    const conditionWorkflowInstanceIds = satisfyCompletionConditionDependenciesInTransaction(db, {
+      workspaceId: node.workspace_id,
+      subjectType: node.subject_type,
+      subjectId: node.subject_id,
+      completes: parseStringArrayFromConfig(node.config_json, 'completes'),
+      actor,
+      payload: { source_task_id: taskId, source_node_key: node.node_key, ...payload },
+      now,
+    })
     const readyNodes = evaluateWorkflowInstanceInTransaction(db, node.workflow_instance_id, now)
+    for (const workflowInstanceId of conditionWorkflowInstanceIds) {
+      evaluateWorkflowInstanceInTransaction(db, workflowInstanceId, now)
+    }
     updateWorkflowInstanceCompletionInTransaction(db, node.workflow_instance_id, node.workspace_id, actor, now)
-    result = { workflow_instance_id: node.workflow_instance_id, ready_nodes: readyNodes }
+    result = {
+      workflow_instance_id: node.workflow_instance_id,
+      ready_nodes: readyNodes,
+      condition_workflow_instance_ids: [...conditionWorkflowInstanceIds],
+    }
   })()
   return result
 }
@@ -817,7 +839,22 @@ export function advanceWorkflowAfterTaskApproval(
     now,
   })
 
-  return { completed, materialized }
+  const conditionMaterialized: MaterializeReadyWorkflowNodesResult[] = []
+  for (const workflowInstanceId of completed.condition_workflow_instance_ids ?? []) {
+    if (workflowInstanceId === completed.workflow_instance_id) continue
+    conditionMaterialized.push(materializeReadyWorkflowNodes(db, {
+      workflowInstanceId,
+      projectId: task.project_id,
+      workspaceId: task.workspace_id,
+      actor: input.actor,
+      baseRef: baseRefFromWorkspaceSource(task.workspace_source),
+      assignedTo: input.assignedTo,
+      status: input.status ?? 'inbox',
+      now,
+    }))
+  }
+
+  return { completed, materialized, condition_materialized: conditionMaterialized }
 }
 
 export function cancelWorkflowInstance(
@@ -1166,7 +1203,7 @@ export function materializeReadyWorkflowNodes(
       FROM workflow_node_instances
       WHERE workflow_instance_id = ?
         AND status = 'ready'
-        AND node_type = 'recipe'
+        AND node_type IN ('recipe', 'review')
       ORDER BY id ASC
     `).all(input.workflowInstanceId) as Array<{
       id: number
@@ -1183,8 +1220,12 @@ export function materializeReadyWorkflowNodes(
         skipped.push({ node_key: node.node_key, reason: 'already_linked', task_id: node.task_id })
         continue
       }
-      if (!node.recipe_slug) {
+      if (node.node_type === 'recipe' && !node.recipe_slug) {
         skipped.push({ node_key: node.node_key, reason: 'missing_recipe' })
+        continue
+      }
+      if (node.node_type === 'review' && !isHumanReviewNode(node.config_json)) {
+        skipped.push({ node_key: node.node_key, reason: 'non_human_review_without_recipe' })
         continue
       }
 
@@ -1202,6 +1243,7 @@ export function materializeReadyWorkflowNodes(
       const vars = parseWorkflowRuntimeVars(context.vars_json)
       const title = `[Workflow] ${context.definition_name}: ${titleFromNodeKey(node.node_key)}`
       const lawFirmMetadata = lawFirmTaskMetadata(context.subject_type, context.subject_id, vars)
+      const nodeFinalStatus = node.node_type === 'review' ? 'review' : finalStatus
       const metadata = {
         workflow: {
           workflow_instance_id: context.id,
@@ -1228,7 +1270,7 @@ export function materializeReadyWorkflowNodes(
       `).run(
         title,
         workflowTaskDescription({ ...context, vars }, node),
-        finalStatus,
+        nodeFinalStatus,
         input.projectId,
         ticket.ticket_counter,
         input.assignedTo ?? null,
@@ -1258,7 +1300,7 @@ export function materializeReadyWorkflowNodes(
         eventType: 'task.created',
         actorType: 'system',
         actorId: input.actor,
-        payload: { task_id: taskId, recipe_slug: node.recipe_slug, status: finalStatus },
+        payload: { task_id: taskId, recipe_slug: node.recipe_slug, status: nodeFinalStatus },
         workspaceId: input.workspaceId,
         createdAt: now,
       })
@@ -1271,7 +1313,7 @@ export function materializeReadyWorkflowNodes(
         WHERE t.id = ? AND t.workspace_id = ?
       `).get(taskId, input.workspaceId) as Record<string, unknown>
       broadcastRows.push(row)
-      if (finalStatus === 'assigned') {
+      if (nodeFinalStatus === 'assigned' && node.recipe_slug) {
         runnerRequests.push({ task_id: taskId, recipe_slug: node.recipe_slug, workspace_id: input.workspaceId })
       }
     }
@@ -1348,6 +1390,9 @@ function seedWorkflowDependencies(
     if (!nodeInstanceId) continue
     const dependencies = normalizeDependsOn(node.depends_on)
     const timerDependencies = [...dependencies.timers]
+    const waitExitGroup = node.type === 'wait' && node.exit_when?.condition
+      ? `wait-exit:${nodeKey}`
+      : null
     if (node.type === 'wait' && node.duration) {
       timerDependencies.push({ after: nodeKey, duration: node.duration, key: 'wait-duration' })
     }
@@ -1380,14 +1425,30 @@ function seedWorkflowDependencies(
       })
     }
 
+    if (waitExitGroup && node.exit_when?.condition) {
+      insertWorkflowDependency(db, {
+        workflowInstanceId: input.workflowInstanceId,
+        nodeInstanceId,
+        nodeKey,
+        dependencyType: 'condition',
+        dependencyKey: conditionDependencyKey(input.subjectType, input.subjectId, node.exit_when.condition),
+        dependencySemantics: 'waits_for_any',
+        dependencyGroup: waitExitGroup,
+        workspaceId: input.workspaceId,
+        now: input.now,
+      })
+    }
+
     for (const timer of timerDependencies) {
+      const isSelfWaitTimer = node.type === 'wait' && timer.after === nodeKey
       insertWorkflowDependency(db, {
         workflowInstanceId: input.workflowInstanceId,
         nodeInstanceId,
         nodeKey,
         dependencyType: 'timer',
         dependencyKey: timerDependencyKey(input.workflowInstanceId, nodeKey, timer),
-        dependencySemantics: 'blocks',
+        dependencySemantics: waitExitGroup && isSelfWaitTimer ? 'waits_for_any' : 'blocks',
+        dependencyGroup: waitExitGroup && isSelfWaitTimer ? waitExitGroup : null,
         sourceNodeKey: timer.after === nodeKey ? null : timer.after,
         durationSeconds: durationToSeconds(timer.duration),
         workspaceId: input.workspaceId,
@@ -1542,7 +1603,7 @@ function scheduleSelfTimersForDependencyReadyNodes(
   now: number,
 ): void {
   const rows = db.prepare(`
-    SELECT wnd.id, wnd.node_instance_id, wnd.node_key, wnd.duration_seconds, wnd.workspace_id
+    SELECT wnd.id, wnd.node_instance_id, wnd.node_key, wnd.duration_seconds, wnd.workspace_id, wnd.dependency_group
     FROM workflow_node_dependencies wnd
     JOIN workflow_node_instances wni ON wni.id = wnd.node_instance_id
     WHERE wnd.workflow_instance_id = ?
@@ -1564,6 +1625,7 @@ function scheduleSelfTimersForDependencyReadyNodes(
         WHERE any_dep.node_instance_id = wnd.node_instance_id
           AND any_dep.id != wnd.id
           AND any_dep.dependency_semantics = 'waits_for_any'
+          AND COALESCE(any_dep.dependency_group, any_dep.dependency_key) != COALESCE(wnd.dependency_group, wnd.dependency_key)
         GROUP BY COALESCE(any_dep.dependency_group, any_dep.dependency_key)
         HAVING SUM(CASE WHEN any_dep.status = 'satisfied' THEN 1 ELSE 0 END) = 0
       )
@@ -1573,6 +1635,7 @@ function scheduleSelfTimersForDependencyReadyNodes(
     node_key: string
     duration_seconds: number | null
     workspace_id: number
+    dependency_group: string | null
   }>
 
   for (const row of rows) {
@@ -1906,6 +1969,96 @@ function parseStringArray(raw: string | null): string[] {
   } catch {
     return []
   }
+}
+
+function parseStringArrayFromConfig(raw: string | null, key: string): string[] {
+  const config = parseObject(raw)
+  const value = config[key]
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function isHumanReviewNode(raw: string | null): boolean {
+  const config = parseObject(raw)
+  const review = objectRecord(config.review)
+  return review.mode === 'human'
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function satisfyCompletionConditionDependenciesInTransaction(
+  db: Database.Database,
+  input: {
+    workspaceId: number
+    subjectType: string
+    subjectId: string
+    completes: string[]
+    actor: string
+    payload: Record<string, unknown>
+    now: number
+  },
+): Set<number> {
+  const workflowIds = new Set<number>()
+  for (const condition of completionConditions(input.completes)) {
+    const dependencyKey = conditionDependencyKey(input.subjectType, input.subjectId, condition)
+    const rows = db.prepare(`
+      SELECT id, workflow_instance_id, node_instance_id, node_key, workspace_id
+      FROM workflow_node_dependencies
+      WHERE workspace_id = ?
+        AND dependency_type = 'condition'
+        AND dependency_key = ?
+        AND status IN ('pending', 'scheduled')
+    `).all(input.workspaceId, dependencyKey) as Array<{
+      id: number
+      workflow_instance_id: number
+      node_instance_id: number
+      node_key: string
+      workspace_id: number
+    }>
+
+    for (const row of rows) {
+      const updated = db.prepare(`
+        UPDATE workflow_node_dependencies
+        SET status = 'satisfied', satisfied_at = COALESCE(satisfied_at, ?), payload_json = ?, updated_at = ?
+        WHERE id = ? AND status IN ('pending', 'scheduled')
+      `).run(input.now, JSON.stringify(input.payload), input.now, row.id)
+      if (updated.changes === 0) continue
+      workflowIds.add(row.workflow_instance_id)
+      writeWorkflowEvent(db, {
+        workflowInstanceId: row.workflow_instance_id,
+        nodeInstanceId: row.node_instance_id,
+        nodeKey: row.node_key,
+        eventType: 'dependency.satisfied',
+        actorType: 'system',
+        actorId: input.actor,
+        payload: {
+          dependency_type: 'condition',
+          dependency_key: dependencyKey,
+          condition,
+          ...input.payload,
+        },
+        workspaceId: row.workspace_id,
+        createdAt: input.now,
+      })
+    }
+  }
+  return workflowIds
+}
+
+function completionConditions(completes: string[]): string[] {
+  const conditions = new Set<string>()
+  for (const raw of completes) {
+    const item = raw.trim()
+    if (!item) continue
+    conditions.add(item)
+    if (/^law_firm\.landmarks\.[a-zA-Z0-9_.-]+$/.test(item)) {
+      conditions.add(`${item} == true`)
+    }
+  }
+  return [...conditions]
 }
 
 function titleFromNodeKey(nodeKey: string): string {

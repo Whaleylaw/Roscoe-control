@@ -506,6 +506,11 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
     LEFT JOIN recipes r ON r.slug = t.recipe_slug AND r.workspace_id = t.workspace_id AND r.error_message IS NULL
     WHERE t.status IN ('review', 'quality_review')
       AND NOT (
+        t.recipe_slug IS NULL
+        AND json_extract(t.metadata, '$.workflow.node_type') = 'review'
+        AND COALESCE(json_extract(t.metadata, '$.workflow.recipe_slug'), '') = ''
+      )
+      AND NOT (
         t.status = 'review'
         AND t.recipe_slug IS NOT NULL
       )

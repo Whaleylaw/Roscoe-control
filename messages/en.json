@@ -766,7 +766,7 @@
     "colAssigned": "Assigned",
     "colAwaitingOwner": "Awaiting Owner",
     "colInProgress": "In Progress",
-    "colReview": "Review",
+    "colReview": "Human Review",
     "colQualityReview": "Quality Review",
     "colFailed": "Failed",
     "retryTask": "Retry Task",

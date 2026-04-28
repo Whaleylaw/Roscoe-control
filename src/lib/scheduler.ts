@@ -13,6 +13,7 @@ import { syncLocalAgents } from './local-agent-sync'
 import { dispatchAssignedTasks, runAegisReviews, requeueStaleTasks, autoRouteInboxTasks, reconcileRunnerHeartbeat } from './task-dispatch'
 import { spawnRecurringTasks } from './recurring-tasks'
 import { advanceDueWorkflowTimers } from './workflow-engine'
+import { satisfyPassiveFirmVaultLandmarks } from './firmvault-passive-landmarks'
 
 const BACKUP_DIR = join(dirname(config.dbPath), 'backups')
 
@@ -275,18 +276,23 @@ async function syncAgentLiveStatuses(): Promise<number> {
 async function runWorkflowTimerAdvance(): Promise<{ ok: boolean; message: string }> {
   try {
     const db = getDatabase()
+    const passive = await satisfyPassiveFirmVaultLandmarks(db, {
+      actor: 'passive-landmark-resolver',
+      status: 'inbox',
+    })
     const result = advanceDueWorkflowTimers(db, {
       actor: 'workflow-timer',
       limit: 500,
       status: 'inbox',
     })
     const materializedCount = result.materialized.reduce((sum, item) => sum + item.created.length, 0)
-    if (result.completed.length === 0 && materializedCount === 0) {
+    const passiveCount = passive.satisfied.reduce((sum, item) => sum + item.satisfied_dependencies, 0)
+    if (passiveCount === 0 && result.completed.length === 0 && materializedCount === 0) {
       return { ok: true, message: 'No workflow timers due' }
     }
     return {
       ok: true,
-      message: `Advanced ${result.completed.length} workflow timer(s); materialized ${materializedCount} task(s)`,
+      message: `Resolved ${passiveCount} passive FirmVault condition(s); advanced ${result.completed.length} workflow timer(s); materialized ${materializedCount} task(s)`,
     }
   } catch (err: any) {
     return { ok: false, message: `Workflow timer advance failed: ${err.message}` }

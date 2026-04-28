@@ -19,7 +19,7 @@ export function TaskPipelineWidget({ data }: { data: DashboardData }) {
     { label: 'Inbox', count: inboxCount, color: 'text-zinc-400', bgColor: 'bg-zinc-500', dotColor: 'bg-zinc-400' },
     { label: 'Assigned', count: assignedCount, color: 'text-blue-400', bgColor: 'bg-blue-500', dotColor: 'bg-blue-400' },
     { label: 'Running', count: runningTasks, color: 'text-amber-400', bgColor: 'bg-amber-500', dotColor: 'bg-amber-400' },
-    { label: 'Review', count: reviewCount, color: 'text-purple-400', bgColor: 'bg-purple-500', dotColor: 'bg-purple-400' },
+    { label: 'Human Review', count: reviewCount, color: 'text-purple-400', bgColor: 'bg-purple-500', dotColor: 'bg-purple-400' },
     { label: 'Done', count: doneCount, color: 'text-green-400', bgColor: 'bg-green-500', dotColor: 'bg-green-400' },
   ]
 
@@ -90,7 +90,7 @@ export function TaskPipelineWidget({ data }: { data: DashboardData }) {
               <path d="M8 2l6.5 11H1.5z" />
               <path d="M8 7v2.5M8 11.5v0" />
             </svg>
-            {reviewCount} tasks waiting for review
+            {reviewCount} tasks waiting for human review
           </p>
         )}
       </div>
