@@ -167,7 +167,10 @@ function buildResumePreamble(input: PreambleInput): string {
   lines.push('')
   lines.push('- Trust git over progress.md when they conflict.')
   lines.push(
-    '- If a prior attempt committed the deliverable but did not submit, submit now and exit.',
+    '- `/recipe/SOUL.md` and the current task instructions override resume shortcuts. If the current recipe says the work is blocked, incomplete, or requires owner input, post a blocked checkpoint instead of submitting done.',
+  )
+  lines.push(
+    '- Submit now and exit only if a prior attempt already produced a deliverable that still satisfies the current `/recipe/SOUL.md` completion rules.',
   )
   lines.push(`- Append new notes under a \`## attempt ${attemptNumber}\` header in progress.md.`)
   lines.push('')

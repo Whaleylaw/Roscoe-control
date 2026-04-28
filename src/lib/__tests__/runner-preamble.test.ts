@@ -50,10 +50,10 @@ describe('runner preamble generator', () => {
     expect(text).toContain('git -C /workspace log --oneline')
   })
 
-  it('WORK-04/05: both variants forward-reference POST ${apiBase}/api/runner/checkpoint literal', () => {
+  it('WORK-04/05: both variants forward-reference the task-scoped checkpoint endpoint', () => {
     const firstAttempt = generatePreamble(firstAttemptInput())
     const resume = generatePreamble(resumeInput())
-    const literal = `POST ${API_BASE}/api/runner/checkpoint`
+    const literal = `POST ${API_BASE}/api/tasks/$MC_TASK_ID/checkpoints`
     expect(firstAttempt).toContain(literal)
     expect(resume).toContain(literal)
   })
@@ -69,7 +69,13 @@ describe('runner preamble generator', () => {
     const text = generatePreamble(resumeInput())
     const count = nonBlankLineCount(text)
     expect(count).toBeGreaterThanOrEqual(35)
-    expect(count).toBeLessThanOrEqual(55)
+    expect(count).toBeLessThanOrEqual(57)
+  })
+
+  it('WORK-04: resume preamble makes current SOUL completion rules override shortcut submission', () => {
+    const text = generatePreamble(resumeInput())
+    expect(text).toContain('current recipe says the work is blocked')
+    expect(text).toContain('still satisfies the current `/recipe/SOUL.md` completion rules')
   })
 
   it('WORK-04/05: generatePreamble is deterministic — same inputs produce identical output', () => {

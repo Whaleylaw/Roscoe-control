@@ -231,6 +231,34 @@ describe('GET /api/runner/ready-tasks', () => {
     expect(body.tasks.map((t: { id: number }) => t.id)).toEqual([stillNeedsReviewId])
   })
 
+  it('excludes quality_review recipe tasks blocked by a recipe-specific reviewer', async () => {
+    asRunner()
+    seedRecipeWithReview('reviewable')
+    seedTask({
+      title: 'blocked-review',
+      status: 'quality_review',
+      recipe_slug: 'reviewable',
+      // Simulates legacy rows left in quality_review before blocked verdicts
+      // were routed back to Human Review.
+    })
+    testDb.prepare(`
+      UPDATE tasks
+      SET error_message = 'Recipe review blocked: Need reporting agency.'
+      WHERE title = 'blocked-review'
+    `).run()
+    const stillNeedsReviewId = seedTask({
+      title: 'needs-review',
+      status: 'quality_review',
+      recipe_slug: 'reviewable',
+    })
+
+    const res = await GET(makeGet())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expect(body.tasks.map((t: { id: number }) => t.id)).toEqual([stillNeedsReviewId])
+  })
+
   it('RUNNER-04: rejects non-runner-secret bearer with 403 (id-guard)', async () => {
     asOperatorSessionUser()
 

@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
           AND r.review_md IS NOT NULL
           AND r.review_md <> ''
           AND (t.error_message IS NULL OR t.error_message NOT LIKE 'Aegis review error:%')
+          AND (t.error_message IS NULL OR t.error_message NOT LIKE 'Recipe review blocked:%')
           AND NOT EXISTS (
             SELECT 1
             FROM task_review_prs pr

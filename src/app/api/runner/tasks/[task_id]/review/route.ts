@@ -246,7 +246,7 @@ export async function POST(
       `).run(taskId, `Quality Review Blocked:\n${body.notes}`, now, task.workspace_id)
       const transition = db.prepare(`
         UPDATE tasks
-        SET status = 'quality_review',
+        SET status = 'review',
             container_id = NULL,
             error_message = ?,
             updated_at = ?
@@ -259,7 +259,7 @@ export async function POST(
     })()
     eventBus.broadcast('task.status_changed', {
       task_id: taskId,
-      status: 'quality_review',
+      status: 'review',
       previous_status: 'quality_review',
       reason: 'recipe_review_blocked',
       workspace_id: task.workspace_id,

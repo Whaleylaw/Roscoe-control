@@ -484,7 +484,7 @@ function allToolDefinitions() {
     },
     {
       name: 'checkpoint',
-      description: 'Post a Mission Control checkpoint and append local checkpoint JSONL. Use status=blocked when you need user input, recipe clarification, missing facts, or other review before continuing; Mission Control will move the task to awaiting_owner and create a task-thread comment from blocker_reason.',
+      description: 'Post a Mission Control checkpoint and append local checkpoint JSONL. Use status=blocked when you need user input, recipe clarification, missing facts, or other review before continuing; Mission Control will move recipe tasks to Human Review and create a task-thread comment from blocker_reason.',
       input_schema: {
         type: 'object',
         properties: {
@@ -499,7 +499,7 @@ function allToolDefinitions() {
     },
     {
       name: 'submit_done',
-      description: 'Submit the task as complete. Mission Control will move it to review and post resolution as the task-thread handoff comment for the user/reviewer.',
+      description: 'Submit the task as complete only when the current recipe/SOUL completion rules are satisfied. Do not use for missing facts, owner questions, incomplete handoffs, unclear legal-workflow instructions, or blocked work; use checkpoint with status=blocked instead. Mission Control will move completed work to review and post resolution as the task-thread handoff comment for the user/reviewer.',
       input_schema: {
         type: 'object',
         properties: {

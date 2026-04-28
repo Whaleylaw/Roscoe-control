@@ -143,6 +143,7 @@ describe('FirmVault test ladder workflows', () => {
     })
     expect(accidentReport.nodes.identify_report_status.recipe).toBe('firmvault-accident-report-analyze')
     expect(accidentReport.nodes.request_accident_report.recipe).toBe('firmvault-accident-report-analyze')
+    expect(accidentReport.nodes.request_accident_report.config.task_goal).toContain('blocked checkpoint')
     expect(accidentReport.nodes.wait_for_accident_report.exit_when).toMatchObject({
       condition: 'law_firm.landmarks.accident_report_received == true',
     })
@@ -156,6 +157,12 @@ describe('FirmVault test ladder workflows', () => {
     expect(
       existsSync(join(MISSION_CONTROL_ROOT, 'recipes', 'firmvault-accident-report-analyze', 'REVIEW.md')),
     ).toBe(true)
+    const soul = readFileSync(
+      join(MISSION_CONTROL_ROOT, 'recipes', 'firmvault-accident-report-analyze', 'SOUL.md'),
+      'utf8',
+    )
+    expect(soul).toContain('the case root is `/workspace/example-client.md`')
+    expect(soul).toContain('do not submit `done`')
   })
 
   it('defines the complete deterministic starter tree for every new personal-injury case', () => {

@@ -54,7 +54,8 @@ nodes:
         handoff for requesting it from the reporting agency. Record agency,
         known report number, request method, fee issue, and next expected follow
         up. Do not claim the report was requested unless supported by evidence
-        or owner confirmation.
+        or owner confirmation. If agency/request facts are missing, ask for
+        those facts through a blocked checkpoint and do not complete this node.
 
   wait_for_accident_report:
     type: wait
@@ -98,4 +99,3 @@ nodes:
       - law_firm.landmarks.accident_report_reviewed
     config:
       task_goal: Confirm accident report facts are sufficiently captured before BI, PIP, UM/UIM, Med Pay, or workers' compensation workflows rely on them.
-

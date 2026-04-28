@@ -363,4 +363,36 @@ describe('POST /api/runner/tasks/:task_id/review PR gate', () => {
     expect(testDb.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = 51`).get()).toMatchObject({ count: 0 })
     expect(broadcastMock).not.toHaveBeenCalledWith('task.status_changed', expect.objectContaining({ reason: 'recipe_review_blocked' }))
   })
+
+  it('moves blocked recipe reviews back to review so the reviewer does not loop', async () => {
+    authTaskId = 52
+    seedTask(52)
+    issueRunnerToken(testDb, 52, 1, 300)
+
+    const response = await review(52, { verdict: 'blocked', notes: 'Need reporting agency.' })
+
+    expect(response.status).toBe(204)
+    expect(testDb.prepare(`
+      SELECT status, container_id, error_message, completed_at
+      FROM tasks
+      WHERE id = 52
+    `).get()).toMatchObject({
+      status: 'review',
+      container_id: null,
+      error_message: expect.stringContaining('Recipe review blocked: Need reporting agency.'),
+      completed_at: null,
+    })
+    expect(testDb.prepare(`
+      SELECT revoked_at FROM task_runner_tokens WHERE task_id = 52
+    `).get()).toMatchObject({ revoked_at: expect.any(Number) })
+    expect(testDb.prepare(`
+      SELECT content FROM comments WHERE task_id = 52 ORDER BY id DESC LIMIT 1
+    `).get()).toMatchObject({ content: expect.stringContaining('Quality Review Blocked') })
+    expect(broadcastMock).toHaveBeenCalledWith('task.status_changed', expect.objectContaining({
+      task_id: 52,
+      status: 'review',
+      previous_status: 'quality_review',
+      reason: 'recipe_review_blocked',
+    }))
+  })
 })

@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- |
 | Case Setup | `firmvault-case-setup` | Live Tested | Workflow instance `25`; tasks `2163`, `2164`; Forgejo PR `#9` manually merged | Created canonical case scaffold and passed human review. |
 | Initial Document Collection | `firmvault-document-collection` | Live Tested | Workflow instance `26`; tasks `2165`-`2168`; Forgejo PRs `#10`-`#13` manually merged/closed as needed | Signed-document wait completed early from canonical shadows; final human review task `2168` approved. |
-| Accident Report | `firmvault-accident-report` | Executable YAML | Definition and materialization tests added; live DB definition id `6` | Next recommended live-test target. |
+| Accident Report | `firmvault-accident-report` | Issue | Definition and materialization tests added; live DB definition id `6`; task `2169` passed through Forgejo PR `#14`; task `2170` is in Human Review blocked on missing accident-report request facts; accidental PR `#15` closed unmerged | Needs owner/test-fixture accident-report facts before the request node can advance. |
 
 ## Status Key
 
@@ -54,7 +54,7 @@ These workflows become eligible once intake and signed authorizations are in pla
 
 | Workflow | Build status | Trigger / dependency gate | Output landmarks | Canonical FirmVault paths | Test state needed | Issues |
 | --- | --- | --- | --- | --- | --- | --- |
-| Accident Report | Executable YAML | `full_intake_complete == true` | `accident_report_status_checked`, `accident_report_requested`, `accident_report_received`, `accident_report_obtained`, `accident_report_reviewed` | `accident/police-report.md`, `accident/accident.md`, `accident/liability.md`, `documents/shadows/accident/`, defendant/contact stubs, insurance clues | Phase 0 complete case; optional accident report shadow for passive arrival test | Next live-test target. Current v1 uses one node-aware `firmvault-accident-report-analyze` recipe for status, request, and analysis nodes; split later if live test shows the prompt is too broad. |
+| Accident Report | Issue | `full_intake_complete == true` | `accident_report_status_checked`, `accident_report_requested`, `accident_report_received`, `accident_report_obtained`, `accident_report_reviewed` | `accident/police-report.md`, `accident/accident.md`, `accident/liability.md`, `documents/shadows/accident/`, defendant/contact stubs, insurance clues | Phase 0 complete case; optional accident report shadow for passive arrival test | Task `2169` completed and merged. Task `2170` is correctly blocked in Human Review because the test case lacks reporting agency, report number, request method, and fee details. Current v1 uses one node-aware `firmvault-accident-report-analyze` recipe for status, request, and analysis nodes; split later if live test shows the prompt is too broad. |
 | Medical Provider Setup | Not Started | `full_intake_complete == true`; provider facts from intake/report/client | `providers_setup`, `provider_treatment_dates_recorded`, `injury_summary_recorded` | `medical-providers/<provider-slug>/`, provider contact stubs, `client/intake.md`, `activity/` | Phase 0 complete case with provider facts | Can run in parallel with Accident Report if intake already has provider facts. |
 | Client Check-In Cadence | Not Started | Case active / full intake complete | `client_reachable`, `client_check_in_active`, possible `provider_referral_needed` | `client/check-ins.md`, `activity/`, provider notes | Phase 0 complete case | Catalog still uses generic `firmvault-workflow-task`; needs real recipes. |
 
@@ -139,7 +139,7 @@ Litigation is a separate branch, not part of the first non-litigation PI happy p
 - [x] Wave 0.1: Case Setup live test complete.
 - [x] Wave 0.2: Initial Document Collection live test complete.
 - [x] Wave 1.1: Design and implement executable Accident Report workflow.
-- [ ] Wave 1.2: Live-test Accident Report on `test-ladder-006-template-tool` or a new `test-ladder-007-accident-report` state.
+- [ ] Wave 1.2: Live-test Accident Report on `test-ladder-006-template-tool` or a new `test-ladder-007-accident-report` state. Task `2169` passed; task `2170` is blocked in Human Review pending owner/test-fixture report request facts.
 - [ ] Wave 1.3: Design and implement Medical Provider Setup.
 - [ ] Wave 1.4: Live-test Medical Provider Setup.
 - [ ] Wave 1.5: Design Client Check-In Cadence after provider setup assumptions are stable.
@@ -177,6 +177,8 @@ Copy this checklist under the workflow section when actively working on it.
 | 2026-04-28 | Audit safety | Agents can accidentally modify existing activity/workflow log entries. | Guarded | Append-only review PR validation added; existing log edits should block PR publication. |
 | 2026-04-28 | Workflow design | Many catalog workflows still use generic `firmvault-workflow-task`. | Open | Replace with workflow-specific recipes before live testing those workflows. |
 | 2026-04-28 | Branching | Lien, PIP exhaustion, UM/UIM/MedPay/Workers Comp tasks can be not applicable. | Open | Ensure bypass/not-applicable marks the corresponding dependency satisfied without polluting the case. |
+| 2026-04-28 | Accident Report | Request node submitted completion even though no reporting agency, report number, request method, or fee details existed. | Guarded | Tightened `firmvault-accident-report-analyze`, `REVIEW.md`, runner resume preamble, and recipe-agent tool descriptions. Recipe-specific review blocked the task; accidental PR `#15` was closed unmerged. |
+| 2026-04-28 | Quality Review | Recipe-review blocked verdicts left tasks in `quality_review`, causing repeated reviewer pickup. | Fixed | Blocked recipe-review verdicts now return tasks to Human Review, and ready-task polling excludes legacy `Recipe review blocked:` rows. |
 
 ## Update Rules
 
