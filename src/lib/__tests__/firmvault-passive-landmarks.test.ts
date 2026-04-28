@@ -356,6 +356,7 @@ nodes:
     depends_on:
       conditions:
         - law_firm.landmarks.case_setup_complete == true
+        - law_firm.landmarks.client_info_received == true
 `, 'tester', 1, 1)
       const instance = startWorkflowInstance(db, {
         definitionId,
@@ -379,6 +380,12 @@ nodes:
           case_slug: 'test-case',
           landmark: 'case_setup_complete',
           condition: 'law_firm.landmarks.case_setup_complete == true',
+          satisfied_dependencies: 1,
+        },
+        {
+          case_slug: 'test-case',
+          landmark: 'client_info_received',
+          condition: 'law_firm.landmarks.client_info_received == true',
           satisfied_dependencies: 1,
         },
       ])

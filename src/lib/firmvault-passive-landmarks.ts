@@ -55,6 +55,8 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
   const caseLandmarks = objectRecord(caseFrontmatter.landmarks)
   const caseSetupComplete = landmarkSatisfied(caseLandmarks.case_setup_complete)
     || caseSetupEvidence.length > 0
+  const clientInfoReceived = landmarkSatisfied(caseLandmarks.client_info_received)
+    || caseSetupComplete
   const contractSigned = booleanValue(contracts.contract_signed)
     || feeAgreementShadow
     || landmarkSatisfied(caseLandmarks.contract_signed)
@@ -71,6 +73,12 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
         satisfied: caseSetupComplete,
         evidence: caseSetupComplete
           ? evidenceList(caseFrontmatter, `${caseSlug}.md`, caseSetupEvidence)
+          : [],
+      },
+      client_info_received: {
+        satisfied: clientInfoReceived,
+        evidence: clientInfoReceived
+          ? evidenceList(caseFrontmatter, `${caseSlug}.md`, ['client/intake.md'])
           : [],
       },
       contract_signed: {
