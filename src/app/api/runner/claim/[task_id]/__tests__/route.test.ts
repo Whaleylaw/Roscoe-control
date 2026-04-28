@@ -103,6 +103,7 @@ function seedRecipe(
     maxConcurrent?: number
     env?: Record<string, string>
     secrets?: string[]
+    reviewMd?: string | null
     errorMessage?: string | null
   } = {},
 ) {
@@ -115,6 +116,7 @@ function seedRecipe(
     maxConcurrent = 3,
     env = {},
     secrets = [],
+    reviewMd = null,
     errorMessage = null,
   } = opts
   const modelJson = JSON.stringify({
@@ -128,8 +130,8 @@ function seedRecipe(
       `INSERT INTO recipes
          (slug, name, description, when_to_use, image, workspace_mode, timeout_seconds,
           max_concurrent, env_json, secrets_json, tags_json, model_json, version, dir_sha,
-          soul_md, error_message, workspace_id, tenant_id)
-       VALUES (?, ?, NULL, NULL, 'ubuntu', 'worktree', ?, ?, ?, ?, '[]', ?, 1, ?, NULL, ?, 1, 1)`,
+          soul_md, review_md, error_message, workspace_id, tenant_id)
+       VALUES (?, ?, NULL, NULL, 'ubuntu', 'worktree', ?, ?, ?, ?, '[]', ?, 1, ?, NULL, ?, ?, 1, 1)`,
     )
     .run(
       slug,
@@ -140,6 +142,7 @@ function seedRecipe(
       JSON.stringify(secrets),
       modelJson,
       `sha-${slug}`,
+      reviewMd,
       errorMessage,
     )
 }
@@ -193,6 +196,18 @@ function seedSetting(key: string, value: string) {
       `INSERT OR REPLACE INTO settings (key, value, category, updated_at) VALUES (?, ?, 'runtime', unixepoch())`,
     )
     .run(key, value)
+}
+
+function seedOpenReviewPr(taskId: number): void {
+  testDb
+    .prepare(
+      `INSERT INTO task_review_prs (
+         task_id, workspace_id, provider, remote_name, remote_url, repo_owner,
+         repo_name, base_ref, head_ref, branch_name, pr_number, pr_url, state
+       ) VALUES (?, 1, 'forgejo', 'forgejo', 'ssh://git@localhost:2222/aaron/FirmVault.git',
+         'aaron', 'FirmVault', 'main', 'mc/task-open', 'mc/task-open', ?, ?, 'open')`,
+    )
+    .run(taskId, 2000 + taskId, `http://localhost:3001/aaron/FirmVault/pulls/${2000 + taskId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -319,6 +334,28 @@ describe('POST /api/runner/claim/:task_id', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toBe('already claimed or ineligible')
+  })
+
+  it('returns 409 and does not claim a quality_review task that is waiting on an open review PR', async () => {
+    asRunner()
+    seedRecipe('reviewable', { reviewMd: 'review instructions' })
+    const taskId = seedTask({ status: 'quality_review', recipeSlug: 'reviewable' })
+    seedOpenReviewPr(taskId)
+
+    const { req, ctx } = claimReq(taskId)
+    const res = await POST(req, ctx)
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toMatch(/review PR/i)
+    const row = testDb
+      .prepare(`SELECT status, container_id, runner_attempts FROM tasks WHERE id = ?`)
+      .get(taskId) as { status: string; container_id: string | null; runner_attempts: number }
+    expect(row).toMatchObject({
+      status: 'quality_review',
+      container_id: null,
+      runner_attempts: 0,
+    })
   })
 
   // ------------- RUNNER-07 allowlist re-validation -------------

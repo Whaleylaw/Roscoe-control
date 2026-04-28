@@ -10,7 +10,7 @@ import {
 
 describe('model-registry: MODELS seeded entries', () => {
   it('exposes Anthropic + OpenRouter model IDs required by runtime recipes', () => {
-    expect(MODEL_IDS.length).toBe(6)
+    expect(MODEL_IDS.length).toBe(7)
     expect(MODEL_IDS).toEqual(
       expect.arrayContaining([
         'claude-opus-4-7',
@@ -19,6 +19,7 @@ describe('model-registry: MODELS seeded entries', () => {
         'openai/gpt-5.3-codex',
         'openai/gpt-5.4-mini',
         'google/gemini-3-flash',
+        'google/gemini-2.5-flash',
       ])
     )
   })
@@ -88,6 +89,17 @@ describe('model-registry: MODELS seeded entries', () => {
       supports_thinking: true,
     })
   })
+
+  it('seeds OpenRouter Gemini 2.5 Flash with expected metadata', () => {
+    const geminiFlash = MODELS['google/gemini-2.5-flash']
+    expect(geminiFlash).toEqual<Model>({
+      provider: 'openrouter',
+      context_window: 1048576,
+      output_tokens_max: 8192,
+      supports_tools: true,
+      supports_thinking: false,
+    })
+  })
 })
 
 describe('model-registry: getModel()', () => {
@@ -106,6 +118,7 @@ describe('model-registry: getModel()', () => {
     expect(getModel('openai/gpt-5.3-codex')).not.toBeNull()
     expect(getModel('openai/gpt-5.4-mini')).not.toBeNull()
     expect(getModel('google/gemini-3-flash')).not.toBeNull()
+    expect(getModel('google/gemini-2.5-flash')).not.toBeNull()
   })
 
   it('returns null (not undefined, not a throw) for an unknown id', () => {
@@ -132,6 +145,7 @@ describe('model-registry: isKnownModel()', () => {
     expect(isKnownModel('openai/gpt-5.3-codex')).toBe(true)
     expect(isKnownModel('openai/gpt-5.4-mini')).toBe(true)
     expect(isKnownModel('google/gemini-3-flash')).toBe(true)
+    expect(isKnownModel('google/gemini-2.5-flash')).toBe(true)
   })
 
   it('returns false for an unknown id', () => {

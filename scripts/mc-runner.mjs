@@ -252,13 +252,23 @@ function taskBranchName(taskId) {
 }
 
 function gitOutput(repoPath, args) {
-  const result = spawnSync('git', ['-C', repoPath, ...args], { encoding: 'utf8' })
+  const result = spawnSync('git', ['-C', repoPath, ...args], gitSpawnOptions({ encoding: 'utf8' }))
   if (result.status !== 0) return ''
   return result.stdout.trim()
 }
 
+function gitSpawnOptions(options = {}) {
+  const gitSshCommand = process.env.MC_RUNNER_GIT_SSH_COMMAND || process.env.GIT_SSH_COMMAND || ''
+  return {
+    ...options,
+    env: gitSshCommand
+      ? { ...process.env, GIT_SSH_COMMAND: gitSshCommand }
+      : process.env,
+  }
+}
+
 function pruneGitWorktrees(repoPath) {
-  const pruneR = spawnSync('git', ['-C', repoPath, 'worktree', 'prune'], { encoding: 'utf8' })
+  const pruneR = spawnSync('git', ['-C', repoPath, 'worktree', 'prune'], gitSpawnOptions({ encoding: 'utf8' }))
   if (pruneR.status !== 0) {
     log('warn', 'git worktree prune non-zero (continuing)', {
       repo: repoPath,
@@ -272,10 +282,10 @@ function refreshEmptyTaskBranch(repoPath, baseRef, branchName, taskId) {
   const branchBehindBase = spawnSync(
     'git',
     ['-C', repoPath, 'merge-base', '--is-ancestor', branchName, baseRef],
-    { stdio: 'ignore' },
+    gitSpawnOptions({ stdio: 'ignore' }),
   ).status === 0
   if (uniqueCount === '0' && branchBehindBase) {
-    const resetR = spawnSync('git', ['-C', repoPath, 'branch', '-f', branchName, baseRef], { encoding: 'utf8' })
+    const resetR = spawnSync('git', ['-C', repoPath, 'branch', '-f', branchName, baseRef], gitSpawnOptions({ encoding: 'utf8' }))
     if (resetR.status !== 0) {
       log('warn', 'failed to refresh empty task branch (continuing)', {
         task_id: taskId,
@@ -287,7 +297,38 @@ function refreshEmptyTaskBranch(repoPath, baseRef, branchName, taskId) {
   }
 }
 
+function resolveFreshBaseRef(repoPath, baseRef) {
+  const remoteName =
+    runnerConfig?.review_pr_remote_name ||
+    process.env.MC_RUNNER_GIT_REMOTE ||
+    'forgejo'
+  const remoteRef = `${remoteName}/${baseRef}`
+  const hasRemoteRef = spawnSync(
+    'git',
+    ['-C', repoPath, 'rev-parse', '--verify', '--quiet', remoteRef],
+    gitSpawnOptions({ stdio: 'ignore' }),
+  ).status === 0
+  return hasRemoteRef ? remoteRef : baseRef
+}
+
+function resolveFetchRemote(repoPath) {
+  const preferredRemote =
+    runnerConfig?.review_pr_remote_name ||
+    process.env.MC_RUNNER_GIT_REMOTE ||
+    'forgejo'
+  const remotes = gitOutput(repoPath, ['remote'])
+    .split(/\r?\n/)
+    .map((remote) => remote.trim())
+    .filter(Boolean)
+  if (remotes.includes(preferredRemote)) return preferredRemote
+  if (remotes.includes('origin')) return 'origin'
+  return remotes[0] || null
+}
+
 function firmVaultCaseWorkspaceSubpath(task) {
+  if (task?.recipe_slug === 'firmvault-case-setup-create-shell') {
+    return null
+  }
   const slug = task?.metadata?.law_firm?.case_slug
   if (typeof slug === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(slug)) {
     return path.join('cases', slug)
@@ -351,19 +392,22 @@ function generatePreamble(input) {
   const skeleton = [
     '## Emitting checkpoints',
     '',
-    'As you make progress, POST a checkpoint so Mission Control and any watcher can follow along:',
+    'If your runtime exposes a `checkpoint` tool, use that tool instead of raw HTTP.',
+    'Emit checkpoints for meaningful milestones, blockers, and final handoff context; do not checkpoint after every small file read.',
+    'If raw HTTP is required, POST checkpoints here:',
     '',
     '```',
-    `POST ${apiBase}/api/runner/checkpoint`,
+    `POST ${apiBase}/api/tasks/$MC_TASK_ID/checkpoints`,
     'Authorization: Bearer $MC_API_TOKEN',
     'Content-Type: application/json',
     '',
-    '{ "task_id": $MC_TASK_ID, "step": "short-slug", "status": "in_progress", "summary": "what you just did" }',
+    '{ "step": "short-slug", "status": "in_progress", "summary": "what you just did" }',
     '```',
     '',
     '## Finishing',
     '',
-    'When finished, POST your result to the submit endpoint, then exit with code 0:',
+    'If your runtime exposes a `submit_done` tool, use that tool when finished.',
+    'If raw HTTP is required, POST your result to the submit endpoint, then exit with code 0:',
     '',
     '```',
     `POST ${apiBase}/api/runner/tasks/$MC_TASK_ID/submit`,
@@ -503,6 +547,7 @@ try {
     project_repo_map_size: Object.keys(runnerConfig.project_repo_map || {}).length,
     failed_gc_window_days: runnerConfig.failed_gc_window_days,
     max_concurrent_containers: runnerConfig.max_concurrent_containers,
+    docker_network_mode: runnerConfig.docker_network_mode || process.env.MC_RUNNER_DOCKER_NETWORK || '',
   })
 } catch (err) {
   console.error(
@@ -1027,6 +1072,27 @@ async function surfaceLocalBlockedCheckpoint(taskId, workspaceHostPath) {
   return posted
 }
 
+function waitForDockerExit(containerId) {
+  return new Promise((resolve) => {
+    const child = spawn('docker', ['wait', containerId], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+    })
+    let stdout = ''
+    let stderr = ''
+    child.stdout?.setEncoding('utf8')
+    child.stderr?.setEncoding('utf8')
+    child.stdout?.on('data', (chunk) => { stdout += chunk })
+    child.stderr?.on('data', (chunk) => { stderr += chunk })
+    child.on('error', (err) => {
+      resolve({ stdout, stderr: `${stderr}${String(err)}`, status: null })
+    })
+    child.on('close', (status) => {
+      resolve({ stdout, stderr, status })
+    })
+  })
+}
+
 /**
  * Spawn a background `docker logs -f` and `docker wait` chain. Waits for the
  * container to exit, then finalizes meta + posts runner-exit + cleans env-file.
@@ -1053,8 +1119,9 @@ async function watchContainerExit(taskId, containerId, attempt, logPaths, envFil
   const existing = activeTasks.get(taskId)
   if (existing) existing.logsProc = logsProc
 
-  // Block on docker wait. spawnSync blocks this async function until exit.
-  const waitR = spawnSync('docker', ['wait', containerId], { encoding: 'utf8' })
+  // Wait asynchronously so the runner heartbeat loop keeps reporting active
+  // task ids while recipe containers are running.
+  const waitR = await waitForDockerExit(containerId)
   const rawExitCode = (waitR.stdout || '').trim()
   const exitCode = rawExitCode === '' ? Number.NaN : Number(rawExitCode)
   const tracked = activeTasks.get(taskId)
@@ -1157,28 +1224,33 @@ async function runContainer(dispatch) {
   const worktreePath = path.join(DATA_DIR, 'runner', 'worktrees', `task-${taskId}`)
   let workspaceHostPath = worktreePath
   try {
-    const fetchR = spawnSync('git', ['-C', repoPath, 'fetch', '--all', '--prune'], {
-      stdio: 'ignore',
-    })
+    const fetchRemote = resolveFetchRemote(repoPath)
+    if (!fetchRemote) {
+      throw new Error('git fetch cannot run because the project repo has no configured remotes')
+    }
+    const fetchR = spawnSync('git', ['-C', repoPath, 'fetch', '--prune', fetchRemote], gitSpawnOptions({
+      encoding: 'utf8',
+    }))
     if (fetchR.status !== 0) {
-      log('warn', 'git fetch non-zero (continuing)', { task_id: taskId, repo: repoPath })
+      throw new Error(`git fetch exited ${fetchR.status}: ${(fetchR.stderr || fetchR.stdout || '').slice(-4000)}`)
     }
     pruneGitWorktrees(repoPath)
     if (!fs.existsSync(worktreePath)) {
       const baseRef = task.workspace_source?.base_ref || 'main'
+      const worktreeBaseRef = resolveFreshBaseRef(repoPath, baseRef)
       const branchName = taskBranchName(taskId)
       const hasBranch = spawnSync(
         'git',
         ['-C', repoPath, 'show-ref', '--verify', '--quiet', `refs/heads/${branchName}`],
-        { stdio: 'ignore' },
+        gitSpawnOptions({ stdio: 'ignore' }),
       ).status === 0
       if (hasBranch) {
-        refreshEmptyTaskBranch(repoPath, baseRef, branchName, taskId)
+        refreshEmptyTaskBranch(repoPath, worktreeBaseRef, branchName, taskId)
       }
       const args = hasBranch
         ? ['-C', repoPath, 'worktree', 'add', worktreePath, branchName]
-        : ['-C', repoPath, 'worktree', 'add', '-b', branchName, worktreePath, baseRef]
-      const addR = spawnSync('git', args, { encoding: 'utf8' })
+        : ['-C', repoPath, 'worktree', 'add', '-b', branchName, worktreePath, worktreeBaseRef]
+      const addR = spawnSync('git', args, gitSpawnOptions({ encoding: 'utf8' }))
       if (addR.status !== 0) {
         throw new Error(`git worktree add exited ${addR.status}: ${(addR.stderr || addR.stdout || '').slice(-4000)}`)
       }
@@ -1263,6 +1335,15 @@ async function runContainer(dispatch) {
     return
   }
   const fullEnv = { ...env, ...secretEnv.values }
+  const dockerNetworkMode = runnerConfig.docker_network_mode || process.env.MC_RUNNER_DOCKER_NETWORK || ''
+  if (dockerNetworkMode === 'host') {
+    const mcUrl = new URL(MC_URL)
+    const localMcHost = ['127.0.0.1', 'localhost', '::1'].includes(mcUrl.hostname)
+    fullEnv.MC_API_URL = localMcHost
+      ? `http://host.docker.internal:${mcUrl.port || process.env.PORT || '3000'}`
+      : (env.MC_API_URL || `http://host.docker.internal:${process.env.PORT || '3000'}`)
+    fullEnv.MC_API_HOST_HEADER = mcUrl.host
+  }
   const envFilePath = path.join(DATA_DIR, 'runner', 'env', `task-${taskId}-a${attempt}.env`)
   try {
     writeEnvFile(fullEnv, envFilePath)
@@ -1272,7 +1353,6 @@ async function runContainer(dispatch) {
   }
 
   // Step 7: docker run -d.
-  const dockerNetworkMode = process.env.MC_RUNNER_DOCKER_NETWORK || ''
   const argv = buildDockerRunArgs({
     image: recipe.image,
     taskId,

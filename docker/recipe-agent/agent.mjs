@@ -4,10 +4,21 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const AGENT = 'recipe-agent'
-const MAX_TOOL_ROUNDS = Number.parseInt(process.env.MC_AGENT_MAX_TOOL_ROUNDS || '20', 10)
+const MAX_TOOL_ROUNDS = Number.parseInt(process.env.MC_AGENT_MAX_TOOL_ROUNDS || '40', 10)
 const MAX_READ_CHARS = Number.parseInt(process.env.MC_AGENT_MAX_READ_CHARS || '50000', 10)
-const CAPABILITY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'grep_files', 'write_file', 'run_shell'])
-const SKIPPED_SEARCH_DIRS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage'])
+const MODEL_TIMEOUT_MS = Number.parseInt(process.env.MC_AGENT_MODEL_TIMEOUT_MS || '120000', 10)
+const CAPABILITY_TOOL_NAMES = new Set(['read_file', 'list_dir', 'grep_files', 'write_file', 'copy_case_template', 'run_shell'])
+const SKIPPED_SEARCH_DIRS = new Set([
+  '.git',
+  '.next',
+  '.obsidian',
+  '_archive',
+  'archive-cases',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+])
 
 function log(level, msg, ctx = {}) {
   console.log(JSON.stringify({ level, ts: new Date().toISOString(), agent: AGENT, msg, ...ctx }))
@@ -26,6 +37,19 @@ function envSnapshot() {
     'MC_RUNNER_MODE',
   ]
   return Object.fromEntries(keys.map((key) => [key, process.env[key] || null]))
+}
+
+function missionControlHeaders(extra = {}) {
+  const hostOverride = process.env.MC_API_HOST_HEADER
+  return {
+    ...extra,
+    ...(hostOverride
+      ? {
+          'X-Forwarded-Host': hostOverride,
+          'X-Original-Host': hostOverride,
+        }
+      : {}),
+  }
 }
 
 function readText(filePath, maxChars = MAX_READ_CHARS) {
@@ -79,10 +103,10 @@ async function postCheckpoint(body) {
 
   const res = await fetch(`${MC_API_URL}/api/tasks/${MC_TASK_ID}/checkpoints`, {
     method: 'POST',
-    headers: {
+    headers: missionControlHeaders({
       Authorization: `Bearer ${MC_API_TOKEN}`,
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify(checkpoint),
   })
   const text = await res.text()
@@ -95,10 +119,10 @@ async function submitDone(resolution) {
   const trimmedResolution = String(resolution || '').trim().slice(0, 10000)
   const res = await fetch(`${MC_API_URL}/api/runner/tasks/${MC_TASK_ID}/submit`, {
     method: 'POST',
-    headers: {
+    headers: missionControlHeaders({
       Authorization: `Bearer ${MC_API_TOKEN}`,
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ status: 'done', ...(trimmedResolution ? { resolution: trimmedResolution } : {}) }),
   })
   const text = await res.text()
@@ -112,10 +136,10 @@ async function submitReview(verdict, notes) {
   const trimmedNotes = String(notes || '').trim().slice(0, 10000)
   const res = await fetch(`${MC_API_URL}/api/runner/tasks/${MC_TASK_ID}/review`, {
     method: 'POST',
-    headers: {
+    headers: missionControlHeaders({
       Authorization: `Bearer ${MC_API_TOKEN}`,
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ verdict: status, notes: trimmedNotes }),
   })
   const text = await res.text()
@@ -167,6 +191,66 @@ function isProbablyTextFile(filePath) {
   return textExtensions.has(ext) || ext === ''
 }
 
+function safeCaseSlug(value) {
+  const slug = String(value || '').trim()
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error('case_slug must be a safe FirmVault slug')
+  return slug
+}
+
+function titleFromSlug(slug) {
+  return slug.split('-').map((part) => part ? `${part[0].toUpperCase()}${part.slice(1)}` : '').join(' ')
+}
+
+function templateReplacementMap(input, caseSlug) {
+  const clientName = String(input.client_name || titleFromSlug(caseSlug)).trim()
+  const openedDate = String(input.opened_date || new Date().toISOString().slice(0, 10)).trim()
+  return {
+    '{{case_id}}': caseSlug,
+    '{{case_slug}}': caseSlug,
+    '{{client_name}}': clientName,
+    '{{case_type}}': String(input.case_type || 'personal injury').trim(),
+    '{{date_of_incident}}': String(input.date_of_incident || 'unknown').trim(),
+    '{{jurisdiction}}': String(input.jurisdiction || 'unknown').trim(),
+    '{{opened_date}}': openedDate,
+    '{{real_file_root}}': String(input.real_file_root || '').trim(),
+  }
+}
+
+function applyTemplateReplacements(content, replacements) {
+  let output = content
+  for (const [needle, value] of Object.entries(replacements)) {
+    output = output.split(needle).join(value)
+  }
+  return output
+}
+
+function copyCaseTemplate(input) {
+  const caseSlug = safeCaseSlug(input.case_slug)
+  const workspace = process.env.MC_WORKSPACE || '/workspace'
+  const templatePath = path.join(workspace, 'skills.tools.workflows', 'case_template', 'blank-personal-injury-case')
+  if (!fs.existsSync(templatePath)) throw new Error(`case template not found: ${templatePath}`)
+  const targetRoot = path.join(workspace, 'cases', caseSlug)
+  if (!isWorkspacePath(targetRoot)) throw new Error(`copy target denied outside /workspace: ${targetRoot}`)
+  const replacements = templateReplacementMap(input, caseSlug)
+  const written = []
+
+  for (const sourcePath of walkSearchFiles(templatePath)) {
+    const rel = path.relative(templatePath, sourcePath)
+    const targetRel = rel === '_case-slug.md' ? `${caseSlug}.md` : rel
+    const targetPath = path.join(targetRoot, targetRel)
+    if (!isWorkspacePath(targetPath)) throw new Error(`copy target denied outside /workspace: ${targetPath}`)
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true })
+    if (path.basename(sourcePath) === '.gitkeep') {
+      fs.writeFileSync(targetPath, '', 'utf8')
+    } else {
+      fs.writeFileSync(targetPath, applyTemplateReplacements(fs.readFileSync(sourcePath, 'utf8'), replacements), 'utf8')
+    }
+    written.push(path.relative(workspace, targetPath))
+  }
+
+  return { ok: true, case_slug: caseSlug, target: targetRoot, files_written: written.length, files: written.slice(0, 200) }
+}
+
 function walkSearchFiles(root, files = []) {
   const entries = fs.readdirSync(root, { withFileTypes: true })
   for (const entry of entries) {
@@ -189,6 +273,66 @@ function grepFiles(input) {
   if (!needleRaw.trim()) throw new Error('pattern is required')
   const maxResults = Math.max(1, Math.min(Number(input.max_results || 100), 500))
   const caseSensitive = Boolean(input.case_sensitive)
+
+  const rgArgs = [
+    '--fixed-strings',
+    '--line-number',
+    '--with-filename',
+    '--no-heading',
+    '--color',
+    'never',
+    '--max-filesize',
+    '250K',
+    '--glob',
+    '!.git/**',
+    '--glob',
+    '!.next/**',
+    '--glob',
+    '!node_modules/**',
+    '--glob',
+    '!archive-cases/**',
+    '--glob',
+    '!_archive/**',
+  ]
+  if (!caseSensitive) rgArgs.push('--ignore-case')
+  rgArgs.push('--', needleRaw, rootPath)
+  const rg = spawnSync('rg', rgArgs, {
+    encoding: 'utf8',
+    timeout: Number.parseInt(process.env.MC_AGENT_GREP_TIMEOUT_MS || '30000', 10),
+    maxBuffer: 1024 * 1024,
+  })
+  if (rg.status === 0 || rg.status === 1) {
+    const matches = []
+    for (const line of (rg.stdout || '').split(/\r?\n/)) {
+      if (!line || matches.length >= maxResults) break
+      const parts = line.split(':')
+      if (parts.length < 3) continue
+      const lineNumber = Number.parseInt(parts[1], 10)
+      matches.push({
+        path: parts[0],
+        line_number: Number.isFinite(lineNumber) ? lineNumber : 0,
+        line: parts.slice(2).join(':').slice(0, 1000),
+      })
+    }
+    return {
+      ok: true,
+      root: rootPath,
+      pattern: needleRaw,
+      case_sensitive: caseSensitive,
+      matches,
+      truncated: Boolean(rg.stdout && rg.stdout.split(/\r?\n/).length > maxResults),
+    }
+  }
+  if (rg.error || rg.signal || rg.status === null) {
+    return {
+      ok: false,
+      root: rootPath,
+      pattern: needleRaw,
+      error: `ripgrep failed or timed out: ${rg.error ? String(rg.error) : rg.signal || 'unknown'}`,
+      stderr: (rg.stderr || '').slice(0, 1000),
+    }
+  }
+
   const needle = caseSensitive ? needleRaw : needleRaw.toLowerCase()
   const stat = fs.statSync(rootPath)
   const files = stat.isDirectory() ? walkSearchFiles(rootPath) : [rootPath]
@@ -310,6 +454,23 @@ function allToolDefinitions() {
       },
     },
     {
+      name: 'copy_case_template',
+      description: 'Deterministically copy the FirmVault blank personal-injury case template from /workspace/skills.tools.workflows/case_template/blank-personal-injury-case into /workspace/cases/<case_slug>, replacing safe placeholders. Use this for FirmVault case setup instead of hand-creating every starter path.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          case_slug: { type: 'string' },
+          client_name: { type: 'string' },
+          case_type: { type: 'string' },
+          date_of_incident: { type: 'string' },
+          jurisdiction: { type: 'string' },
+          opened_date: { type: 'string' },
+          real_file_root: { type: 'string' },
+        },
+        required: ['case_slug'],
+      },
+    },
+    {
       name: 'run_shell',
       description: 'Run a shell command in /workspace. Use for tests, git diff/status, and safe local commands.',
       input_schema: {
@@ -404,6 +565,7 @@ async function handleTool(name, input) {
       fs.writeFileSync(filePath, input.content, 'utf8')
       return { ok: true, path: filePath, bytes: Buffer.byteLength(input.content) }
     }
+    if (name === 'copy_case_template') return copyCaseTemplate(input)
     if (name === 'run_shell') {
       const workspace = process.env.MC_WORKSPACE || '/workspace'
       const timeout = Math.max(1, Math.min(Number(input.timeout_seconds || 120), 900)) * 1000
@@ -498,8 +660,11 @@ async function callOpenRouter(messages, system) {
   const key = process.env.OPENROUTER_API_KEY
   if (!key) throw new Error('OPENROUTER_API_KEY is required for mc-recipe-agent when MC_MODEL_PROVIDER=openrouter')
   const model = process.env.MC_MODEL_PRIMARY || 'openai/gpt-5.4-mini'
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS)
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
@@ -514,7 +679,7 @@ async function callOpenRouter(messages, system) {
       tools: openAiTools(),
       tool_choice: 'auto',
     }),
-  })
+  }).finally(() => clearTimeout(timer))
   const body = await res.text()
   if (!res.ok) throw new Error(`OpenRouter API failed ${res.status}: ${body.slice(0, 1000)}`)
   const parsed = JSON.parse(body)
@@ -539,8 +704,11 @@ async function callAnthropic(messages, system) {
   const key = process.env.ANTHROPIC_API_KEY
   if (!key) throw new Error('ANTHROPIC_API_KEY is required for mc-recipe-agent')
   const model = process.env.MC_MODEL_PRIMARY || 'claude-sonnet-4-6'
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS)
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: controller.signal,
     headers: {
       'x-api-key': key,
       'anthropic-version': '2023-06-01',
@@ -554,7 +722,7 @@ async function callAnthropic(messages, system) {
       tools: toolDefinitions(),
       messages,
     }),
-  })
+  }).finally(() => clearTimeout(timer))
   const body = await res.text()
   if (!res.ok) throw new Error(`Anthropic API failed ${res.status}: ${body.slice(0, 1000)}`)
   return JSON.parse(body)
@@ -587,6 +755,8 @@ function buildSystemPrompt() {
       : 'Only write under /workspace. /refs, /recipe, and /skills are read-only references.',
     'The Mission Control task comment thread is the user-facing chat and handoff channel. Your checkpoints and final submit are recorded for audit.',
     `Recipe-enabled capability tools: ${allowedTools.join(', ') || '(none)'}. Mission Control control tools are available separately for checkpointing and submission.`,
+    `Do not call tools that are not in this list. In particular, do not call run_code; use grep_files/list_dir/read_file/write_file${allowedTools.includes('run_shell') ? '/run_shell' : ''} only as allowed by the recipe.`,
+    'Use checkpoints sparingly: start, meaningful milestone, blocked question, or final handoff context. Do not post a checkpoint after every file read.',
     'If you have a question, find missing facts, identify unclear recipe behavior, or need human approval, call checkpoint with status blocked. Put the exact question or configuration problem in blocker_reason. Do not silently improvise around unclear legal-workflow instructions.',
     'When work is complete, call submit_done with a detailed resolution. Mission Control will move the task to review and post that resolution into the task comments so the user can see what you did and what remains.',
     '',
@@ -642,6 +812,15 @@ async function main() {
         .filter((part) => part.type === 'text')
         .map((part) => part.text)
         .join('\n')
+      if (lastCompletedSummary) {
+        const resolution = (text || lastCompletedSummary).trim()
+        const submit = await submitDone(resolution || `Completed work: ${lastCompletedSummary}`)
+        if (submit.ok) {
+          appendProgress('recipe-agent submitted task after completed checkpoint')
+          process.exit(0)
+        }
+        lastToolFailure = `submit_done fallback returned ${JSON.stringify(submit).slice(0, 1000)}`
+      }
       await postCheckpoint({
         step: 'model-finished',
         status: 'blocked',

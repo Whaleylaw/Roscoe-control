@@ -10,6 +10,8 @@ export type ReviewPrTask = {
   id: number
   title: string
   workspace_id: number
+  recipe_slug?: string | null
+  metadata?: string | null
   worktree_path: string | null
   workspace_source: string | null
 }
@@ -63,8 +65,11 @@ type ReviewPrReconcileRow = {
   id: number
   task_id: number
   workspace_id: number
+  remote_url: string
   repo_owner: string
   repo_name: string
+  base_ref: string
+  branch_name: string
   pr_number: number
   pr_url: string
 }
@@ -90,6 +95,7 @@ export async function publishApprovedWorktreeForReview(
   if (!existsSync(task.worktree_path)) {
     throw new Error(`worktree path does not exist: ${task.worktree_path}`)
   }
+  validateTaskWorktreeForReview(task)
 
   const settings = getReviewPrSettings()
   if (!settings.autoCreate) throw new Error('runtime.review_pr_auto_create is disabled')
@@ -254,7 +260,7 @@ export async function reconcileOpenReviewPrs(
   const now = input.now ?? unixNow()
   const limit = input.limit ?? 25
   const rows = db.prepare(`
-    SELECT id, task_id, workspace_id, repo_owner, repo_name, pr_number, pr_url
+    SELECT id, task_id, workspace_id, remote_url, repo_owner, repo_name, base_ref, branch_name, pr_number, pr_url
     FROM task_review_prs
     WHERE provider = 'forgejo'
       AND state = 'open'
@@ -282,7 +288,15 @@ export async function reconcileOpenReviewPrs(
 
       const baseAlreadyContainsHead = pr.state === 'open'
         && Boolean(pr.headSha)
-        && pr.headSha === pr.baseSha
+        && (
+          pr.headSha === pr.baseSha
+          || localBaseContainsHead({
+            remoteUrl: row.remote_url,
+            baseRef: row.base_ref,
+            branchName: row.branch_name,
+            headSha: pr.headSha,
+          })
+        )
 
       if (pr.state === 'merged' || baseAlreadyContainsHead) {
         const mergeCommitSha = pr.mergeCommitSha ?? pr.baseSha
@@ -439,6 +453,90 @@ function parseWorkspaceSource(raw: string): WorkspaceSource | null {
   }
 }
 
+function validateTaskWorktreeForReview(task: ReviewPrTask): void {
+  if (task.recipe_slug !== 'firmvault-case-setup-create-shell') return
+  if (!task.worktree_path) return
+
+  const caseSlug = taskCaseSlug(task)
+  if (!caseSlug) {
+    throw new Error('case setup scaffold incomplete: missing law_firm.case_slug task metadata')
+  }
+
+  const caseRoot = `${task.worktree_path}/cases/${caseSlug}`
+  const requiredFiles = [
+    `${caseSlug}.md`,
+    'Dashboard.md',
+    'AGENTS.md',
+    'client/intake.md',
+    'client/contracts.md',
+    'client/authorizations.md',
+    'client/contactability.md',
+    'client/check-ins.md',
+    'accident/accident.md',
+    'accident/police-report.md',
+    'accident/liability.md',
+    'contacts/README.md',
+    'insurance/README.md',
+    'medical-providers/README.md',
+    'liens/README.md',
+    'demand/readiness.md',
+    'negotiation/offers.md',
+    'settlement/settlement.md',
+    'settlement/distribution.md',
+    'litigation/litigation.md',
+    'activity/index.md',
+    'workflow-log/index.md',
+  ]
+  const requiredDirs = [
+    'documents/incoming',
+    'documents/shadows/client',
+    'documents/shadows/accident',
+    'documents/shadows/insurance',
+    'documents/shadows/litigation',
+    'documents/generated',
+    'documents/sent',
+    'documents/received',
+    'documents/_extractions',
+    'litigation/discovery',
+    'litigation/mediation',
+    'litigation/pleadings',
+    'litigation/service',
+    'litigation/trial-prep',
+    'litigation/trial',
+  ]
+  const missing = [
+    ...requiredFiles.filter((path) => !existsSync(`${caseRoot}/${path}`)),
+    ...requiredDirs.filter((path) => !existsSync(`${caseRoot}/${path}`)),
+  ]
+  if (missing.length > 0) {
+    throw new Error(`case setup scaffold incomplete: missing ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? `, and ${missing.length - 12} more` : ''}`)
+  }
+}
+
+function taskCaseSlug(task: ReviewPrTask): string | null {
+  const metadata = parseObject(task.metadata)
+  const lawFirm = parseObject(metadata.law_firm)
+  const caseSlug = lawFirm.case_slug
+  if (typeof caseSlug === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(caseSlug)) return caseSlug
+
+  const match = task.title.match(/\b([a-z0-9]+(?:-[a-z0-9]+)+)\b/)
+  return match?.[1] ?? null
+}
+
+function parseObject(raw: unknown): Record<string, unknown> {
+  if (!raw) return {}
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
+  if (typeof raw !== 'string') return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
+}
+
 function parseRepoFromRemote(remoteUrl: string): RemoteRepo {
   const match = remoteUrl.match(/[:/]([^/:]+)\/([^/]+?)(?:\.git)?$/)
   if (!match) {
@@ -505,6 +603,56 @@ function gitOutput(cwd: string, args: string[]): string {
   const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
   if (result.status !== 0) return ''
   return String(result.stdout ?? '').trim()
+}
+
+function localBaseContainsHead(input: {
+  remoteUrl: string
+  baseRef: string
+  branchName: string
+  headSha: string | null | undefined
+}): boolean {
+  if (!input.headSha) return false
+
+  const repoPath = repoPathForRemote(input.remoteUrl)
+  if (!repoPath) return false
+
+  const remoteName = getReviewPrSettings().remoteName
+  const baseCandidates = [`${remoteName}/${input.baseRef}`, input.baseRef]
+  const headCandidates = [input.headSha, `${remoteName}/${input.branchName}`, input.branchName]
+
+  for (const baseRef of baseCandidates) {
+    const baseSha = gitOutput(repoPath, ['rev-parse', '--verify', '--quiet', baseRef])
+    if (!baseSha) continue
+
+    for (const headRef of headCandidates) {
+      const headSha = gitOutput(repoPath, ['rev-parse', '--verify', '--quiet', headRef])
+      if (!headSha) continue
+
+      const result = spawnSync('git', ['-C', repoPath, 'merge-base', '--is-ancestor', headSha, baseSha], {
+        stdio: 'ignore',
+      })
+      if (result.status === 0) return true
+    }
+  }
+
+  return false
+}
+
+function repoPathForRemote(remoteUrl: string): string | null {
+  const settings = getReviewPrSettings()
+  for (const repoPath of Object.values(getProjectRepoMap())) {
+    if (!repoPath || !existsSync(repoPath)) continue
+    if (gitOutput(repoPath, ['remote', 'get-url', settings.remoteName]) === remoteUrl) return repoPath
+
+    const remotes = gitOutput(repoPath, ['remote'])
+      .split(/\r?\n/)
+      .map((remote) => remote.trim())
+      .filter(Boolean)
+    for (const remote of remotes) {
+      if (gitOutput(repoPath, ['remote', 'get-url', remote]) === remoteUrl) return repoPath
+    }
+  }
+  return null
 }
 
 function gitOutputRequired(cwd: string, args: string[]): string {

@@ -107,6 +107,13 @@ export async function GET(request: NextRequest) {
           AND r.review_md IS NOT NULL
           AND r.review_md <> ''
           AND (t.error_message IS NULL OR t.error_message NOT LIKE 'Aegis review error:%')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM task_review_prs pr
+            WHERE pr.task_id = t.id
+              AND pr.workspace_id = t.workspace_id
+              AND pr.state = 'open'
+          )
         ORDER BY t.id ASC
         LIMIT ?
       `).all(50 - rows.length) as ReadyTaskRow[]

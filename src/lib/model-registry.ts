@@ -82,6 +82,13 @@ export const MODELS = {
     supports_tools: true,
     supports_thinking: true,
   },
+  'google/gemini-2.5-flash': {
+    provider: 'openrouter',
+    context_window: 1048576,
+    output_tokens_max: 8192,
+    supports_tools: true,
+    supports_thinking: false,
+  },
 } as const satisfies Record<string, Model>
 
 /**

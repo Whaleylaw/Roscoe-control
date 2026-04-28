@@ -21,6 +21,7 @@ type TaskRow = {
   project_id: number | null
   workspace_id: number
   recipe_slug: string | null
+  metadata: string | null
   worktree_path: string | null
   workspace_source: string | null
 }
@@ -62,7 +63,7 @@ export async function POST(
   try {
     const db = getDatabase()
     const task = db.prepare(`
-      SELECT id, title, status, project_id, workspace_id, recipe_slug, worktree_path, workspace_source
+      SELECT id, title, status, project_id, workspace_id, recipe_slug, metadata, worktree_path, workspace_source
       FROM tasks
       WHERE id = ?
     `).get(taskId) as TaskRow | undefined

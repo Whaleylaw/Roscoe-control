@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { runMigrations } from '@/lib/migrations'
 import {
   advanceWorkflowAfterTaskApproval,
@@ -12,8 +16,12 @@ const forgejoMocks = vi.hoisted(() => ({
   getPullRequest: vi.fn(),
 }))
 
+const runtimeSettingsMocks = vi.hoisted(() => ({
+  projectRepoMap: {} as Record<string, string>,
+}))
+
 vi.mock('@/lib/task-runtime-settings', () => ({
-  getProjectRepoMap: () => ({}),
+  getProjectRepoMap: () => runtimeSettingsMocks.projectRepoMap,
   getReviewPrSettings: () => ({
     provider: 'forgejo',
     remoteName: 'forgejo',
@@ -40,6 +48,7 @@ vi.mock('@/lib/workflow-engine', async () => {
 const { reconcileOpenReviewPrs } = await import('@/lib/review-prs')
 
 let db: Database.Database
+let tempDirs: string[] = []
 
 function projectId(): number {
   const project = db.prepare(`
@@ -120,16 +129,31 @@ function insertReviewPr(taskId: number, input: { id?: number; lastCheckedAt?: nu
   return Number(inserted.lastInsertRowid)
 }
 
+function gitOutput(cwd: string, args: string[]): string {
+  const result = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(' ')} failed: ${String(result.stderr || result.stdout)}`)
+  }
+  return String(result.stdout).trim()
+}
+
+function runGit(cwd: string, args: string[]): void {
+  gitOutput(cwd, args)
+}
+
 beforeEach(() => {
   db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
   runMigrations(db)
   forgejoMocks.getPullRequest.mockReset()
+  runtimeSettingsMocks.projectRepoMap = {}
+  tempDirs = []
   vi.mocked(advanceWorkflowAfterTaskApproval).mockClear()
 })
 
-afterEach(() => {
+afterEach(async () => {
   db.close()
+  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })))
 })
 
 describe('reconcileOpenReviewPrs', () => {
@@ -235,6 +259,55 @@ describe('reconcileOpenReviewPrs', () => {
         }),
       }),
     )
+  })
+
+  it('treats an open PR as merged when the local base branch contains the head commit as an ancestor', async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-ancestor-'))
+    tempDirs.push(repoDir)
+    runGit(repoDir, ['init', '-b', 'main'])
+    runGit(repoDir, ['config', 'user.name', 'Test'])
+    runGit(repoDir, ['config', 'user.email', 'test@example.com'])
+    runGit(repoDir, ['commit', '--allow-empty', '-m', 'base'])
+    runGit(repoDir, ['checkout', '-b', 'mc/task-1'])
+    runGit(repoDir, ['commit', '--allow-empty', '-m', 'task'])
+    const headSha = gitOutput(repoDir, ['rev-parse', 'HEAD'])
+    runGit(repoDir, ['checkout', 'main'])
+    runGit(repoDir, ['merge', '--no-ff', 'mc/task-1', '-m', 'merge task'])
+    runGit(repoDir, ['remote', 'add', 'forgejo', 'ssh://git@localhost:2222/aaron/FirmVault.git'])
+    runtimeSettingsMocks.projectRepoMap = { 1: repoDir }
+
+    const taskId = createWorkflowReviewTask()
+    insertReviewPr(taskId)
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'open',
+      head: 'mc/task-1',
+      headSha,
+      base: 'main',
+      baseSha: gitOutput(repoDir, ['rev-parse', 'main']),
+      mergeCommitSha: null,
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', now: 207 })
+
+    expect(result).toEqual({ checked: 1, merged: [taskId], closed: [], errors: [] })
+    expect(db.prepare(`
+      SELECT status, completed_at, github_pr_state
+      FROM tasks WHERE id = ?
+    `).get(taskId)).toMatchObject({
+      status: 'done',
+      completed_at: 207,
+      github_pr_state: 'merged',
+    })
+    expect(db.prepare(`
+      SELECT state, merge_commit_sha, last_checked_at
+      FROM task_review_prs WHERE task_id = ?
+    `).get(taskId)).toMatchObject({
+      state: 'merged',
+      merge_commit_sha: gitOutput(repoDir, ['rev-parse', 'main']),
+      last_checked_at: 207,
+    })
   })
 
   it('keeps a closed unmerged PR task in quality review and does not advance', async () => {

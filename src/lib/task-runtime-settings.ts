@@ -29,6 +29,7 @@ export const TASK_RUNTIME_SETTING_KEYS = {
   MAX_MEMORY_PER_CONTAINER: 'runtime.max_memory_per_container',
   MAX_CPU_PER_CONTAINER: 'runtime.max_cpu_per_container',
   FAILED_GC_WINDOW_DAYS: 'runtime.failed_gc_window_days',
+  DOCKER_NETWORK_MODE: 'runtime.docker_network_mode',
   REVIEW_PR_PROVIDER: 'runtime.review_pr_provider',
   REVIEW_PR_REMOTE_NAME: 'runtime.review_pr_remote_name',
   FORGEJO_BASE_URL: 'runtime.forgejo_base_url',
@@ -42,6 +43,7 @@ export const DEFAULT_MAX_CONCURRENT_CONTAINERS = 4
 export const DEFAULT_MAX_MEMORY_PER_CONTAINER = '8g'
 export const DEFAULT_MAX_CPU_PER_CONTAINER = 4.0
 export const DEFAULT_FAILED_GC_WINDOW_DAYS = 7
+export const DEFAULT_DOCKER_NETWORK_MODE = ''
 export const DEFAULT_REVIEW_PR_PROVIDER = 'forgejo'
 export const DEFAULT_REVIEW_PR_REMOTE_NAME = 'forgejo'
 export const DEFAULT_FORGEJO_BASE_URL = ''
@@ -188,6 +190,13 @@ export function getFailedGcWindowDays(): number {
     .get() as { value: string } | undefined
   const parsed = row ? parseInt(row.value, 10) : DEFAULT_FAILED_GC_WINDOW_DAYS
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_FAILED_GC_WINDOW_DAYS
+}
+
+export function getDockerNetworkMode(): string {
+  const raw = readSettingValue(TASK_RUNTIME_SETTING_KEYS.DOCKER_NETWORK_MODE)
+  if (!raw) return DEFAULT_DOCKER_NETWORK_MODE
+  const value = raw.trim()
+  return value.length > 0 ? value : DEFAULT_DOCKER_NETWORK_MODE
 }
 
 export function getReviewPrSettings(): {

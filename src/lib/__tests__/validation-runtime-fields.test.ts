@@ -106,4 +106,15 @@ describe('createTaskSchema runtime-context fields (Phase 13)', () => {
     const result = updateTaskSchema.safeParse({})
     expect(result.success).toBe(true)
   })
+
+  it('updateTaskSchema does not materialize create defaults on sparse patches', () => {
+    const result = updateTaskSchema.safeParse({ status: 'assigned' })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data).toEqual({ status: 'assigned' })
+      expect('metadata' in result.data).toBe(false)
+      expect('tags' in result.data).toBe(false)
+      expect('priority' in result.data).toBe(false)
+    }
+  })
 })

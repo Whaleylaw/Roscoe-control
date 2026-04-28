@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const workspaceId = auth.user.workspace_id ?? 1;
 
     const task = db
-      .prepare('SELECT id, title, status, workspace_id, worktree_path, workspace_source FROM tasks WHERE id = ? AND workspace_id = ?')
+      .prepare('SELECT id, title, status, workspace_id, recipe_slug, metadata, worktree_path, workspace_source FROM tasks WHERE id = ? AND workspace_id = ?')
       .get(taskId, workspaceId) as any
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })

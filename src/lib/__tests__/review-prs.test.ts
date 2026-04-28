@@ -29,6 +29,7 @@ vi.mock('@/lib/forgejo-client', () => ({
 }))
 
 const { spawnSync } = await import('node:child_process')
+const { existsSync } = await import('node:fs')
 const { publishApprovedWorktreeForReview } = await import('@/lib/review-prs')
 
 type ReviewPrRow = {
@@ -135,6 +136,8 @@ function mockGit() {
 describe('publishApprovedWorktreeForReview', () => {
   beforeEach(() => {
     vi.mocked(spawnSync).mockReset()
+    vi.mocked(existsSync).mockReset()
+    vi.mocked(existsSync).mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })))
     forgejoMocks.createPullRequest.mockReset()
     forgejoMocks.createPullRequest.mockResolvedValue({
@@ -207,6 +210,24 @@ describe('publishApprovedWorktreeForReview', () => {
     expect(result).toEqual({ published: false, reason: 'not_worktree_task' })
     expect(spawnSync).not.toHaveBeenCalled()
     expect(forgejoMocks.createPullRequest).not.toHaveBeenCalled()
+  })
+
+  it('rejects case setup PR publication when the worktree does not contain the required case scaffold', async () => {
+    vi.mocked(existsSync).mockImplementation((path) => String(path) === '/worktrees/task-2160')
+
+    await expect(
+      publishApprovedWorktreeForReview(createDb() as never, {
+        id: 2160,
+        title: '[Workflow] FirmVault Case Setup: Create Case Workspace',
+        workspace_id: 1,
+        worktree_path: '/worktrees/task-2160',
+        workspace_source: JSON.stringify({ project_id: 38, base_ref: 'codex/complete-workflow-v2' }),
+        recipe_slug: 'firmvault-case-setup-create-shell',
+        metadata: JSON.stringify({ law_firm: { case_slug: 'test-ladder-004-live-e2e' } }),
+      } as any),
+    ).rejects.toThrow('case setup scaffold incomplete')
+    expect(forgejoMocks.createPullRequest).not.toHaveBeenCalled()
+    expect(vi.mocked(spawnSync).mock.calls.some((call) => (call[1] as string[]).includes('push'))).toBe(false)
   })
 
   it('throws when rev-list cannot compare the worktree branch to the base', async () => {

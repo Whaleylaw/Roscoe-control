@@ -57,9 +57,8 @@ function formatPriorAttempts(attempts: PriorAttempt[]): string {
 /**
  * Checkpoint + submit HTTP skeleton shared by both variants.
  *
- * Phase 14 does NOT wire /api/runner/checkpoint live — Phase 15 does. The
- * preamble copy still forward-references the endpoint so the copy stays
- * stable across the Phase 14/15 boundary.
+ * The checkpoint endpoint uses the public task checkpoint path because
+ * runner-token auth explicitly allowlists POST /api/tasks/:id/checkpoints.
  *
  * The /submit endpoint reference uses the /api/runner/tasks/:id/submit path
  * (per the runner-token allowlist in src/lib/runner-tokens.ts). This closes
@@ -70,19 +69,22 @@ function buildHttpSkeleton(apiBase: string): string {
   return [
     '## Emitting checkpoints',
     '',
-    'As you make progress, POST a checkpoint so Mission Control and any watcher can follow along:',
+    'If your runtime exposes a `checkpoint` tool, use that tool instead of raw HTTP.',
+    'Emit checkpoints for meaningful milestones, blockers, and final handoff context; do not checkpoint after every small file read.',
+    'If raw HTTP is required, POST checkpoints here:',
     '',
     '```',
-    `POST ${apiBase}/api/runner/checkpoint`,
+    `POST ${apiBase}/api/tasks/$MC_TASK_ID/checkpoints`,
     'Authorization: Bearer $MC_API_TOKEN',
     'Content-Type: application/json',
     '',
-    '{ "task_id": $MC_TASK_ID, "step": "short-slug", "status": "in_progress", "summary": "what you just did" }',
+    '{ "step": "short-slug", "status": "in_progress", "summary": "what you just did" }',
     '```',
     '',
     '## Finishing',
     '',
-    'When finished, POST your result to the submit endpoint, then exit with code 0:',
+    'If your runtime exposes a `submit_done` tool, use that tool when finished.',
+    'If raw HTTP is required, POST your result to the submit endpoint, then exit with code 0:',
     '',
     '```',
     `POST ${apiBase}/api/runner/tasks/$MC_TASK_ID/submit`,

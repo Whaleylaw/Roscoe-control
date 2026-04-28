@@ -182,6 +182,22 @@ export async function POST(
       { status: 400 },
     )
   }
+  if (runnerMode === 'review') {
+    const openReviewPr = db.prepare(`
+      SELECT id
+      FROM task_review_prs
+      WHERE task_id = ?
+        AND workspace_id = ?
+        AND state = 'open'
+      LIMIT 1
+    `).get(taskId, task.workspace_id) as { id: number } | undefined
+    if (openReviewPr) {
+      return NextResponse.json(
+        { error: 'task is waiting on an open review PR and is not eligible for another quality review run' },
+        { status: 409 },
+      )
+    }
+  }
 
   // 5. Re-validate mounts + skills against the allowlist (defense-in-depth).
   const mounts = parseJsonColumn<Array<{ host_path: string; container_path: string; label: string }>>(
