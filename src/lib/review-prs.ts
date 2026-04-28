@@ -454,6 +454,7 @@ function parseWorkspaceSource(raw: string): WorkspaceSource | null {
 }
 
 function validateTaskWorktreeForReview(task: ReviewPrTask): void {
+  validateFirmVaultAppendOnlyAuditLogs(task)
   if (task.recipe_slug !== 'firmvault-case-setup-create-shell') return
   if (!task.worktree_path) return
 
@@ -511,6 +512,40 @@ function validateTaskWorktreeForReview(task: ReviewPrTask): void {
   if (missing.length > 0) {
     throw new Error(`case setup scaffold incomplete: missing ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? `, and ${missing.length - 12} more` : ''}`)
   }
+}
+
+function validateFirmVaultAppendOnlyAuditLogs(task: ReviewPrTask): void {
+  if (!task.worktree_path) return
+  if (!isFirmVaultTask(task)) return
+
+  const result = spawnSync('git', ['-C', task.worktree_path, 'status', '--porcelain', '--', 'cases'], {
+    encoding: 'utf8',
+  })
+  if (result.status !== 0) {
+    throw new Error(`git status --porcelain failed while validating FirmVault audit logs: ${(result.stderr || result.stdout || '').slice(-1000)}`)
+  }
+
+  const modifiedAuditLogs = (result.stdout || '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .filter((line) => {
+      const status = line.slice(0, 2)
+      const filePath = line.slice(3).trim()
+      if (status === '??') return false
+      if (!/\/(?:activity|workflow-log)\//.test(filePath)) return false
+      return /[MADRC]/.test(status)
+    })
+    .map((line) => line.slice(3).trim())
+
+  if (modifiedAuditLogs.length > 0) {
+    throw new Error(`FirmVault audit logs are append-only; restore existing log entries before review PR publication: ${modifiedAuditLogs.slice(0, 8).join(', ')}${modifiedAuditLogs.length > 8 ? `, and ${modifiedAuditLogs.length - 8} more` : ''}`)
+  }
+}
+
+function isFirmVaultTask(task: ReviewPrTask): boolean {
+  if (task.recipe_slug?.startsWith('firmvault-')) return true
+  return Boolean(taskCaseSlug(task))
 }
 
 function taskCaseSlug(task: ReviewPrTask): string | null {

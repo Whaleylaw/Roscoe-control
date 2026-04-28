@@ -230,6 +230,34 @@ describe('publishApprovedWorktreeForReview', () => {
     expect(vi.mocked(spawnSync).mock.calls.some((call) => (call[1] as string[]).includes('push'))).toBe(false)
   })
 
+  it('rejects FirmVault review PR publication when an existing activity log is modified', async () => {
+    vi.mocked(spawnSync).mockImplementation((cmd, args) => {
+      const joined = [cmd, ...(args as string[])].join(' ')
+      if (joined.includes('status --porcelain')) {
+        return {
+          status: 0,
+          stdout: ' M cases/test-case/activity/2026-04-28-1727-system.md\n?? cases/test-case/activity/2026-04-28-2040-intake.md\n',
+          stderr: '',
+        } as ReturnType<typeof spawnSync>
+      }
+      return { status: 0, stdout: '', stderr: '' } as ReturnType<typeof spawnSync>
+    })
+
+    await expect(
+      publishApprovedWorktreeForReview(createDb() as never, {
+        id: 2165,
+        title: '[Workflow] FirmVault Initial Document Collection: Load Document Checklist',
+        workspace_id: 1,
+        worktree_path: '/worktrees/task-2165',
+        workspace_source: JSON.stringify({ project_id: 38, base_ref: 'codex/complete-workflow-v2' }),
+        recipe_slug: 'firmvault-document-collection-review-intake',
+        metadata: JSON.stringify({ law_firm: { case_slug: 'test-case' } }),
+      } as any),
+    ).rejects.toThrow('FirmVault audit logs are append-only')
+    expect(forgejoMocks.createPullRequest).not.toHaveBeenCalled()
+    expect(vi.mocked(spawnSync).mock.calls.some((call) => (call[1] as string[]).includes('push'))).toBe(false)
+  })
+
   it('throws when rev-list cannot compare the worktree branch to the base', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd, args) => {
       const joined = [cmd, ...(args as string[])].join(' ')

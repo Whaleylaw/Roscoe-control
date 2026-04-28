@@ -29,7 +29,9 @@ Expected work:
 - Summarize what required intake documents are present.
 - Identify exact missing documents or unclear signature status.
 - Normalize supported status fields in `client/intake.md`, `client/contracts.md`, or `client/authorizations.md` when the contract provides a home.
-- Add `activity/` and `workflow-log/` entries when onboarding status changes.
+- Add append-only `activity/` and `workflow-log/` entries when onboarding status changes or when the checklist result is materially recorded.
+- Never overwrite an existing activity or workflow-log file. Before writing a log entry, list the target folder and choose a new task-specific filename that cannot collide with existing entries, such as `activity/YYYY-MM-DD-HHMM-intake-document-review-task-<task_id>.md` and `workflow-log/YYYY-MM-DD-HHMM-firmvault-document-collection-<task_id>.md`.
+- If you accidentally overwrite or materially change an unrelated prior log entry, restore the prior entry and create a separate new entry for this task before submitting.
 - Route to review with a precise question if a document exists but its legal sufficiency is unclear.
 
 Do not request signatures externally or access raw files.
