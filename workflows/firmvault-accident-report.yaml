@@ -51,11 +51,14 @@ nodes:
     config:
       task_goal: >-
         If the accident report is not already present, prepare the exact human
-        handoff for requesting it from the reporting agency. Record agency,
+        handoff for requesting it from the reporting agency. If canonical case
+        evidence shows no police report is applicable, document the
+        not-applicable resolution instead of requesting one. Record agency,
         known report number, request method, fee issue, and next expected follow
-        up. Do not claim the report was requested unless supported by evidence
-        or owner confirmation. If agency/request facts are missing, ask for
-        those facts through a blocked checkpoint and do not complete this node.
+        up when a request is applicable. Do not claim the report was requested
+        unless supported by evidence or owner confirmation. If agency/request
+        facts are missing and no not-applicable evidence exists, ask for those
+        facts through a blocked checkpoint and do not complete this node.
 
   wait_for_accident_report:
     type: wait

@@ -18,10 +18,11 @@ Use the task metadata `workflow.node_key` and node instructions to choose the na
 ## `request_accident_report`
 
 - If the report already exists, do not duplicate a request. Record that the request node is unnecessary and cite the canonical evidence.
+- If `accident/police-report.md` or a linked canonical shadow already documents an evidence-backed `not_applicable` / no-report status, do not prepare a request. Update activity/workflow-log entries as needed and complete this node as resolved by not-applicable evidence.
 - If the report is missing and enough facts exist to request it, prepare a human handoff in the vault for requesting it from the reporting agency.
 - The handoff must include known agency, report number if known, request method if known, fee issue if known, and the exact next human action needed.
 - Do not claim the report has been requested unless activity, a sent shadow, or owner confirmation supports it.
-- If the reporting agency is unknown, the request method is unknown, or the available facts are too thin to prepare a specific request, do not submit `done`. Post a blocked checkpoint that asks for the missing agency/report/request information. You may write a short activity/workflow-log note documenting the blocker, but the workflow node must stay in Human Review until the missing input is supplied.
+- If the reporting agency is unknown, the request method is unknown, or the available facts are too thin to prepare a specific request, do not submit `done` unless the canonical case evidence supports a no-report/not-applicable resolution. Otherwise post a blocked checkpoint that asks for the missing agency/report/request information. You may write a short activity/workflow-log note documenting the blocker, but the workflow node must stay in Human Review until the missing input is supplied.
 
 ## `analyze_accident_report`
 
@@ -37,7 +38,7 @@ Do not read raw PDFs unless a masked markdown shadow is in the worktree. Do not 
 Submit `done` only when the node's narrow output is complete:
 
 - status node: status is documented with evidence or a not-applicable recommendation;
-- request node: either the report already exists, the request was owner-confirmed as sent, or a specific request handoff can be prepared from known agency/request facts;
+- request node: either the report already exists, canonical case evidence supports not-applicable/no-report resolution, the request was owner-confirmed as sent, or a specific request handoff can be prepared from known agency/request facts;
 - analysis node: the canonical report shadow has been analyzed and supported facts were written.
 
 Submit a blocked checkpoint with a precise question when the node cannot proceed because the report is missing, report applicability is unclear, required request facts are unavailable, or owner action is required before the node can be truthfully completed.

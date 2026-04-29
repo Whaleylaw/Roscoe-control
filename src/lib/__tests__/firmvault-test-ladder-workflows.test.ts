@@ -144,6 +144,7 @@ describe('FirmVault test ladder workflows', () => {
     expect(accidentReport.nodes.identify_report_status.recipe).toBe('firmvault-accident-report-analyze')
     expect(accidentReport.nodes.request_accident_report.recipe).toBe('firmvault-accident-report-analyze')
     expect(accidentReport.nodes.request_accident_report.config.task_goal).toContain('blocked checkpoint')
+    expect(accidentReport.nodes.request_accident_report.config.task_goal).toContain('not-applicable resolution')
     expect(accidentReport.nodes.wait_for_accident_report.exit_when).toMatchObject({
       condition: 'law_firm.landmarks.accident_report_received == true',
     })
@@ -163,6 +164,7 @@ describe('FirmVault test ladder workflows', () => {
     )
     expect(soul).toContain('the case root is `/workspace/example-client.md`')
     expect(soul).toContain('do not submit `done`')
+    expect(soul).toContain('canonical case evidence supports not-applicable/no-report resolution')
   })
 
   it('defines the complete deterministic starter tree for every new personal-injury case', () => {
