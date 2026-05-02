@@ -51,6 +51,19 @@ describe('waypoint command parser', () => {
     })
   })
 
+  it('parses doctor and forensics with defaults and overrides', () => {
+    expect(parseWaypointCommand('/waypoint doctor')).toEqual({
+      name: 'doctor',
+      definitionSlug: 'waypoint-doctor',
+      definitionVersion: 1,
+    })
+    expect(parseWaypointCommand('/waypoint forensics --definition waypoint-forensics-custom --version 2')).toEqual({
+      name: 'forensics',
+      definitionSlug: 'waypoint-forensics-custom',
+      definitionVersion: 2,
+    })
+  })
+
   it('rejects invalid commands and malformed flags', () => {
     expect(() => parseWaypointCommand('/waypoint nonsense')).toThrow(/Unknown Waypoint command/)
     expect(() => parseWaypointCommand('/waypoint start plan')).toThrow(/--plan-id/)

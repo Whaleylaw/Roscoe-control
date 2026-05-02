@@ -198,6 +198,90 @@ nodes:
     expect(body.route.instanceId).toBeTypeOf('number')
   })
 
+  it('starts a project doctor route', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-doctor
+name: Waypoint Doctor
+version: 1
+subject_type: waypoint_project
+vars:
+  project_id:
+    required: true
+    type: number
+nodes:
+  diagnose:
+    type: recipe
+    recipe: gsd-debugger
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint doctor',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.command).toEqual({ name: 'doctor', definitionSlug: 'waypoint-doctor', definitionVersion: 1 })
+    expect(body.route.instanceId).toBeTypeOf('number')
+  })
+
+  it('starts a project forensics route', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-forensics
+name: Waypoint Forensics
+version: 1
+subject_type: waypoint_project
+vars:
+  project_id:
+    required: true
+    type: number
+nodes:
+  reconstruct:
+    type: recipe
+    recipe: gsd-researcher
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint forensics',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.command).toEqual({
+      name: 'forensics',
+      definitionSlug: 'waypoint-forensics',
+      definitionVersion: 1,
+    })
+    expect(body.route.instanceId).toBeTypeOf('number')
+  })
+
   it('starts task discussion and posts a message', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
     const inserted = db

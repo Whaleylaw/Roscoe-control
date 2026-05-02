@@ -1,0 +1,36 @@
+schema_version: 1
+id: waypoint-doctor
+name: Waypoint Doctor
+version: 1
+subject_type: waypoint_project
+
+vars:
+  project_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+
+triggers:
+  - type: manual
+
+nodes:
+  gather_runtime_state:
+    type: recipe
+    recipe: gsd-researcher
+    description: Inspect workflow instances, route nodes, and lifecycle/task state for integrity issues.
+
+  diagnose_failures:
+    type: recipe
+    recipe: gsd-debugger
+    depends_on:
+      nodes:
+        - gather_runtime_state
+
+  remediation_recommendations:
+    type: recipe
+    recipe: gsd-doc-drafter
+    depends_on:
+      nodes:
+        - diagnose_failures

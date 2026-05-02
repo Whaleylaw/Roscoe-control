@@ -3,7 +3,7 @@ import { runWaypointAutopilot } from './waypoint-autopilot'
 import { getWaypointStatus, startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from './waypoint'
 import { listTaskDiscussion, postTaskDiscussionMessage, startTaskDiscussion } from './waypoint-task-discussion'
 
-export type WaypointCommandName = 'status' | 'start' | 'auto' | 'discuss' | 'help'
+export type WaypointCommandName = 'status' | 'start' | 'auto' | 'discuss' | 'doctor' | 'forensics' | 'help'
 
 export type WaypointParsedCommand =
   | { name: 'status' }
@@ -16,6 +16,8 @@ export type WaypointParsedCommand =
     }
   | { name: 'auto'; maxIterations?: number }
   | { name: 'discuss'; taskId: number; message?: string }
+  | { name: 'doctor'; definitionSlug: string; definitionVersion: number }
+  | { name: 'forensics'; definitionSlug: string; definitionVersion: number }
   | { name: 'help' }
 
 export interface ExecuteWaypointCommandInput {
@@ -79,6 +81,30 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     }
 
     return { name: 'discuss', taskId }
+  }
+
+  if (head === 'doctor') {
+    const defFlagIdx = tokens.findIndex((t) => t === '--definition')
+    const definitionSlug = defFlagIdx >= 0 ? tokens[defFlagIdx + 1] : 'waypoint-doctor'
+    if (!definitionSlug) throw new Error('Invalid --definition value')
+
+    const versionFlagIdx = tokens.findIndex((t) => t === '--version')
+    const definitionVersion = versionFlagIdx >= 0 ? asPositiveInt(tokens[versionFlagIdx + 1]) : 1
+    if (definitionVersion == null) throw new Error('Invalid --version value')
+
+    return { name: 'doctor', definitionSlug, definitionVersion }
+  }
+
+  if (head === 'forensics') {
+    const defFlagIdx = tokens.findIndex((t) => t === '--definition')
+    const definitionSlug = defFlagIdx >= 0 ? tokens[defFlagIdx + 1] : 'waypoint-forensics'
+    if (!definitionSlug) throw new Error('Invalid --definition value')
+
+    const versionFlagIdx = tokens.findIndex((t) => t === '--version')
+    const definitionVersion = versionFlagIdx >= 0 ? asPositiveInt(tokens[versionFlagIdx + 1]) : 1
+    if (definitionVersion == null) throw new Error('Invalid --version value')
+
+    return { name: 'forensics', definitionSlug, definitionVersion }
   }
 
   if (head === 'start') {
@@ -177,7 +203,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     }
   }
 
@@ -242,28 +268,52 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
     }
   }
 
-  const scope = resolveWaypointPlanRouteScope(input.db, {
-    workspaceId: input.workspaceId,
-    projectId: input.projectId,
-    planId: parsed.planId,
-  })
+  if (parsed.name === 'start') {
+    const scope = resolveWaypointPlanRouteScope(input.db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      planId: parsed.planId,
+    })
+    const route = startOrReuseWaypointRoute(input.db, {
+      workspaceId: input.workspaceId,
+      tenantId: input.tenantId,
+      actor: input.actor,
+      projectId: input.projectId,
+      subjectType: WAYPOINT_SUBJECT_TYPES.plan,
+      subjectId: parsed.planId,
+      definitionSlug: parsed.definitionSlug,
+      definitionVersion: parsed.definitionVersion,
+      vars: {
+        project_id: scope.projectId,
+        workstream_id: scope.workstreamId,
+        milestone_id: scope.milestoneId,
+        phase_id: scope.phaseId,
+        plan_id: scope.planId,
+        workspace_id: input.workspaceId,
+        objective: scope.objective,
+      },
+    })
+
+    return {
+      ok: true,
+      command: parsed,
+      route,
+    }
+  }
+
   const route = startOrReuseWaypointRoute(input.db, {
     workspaceId: input.workspaceId,
     tenantId: input.tenantId,
     actor: input.actor,
     projectId: input.projectId,
-    subjectType: WAYPOINT_SUBJECT_TYPES.plan,
-    subjectId: parsed.planId,
+    subjectType: WAYPOINT_SUBJECT_TYPES.project,
+    subjectId: input.projectId,
     definitionSlug: parsed.definitionSlug,
     definitionVersion: parsed.definitionVersion,
     vars: {
-      project_id: scope.projectId,
-      workstream_id: scope.workstreamId,
-      milestone_id: scope.milestoneId,
-      phase_id: scope.phaseId,
-      plan_id: scope.planId,
+      project_id: input.projectId,
       workspace_id: input.workspaceId,
-      objective: scope.objective,
+      objective: parsed.name === 'doctor' ? 'Waypoint project diagnostics' : 'Waypoint project forensics',
     },
   })
 
