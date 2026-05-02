@@ -1,0 +1,119 @@
+schema_version: 1
+id: firmvault-final-distribution
+name: FirmVault Final Distribution
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as liens_negotiated, funds_received, no_lien_clearance, or manual.
+    default: liens_negotiated
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.liens_negotiated == true
+  - type: condition
+    condition: law_firm.landmarks.funds_received == true
+  - type: event
+    event: law_firm.settlement.final_distribution_ready
+  - type: manual
+
+nodes:
+  prepare_final_distribution_statement:
+    type: recipe
+    name: Prepare Final Distribution Statement
+    recipe: firmvault-final-distribution-prepare-statement
+    depends_on:
+      conditions:
+        - law_firm.landmarks.funds_received == true
+        - law_firm.landmarks.liens_negotiated == true
+    completes:
+      - law_firm.landmarks.final_distribution_statement_prepared
+    config:
+      task_goal: >-
+        Prepare the final or supplemental settlement distribution statement from
+        canonical settlement, distribution, lien, expense, and human-supplied
+        test facts. If fee, cost, lien, check, trust-account, or net-to-client
+        facts are missing from canonical files, require same-task human/test
+        comments before using them. Write the draft under
+        documents/generated/settlement/, update settlement/distribution.md as a
+        prepared-for-human-issuance ledger, and append activity/workflow-log
+        entries. Do not issue funds, mark client receipt, zero the trust account,
+        close the case, or mark final distribution complete.
+      canonical_paths:
+        - settlement/settlement.md
+        - settlement/distribution.md
+        - liens/
+        - expenses/
+        - documents/generated/settlement/
+        - activity/
+        - workflow-log/
+
+  human_issue_client_distribution:
+    type: review
+    name: Human Issue Client Distribution
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_final_distribution_statement
+    completes:
+      - law_firm.landmarks.client_distribution_issued
+    config:
+      task_goal: >-
+        Review the final distribution statement and record whether the office
+        issued the client distribution. For this test ladder, comment with
+        synthetic issue facts: date, method, amount, payee, check/reference
+        number if any, and whether the distribution statement was provided to the
+        client. If the distribution should not issue, leave the task in Human
+        Review with the exact blocker.
+
+  human_confirm_client_receipt:
+    type: review
+    name: Human Confirm Client Receipt
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - human_issue_client_distribution
+    completes:
+      - law_firm.landmarks.client_distributed
+    config:
+      task_goal: >-
+        Confirm the client received or accepted the final distribution. For this
+        test ladder, comment with synthetic receipt facts: receipt date, method,
+        recipient, amount, and any acknowledgment. If receipt is not confirmed,
+        leave the task in Human Review with the needed follow-up.
+
+  zero_trust_account:
+    type: recipe
+    name: Document Trust Account Zeroed
+    recipe: firmvault-final-distribution-zero-trust
+    depends_on:
+      nodes:
+        - human_confirm_client_receipt
+    completes:
+      - law_firm.landmarks.trust_account_zeroed
+      - law_firm.landmarks.final_distribution_complete
+    config:
+      task_goal: >-
+        Document the final distribution completion after human-confirmed
+        issuance and receipt. Read same-task Mission Control comments and
+        canonical distribution files. Require human/test facts for issued amount,
+        receipt amount, and trust-account closing balance before marking the
+        trust account zeroed. Update settlement/distribution.md and
+        settlement/settlement.md, append activity/workflow-log entries, and mark
+        final distribution complete only from explicit same-task confirmation.
+        Do not invent check, receipt, or trust-account facts.
+      canonical_paths:
+        - settlement/settlement.md
+        - settlement/distribution.md
+        - documents/generated/settlement/
+        - documents/sent/settlement/
+        - activity/
+        - workflow-log/

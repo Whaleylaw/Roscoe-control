@@ -18,7 +18,7 @@ Review only whether this recipe's goal was satisfied:
 Inspect the task description, task comments, worker resolution, and worktree diff. Relevant files usually include:
 
 - The case markdown frontmatter and landmarks.
-- The case claim summary and any PIP claim file under `claims/`.
+- The case claim summary and any PIP ledger under `insurance/pip-*.md`.
 - Masked billing, payment, ledger, EOB, or activity/ entries.
 - Owner comments in the task thread.
 

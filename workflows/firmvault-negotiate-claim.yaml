@@ -1,0 +1,103 @@
+schema_version: 1
+id: firmvault-negotiate-claim
+name: FirmVault Negotiate Claim
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as offer_decision_documented, acceptance_authorized, or manual.
+    default: offer_decision_documented
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.offer_decision_documented == true
+  - type: event
+    event: law_firm.negotiation.client_decision_documented
+  - type: manual
+
+nodes:
+  prepare_negotiation_response:
+    type: recipe
+    name: Prepare Negotiation Response
+    recipe: firmvault-negotiation-prepare-response
+    depends_on:
+      conditions:
+        - law_firm.landmarks.offer_decision_documented == true
+    completes:
+      - law_firm.landmarks.negotiation_response_prepared
+    config:
+      task_goal: >-
+        Read the documented client decision and prepare the next negotiation
+        response handoff. For the current v1 acceptance path, if the client has
+        authorized accepting a supported offer, prepare a human-send acceptance
+        handoff and ready-to-send acceptance letter under documents/generated/insurance/.
+        If the decision is to counter or reject, prepare a human-send handoff
+        for that response without sending it. If no clear decision is documented,
+        return to Human Review with the exact missing facts. Do not send any
+        external communication and do not mark settlement reached.
+      canonical_paths:
+        - negotiation/offers.md
+        - negotiation/offer-evaluation.md
+        - insurance/
+        - documents/generated/insurance/
+        - activity/
+        - workflow-log/
+
+  human_send_negotiation_response:
+    type: review
+    name: Human Send Negotiation Response
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_negotiation_response
+    completes:
+      - law_firm.landmarks.negotiation_response_human_sent
+    config:
+      task_goal: >-
+        Review the generated negotiation-response handoff and send the response
+        by the appropriate human channel. If accepting an offer, send the formal
+        acceptance to the carrier/adjuster using the prepared acceptance letter
+        or the firm's normal communication method. Then comment with send date,
+        method, recipient, confirmation/tracking if any, exact offer accepted,
+        and any carrier response or requested release/funds instructions. If the
+        response cannot be sent, comment with the exact missing information and
+        leave the task in Human Review.
+
+  document_negotiation_response:
+    type: recipe
+    name: Document Negotiation Response
+    recipe: firmvault-negotiation-document-response
+    depends_on:
+      nodes:
+        - human_send_negotiation_response
+    completes:
+      - law_firm.landmarks.negotiation_result_documented
+      - law_firm.landmarks.settlement_reached
+    config:
+      task_goal: >-
+        Read same-task Mission Control comments from the human-send gate and
+        document the negotiation response in canonical FirmVault files. For an
+        accepted offer, require human confirmation that external acceptance was
+        actually sent before marking settlement reached. Write sent acceptance
+        evidence under documents/sent/insurance/, update negotiation and
+        insurance ledgers, append activity and workflow-log entries, and set the
+        settlement trigger only after supported sent-acceptance evidence exists.
+        If the human comment records a counter or rejection, document that
+        response without marking settlement reached. If the human send comment
+        is missing or unclear, return to Human Review with exact missing facts.
+      canonical_paths:
+        - negotiation/offers.md
+        - negotiation/offer-evaluation.md
+        - insurance/
+        - settlement/
+        - documents/generated/insurance/
+        - documents/sent/insurance/
+        - activity/
+        - workflow-log/

@@ -1,0 +1,157 @@
+schema_version: 1
+id: firmvault-settlement-processing
+name: FirmVault Settlement Processing
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as settlement_reached, manual, or offer_acceptance_sent.
+    default: settlement_reached
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.settlement_reached == true
+  - type: event
+    event: law_firm.settlement.reached
+  - type: manual
+
+nodes:
+  prepare_settlement_statement:
+    type: recipe
+    name: Prepare Settlement Statement
+    recipe: firmvault-settlement-prepare-statement
+    depends_on:
+      conditions:
+        - law_firm.landmarks.settlement_reached == true
+    completes:
+      - law_firm.landmarks.settlement_statement_prepared
+    config:
+      task_goal: >-
+        Prepare a draft settlement statement from canonical FirmVault settlement,
+        negotiation, insurance, expense, and lien facts. Use the accepted
+        settlement amount already documented by the negotiation workflow. If fee,
+        cost, lien, or trust-account facts are missing, preserve them as explicit
+        TBD/needs-review fields instead of inventing numbers. Write the draft
+        under documents/generated/settlement/, update settlement/distribution.md
+        as a draft planning ledger, and append activity and workflow-log entries.
+        Do not distribute funds, mark liens paid, or mark funds received.
+      canonical_paths:
+        - settlement/settlement.md
+        - settlement/distribution.md
+        - negotiation/offers.md
+        - insurance/
+        - liens/
+        - expenses/
+        - documents/generated/settlement/
+        - activity/
+        - workflow-log/
+
+  prepare_authorization_to_settle:
+    type: recipe
+    name: Prepare Authorization to Settle
+    recipe: firmvault-settlement-prepare-authorization
+    depends_on:
+      nodes:
+        - prepare_settlement_statement
+    completes:
+      - law_firm.landmarks.authorization_to_settle_prepared
+    config:
+      task_goal: >-
+        Prepare an authorization-to-settle draft and human signature handoff
+        using the draft settlement statement. The authorization should summarize
+        the accepted settlement amount, known deductions, TBD deductions, client
+        net estimate if calculable, and the exact human actions required to get
+        the client signature. Write the authorization draft under
+        documents/generated/settlement/ and append activity and workflow-log
+        entries. Do not send the document, claim client authorization, or mark a
+        release or funds milestone complete.
+      canonical_paths:
+        - settlement/settlement.md
+        - settlement/distribution.md
+        - documents/generated/settlement/
+        - activity/
+        - workflow-log/
+
+  get_client_signature:
+    type: review
+    name: Human Get Client Settlement Authorization
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_authorization_to_settle
+    completes:
+      - law_firm.landmarks.client_authorized
+    config:
+      task_goal: >-
+        Review the generated settlement statement and authorization-to-settle
+        draft. For this test ladder, comment with synthetic or real signature
+        facts: signature date, method, signer, whether any deduction fields were
+        changed, and whether the client authorized the settlement. If the client
+        did not authorize or signature facts are missing, leave the task in Human
+        Review with the exact issue.
+
+  execute_release:
+    type: review
+    name: Human Execute Release
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - get_client_signature
+    completes:
+      - law_firm.landmarks.release_executed
+    config:
+      task_goal: >-
+        Record the release execution step. For this test ladder, comment with
+        synthetic or real release facts: release received date, carrier/adjuster,
+        settlement amount, whether attorney review found any problem language,
+        signature date/method, return date/method, and any promised payment
+        timing. If release facts are missing or problematic, leave the task in
+        Human Review with the exact issue.
+
+  wait_for_funds:
+    type: wait
+    name: Wait for Settlement Funds
+    duration: 14d
+    depends_on:
+      nodes:
+        - execute_release
+    exit_when:
+      condition: law_firm.landmarks.funds_received == true
+    config:
+      task_goal: Wait 14 days after release return unless settlement funds are documented earlier through document intake, owner confirmation, or a supported settlement ledger update.
+
+  receive_settlement_funds:
+    type: recipe
+    name: Document Settlement Funds Receipt
+    recipe: firmvault-settlement-document-funds
+    depends_on:
+      nodes:
+        - wait_for_funds
+    completes:
+      - law_firm.landmarks.funds_received
+    config:
+      task_goal: >-
+        Read same-task Mission Control comments and canonical settlement files
+        to document settlement funds receipt. Require human-confirmed funds facts
+        before marking funds received: received date, amount, payer, check or
+        payment reference if available, deposit date, trust-account status, and
+        whether the funds have cleared. Write received-funds documentation under
+        documents/received/settlement/ when supported by the comment, update
+        settlement/settlement.md and settlement/distribution.md as funds-received
+        tracking only, and append activity and workflow-log entries. Do not pay
+        liens, issue client/law-firm checks, mark liens paid, or mark final
+        distribution complete.
+      canonical_paths:
+        - settlement/settlement.md
+        - settlement/distribution.md
+        - documents/received/settlement/
+        - activity/
+        - workflow-log/

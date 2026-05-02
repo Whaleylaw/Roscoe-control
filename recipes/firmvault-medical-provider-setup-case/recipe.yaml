@@ -1,0 +1,25 @@
+slug: firmvault-medical-provider-setup-case
+name: FirmVault Medical Provider Setup - Case
+description: Creates or normalizes medical provider ledgers for known providers in one FirmVault case.
+when_to_use: Use after full intake completion, accident report analysis, client check-in, referral, or manual provider discovery.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - law-firm
+  - firmvault
+  - medical-provider
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

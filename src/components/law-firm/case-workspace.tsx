@@ -118,6 +118,19 @@ type WorkflowPreview = {
   }>
 }
 
+const STARTABLE_CASE_WORKFLOWS = [
+  {
+    definitionSlug: 'firmvault-demand-readiness',
+    name: 'Demand Readiness',
+    description: 'Gather demand materials after records, bills, and chronology are ready.',
+  },
+  {
+    definitionSlug: 'firmvault-draft-demand',
+    name: 'Draft Demand',
+    description: 'Check internal final-lien process status, then draft the demand package for attorney review.',
+  },
+]
+
 const VIEWS = ['dashboard', 'tasks', 'workflow', 'activity', 'files'] as const
 
 export function LawFirmCaseWorkspace() {
@@ -370,6 +383,38 @@ export function LawFirmCaseWorkspace() {
     }
   }, [slug, t, workflowInstanceUpdating])
 
+  const startCaseWorkflow = useCallback(async (definitionSlug: string) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(`start-workflow:${definitionSlug}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start_case_workflow',
+          definition_slug: definitionSlug,
+          status: 'inbox',
+          vars: { source_trigger: 'manual' },
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        medical_providers: Array.isArray(body.medical_providers) ? body.medical_providers : prev?.medical_providers ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      const created = Array.isArray(body.materialized?.created) ? body.materialized.created.length : 0
+      setFeedback(created > 0 ? 'Workflow started' : 'Workflow started; no task materialized yet')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
   if (loading && !detail) {
     return <div className="p-6 text-sm text-muted-foreground">{t('detailLoading')}</div>
   }
@@ -386,8 +431,8 @@ export function LawFirmCaseWorkspace() {
   if (!detail) return null
 
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="space-y-3 border-b border-border px-4 pt-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 space-y-3 border-b border-border px-4 pt-4">
         <button
           type="button"
           className="text-sm text-muted-foreground hover:text-foreground"
@@ -425,7 +470,11 @@ export function LawFirmCaseWorkspace() {
       )}
 
       {view === 'dashboard' && <CaseDashboard detail={detail} />}
-      {view === 'tasks' && <CaseTasksView slug={slug} />}
+      {view === 'tasks' && (
+        <div className="min-h-0 flex-1">
+          <CaseTasksView slug={slug} />
+        </div>
+      )}
       {view === 'workflow' && (
         <WorkflowView
           workflowPreview={workflowPreview}
@@ -438,6 +487,7 @@ export function LawFirmCaseWorkspace() {
           onCancelWorkflowInstance={cancelWorkflowInstance}
           onBypassWorkflowNode={bypassWorkflowNode}
           onStartProviderMedicalRecords={startProviderMedicalRecordsWorkflow}
+          onStartCaseWorkflow={startCaseWorkflow}
         />
       )}
       {view === 'activity' && <ActivityView detail={detail} />}
@@ -484,15 +534,17 @@ function CaseTasksView({ slug }: { slug: string }) {
   }
 
   return (
-    <TaskBoardPanel
-      scope={{
-        lockedProjectId: project.id,
-        hideProjectFilter: true,
-        hideProjectLabels: true,
-        includeHiddenProjects: true,
-        defaultCreateProjectId: project.id,
-      }}
-    />
+    <div className="h-full min-h-0">
+      <TaskBoardPanel
+        scope={{
+          lockedProjectId: project.id,
+          hideProjectFilter: true,
+          hideProjectLabels: true,
+          includeHiddenProjects: true,
+          defaultCreateProjectId: project.id,
+        }}
+      />
+    </div>
   )
 }
 
@@ -549,6 +601,7 @@ function WorkflowView({
   onCancelWorkflowInstance,
   onBypassWorkflowNode,
   onStartProviderMedicalRecords,
+  onStartCaseWorkflow,
 }: {
   workflowPreview: WorkflowPreview | null
   workflowLoading: boolean
@@ -560,6 +613,7 @@ function WorkflowView({
   onCancelWorkflowInstance: (workflowInstanceId: number) => void
   onBypassWorkflowNode: (workflowInstanceId: number, nodeKey: string) => void
   onStartProviderMedicalRecords: (providerSlug: string) => void
+  onStartCaseWorkflow: (definitionSlug: string) => void
 }) {
   const t = useTranslations('lawFirm')
   const workflowInstances = workflowPreview?.workflow_instances ?? []
@@ -573,6 +627,40 @@ function WorkflowView({
   }
   return (
     <div className="p-6 space-y-4">
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-foreground">Case Workflows</h2>
+          <p className="text-sm text-muted-foreground">
+            Start case-scoped workflow instances from registered Mission Control workflow definitions.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {STARTABLE_CASE_WORKFLOWS.map((workflow) => {
+            const existing = workflowInstances.find((instance) => instance.definition_slug === workflow.definitionSlug && ['active', 'blocked'].includes(instance.status))
+            const startingKey = `start-workflow:${workflow.definitionSlug}`
+            return (
+              <div key={workflow.definitionSlug} className="rounded border bg-background p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-foreground">{workflow.name}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{workflow.description}</div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onStartCaseWorkflow(workflow.definitionSlug)}
+                    disabled={workflowInstanceUpdating !== null || Boolean(existing)}
+                  >
+                    {workflowInstanceUpdating === startingKey ? 'Starting' : existing ? 'Active' : 'Start'}
+                  </Button>
+                </div>
+                <div className="mt-2 font-mono text-[11px] text-muted-foreground">{workflow.definitionSlug}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="rounded-md border bg-card p-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-foreground">Provider Workflows</h2>

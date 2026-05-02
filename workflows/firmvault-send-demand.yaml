@@ -1,0 +1,97 @@
+schema_version: 1
+id: firmvault-send-demand
+name: FirmVault Send Demand
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as attorney_reviewed_demand, manual, or demand_ready_to_send.
+    default: attorney_reviewed_demand
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.attorney_reviewed_demand == true
+  - type: event
+    event: law_firm.demand_send.manual
+  - type: manual
+
+nodes:
+  identify_demand_recipients:
+    type: recipe
+    name: Identify Demand Recipients
+    recipe: firmvault-demand-identify-recipients
+    depends_on:
+      conditions:
+        - law_firm.landmarks.attorney_reviewed_demand == true
+    completes:
+      - law_firm.landmarks.demand_recipients_identified
+    config:
+      task_goal: >-
+        Read the attorney-approved demand artifacts and canonical insurance
+        ledgers to identify the proper demand recipient for each applicable
+        BI/UM/UIM claim. If a defense attorney exists, identify the attorney as
+        primary recipient and the adjuster/carrier as copied recipient. If no
+        attorney exists, identify the adjuster or carrier recipient from
+        canonical ledger/contact facts. Prepare a human-send handoff under
+        documents/generated/insurance/ that links the approved demand letter,
+        damages summary, demand package, exhibits, recipient, delivery options,
+        and missing send facts. Do not send anything externally.
+      canonical_paths:
+        - demand/demand-letter.md
+        - demand/damages-summary.md
+        - demand/demand-package.md
+        - insurance/
+        - contacts/
+        - documents/generated/insurance/
+        - activity/
+        - workflow-log/
+
+  send_demand_package:
+    type: recipe
+    name: Send Demand Package
+    recipe: firmvault-demand-send-package
+    depends_on:
+      nodes:
+        - identify_demand_recipients
+    completes:
+      - law_firm.landmarks.demand_sent
+    config:
+      task_goal: >-
+        This is a same-task human confirmation gateway. First, check whether the
+        same Mission Control task thread contains a human/operator comment
+        confirming that the approved demand package was sent. If no send
+        confirmation exists, leave the task in Human Review with exact
+        instructions: review the generated demand-send handoff, send the demand
+        package by the human-selected channel, then comment with send date,
+        method, recipient, tracking/confirmation, demand amount, and response
+        deadline. Do not send mail, email, fax, portal messages, or phone calls
+        yourself. Once a human comment confirms sending, write the sent-demand
+        shadow, update the BI/UM/UIM insurance ledger, append activity and
+        workflow-log entries, and then submit for quality review.
+      canonical_paths:
+        - demand/demand-letter.md
+        - demand/damages-summary.md
+        - demand/demand-package.md
+        - documents/generated/insurance/
+        - documents/sent/insurance/
+        - insurance/
+        - activity/
+        - workflow-log/
+
+  wait_for_response:
+    type: wait
+    name: Wait for Demand Response
+    duration: 30d
+    depends_on:
+      nodes:
+        - send_demand_package
+    exit_when:
+      condition: law_firm.landmarks.initial_offer_received == true
+    config:
+      task_goal: Wait 30 days for a demand response unless an initial offer arrives earlier through document intake, owner confirmation, or a supported negotiation ledger update.

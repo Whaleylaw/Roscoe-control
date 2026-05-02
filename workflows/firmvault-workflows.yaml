@@ -135,7 +135,8 @@ workflows:
         depends_on: [send_bi_lor]
 
   insurance_pip_claim:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-pip-claim-setup
     source: phase_1_file_setup/workflows/insurance_pip_claim/workflow.md
     phase_id: pip_track
     name: PIP Claim Setup
@@ -169,7 +170,8 @@ workflows:
         depends_on: [wait_before_pip_status_followup]
 
   medical_provider_setup:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-medical-provider-setup
     source: phase_1_file_setup/workflows/medical_provider_setup/workflow.md
     phase_id: phase_1_file_setup
     name: Medical Provider Setup
@@ -177,28 +179,24 @@ workflows:
     trigger:
       active_when: full_intake_complete
     steps:
-      - id: collect_provider_information
+      - id: create_provider_ledgers
         type: recipe
-        recipe_slug: firmvault-medical-provider-create-ledger
-        landmark_id: providers_setup
-      - id: collect_treatment_dates
-        type: recipe
-        recipe_slug: firmvault-medical-provider-create-ledger
-        landmark_id: provider_treatment_dates_recorded
-        depends_on: [collect_provider_information]
-      - id: document_injuries_treated
-        type: recipe
-        recipe_slug: firmvault-medical-provider-create-ledger
-        landmark_id: injury_summary_recorded
-        depends_on: [collect_treatment_dates]
-      - id: auto_send_initial_records_request
-        type: recipe
-        recipe_slug: firmvault-request-records-bills-prepare-request
-        landmark_id: records_requested_all_providers
-        depends_on: [medical_auth_signed, document_injuries_treated]
+        recipe_slug: firmvault-medical-provider-setup-case
+        landmark_id:
+          - providers_setup
+          - provider_treatment_dates_recorded
+          - injury_summary_recorded
+        depends_on:
+          conditions:
+            - law_firm.landmarks.full_intake_complete == true
+      - id: confirm_medical_provider_setup
+        type: human_review
+        landmark_id: medical_provider_setup_reviewed
+        depends_on: [create_provider_ledgers]
 
   client_check_in:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-client-check-in-cadence
     source: phase_2_treatment/workflows/client_check_in/workflow.md
     phase_id: client_contact
     name: Client Check-In
@@ -206,25 +204,32 @@ workflows:
     trigger:
       active_when: case_active
     steps:
+      - id: start_check_in_cadence
+        type: recipe
+        recipe_slug: firmvault-client-check-in-start-cadence
+        landmark_id: client_check_in_active
+        depends_on:
+          conditions:
+            - law_firm.landmarks.full_intake_complete == true
+      - id: prepare_check_in_handoff
+        type: recipe
+        recipe_slug: firmvault-client-check-in-prepare-handoff
+        landmark_id: client_check_in_prepared
+        depends_on: [start_check_in_cadence]
+      - id: human_client_contact
+        type: human_review
+        landmark_id: client_contact_attempted
+        depends_on: [prepare_check_in_handoff]
+      - id: trigger_new_provider_workflow
+        type: recipe
+        recipe_slug: firmvault-medical-provider-setup-case
+        landmark_id: provider_referral_needed
+        depends_on: [human_client_contact]
       - id: wait_for_next_checkin
         type: wait
         wait: { days: 14 }
-        skip_when: [client_check_in_due]
-      - id: contact_client
-        type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: client_reachable
-        depends_on: [wait_for_next_checkin]
-      - id: document_client_responses
-        type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: client_check_in_active
-        depends_on: [contact_client]
-      - id: trigger_new_provider_workflow
-        type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: provider_referral_needed
-        depends_on: [document_client_responses]
+        depends_on: [human_client_contact]
+        skip_when: [demand_sent]
 
   lien_identification:
     enabled: false
@@ -557,69 +562,66 @@ workflows:
         depends_on: [initial_offer_received]
 
   offer_evaluation:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-offer-evaluation
     source: phase_4_negotiation/workflows/offer_evaluation/workflow.md
     phase_id: phase_4_negotiation
     name: Offer Evaluation
-    goal: Evaluate settlement offer, net to client, lien impact, and attorney/client recommendation.
+    goal: Prepare attorney-facing offer evaluation, net-to-client analysis, and client decision documentation.
     trigger:
-      active_when: initial_offer_received
+      active_when: offer_documented
     steps:
-      - id: document_offer
+      - id: prepare_offer_evaluation
         type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: offer_documented
-      - id: calculate_net_to_client
-        type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: offer_net_to_client_calculated
-        depends_on: [document_offer]
-      - id: evaluate_case_factors
-        type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: offer_case_factors_evaluated
-        depends_on: [calculate_net_to_client]
-      - id: attorney_offer_review
-        type: human_review
-        landmark_id: offer_recommendation_reviewed
-        depends_on: [evaluate_case_factors]
+        recipe_slug: firmvault-negotiation-offer-evaluation
+        landmark_id:
+          - offer_evaluated
+          - net_to_client_prepared
+        depends_on:
+          conditions:
+            - law_firm.landmarks.offer_documented == true
       - id: client_offer_decision
         type: human_review
-        landmark_id: client_offer_decision_documented
-        depends_on: [attorney_offer_review]
+        landmark_id: client_advised_of_offer
+        depends_on: [prepare_offer_evaluation]
+      - id: document_client_decision
+        type: recipe
+        recipe_slug: firmvault-negotiation-document-client-decision
+        landmark_id: offer_decision_documented
+        depends_on: [client_offer_decision]
 
   negotiate_claim:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-negotiate-claim
     source: phase_4_negotiation/workflows/negotiate_claim/workflow.md
     phase_id: phase_4_negotiation
     name: Negotiate Claim
-    goal: Prepare counteroffers, negotiate with carrier, and document settlement or impasse.
+    goal: Prepare and document the formal negotiation response after attorney/client decision.
     trigger:
-      active_when: client_offer_decision_documented
+      active_when: offer_decision_documented
     steps:
-      - id: prepare_counter
+      - id: prepare_negotiation_response
         type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: counter_prepared
-      - id: send_counter
+        recipe_slug: firmvault-negotiation-prepare-response
+        landmark_id: negotiation_response_prepared
+        depends_on:
+          conditions:
+            - law_firm.landmarks.offer_decision_documented == true
+      - id: human_send_negotiation_response
         type: human_review
-        landmark_id: counter_sent
-        depends_on: [prepare_counter]
-      - id: wait_for_counter_response
-        type: wait
-        wait: { days: 14 }
-        depends_on: [send_counter]
-        skip_when:
-          - settlement_reached
-          - impasse_declared
+        landmark_id: negotiation_response_human_sent
+        depends_on: [prepare_negotiation_response]
       - id: document_negotiation_result
         type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: negotiation_result_documented
-        depends_on: [wait_for_counter_response]
+        recipe_slug: firmvault-negotiation-document-response
+        landmark_id:
+          - negotiation_result_documented
+          - settlement_reached
+        depends_on: [human_send_negotiation_response]
 
   settlement_processing:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-settlement-processing
     source: phase_5_settlement/workflows/settlement_processing/workflow.md
     phase_id: phase_5_settlement
     name: Settlement Processing
@@ -629,11 +631,11 @@ workflows:
     steps:
       - id: prepare_settlement_statement
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-settlement-prepare-statement
         landmark_id: settlement_statement_prepared
       - id: prepare_authorization_to_settle
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-settlement-prepare-authorization
         landmark_id: authorization_to_settle_prepared
         depends_on: [prepare_settlement_statement]
       - id: get_client_signature
@@ -651,12 +653,13 @@ workflows:
         skip_when: [funds_received]
       - id: receive_settlement_funds
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-settlement-document-funds
         landmark_id: funds_received
         depends_on: [wait_for_funds]
 
   settlement_lien_negotiation:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-settlement-lien-negotiation
     source: phase_5_settlement/workflows/lien_negotiation/workflow.md
     phase_id: phase_5_settlement
     name: Settlement Lien Negotiation
@@ -666,21 +669,22 @@ workflows:
     steps:
       - id: prioritize_liens
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-settlement-lien-audit
         landmark_id: liens_prioritized
       - id: calculate_available_funds
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-settlement-lien-audit
         landmark_id: lien_available_funds_calculated
         depends_on: [prioritize_liens]
       - id: negotiate_settlement_liens
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-settlement-lien-document-result
         landmark_id: liens_negotiated
         depends_on: [calculate_available_funds]
 
   lien_resolution:
     enabled: true
+    executable_definition: firmvault-lien-resolution
     source: phase_6_lien/workflows/get_final_lien/workflow.md
     phase_id: lien_track
     name: Lien Identification and Resolution
@@ -691,18 +695,18 @@ workflows:
       - id: identify_liens
         type: recipe
         landmark_id: liens_identified
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-lien-resolution-review-inventory
 
       - id: open_liens
         type: recipe
         landmark_id: liens_opened
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-lien-resolution-review-inventory
         depends_on: [identify_liens]
 
       - id: request_final_amounts
         type: recipe
         landmark_id: final_amounts_requested
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-lien-resolution-prepare-final-request
         depends_on:
           - open_liens
           - treatment_complete
@@ -716,38 +720,39 @@ workflows:
       - id: receive_final_amounts
         type: recipe
         landmark_id: final_amounts_received
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-lien-resolution-document-final-amount
         depends_on: [wait_for_final_amounts]
 
       - id: negotiate_liens
         type: recipe
         landmark_id: liens_negotiated
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-lien-resolution-document-payment
         depends_on: [receive_final_amounts]
 
       - id: pay_liens
         type: recipe
         landmark_id: liens_paid
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-lien-resolution-document-payment
         depends_on: [negotiate_liens]
 
   final_distribution:
-    enabled: false
+    enabled: true
+    executable_definition: firmvault-final-distribution
     source: phase_6_lien/workflows/final_distribution/workflow.md
     phase_id: lien_track
     name: Final Distribution
     goal: Prepare supplemental statement and distribute remaining funds after liens resolve.
     trigger:
-      active_when: liens_paid
+      active_when: liens_negotiated
     steps:
       - id: prepare_supplemental_statement
         type: recipe
-        recipe_slug: firmvault-workflow-task
-        landmark_id: supplemental_statement_prepared
-        depends_on: [liens_paid]
+        recipe_slug: firmvault-final-distribution-prepare-statement
+        landmark_id: final_distribution_statement_prepared
+        depends_on: [funds_received, liens_negotiated]
       - id: issue_additional_distribution
         type: human_review
-        landmark_id: additional_distribution_issued
+        landmark_id: client_distribution_issued
         depends_on: [prepare_supplemental_statement]
       - id: confirm_receipt
         type: human_review
@@ -755,6 +760,6 @@ workflows:
         depends_on: [issue_additional_distribution]
       - id: zero_trust_account
         type: recipe
-        recipe_slug: firmvault-workflow-task
+        recipe_slug: firmvault-final-distribution-zero-trust
         landmark_id: trust_account_zeroed
         depends_on: [confirm_receipt]

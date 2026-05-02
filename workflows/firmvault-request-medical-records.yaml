@@ -138,6 +138,7 @@ nodes:
     config:
       task_goal: If records or bills have not arrived 15 days after the request, check for receipt first, then prepare or document first follow-up, provider status, fee issue, HIPAA issue, wrong contact issue, or expected production date.
       provider_scoped: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   wait_15_more_days_for_second_follow_up:
     type: wait
@@ -150,6 +151,7 @@ nodes:
       condition: law_firm.provider.records_and_bills_received == true
     config:
       task_goal: Wait 15 more days after first follow-up unless the provider's records and bills arrive first.
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   second_follow_up_records_request:
     type: recipe
@@ -164,6 +166,7 @@ nodes:
     config:
       task_goal: If records or bills remain outstanding 30 days after the original request, check for receipt first, then prepare or document the second follow-up and capture the provider's response, fee issue, HIPAA issue, or expected production date.
       provider_scoped: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   wait_15_more_days_for_third_follow_up:
     type: wait
@@ -176,6 +179,7 @@ nodes:
       condition: law_firm.provider.records_and_bills_received == true
     config:
       task_goal: Wait 15 more days after the second follow-up unless the provider's records and bills arrive first.
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   third_follow_up_records_request:
     type: recipe
@@ -190,6 +194,7 @@ nodes:
     config:
       task_goal: If records or bills remain outstanding 45 days after the original request, check for receipt first, then prepare or document the third follow-up and identify whether provider delay, fee, HIPAA, wrong contact, or production-date issues explain the delay.
       provider_scoped: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   wait_15_more_days_for_escalation:
     type: wait
@@ -202,6 +207,7 @@ nodes:
       condition: law_firm.provider.records_and_bills_received == true
     config:
       task_goal: Wait 15 more days after the third follow-up unless the provider's records and bills arrive first.
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   escalate_records_request:
     type: recipe
@@ -217,6 +223,7 @@ nodes:
       task_goal: If records or bills are still missing 60 days after the original request, check for receipt first, then prepare attorney-review escalation to office manager, compliance/privacy officer, formal demand, subpoena strategy, or other legal intervention if litigation is active.
       provider_scoped: true
       attorney_review_if_legal_intervention_needed: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
 
   receive_and_process_records_bills:
     type: recipe

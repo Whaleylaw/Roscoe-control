@@ -102,6 +102,38 @@ beforeEach(() => {
     }
     if (href === '/api/law-firm/cases/colleen-colvin/workflow') {
       if (init?.method === 'POST') {
+        const requestBody = JSON.parse(String(init.body || '{}')) as { action?: string }
+        if (requestBody.action === 'start_case_workflow') {
+          return new Response(JSON.stringify({
+            workflow_instance: { instance_id: 11, ready_nodes: ['gather_demand_materials'], vars: { case_slug: 'colleen-colvin', source_trigger: 'manual' } },
+            materialized: { created: [{ task_id: 101, node_key: 'gather_demand_materials' }], skipped: [] },
+            workflow_instances: [
+              {
+                workflow_instance_id: 11,
+                workflow_key: 'firmvault-demand-readiness:law_firm_case:colleen-colvin:case_slug=colleen-colvin,source_trigger=manual',
+                definition_slug: 'firmvault-demand-readiness',
+                definition_name: 'FirmVault Demand Readiness',
+                definition_version: 1,
+                vars: { case_slug: 'colleen-colvin', source_trigger: 'manual' },
+                status: 'active',
+                started_by: 'tester',
+                started_at: 1000,
+                completed_at: null,
+                updated_at: 1000,
+                total_nodes: 2,
+                ready_nodes: 0,
+                running_nodes: 1,
+                waiting_nodes: 0,
+                blocked_nodes: 0,
+                complete_nodes: 0,
+                failed_nodes: 0,
+                task_count: 1,
+                nodes: [],
+              },
+            ],
+            medical_providers: caseDetail.dashboard.medical_providers,
+          }), { status: 201 })
+        }
         return new Response(JSON.stringify({
           result: {
             started: [{ workflow_instance_id: 9, definition_slug: 'firmvault-request-medical-records' }],
@@ -336,6 +368,25 @@ describe('LawFirmCaseWorkspace', () => {
       }),
     )
     expect(document.body.textContent).toContain('Provider: UofL Orthopedics')
+  })
+
+  it('can start a generic case workflow from the workflow tab', async () => {
+    nav.pathname = '/law-firm/case/colleen-colvin/workflow'
+    render(<LawFirmCaseWorkspace />)
+
+    await waitFor(() => expect(screen.getByText('Demand Readiness')).toBeTruthy())
+    expect(screen.getByText('Draft Demand')).toBeTruthy()
+    fireEvent.click(screen.getAllByText('Start')[0])
+
+    await waitFor(() => expect(document.body.textContent).toContain('Workflow started'))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/law-firm/cases/colleen-colvin/workflow',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('start_case_workflow'),
+      }),
+    )
+    expect(document.body.textContent).toContain('FirmVault Demand Readiness')
   })
 
   it('can cancel an active workflow instance from the workflow tab', async () => {

@@ -1,0 +1,106 @@
+schema_version: 1
+id: firmvault-settlement-lien-negotiation
+name: FirmVault Settlement Lien Negotiation
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as settlement_reached, funds_received, manual, or lien_review.
+    default: settlement_reached
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.settlement_reached == true
+  - type: event
+    event: law_firm.settlement.lien_review_needed
+  - type: manual
+
+nodes:
+  audit_settlement_liens:
+    type: recipe
+    name: Audit Settlement Liens
+    recipe: firmvault-settlement-lien-audit
+    depends_on:
+      conditions:
+        - law_firm.landmarks.settlement_reached == true
+    completes:
+      - law_firm.landmarks.settlement_liens_audited
+      - law_firm.landmarks.liens_prioritized
+      - law_firm.landmarks.lien_available_funds_calculated
+    config:
+      task_goal: >-
+        Audit settlement-stage lien status from canonical FirmVault files. Read
+        settlement, distribution, liens, provider/payor, demand, negotiation, and
+        insurance evidence. If no evidence-backed outstanding liens exist,
+        document that no settlement-lien negotiation is currently applicable and
+        create an internal no-lien clearance summary. If outstanding liens exist,
+        prioritize them by type, identify final-amount status, calculate the
+        available funds picture from supported settlement/distribution facts, and
+        prepare a negotiation strategy handoff. Do not contact lien holders, send
+        reduction requests, pay liens, mark liens paid, or mark final
+        distribution complete.
+      canonical_paths:
+        - settlement/settlement.md
+        - settlement/distribution.md
+        - liens/
+        - medical-providers/
+        - demand/readiness.md
+        - negotiation/offers.md
+        - insurance/
+        - documents/received/liens/
+        - documents/generated/settlement/
+        - activity/
+        - workflow-log/
+
+  human_lien_strategy_review:
+    type: review
+    name: Human Lien Strategy Review
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - audit_settlement_liens
+    completes:
+      - law_firm.landmarks.settlement_lien_strategy_reviewed
+    config:
+      task_goal: >-
+        Review the settlement-lien audit and strategy handoff. For this test
+        ladder, comment whether the no-lien clearance is accepted or, if liens
+        exist, what reduction/payment strategy should be pursued for each lien.
+        If the audit missed a known lien, comment with the lien holder, type,
+        known amount/status, and canonical evidence path so the workflow can be
+        corrected before distribution.
+
+  document_lien_negotiation_result:
+    type: recipe
+    name: Document Settlement Lien Result
+    recipe: firmvault-settlement-lien-document-result
+    depends_on:
+      nodes:
+        - human_lien_strategy_review
+    completes:
+      - law_firm.landmarks.liens_negotiated
+    config:
+      task_goal: >-
+        Document the human-reviewed settlement-lien outcome. Read same-task
+        Mission Control comments plus the canonical lien audit/strategy files.
+        If no outstanding liens were accepted as applicable, record a no-lien
+        settlement-lien result and preserve distribution readiness boundaries.
+        If liens exist, record only human-confirmed negotiation outcomes,
+        reduced/final amounts, written-confirmation needs, and next payment
+        blockers. Do not invent reductions, payment amounts, payee details,
+        release terms, or payment dates. Do not pay liens or mark final
+        distribution complete.
+      canonical_paths:
+        - settlement/distribution.md
+        - liens/
+        - documents/generated/settlement/
+        - documents/received/liens/
+        - activity/
+        - workflow-log/

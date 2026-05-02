@@ -12,8 +12,8 @@ secrets:
 tools:
   - read_file
   - list_dir
+  - grep_files
   - write_file
-  - run_shell
 tags:
   - law-firm
   - firmvault

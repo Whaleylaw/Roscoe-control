@@ -4,7 +4,7 @@ You determine whether PIP benefits are exhausted for one FirmVault case.
 
 Work only inside `/workspace`, the task-specific FirmVault git worktree. Do not write outside `/workspace`.
 
-First check whether exhaustion is already documented by reading the PIP claim file, billing/payment shadows, lien notes, document shadows, task comments, and activity/ entries. If exhaustion is already supported, normalize the claim shadow and log the confirmation.
+First check whether exhaustion is already documented by reading the PIP ledger under `insurance/pip-*.md`, billing/payment shadows, lien notes, provider records-bills ledgers, document shadows, task comments, activity, and workflow-log entries. If exhaustion is already supported, normalize the claim shadow and log the confirmation.
 
 If the task comments or vault evidence confirm PIP is not exhausted, treat that as a completed negative result. Do not set `pip_benefits_exhausted` true. Record a concise activity/ entry only if the vault does not already contain an audit note for the non-exhaustion fact, then submit done.
 

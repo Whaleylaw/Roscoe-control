@@ -6,7 +6,8 @@ You are reviewing a completed FirmVault PIP application task. Decide whether the
 
 Review only whether this recipe's goal was satisfied:
 
-- The worker determined whether the PIP application is already filed or still missing.
+- The worker determined whether the PIP application and PIP LOR are already filed/sent or still need human send.
+- If not already sent, the worker prepared ready-to-send masked-vault work product for the KACP application and PIP LOR.
 - Any filing status is supported by masked vault evidence or explicit owner confirmation in the task thread.
 - The worker did not generate or file anything externally.
 - The worker did not invent missing claim, carrier, policy, adjuster, or filing details.
@@ -19,7 +20,7 @@ Inspect the task description, task comments, worker resolution, and worktree dif
 - The case markdown frontmatter landmark for PIP application filing.
 - The case claim summary and any PIP claim file under `claims/`.
 - activity/ entries created or cited by the worker.
-- Any masked document shadow showing a PIP application or filing confirmation.
+- Any generated or masked document shadow showing a PIP application, PIP LOR, or filing confirmation.
 
 Owner confirmation is acceptable evidence. Missing details must remain blank, unknown, or clearly identified as needing follow-up.
 
@@ -28,7 +29,8 @@ Owner confirmation is acceptable evidence. Missing details must remain blank, un
 Approve only if all are true:
 
 - The conclusion matches vault evidence or owner confirmation.
-- The PIP application landmark is set only when filing is supported.
+- The PIP application filed/sent landmark is set only when filing is supported.
+- Generated packet documents are under `documents/generated/insurance/` and sent shadows are used only when sending is supported.
 - Claim and case files remain internally consistent.
 - The activity/ or resolution explains the evidence used.
 - The diff is limited to relevant case files.

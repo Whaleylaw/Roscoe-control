@@ -6,7 +6,7 @@ You are reviewing a completed FirmVault PIP approval confirmation task. Your job
 
 Review only whether this recipe's goal was satisfied:
 
-- The task determined whether the case has an approved or active PIP claim.
+- The task determined whether the case has an acknowledged, approved, active, denied, assigned, defective, or still-unanswered PIP claim.
 - The worker checked whether the approval was already documented before making changes.
 - Any vault updates are supported by masked vault evidence or by an explicit owner confirmation in the task thread.
 - The worker did not invent unknown claim details.
@@ -19,13 +19,16 @@ Inspect the task description, task comments, worker resolution, and the worktree
 
 - The case markdown frontmatter `landmarks` entry for the PIP approval landmark.
 - The case PIP claim summary in the case markdown file.
-- Any PIP claim file under `claims/`.
+- Any PIP ledger under `insurance/pip-*.md`.
+- Any generated follow-up draft under `documents/generated/insurance/`.
 - Any activity/ entry created for this task.
 
 Approval may be accepted when either:
 
 - the masked vault already contains sufficient evidence of active or approved PIP coverage; or
 - the task thread contains an owner confirmation that PIP is approved or active.
+
+If no acknowledgment arrived after a wait, the worker may pass by preparing a supported human follow-up draft and recording the no-acknowledgment status without marking PIP approved.
 
 Owner confirmation is enough to set the landmark and status, but missing details must remain blank or be clearly marked unknown. Do not reject solely because the adjuster name, phone, email, approval date, or claim number is unavailable, unless the worker invented those details.
 

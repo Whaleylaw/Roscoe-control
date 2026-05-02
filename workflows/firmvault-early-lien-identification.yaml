@@ -1,0 +1,84 @@
+schema_version: 1
+id: firmvault-early-lien-identification
+name: FirmVault Early Lien Identification
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as providers_setup, bill_payor_clue, client_check_in, or manual.
+    default: providers_setup
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.providers_setup == true
+  - type: event
+    event: law_firm.medical_bill.payor_detected
+  - type: event
+    event: law_firm.lien.notice_received
+  - type: manual
+
+nodes:
+  identify_potential_liens:
+    type: recipe
+    name: Identify Potential Liens
+    recipe: firmvault-lien-identify-potential
+    depends_on:
+      conditions:
+        - law_firm.landmarks.providers_setup == true
+    completes:
+      - law_firm.landmarks.health_coverage_categorized
+      - law_firm.landmarks.lien_clues_reviewed
+      - law_firm.landmarks.liens_identified
+    config:
+      task_goal: >-
+        Review canonical case evidence for early lien and payor clues. Read the
+        case root file, client intake and check-ins, insurance ledgers, medical
+        provider ledgers, records-bills ledgers, existing liens, received
+        medical bills/EOB shadows if present, activity, and workflow-log. Classify
+        supported lien possibilities only when evidence exists: Medicare,
+        Medicaid, ERISA/private health subrogation, provider/hospital lien,
+        workers' compensation, VA/TRICARE, child support, pre-settlement funding,
+        or other. Create or update liens/<holder-slug>.md only for supported
+        lien holders or concrete payor/lien clues. Do not create speculative lien
+        files merely because a provider exists. If no liens are supported, record
+        an evidence-backed no-current-lien-clue review in activity/workflow-log
+        and leave downstream lien workflows blocked. Do not request final amounts,
+        negotiate liens, pay liens, or send external notices in this workflow.
+      canonical_paths:
+        - client/intake.md
+        - client/check-ins.md
+        - insurance/
+        - medical-providers/<provider-slug>/provider.md
+        - medical-providers/<provider-slug>/records-bills.md
+        - medical-providers/<provider-slug>/documents/
+        - liens/
+        - documents/received/
+        - documents/shadows/
+        - activity/
+        - workflow-log/
+
+  human_lien_inventory_review:
+    type: review
+    name: Human Lien Inventory Review
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - identify_potential_liens
+    completes:
+      - law_firm.landmarks.lien_inventory_reviewed
+    config:
+      task_goal: >-
+        Review the early lien inventory result. Confirm whether the identified
+        liens/payor clues are correct, whether any known Medicare, Medicaid,
+        private health insurance, provider/hospital, workers' compensation,
+        VA/TRICARE, child support, or funding lien is missing, and whether any
+        listed lien should be marked not applicable. This review does not unlock
+        final amount requests unless an actual lien holder exists and later
+        dependencies are satisfied.

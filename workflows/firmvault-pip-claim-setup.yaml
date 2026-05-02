@@ -1,0 +1,183 @@
+schema_version: 1
+id: firmvault-pip-claim-setup
+name: FirmVault PIP Claim Setup
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Trigger source such as accident_report, intake, manual, or owner_supplied_pip_facts.
+    default: accident_report
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.accident_report_obtained == true
+  - type: condition
+    condition: law_firm.landmarks.pip_track_active == true
+  - type: event
+    event: law_firm.insurance.pip.manual
+  - type: manual
+
+nodes:
+  determine_pip_path:
+    type: recipe
+    name: Determine PIP Path
+    recipe: firmvault-insurance-pip-open-claim
+    depends_on:
+      conditions:
+        - law_firm.landmarks.accident_report_obtained == true
+    completes:
+      - law_firm.landmarks.pip_track_active
+      - law_firm.landmarks.pip_carrier_identified
+    config:
+      task_goal: >-
+        Apply the Kentucky PIP waterfall from canonical accident, intake,
+        insurance, client, and document-shadow evidence. Determine whether PIP
+        is through the occupied vehicle insurer, the client's own insurer, a
+        household insurer, Kentucky Assigned Claims, or whether the client is
+        disqualified because the occupied vehicle was titled to the client and
+        uninsured. Create or normalize insurance/pip-<carrier-slug>.md,
+        including KAC/Travelers assigned-claims facts when supported, without
+        inventing policy, claim, adjuster, or coverage facts. If the waterfall
+        cannot be completed from the vault, route to Human Review with the exact
+        missing waterfall question.
+      canonical_paths:
+        - accident/accident.md
+        - accident/police-report.md
+        - accident/liability.md
+        - client/intake.md
+        - insurance/pip-<carrier-slug>.md
+        - insurance/um-<carrier-slug>.md
+        - insurance/uim-<carrier-slug>.md
+        - documents/shadows/insurance/
+        - contacts/<carrier-or-adjuster-slug>.md
+
+  prepare_pip_packet:
+    type: recipe
+    name: Prepare PIP Application and LOR Packet
+    recipe: firmvault-pip-file-application
+    depends_on:
+      nodes:
+        - determine_pip_path
+    completes:
+      - law_firm.landmarks.pip_application_prepared
+      - law_firm.landmarks.pip_lor_prepared
+    config:
+      task_goal: >-
+        Prepare the masked-vault PIP packet for human send. Use the determined
+        PIP ledger to create ready-to-send markdown work product for the KACP
+        application and PIP letter of representation under
+        documents/generated/insurance/. The packet must identify the carrier or
+        KAC assigned-claims path, list supported accident/client/provider facts,
+        show unknown or missing fields explicitly, and include human send
+        instructions. Do not send the packet, contact carriers, use portals,
+        email, fax, mail, or claim that the application or LOR was filed unless
+        existing sent/received shadows, activity, workflow-log, or owner
+        confirmation already supports it.
+      canonical_paths:
+        - insurance/pip-<carrier-slug>.md
+        - documents/generated/insurance/pip-<carrier-slug>-application.md
+        - documents/generated/insurance/pip-<carrier-slug>-lor.md
+        - documents/sent/insurance/pip-<carrier-slug>-application-sent.md
+        - documents/sent/insurance/pip-<carrier-slug>-lor-sent.md
+        - activity/
+        - workflow-log/
+
+  human_send_pip_packet:
+    type: review
+    name: Human Send PIP Packet
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_pip_packet
+    completes:
+      - law_firm.landmarks.pip_application_filed
+      - law_firm.landmarks.pip_lor_sent
+    config:
+      task_goal: Review the generated PIP packet artifacts now merged into the case branch under documents/generated/insurance/, including the PIP application and PIP letter of representation. The preceding Forgejo PR may be closed or show no diff after merge, so use the canonical generated artifact paths on the case branch as the authoritative review surface. If the packet is acceptable, send it by the available human channel such as mail, email, fax, portal, or phone-assisted claim setup. Then comment with send date, method, recipient, and any claim number, assigned carrier, adjuster, or acknowledgment information received. If the packet cannot be sent because recipient, signature, or channel information is missing, comment with the exact missing information and leave the task in Human Review.
+
+  wait_for_pip_acknowledgment:
+    type: wait
+    name: Wait for PIP Acknowledgment
+    duration: 10d
+    depends_on:
+      nodes:
+        - human_send_pip_packet
+    exit_when:
+      condition: law_firm.landmarks.pip_approved == true
+    config:
+      task_goal: Wait ten days for PIP carrier, KAC, or assigned-claims acknowledgment unless approval, denial, assignment, claim number, adjuster information, or returned/defective packet evidence arrives earlier through document intake, owner confirmation, or a supported insurance ledger update.
+
+  process_pip_acknowledgment:
+    type: recipe
+    name: Process PIP Acknowledgment or Follow Up
+    recipe: firmvault-pip-confirm-approval
+    depends_on:
+      nodes:
+        - wait_for_pip_acknowledgment
+    completes:
+      - law_firm.landmarks.pip_acknowledgment_checked
+    config:
+      task_goal: >-
+        Check the PIP ledger, sent packet shadows, received insurance shadows,
+        activity, workflow-log, and task comments for PIP acknowledgment,
+        Kentucky Assigned Claims assignment, approval, denial, claim number,
+        adjuster assignment, or returned/defective packet evidence. If
+        acknowledgment or approval arrived, normalize the PIP ledger with only
+        supported facts. If no acknowledgment arrived after the wait, prepare a
+        human follow-up instruction or follow-up draft and record the follow-up
+        need without claiming external contact. If coverage is denied or the
+        packet is defective, route to Human Review with the exact next decision
+        or correction needed.
+      canonical_paths:
+        - insurance/pip-<carrier-slug>.md
+        - documents/sent/insurance/
+        - documents/received/insurance/
+        - documents/generated/insurance/
+        - activity/
+        - workflow-log/
+
+  wait_before_pip_status_followup:
+    type: wait
+    name: Wait Before PIP Status Follow-Up
+    duration: 30d
+    depends_on:
+      nodes:
+        - process_pip_acknowledgment
+    exit_when:
+      condition: law_firm.landmarks.pip_benefits_exhausted == true
+    config:
+      task_goal: Wait thirty days before checking PIP payment/exhaustion status unless benefits are exhausted, denied, or resolved earlier through document intake, owner confirmation, or a supported PIP ledger update.
+
+  track_pip_status:
+    type: recipe
+    name: Track PIP Status
+    recipe: firmvault-pip-track-exhaustion
+    depends_on:
+      nodes:
+        - wait_before_pip_status_followup
+    completes:
+      - law_firm.landmarks.pip_status_checked
+    config:
+      task_goal: >-
+        Review PIP bills, payment summaries, EOB shadows, provider billing
+        ledgers, insurance documents, activity, workflow-log, and task comments
+        to determine whether PIP is exhausted, not exhausted, denied, or still
+        unknown. Mark exhaustion only when supported. If PIP is not exhausted,
+        record that supported status without satisfying the exhaustion
+        landmark. If status cannot be determined, route to Human Review with
+        the exact missing ledger, EOB, payment summary, or owner confirmation
+        needed.
+      canonical_paths:
+        - insurance/pip-<carrier-slug>.md
+        - medical-providers/<provider-slug>/records-bills.md
+        - documents/shadows/insurance/
+        - documents/received/insurance/
+        - activity/
+        - workflow-log/

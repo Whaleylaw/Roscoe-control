@@ -1,0 +1,133 @@
+schema_version: 1
+id: firmvault-lien-resolution
+name: FirmVault Lien Resolution
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as lien_identified, settlement_reached, final_lien_needed, or manual.
+    default: lien_identified
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.liens_identified == true
+  - type: event
+    event: law_firm.lien.final_amount_needed
+  - type: manual
+
+nodes:
+  review_lien_inventory:
+    type: recipe
+    name: Review Lien Inventory
+    recipe: firmvault-lien-resolution-review-inventory
+    depends_on:
+      conditions:
+        - law_firm.landmarks.liens_identified == true
+    completes:
+      - law_firm.landmarks.liens_opened
+    config:
+      task_goal: >-
+        Review canonical lien ledgers and received/sent lien documents. Confirm
+        which evidence-backed lien holders are open and need final amount work.
+        If no open lien exists, submit Human Review with that finding instead of
+        creating downstream final-lien tasks. Do not create speculative liens.
+
+  prepare_final_lien_request:
+    type: recipe
+    name: Prepare Final Lien Request
+    recipe: firmvault-lien-resolution-prepare-final-request
+    depends_on:
+      nodes:
+        - review_lien_inventory
+    completes:
+      - law_firm.landmarks.final_amount_request_prepared
+    config:
+      task_goal: >-
+        Prepare final lien amount request letters/handoffs for each open lien
+        holder requiring a final amount. Use settlement amount, fee/cost facts,
+        lien holder contact facts, and existing conditional amount evidence when
+        present. Write generated request drafts under documents/generated/liens/
+        and update lien ledgers as prepared only. Do not send the requests.
+
+  human_send_final_lien_request:
+    type: review
+    name: Human Send Final Lien Request
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_final_lien_request
+    completes:
+      - law_firm.landmarks.final_amounts_requested
+    config:
+      task_goal: >-
+        Send the prepared final lien request. For this test ladder, comment with
+        synthetic send facts: lien holder, send date, method, recipient, and
+        requested final amount information.
+
+  wait_for_final_lien_amount:
+    type: wait
+    name: Wait for Final Lien Amount
+    duration: 30d
+    depends_on:
+      nodes:
+        - human_send_final_lien_request
+    exit_when:
+      condition: law_firm.landmarks.final_amounts_received == true
+    config:
+      task_goal: Wait 30 days for final lien amount unless a final amount document or human confirmation arrives earlier.
+
+  document_final_lien_amount:
+    type: recipe
+    name: Document Final Lien Amount
+    recipe: firmvault-lien-resolution-document-final-amount
+    depends_on:
+      nodes:
+        - wait_for_final_lien_amount
+    completes:
+      - law_firm.landmarks.final_amounts_received
+    config:
+      task_goal: >-
+        Document received final lien amounts from same-task comments and
+        canonical received lien documents. Update lien ledgers and distribution
+        planning. Do not negotiate, reduce, pay, or mark liens paid.
+
+  human_lien_payment_review:
+    type: review
+    name: Human Lien Payment Review
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - document_final_lien_amount
+    completes:
+      - law_firm.landmarks.lien_payment_authorized
+    config:
+      task_goal: >-
+        Review final lien amount and decide payment/reduction outcome. For this
+        test ladder, comment with synthetic payment authorization facts:
+        holder, authorized amount, whether negotiated/reduced, payment method,
+        payee, and whether written satisfaction/release is required.
+
+  document_lien_payment:
+    type: recipe
+    name: Document Lien Payment
+    recipe: firmvault-lien-resolution-document-payment
+    depends_on:
+      nodes:
+        - human_lien_payment_review
+    completes:
+      - law_firm.landmarks.liens_negotiated
+      - law_firm.landmarks.liens_paid
+    config:
+      task_goal: >-
+        Document human-authorized lien payment or negotiated resolution from
+        same-task comments. Update lien ledgers, settlement/distribution
+        planning, sent/received lien documentation, activity, and workflow-log.
+        Do not invent payment facts or mark final distribution complete.
