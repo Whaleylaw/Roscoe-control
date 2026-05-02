@@ -14,6 +14,7 @@ import { TaskBoardPanel } from '@/components/panels/task-board-panel'
 import { RecipesPanel } from '@/components/panels/recipes-panel'
 import { ProjectsPanel } from '@/components/panels/projects-panel'
 import { LawFirmPanel } from '@/components/panels/law-firm-panel'
+import { EmailReviewerPanel } from '@/components/panels/email-reviewer-panel'
 import { ActivityFeedPanel } from '@/components/panels/activity-feed-panel'
 import { AgentSquadPanelPhase3 } from '@/components/panels/agent-squad-panel-phase3'
 import { AgentCommsPanel } from '@/components/panels/agent-comms-panel'
@@ -434,7 +435,7 @@ export default function Home() {
           role="main"
           aria-hidden={showOnboarding}
         >
-          <div aria-live="polite" className="flex flex-col min-h-full">
+          <div aria-live="polite" className="flex h-full min-h-0 flex-col">
             <ErrorBoundary key={isProjectRoute || isLawFirmCaseRoute ? pathname : activeTab}>
               {isProjectRoute ? <ProjectWorkspace /> : isLawFirmCaseRoute ? <LawFirmCaseWorkspace /> : <ContentRouter tab={activeTab} />}
             </ErrorBoundary>
@@ -483,7 +484,7 @@ export default function Home() {
 }
 
 const ESSENTIAL_PANELS = new Set([
-  'overview', 'agents', 'projects', 'law-firm', 'tasks', 'chat', 'activity', 'logs', 'settings',
+  'overview', 'agents', 'projects', 'law-firm', 'tasks', 'email', 'chat', 'activity', 'logs', 'settings',
 ])
 
 function ContentRouter({ tab }: { tab: string }) {
@@ -543,6 +544,8 @@ function ContentRouter({ tab }: { tab: string }) {
       return <TaskBoardPanel />
     case 'recipes':
       return <RecipesPanel />
+    case 'email':
+      return <EmailReviewerPanel />
     case 'agents':
       return (
         <>

@@ -34,6 +34,7 @@ const navGroups: NavGroup[] = [
       { id: 'law-firm', label: 'Law Firm', icon: <LawFirmIcon />, priority: false, essential: true },
       { id: 'tasks', label: 'Tasks', icon: <TasksIcon />, priority: true, essential: true },
       { id: 'recipes', label: 'Recipes', icon: <RecipesIcon />, priority: false, essential: false },
+      { id: 'email', label: 'Email', icon: <EmailIcon />, priority: false, essential: true },
       { id: 'chat', label: 'Chat', icon: <ChatIcon />, priority: false, essential: true },
       { id: 'channels', label: 'Channels', icon: <ChannelsIcon />, priority: false },
       { id: 'skills', label: 'Skills', icon: <SkillsIcon />, priority: false },
@@ -92,6 +93,7 @@ const navItemTranslationKeys: Record<string, string> = {
   'law-firm': 'lawFirm',
   tasks: 'tasks',
   recipes: 'recipes',
+  email: 'email',
   chat: 'chat',
   channels: 'channels',
   skills: 'skills',
@@ -1262,6 +1264,15 @@ function RecipesIcon() {
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3.5" y="2" width="9" height="12" rx="1.5" />
       <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+    </svg>
+  )
+}
+
+function EmailIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M3 4.5 8 8l5-3.5" />
     </svg>
   )
 }
