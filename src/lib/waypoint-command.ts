@@ -292,7 +292,7 @@ export function listWaypointRoutes(db: Database.Database, input: ListWaypointRou
   return rows
 }
 
-function setWaypointRoutePausedState(
+export function setWaypointRoutePausedState(
   db: Database.Database,
   input: {
     workspaceId: number
