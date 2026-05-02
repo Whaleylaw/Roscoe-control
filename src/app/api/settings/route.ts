@@ -6,6 +6,7 @@ import { mutationLimiter } from '@/lib/rate-limit'
 import { validateBody, updateSettingsSchema } from '@/lib/validation'
 
 const FORGEJO_TOKEN_KEY = 'runtime.forgejo_token'
+const FORGEJO_WEBHOOK_SECRET_KEY = 'runtime.forgejo_webhook_secret'
 const MASKED_SECRET_VALUE = '********'
 
 interface SettingRow {
@@ -120,6 +121,11 @@ const settingDefinitions: Record<string, { category: string; description: string
     description: 'Forgejo/Gitea API token used to create and inspect review pull requests.',
     default: '',
   },
+  [FORGEJO_WEBHOOK_SECRET_KEY]: {
+    category: 'runtime',
+    description: 'Shared secret used to verify Forgejo/Gitea pull-request webhooks.',
+    default: '',
+  },
   'runtime.review_pr_auto_create': {
     category: 'runtime',
     description: 'Whether approving task work should automatically create a review PR. Set exactly false to disable.',
@@ -128,12 +134,12 @@ const settingDefinitions: Record<string, { category: string; description: string
 }
 
 function displaySettingValue(key: string, value: string | undefined, defaultValue: string): string {
-  if (key !== FORGEJO_TOKEN_KEY) return value ?? defaultValue
+  if (key !== FORGEJO_TOKEN_KEY && key !== FORGEJO_WEBHOOK_SECRET_KEY) return value ?? defaultValue
   return value ? MASKED_SECRET_VALUE : ''
 }
 
 function auditSettingValue(key: string, value: string | null | undefined): string | null {
-  if (key !== FORGEJO_TOKEN_KEY) return value ?? null
+  if (key !== FORGEJO_TOKEN_KEY && key !== FORGEJO_WEBHOOK_SECRET_KEY) return value ?? null
   return value ? MASKED_SECRET_VALUE : ''
 }
 
@@ -235,7 +241,7 @@ export async function PUT(request: NextRequest) {
       // Get old value for audit
       const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
       const storedValue =
-        key === FORGEJO_TOKEN_KEY && strValue === MASKED_SECRET_VALUE
+        (key === FORGEJO_TOKEN_KEY || key === FORGEJO_WEBHOOK_SECRET_KEY) && strValue === MASKED_SECRET_VALUE
           ? existing?.value ?? ''
           : strValue
       changes[key] = {

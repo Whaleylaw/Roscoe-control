@@ -258,6 +258,95 @@ describe('publishApprovedWorktreeForReview', () => {
     expect(vi.mocked(spawnSync).mock.calls.some((call) => (call[1] as string[]).includes('push'))).toBe(false)
   })
 
+  it('rejects draft demand PR publication when required demand artifacts are missing from the worktree', async () => {
+    vi.mocked(existsSync).mockImplementation((path) => {
+      const p = String(path)
+      return !p.endsWith('/cases/test-case/demand/damages-summary.md') &&
+        !p.endsWith('/cases/test-case/demand/demand-package.md')
+    })
+    vi.mocked(spawnSync).mockImplementation((cmd, args) => {
+      const joined = [cmd, ...(args as string[])].join(' ')
+      if (joined.includes('remote get-url forgejo')) {
+        return { status: 0, stdout: 'ssh://git@localhost:2222/aaron/FirmVault.git\n', stderr: '' } as ReturnType<typeof spawnSync>
+      }
+      if (joined.includes('status --porcelain')) {
+        return {
+          status: 0,
+          stdout: [
+            ' M cases/test-case/demand/demand-letter.md',
+            '?? cases/test-case/activity/2026-05-01-1512-demand-draft-letter.md',
+            '?? cases/test-case/workflow-log/2026-05-01-1512-demand-draft-letter-task-2210.md',
+          ].join('\n') + '\n',
+          stderr: '',
+        } as ReturnType<typeof spawnSync>
+      }
+      return { status: 0, stdout: '', stderr: '' } as ReturnType<typeof spawnSync>
+    })
+
+    await expect(
+      publishApprovedWorktreeForReview(createDb() as never, {
+        id: 2210,
+        title: '[Workflow] FirmVault Draft Demand: Draft Demand Letter',
+        workspace_id: 1,
+        worktree_path: '/worktrees/task-2210',
+        workspace_source: JSON.stringify({ project_id: 38, base_ref: 'codex/test-ladder-008-treatment-complete-base' }),
+        recipe_slug: 'firmvault-demand-draft-letter',
+        metadata: JSON.stringify({ law_firm: { case_slug: 'test-case' } }),
+      } as any),
+    ).rejects.toThrow('draft demand PR is incomplete')
+    expect(forgejoMocks.createPullRequest).not.toHaveBeenCalled()
+    expect(vi.mocked(spawnSync).mock.calls.some((call) => (call[1] as string[]).includes('push'))).toBe(false)
+  })
+
+  it('allows draft demand PR publication when unchanged required demand artifacts already exist', async () => {
+    vi.mocked(spawnSync).mockImplementation((cmd, args) => {
+      const joined = [cmd, ...(args as string[])].join(' ')
+      if (joined.includes('remote get-url forgejo')) {
+        return { status: 0, stdout: 'ssh://git@localhost:2222/aaron/FirmVault.git\n', stderr: '' } as ReturnType<typeof spawnSync>
+      }
+      if (joined.includes('rev-parse --abbrev-ref HEAD')) {
+        return { status: 0, stdout: 'mc/task-2212\n', stderr: '' } as ReturnType<typeof spawnSync>
+      }
+      if (joined.includes('diff --cached --quiet')) {
+        return { status: 1, stdout: '', stderr: '' } as ReturnType<typeof spawnSync>
+      }
+      if (joined.includes('status --porcelain')) {
+        return {
+          status: 0,
+          stdout: [
+            ' M cases/test-case/demand/demand-package.md',
+            '?? cases/test-case/activity/2026-05-01-1541-demand-draft-letter.md',
+            '?? cases/test-case/workflow-log/2026-05-01-1541-demand-draft-letter.md',
+          ].join('\n') + '\n',
+          stderr: '',
+        } as ReturnType<typeof spawnSync>
+      }
+      if (joined.includes('rev-list --count codex/test-ladder-008-treatment-complete-base..mc/task-2212')) {
+        return { status: 0, stdout: '1\n', stderr: '' } as ReturnType<typeof spawnSync>
+      }
+      return { status: 0, stdout: '', stderr: '' } as ReturnType<typeof spawnSync>
+    })
+
+    const db = createDb()
+    const result = await publishApprovedWorktreeForReview(db as never, {
+      id: 2212,
+      title: '[Workflow] FirmVault Draft Demand: Draft Demand Letter',
+      workspace_id: 1,
+      worktree_path: '/worktrees/task-2212',
+      workspace_source: JSON.stringify({ project_id: 38, base_ref: 'codex/test-ladder-008-treatment-complete-base' }),
+      recipe_slug: 'firmvault-demand-draft-letter',
+      metadata: JSON.stringify({ law_firm: { case_slug: 'test-case' } }),
+    } as any)
+
+    expect(result).toMatchObject({
+      published: true,
+      pr_number: 12,
+      branch: 'mc/task-2212',
+    })
+    expect(forgejoMocks.createPullRequest).toHaveBeenCalled()
+    expect(db.reviewPrs).toHaveLength(1)
+  })
+
   it('throws when rev-list cannot compare the worktree branch to the base', async () => {
     vi.mocked(spawnSync).mockImplementation((cmd, args) => {
       const joined = [cmd, ...(args as string[])].join(' ')

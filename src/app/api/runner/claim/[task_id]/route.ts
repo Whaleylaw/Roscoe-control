@@ -73,6 +73,7 @@ import {
   resolveRecipeMaxAttempts,
   resolveResumeMarker,
   buildDispatchPayload,
+  type TaskCommentPayload,
 } from '@/lib/runner-claim'
 
 const DEFAULT_RUNNER_MAX_ATTEMPTS = 3
@@ -414,6 +415,27 @@ export async function POST(
   // or no checkpoints exist (first attempt) — the dispatch payload field is
   // typed as `ResumeMarker | null` either way.
   const resumeMarker = resolveResumeMarker(db, taskId)
+  const comments = db.prepare(`
+    SELECT id, author, content, created_at
+    FROM comments
+    WHERE task_id = ?
+      AND workspace_id = ?
+    ORDER BY id DESC
+    LIMIT 25
+  `).all(taskId, task.workspace_id).reverse().map((row) => {
+    const comment = row as {
+      id: number
+      author: string
+      content: string
+      created_at: number
+    }
+    return {
+      id: comment.id,
+      author: comment.author,
+      content: comment.content,
+      created_at: new Date(comment.created_at * 1000).toISOString(),
+    } satisfies TaskCommentPayload
+  })
 
   const taskPayload = buildDispatchPayload({
     taskId,
@@ -421,6 +443,7 @@ export async function POST(
     description: task.description,
     tags: taskTags,
     metadata: taskMetadata,
+    comments,
     recipeSlug: task.recipe_slug,
     workspaceSource,
     readOnlyMounts: mounts,

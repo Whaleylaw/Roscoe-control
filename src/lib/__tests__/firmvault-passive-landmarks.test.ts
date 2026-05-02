@@ -76,6 +76,146 @@ received_date: "2026-04-28"
 `)
 }
 
+function writePipAcknowledgmentShadow(root: string, slug: string) {
+  const receivedDir = join(root, 'cases', slug, 'documents', 'received', 'insurance')
+  mkdirSync(receivedDir, { recursive: true })
+  writeFileSync(join(receivedDir, 'kac-acknowledgment.md'), `---
+schema_version: 3
+document_type: insurance_pip_acknowledgment
+case_slug: ${slug}
+carrier_name: Kentucky Assigned Claims / Travelers
+acknowledgment_status: acknowledged
+pip_approved: true
+received_date: "2026-04-29"
+---
+
+# KAC Acknowledgment
+`)
+}
+
+function writeDemandSentEvidence(root: string, slug: string) {
+  const caseDir = join(root, 'cases', slug)
+  mkdirSync(join(caseDir, 'insurance'), { recursive: true })
+  mkdirSync(join(caseDir, 'documents', 'sent', 'insurance'), { recursive: true })
+  writeFileSync(join(caseDir, 'insurance', 'bi-progressive.md'), `---
+schema_version: 3
+ledger: insurance_claim
+case_slug: ${slug}
+coverage_type: BI
+carrier_name: Progressive
+demand_sent: true
+demand_sent_date: "2026-05-01"
+---
+
+# Progressive BI Claim
+`)
+  writeFileSync(join(caseDir, 'documents', 'sent', 'insurance', 'bi-progressive-demand-sent.md'), `---
+schema_version: 3
+document_type: demand_sent_shadow
+case_slug: ${slug}
+carrier_name: Progressive
+sent_date: "2026-05-01"
+---
+
+# BI Progressive Demand Sent
+`)
+}
+
+function writeOfferEvidence(root: string, slug: string) {
+  const caseDir = join(root, 'cases', slug)
+  mkdirSync(join(caseDir, 'insurance'), { recursive: true })
+  mkdirSync(join(caseDir, 'negotiation'), { recursive: true })
+  mkdirSync(join(caseDir, 'documents', 'received', 'insurance'), { recursive: true })
+  writeFileSync(join(caseDir, 'insurance', 'bi-progressive.md'), `---
+schema_version: 3
+ledger: insurance_claim
+case_slug: ${slug}
+coverage_type: BI
+carrier_name: Progressive
+initial_offer_received: true
+initial_offer_amount: 15000
+---
+
+# Progressive BI Claim
+`)
+  writeFileSync(join(caseDir, 'negotiation', 'offers.md'), `---
+schema_version: 3
+ledger: offers
+case_slug: ${slug}
+---
+
+# Offers
+
+## 2020-02-26 - Progressive initial BI offer
+
+- Amount: $15,000.00
+- Source: documents/received/insurance/progressive-offer-letter.md
+`)
+  writeFileSync(join(caseDir, 'documents', 'received', 'insurance', 'progressive-offer-letter.md'), `---
+schema_version: 3
+document_type: insurance_offer_letter
+case_slug: ${slug}
+carrier_name: Progressive
+offer_amount: 15000
+received_date: "2020-02-26"
+---
+
+# Progressive Offer Letter
+`)
+}
+
+function writeProviderRecordsAndBills(root: string, slug: string, providerSlug: string) {
+  const providerDir = join(root, 'cases', slug, 'medical-providers', providerSlug)
+  mkdirSync(join(providerDir, 'documents'), { recursive: true })
+  writeFileSync(join(providerDir, 'records-bills.md'), `---
+schema_version: 3
+ledger: provider_records_bills
+case_slug: ${slug}
+provider_slug: ${providerSlug}
+request_status: requested_sent
+receipt_status: partial
+records_received: false
+bills_received: false
+---
+
+# Records and Bills
+`)
+  writeFileSync(join(providerDir, 'documents', 'records.md'), `---
+schema_version: 3
+document_type: medical_records
+case_slug: ${slug}
+provider_slug: ${providerSlug}
+received_date: "2026-04-30"
+---
+
+# Records
+`)
+  writeFileSync(join(providerDir, 'documents', 'bills.md'), `---
+schema_version: 3
+document_type: medical_bills
+case_slug: ${slug}
+provider_slug: ${providerSlug}
+received_date: "2026-04-30"
+---
+
+# Bills
+`)
+}
+
+function writeProviderChronology(root: string, slug: string, providerSlug: string) {
+  const providerDir = join(root, 'cases', slug, 'medical-providers', providerSlug)
+  mkdirSync(providerDir, { recursive: true })
+  writeFileSync(join(providerDir, 'chronology.md'), `---
+schema_version: 3
+case_slug: ${slug}
+provider_slug: ${providerSlug}
+chronology_status: updated
+---
+
+# Chronology
+`)
+}
+
 function writeCaseSetupScaffold(root: string, slug: string) {
   const caseDir = join(root, 'cases', slug)
   const requiredFiles = [
@@ -183,6 +323,139 @@ describe('FirmVault passive landmarks', () => {
     }
   })
 
+  it('resolves PIP approval from the canonical insurance acknowledgment shadow', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writePipAcknowledgmentShadow(root, 'test-case')
+
+      await expect(resolveFirmVaultPassiveLandmarks('test-case')).resolves.toMatchObject({
+        case_slug: 'test-case',
+        landmarks: {
+          pip_approved: {
+            satisfied: true,
+            evidence: expect.arrayContaining(['documents/received/insurance/kac-acknowledgment.md']),
+          },
+        },
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves demand sent from canonical sent-demand evidence', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writeDemandSentEvidence(root, 'test-case')
+
+      await expect(resolveFirmVaultPassiveLandmarks('test-case')).resolves.toMatchObject({
+        case_slug: 'test-case',
+        landmarks: {
+          demand_sent: {
+            satisfied: true,
+            evidence: expect.arrayContaining([
+              'insurance/bi-progressive.md',
+              'documents/sent/insurance/bi-progressive-demand-sent.md',
+            ]),
+          },
+        },
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves initial offer from canonical negotiation and insurance evidence', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writeOfferEvidence(root, 'test-case')
+
+      await expect(resolveFirmVaultPassiveLandmarks('test-case')).resolves.toMatchObject({
+        case_slug: 'test-case',
+        landmarks: {
+          initial_offer_received: {
+            satisfied: true,
+            evidence: expect.arrayContaining([
+              'insurance/bi-progressive.md',
+              'negotiation/offers.md',
+              'documents/received/insurance/progressive-offer-letter.md',
+            ]),
+          },
+        },
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves provider records and bills receipt from canonical provider document placement', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writeProviderRecordsAndBills(root, 'test-case', 'river-city-orthopedics')
+
+      await expect(resolveFirmVaultPassiveLandmarks('test-case')).resolves.toMatchObject({
+        case_slug: 'test-case',
+        providers: {
+          'river-city-orthopedics': {
+            records_received: true,
+            bills_received: true,
+            records_or_bills_received: true,
+            records_and_bills_received: true,
+            evidence: expect.arrayContaining([
+              'medical-providers/river-city-orthopedics/documents/records.md',
+              'medical-providers/river-city-orthopedics/documents/bills.md',
+            ]),
+          },
+        },
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves case-level demand prerequisites from provider records, bills, and chronology placement', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writeProviderRecordsAndBills(root, 'test-case', 'river-city-orthopedics')
+      writeProviderChronology(root, 'test-case', 'river-city-orthopedics')
+
+      await expect(resolveFirmVaultPassiveLandmarks('test-case')).resolves.toMatchObject({
+        case_slug: 'test-case',
+        landmarks: {
+          all_records_received: {
+            satisfied: true,
+            evidence: expect.arrayContaining([
+              'medical-providers/river-city-orthopedics/documents/records.md',
+            ]),
+          },
+          all_bills_received: {
+            satisfied: true,
+            evidence: expect.arrayContaining([
+              'medical-providers/river-city-orthopedics/documents/bills.md',
+            ]),
+          },
+          medical_chronology_updated: {
+            satisfied: true,
+            evidence: expect.arrayContaining([
+              'medical-providers/river-city-orthopedics/chronology.md',
+            ]),
+          },
+        },
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('satisfies waiting workflow conditions from canonical ledgers without document intake knowing the workflow', async () => {
     const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
     const db = new Database(':memory:')
@@ -259,6 +532,117 @@ nodes:
     }
   })
 
+  it('satisfies provider-scoped records/bills arrival without document intake knowing the workflow', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    const db = new Database(':memory:')
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: true, medicalAuthSigned: true })
+      writeProviderRecordsAndBills(root, 'test-case', 'river-city-orthopedics')
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general'`).get() as { id: number }
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: passive-provider-doc-wait
+name: Passive Provider Doc Wait
+subject_type: law_firm_case
+nodes:
+  send_records_request:
+    type: recipe
+    recipe: hello-world
+  wait_15_days_for_records:
+    type: wait
+    duration: 15d
+    depends_on:
+      nodes:
+        - send_records_request
+    exit_when:
+      condition: law_firm.provider.records_and_bills_received == true
+  first_follow_up_records_request:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      nodes:
+        - wait_15_days_for_records
+    config:
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+  receive_and_process_records_bills:
+    type: recipe
+    recipe: hello-world
+    depends_on:
+      conditions:
+        - law_firm.provider.records_or_bills_received == true
+`, 'tester', 1, 1)
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'test-case',
+        vars: {
+          provider_slug: 'river-city-orthopedics',
+          provider_name: 'River City Orthopedics',
+        },
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 1000,
+      })
+      const firstMaterialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 1001,
+      })
+      advanceWorkflowAfterTaskApproval(db, {
+        taskId: firstMaterialized.created[0].task_id,
+        actor: 'reviewer',
+        now: 1010,
+      })
+
+      const result = await satisfyPassiveFirmVaultLandmarks(db, {
+        workspaceId: 1,
+        actor: 'passive-landmark-resolver',
+        status: 'inbox',
+        now: 1020,
+      })
+
+      expect(result.satisfied).toEqual([
+        {
+          case_slug: 'test-case',
+          landmark: 'provider.records_and_bills_received',
+          condition: 'law_firm.provider.records_and_bills_received == true',
+          satisfied_dependencies: 1,
+        },
+        {
+          case_slug: 'test-case',
+          landmark: 'provider.records_or_bills_received',
+          condition: 'law_firm.provider.records_or_bills_received == true',
+          satisfied_dependencies: 1,
+        },
+      ])
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'wait_15_days_for_records'
+      `).get(instance.instance_id)).toMatchObject({ status: 'complete' })
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'first_follow_up_records_request'
+      `).get(instance.instance_id)).toMatchObject({ status: 'skipped' })
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'receive_and_process_records_bills'
+      `).get(instance.instance_id)).toMatchObject({ status: 'running' })
+      const followUpTasks = db.prepare(`
+        SELECT COUNT(*) AS count FROM tasks
+        WHERE metadata LIKE '%first_follow_up_records_request%'
+      `).get() as { count: number }
+      expect(followUpTasks.count).toBe(0)
+    } finally {
+      db.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('satisfies compound wait exit conditions when every referenced landmark is canonical', async () => {
     const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
     const db = new Database(':memory:')
@@ -329,6 +713,85 @@ nodes:
       expect(db.prepare(`
         SELECT status FROM workflow_node_instances
         WHERE workflow_instance_id = ? AND node_key = 'confirm'
+      `).get(instance.instance_id)).toMatchObject({ status: 'running' })
+    } finally {
+      db.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('unblocks PIP acknowledgment processing when the canonical acknowledgment arrives before the timer', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    const db = new Database(':memory:')
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writePipAcknowledgmentShadow(root, 'test-case')
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general'`).get() as { id: number }
+      const definitionId = createWorkflowDefinition(db, `
+schema_version: 1
+id: passive-pip-acknowledgment
+name: Passive PIP Acknowledgment
+subject_type: law_firm_case
+nodes:
+  human_send_pip_packet:
+    type: review
+    review:
+      mode: human
+  wait_for_pip_acknowledgment:
+    type: wait
+    duration: 10d
+    depends_on:
+      - human_send_pip_packet
+    exit_when:
+      condition: law_firm.landmarks.pip_approved == true
+  process_pip_acknowledgment:
+    type: recipe
+    recipe: firmvault-pip-confirm-approval
+    depends_on:
+      - wait_for_pip_acknowledgment
+`, 'tester', 1, 1)
+      const instance = startWorkflowInstance(db, {
+        definitionId,
+        subjectType: 'law_firm_case',
+        subjectId: 'test-case',
+        actor: 'tester',
+        workspaceId: 1,
+        tenantId: 1,
+        now: 1000,
+      })
+      const firstMaterialized = materializeReadyWorkflowNodes(db, {
+        workflowInstanceId: instance.instance_id,
+        projectId: project.id,
+        workspaceId: 1,
+        actor: 'tester',
+        now: 1001,
+      })
+      advanceWorkflowAfterTaskApproval(db, {
+        taskId: firstMaterialized.created[0].task_id,
+        actor: 'reviewer',
+        now: 1010,
+      })
+
+      const result = await satisfyPassiveFirmVaultLandmarks(db, {
+        workspaceId: 1,
+        actor: 'passive-landmark-resolver',
+        status: 'inbox',
+        now: 1020,
+      })
+
+      expect(result.satisfied).toEqual([
+        {
+          case_slug: 'test-case',
+          landmark: 'pip_approved',
+          condition: 'law_firm.landmarks.pip_approved == true',
+          satisfied_dependencies: 1,
+        },
+      ])
+      expect(db.prepare(`
+        SELECT status FROM workflow_node_instances
+        WHERE workflow_instance_id = ? AND node_key = 'process_pip_acknowledgment'
       `).get(instance.instance_id)).toMatchObject({ status: 'running' })
     } finally {
       db.close()

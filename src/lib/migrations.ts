@@ -1977,6 +1977,150 @@ const migrations: Migration[] = [
           ON task_review_prs(workspace_id, provider, remote_url, repo_owner, repo_name, pr_number);
       `)
     }
+  },
+  {
+    id: '068_email_triage',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS email_triage_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          gmail_message_id TEXT NOT NULL UNIQUE,
+          gmail_thread_id TEXT,
+          sent_at INTEGER,
+          from_name TEXT,
+          from_email TEXT,
+          sender_domain TEXT,
+          to_json TEXT NOT NULL DEFAULT '[]',
+          cc_json TEXT NOT NULL DEFAULT '[]',
+          subject TEXT,
+          snippet TEXT,
+          body_hash TEXT,
+          labels_json TEXT NOT NULL DEFAULT '[]',
+          is_unread INTEGER NOT NULL DEFAULT 1,
+          has_attachments INTEGER NOT NULL DEFAULT 0,
+          bucket TEXT NOT NULL DEFAULT 'needs_review',
+          confidence REAL,
+          reason TEXT,
+          suggested_action TEXT NOT NULL DEFAULT 'none',
+          review_status TEXT NOT NULL DEFAULT 'pending',
+          action_taken TEXT,
+          case_slug TEXT,
+          firmvault_path TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_email_triage_bucket_status
+          ON email_triage_messages(bucket, review_status, sent_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_email_triage_sender
+          ON email_triage_messages(sender_domain, from_email);
+        CREATE INDEX IF NOT EXISTS idx_email_triage_thread
+          ON email_triage_messages(gmail_thread_id);
+        CREATE INDEX IF NOT EXISTS idx_email_triage_unread
+          ON email_triage_messages(is_unread, sent_at DESC);
+
+        CREATE TABLE IF NOT EXISTS email_triage_actions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          action TEXT NOT NULL,
+          actor TEXT NOT NULL DEFAULT 'mission-control',
+          message_count INTEGER NOT NULL DEFAULT 0,
+          detail_json TEXT NOT NULL DEFAULT '{}',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_email_triage_actions_created
+          ON email_triage_actions(created_at DESC);
+      `)
+    }
+  },
+  {
+    id: '069_email_triage_learning_and_body_preview',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(email_triage_messages)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('body_text')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN body_text TEXT`)
+      if (!hasCol('body_fetched_at')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN body_fetched_at INTEGER`)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS email_triage_rules (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          scope TEXT NOT NULL,
+          pattern TEXT NOT NULL,
+          bucket TEXT NOT NULL,
+          suggested_action TEXT NOT NULL DEFAULT 'none',
+          confidence REAL NOT NULL DEFAULT 0.99,
+          source TEXT NOT NULL DEFAULT 'manual_correction',
+          actor TEXT NOT NULL DEFAULT 'mission-control',
+          hit_count INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(scope, pattern)
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_triage_rules_lookup
+          ON email_triage_rules(scope, pattern, bucket);
+      `)
+    }
+  },
+  {
+    id: '070_email_triage_case_routing_contacts',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(email_triage_messages)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('contact_name')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_name TEXT`)
+      if (!hasCol('contact_match_type')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_match_type TEXT`)
+      if (!hasCol('contact_match_value')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_match_value TEXT`)
+      if (!hasCol('contact_confidence')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_confidence REAL`)
+      if (!hasCol('tags_json')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'`)
+      if (!hasCol('paralegal_review_status')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN paralegal_review_status TEXT`)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS law_firm_contact_index (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          case_slug TEXT NOT NULL,
+          contact_name TEXT,
+          match_type TEXT NOT NULL,
+          match_value TEXT NOT NULL,
+          source_path TEXT NOT NULL,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(case_slug, match_type, match_value, source_path)
+        );
+        CREATE INDEX IF NOT EXISTS idx_law_firm_contact_index_lookup
+          ON law_firm_contact_index(match_type, match_value, case_slug);
+        CREATE INDEX IF NOT EXISTS idx_law_firm_contact_index_case
+          ON law_firm_contact_index(case_slug);
+
+        CREATE TABLE IF NOT EXISTS email_triage_case_reviews (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email_message_id INTEGER NOT NULL UNIQUE,
+          gmail_message_id TEXT NOT NULL,
+          gmail_thread_id TEXT,
+          case_slug TEXT,
+          contact_name TEXT,
+          match_type TEXT,
+          match_value TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          source TEXT NOT NULL DEFAULT 'email_reviewer',
+          firmvault_path TEXT,
+          attachments_json TEXT NOT NULL DEFAULT '[]',
+          error_message TEXT,
+          processed_at INTEGER,
+          detail_json TEXT NOT NULL DEFAULT '{}',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (email_message_id) REFERENCES email_triage_messages(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_triage_case_reviews_status
+          ON email_triage_case_reviews(status, case_slug, created_at DESC);
+      `)
+
+      const reviewCols = db.prepare(`PRAGMA table_info(email_triage_case_reviews)`).all() as Array<{ name: string }>
+      const hasReviewCol = (name: string) => reviewCols.some((col) => col.name === name)
+      if (!hasReviewCol('firmvault_path')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN firmvault_path TEXT`)
+      if (!hasReviewCol('attachments_json')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN attachments_json TEXT NOT NULL DEFAULT '[]'`)
+      if (!hasReviewCol('error_message')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN error_message TEXT`)
+      if (!hasReviewCol('processed_at')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN processed_at INTEGER`)
+    }
   }
 ]
 

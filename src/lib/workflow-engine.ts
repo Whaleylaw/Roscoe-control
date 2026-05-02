@@ -2,6 +2,8 @@ import type Database from 'better-sqlite3'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import { eventBus } from '@/lib/event-bus'
+import { isWaypointSubjectType, normalizeWaypointScope } from '@/lib/waypoint'
+import { buildTaskDiscussionConversationId, mergeTaskDiscussionMetadata } from '@/lib/waypoint-task-discussion'
 
 const durationPattern = /^(\d+)(s|m|h|d)$/
 
@@ -248,6 +250,7 @@ export type SatisfyWorkflowConditionInput = {
   condition: string
   actor: string
   workspaceId: number
+  workflowInstanceId?: number
   payload?: Record<string, unknown>
   status?: 'inbox' | 'assigned'
   now?: number
@@ -1094,8 +1097,9 @@ export function satisfyWorkflowCondition(
       WHERE workspace_id = ?
         AND dependency_type = 'condition'
         AND dependency_key = ?
+        AND (? IS NULL OR workflow_instance_id = ?)
         AND status IN ('pending', 'scheduled')
-    `).all(input.workspaceId, dependencyKey) as Array<{
+    `).all(input.workspaceId, dependencyKey, input.workflowInstanceId ?? null, input.workflowInstanceId ?? null) as Array<{
       id: number
       workflow_instance_id: number
       node_instance_id: number
@@ -1126,6 +1130,13 @@ export function satisfyWorkflowCondition(
     }
 
     for (const workflowInstanceId of workflowIds) {
+      skipNodesForSatisfiedConditionInTransaction(db, {
+        workflowInstanceId,
+        condition: input.condition,
+        actor: input.actor,
+        payload: input.payload ?? {},
+        now,
+      })
       const ready = promoteEligibleWorkflowNodesInTransaction(db, workflowInstanceId, now)
       for (const nodeKey of ready) {
         const node = db.prepare(`
@@ -1241,6 +1252,22 @@ export function materializeReadyWorkflowNodes(
       if (!ticket?.ticket_counter) throw new Error('Failed to allocate project ticket number')
 
       const vars = parseWorkflowRuntimeVars(context.vars_json)
+      const waypointScope = isWaypointSubjectType(context.subject_type)
+        ? normalizeWaypointScope({
+            subjectType: context.subject_type,
+            subjectId: context.subject_id,
+            vars,
+          })
+        : null
+      const waypointMetadata = waypointScope
+        ? {
+            project_id: waypointScope.projectId,
+            workstream_id: waypointScope.workstreamId,
+            milestone_id: waypointScope.milestoneId,
+            phase_id: waypointScope.phaseId,
+            plan_id: waypointScope.planId,
+          }
+        : null
       const title = `[Workflow] ${context.definition_name}: ${titleFromNodeKey(node.node_key)}`
       const lawFirmMetadata = lawFirmTaskMetadata(context.subject_type, context.subject_id, vars)
       const nodeFinalStatus = node.node_type === 'review' ? 'review' : finalStatus
@@ -1259,14 +1286,16 @@ export function materializeReadyWorkflowNodes(
           recipe_slug: node.recipe_slug,
         },
         ...(lawFirmMetadata ? { law_firm: lawFirmMetadata } : {}),
+        ...(waypointMetadata ? { waypoint: waypointMetadata } : {}),
       }
 
       const task = db.prepare(`
         INSERT INTO tasks (
           title, description, status, priority, project_id, project_ticket_no, assigned_to, created_by,
           created_at, updated_at, due_date, tags, metadata, workspace_id,
-          recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override
-        ) VALUES (?, ?, ?, 'medium', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, NULL)
+          recipe_slug, workspace_source, read_only_mounts, extra_skills, model_override,
+          gsd_workstream_id, gsd_milestone_id, gsd_phase_id, gsd_plan_id
+        ) VALUES (?, ?, ?, 'medium', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?)
       `).run(
         title,
         workflowTaskDescription({ ...context, vars }, node),
@@ -1283,8 +1312,26 @@ export function materializeReadyWorkflowNodes(
         node.recipe_slug,
         JSON.stringify({ project_id: input.projectId, base_ref: input.baseRef || 'main' }),
         JSON.stringify([]),
+        waypointScope?.workstreamId ?? null,
+        waypointScope?.milestoneId ?? null,
+        waypointScope?.phaseId ?? null,
+        waypointScope?.planId ?? null,
       )
       const taskId = Number(task.lastInsertRowid)
+      const discussionConfig = waypointDiscussionConfigFromNode(node.config_json)
+      if (discussionConfig?.enabled) {
+        const discussionAgent = discussionConfig.agent || node.recipe_slug || input.assignedTo || 'agent'
+        const updatedMetadata = mergeTaskDiscussionMetadata(metadata, {
+          enabled: true,
+          conversation_id: buildTaskDiscussionConversationId(taskId, discussionAgent),
+          agent: discussionAgent,
+          prompt: discussionConfig.prompt,
+          status: 'pending',
+          summary_comment_id: null,
+        })
+        db.prepare('UPDATE tasks SET metadata = ?, updated_at = ? WHERE id = ? AND workspace_id = ?')
+          .run(JSON.stringify(updatedMetadata), now, taskId, input.workspaceId)
+      }
 
       db.prepare(`
         UPDATE workflow_node_instances
@@ -1547,6 +1594,73 @@ function satisfyNodeDependencyInTransaction(
     actor: input.actor,
     now: input.now,
   })
+}
+
+function skipNodesForSatisfiedConditionInTransaction(
+  db: Database.Database,
+  input: {
+    workflowInstanceId: number
+    condition: string
+    actor: string
+    payload: Record<string, unknown>
+    now: number
+  },
+): void {
+  const rows = db.prepare(`
+    SELECT wni.id, wni.node_key, wni.node_type, wni.status, wni.config_json, wi.workspace_id
+    FROM workflow_node_instances wni
+    JOIN workflow_instances wi ON wi.id = wni.workflow_instance_id
+    WHERE wni.workflow_instance_id = ?
+      AND wni.status IN ('pending', 'blocked', 'waiting', 'ready')
+  `).all(input.workflowInstanceId) as Array<{
+    id: number
+    node_key: string
+    node_type: WorkflowNodeType
+    status: WorkflowNodeStatus
+    config_json: string | null
+    workspace_id: number
+  }>
+
+  for (const row of rows) {
+    const config = parseObject(row.config_json)
+    const skipCondition = stringValue(config.skip_when_condition)
+      ?? stringValue(objectRecord(config.skip_when).condition)
+    if (skipCondition !== input.condition) continue
+
+    const updated = db.prepare(`
+      UPDATE workflow_node_instances
+      SET status = 'skipped', completed_at = COALESCE(completed_at, ?), updated_at = ?
+      WHERE id = ? AND status IN ('pending', 'blocked', 'waiting', 'ready')
+    `).run(input.now, input.now, row.id)
+    if (updated.changes === 0) continue
+
+    writeWorkflowEvent(db, {
+      workflowInstanceId: input.workflowInstanceId,
+      nodeInstanceId: row.id,
+      nodeKey: row.node_key,
+      eventType: 'node.skipped',
+      actorType: 'system',
+      actorId: input.actor,
+      payload: {
+        reason: 'skip_when_condition_satisfied',
+        condition: input.condition,
+        ...input.payload,
+      },
+      workspaceId: row.workspace_id,
+      createdAt: input.now,
+    })
+    satisfyNodeDependencyInTransaction(db, {
+      workflowInstanceId: input.workflowInstanceId,
+      nodeKey: row.node_key,
+      actor: input.actor,
+      payload: {
+        reason: 'skipped',
+        condition: input.condition,
+        ...input.payload,
+      },
+      now: input.now,
+    })
+  }
 }
 
 function scheduleTimerDependenciesForSourceNode(
@@ -1989,6 +2103,12 @@ function objectRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
+function stringValue(value: unknown): string | null {
+  if (value == null) return null
+  const str = String(value).trim()
+  return str || null
+}
+
 function satisfyCompletionConditionDependenciesInTransaction(
   db: Database.Database,
   input: {
@@ -2145,6 +2265,22 @@ function parseObject(raw: string | null | undefined): Record<string, unknown> {
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
   } catch {
     return {}
+  }
+}
+
+function waypointDiscussionConfigFromNode(raw: string | null | undefined): { enabled: boolean; agent?: string; prompt?: string } | null {
+  const config = parseObject(raw)
+  const waypoint = config.waypoint && typeof config.waypoint === 'object' && !Array.isArray(config.waypoint)
+    ? config.waypoint as Record<string, unknown>
+    : {}
+  const discussion = waypoint.discussion && typeof waypoint.discussion === 'object' && !Array.isArray(waypoint.discussion)
+    ? waypoint.discussion as Record<string, unknown>
+    : {}
+  if (discussion.enabled !== true) return null
+  return {
+    enabled: true,
+    agent: typeof discussion.agent === 'string' && discussion.agent.trim() ? discussion.agent.trim() : undefined,
+    prompt: typeof discussion.prompt === 'string' && discussion.prompt.trim() ? discussion.prompt.trim() : undefined,
   }
 }
 

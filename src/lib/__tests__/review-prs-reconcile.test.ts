@@ -110,18 +110,20 @@ function createStandaloneReviewTask(status = 'quality_review'): number {
   return Number(inserted.lastInsertRowid)
 }
 
-function insertReviewPr(taskId: number, input: { id?: number; lastCheckedAt?: number | null; prNumber?: number } = {}): number {
+function insertReviewPr(taskId: number, input: { id?: number; lastCheckedAt?: number | null; prNumber?: number; remoteUrl?: string; baseRef?: string } = {}): number {
   const prNumber = input.prNumber ?? 12
   const inserted = db.prepare(`
     INSERT INTO task_review_prs (
       id, task_id, workspace_id, provider, remote_name, remote_url, repo_owner, repo_name,
       base_ref, head_ref, branch_name, pr_number, pr_url, state, last_checked_at
-    ) VALUES (?, ?, 1, 'forgejo', 'forgejo', 'ssh://git@localhost:2222/aaron/FirmVault.git',
-      'aaron', 'FirmVault', 'main', 'mc/task-1', 'mc/task-1', ?,
+    ) VALUES (?, ?, 1, 'forgejo', 'forgejo', ?,
+      'aaron', 'FirmVault', ?, 'mc/task-1', 'mc/task-1', ?,
       ?, 'open', ?)
   `).run(
     input.id ?? null,
     taskId,
+    input.remoteUrl ?? 'ssh://git@localhost:2222/aaron/FirmVault.git',
+    input.baseRef ?? 'main',
     prNumber,
     `http://localhost:3001/aaron/FirmVault/pulls/${prNumber}`,
     input.lastCheckedAt ?? null,
@@ -213,6 +215,53 @@ describe('reconcileOpenReviewPrs', () => {
     )
   })
 
+  it('marks merged PR task done and advances workflow when the task drifted back to human review', async () => {
+    const taskId = createWorkflowReviewTask()
+    db.prepare(`
+      UPDATE tasks
+      SET status = 'review'
+      WHERE id = ?
+    `).run(taskId)
+    insertReviewPr(taskId)
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'merged',
+      head: 'mc/task-1',
+      base: 'main',
+      mergeCommitSha: 'abc123',
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', now: 211 })
+
+    expect(result).toEqual({ checked: 1, merged: [taskId], closed: [], errors: [] })
+    expect(db.prepare(`
+      SELECT status, container_id, error_message, completed_at, github_pr_state
+      FROM tasks WHERE id = ?
+    `).get(taskId)).toMatchObject({
+      status: 'done',
+      container_id: null,
+      error_message: null,
+      completed_at: 211,
+      github_pr_state: 'merged',
+    })
+    expect(advanceWorkflowAfterTaskApproval).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({
+        taskId,
+        actor: 'test-reconciler',
+        now: 211,
+        status: 'inbox',
+        payload: expect.objectContaining({
+          source: 'review_pr_merged',
+          pr_number: 12,
+          merge_commit_sha: 'abc123',
+          merge_detection: 'forgejo_merged',
+        }),
+      }),
+    )
+  })
+
   it('treats an open PR as merged when the base ref already contains the head sha', async () => {
     const taskId = createWorkflowReviewTask()
     insertReviewPr(taskId)
@@ -261,6 +310,99 @@ describe('reconcileOpenReviewPrs', () => {
     )
   })
 
+  it('syncs the local repo worktree from the merged Forgejo base when changed paths are clean', async () => {
+    const bareDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-remote-'))
+    const localDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-local-'))
+    const remoteWorkDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-remote-work-'))
+    tempDirs.push(bareDir, localDir, remoteWorkDir)
+
+    runGit(bareDir, ['init', '--bare'])
+    runGit(localDir, ['init', '-b', 'main'])
+    runGit(localDir, ['config', 'user.name', 'Test'])
+    runGit(localDir, ['config', 'user.email', 'test@example.com'])
+    await import('node:fs/promises').then((fs) => fs.writeFile(join(localDir, 'case.md'), 'before\n'))
+    runGit(localDir, ['add', 'case.md'])
+    runGit(localDir, ['commit', '-m', 'base'])
+    runGit(localDir, ['remote', 'add', 'forgejo', bareDir])
+    runGit(localDir, ['push', 'forgejo', 'main'])
+
+    runGit(remoteWorkDir, ['clone', bareDir, '.'])
+    runGit(remoteWorkDir, ['checkout', 'main'])
+    runGit(remoteWorkDir, ['config', 'user.name', 'Remote'])
+    runGit(remoteWorkDir, ['config', 'user.email', 'remote@example.com'])
+    await import('node:fs/promises').then((fs) => fs.writeFile(join(remoteWorkDir, 'case.md'), 'after merge\n'))
+    runGit(remoteWorkDir, ['add', 'case.md'])
+    runGit(remoteWorkDir, ['commit', '-m', 'merge pr'])
+    runGit(remoteWorkDir, ['push', 'origin', 'main'])
+    const remoteMainSha = gitOutput(remoteWorkDir, ['rev-parse', 'main'])
+
+    runtimeSettingsMocks.projectRepoMap = { 1: localDir }
+    const taskId = createWorkflowReviewTask()
+    insertReviewPr(taskId, { remoteUrl: bareDir })
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'merged',
+      head: 'mc/task-1',
+      base: 'main',
+      mergeCommitSha: remoteMainSha,
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', now: 209 })
+
+    expect(result).toEqual({ checked: 1, merged: [taskId], closed: [], errors: [] })
+    await expect(import('node:fs/promises').then((fs) => fs.readFile(join(localDir, 'case.md'), 'utf8'))).resolves.toBe('after merge\n')
+    expect(db.prepare(`SELECT COUNT(*) AS count FROM comments WHERE task_id = ? AND content LIKE 'Local FirmVault mirror sync skipped%'`).get(taskId)).toMatchObject({ count: 0 })
+  })
+
+  it('does not overwrite local changed paths while syncing a merged PR', async () => {
+    const bareDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-dirty-remote-'))
+    const localDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-dirty-local-'))
+    const remoteWorkDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-dirty-work-'))
+    tempDirs.push(bareDir, localDir, remoteWorkDir)
+
+    runGit(bareDir, ['init', '--bare'])
+    runGit(localDir, ['init', '-b', 'main'])
+    runGit(localDir, ['config', 'user.name', 'Test'])
+    runGit(localDir, ['config', 'user.email', 'test@example.com'])
+    await import('node:fs/promises').then((fs) => fs.writeFile(join(localDir, 'case.md'), 'before\n'))
+    runGit(localDir, ['add', 'case.md'])
+    runGit(localDir, ['commit', '-m', 'base'])
+    runGit(localDir, ['remote', 'add', 'forgejo', bareDir])
+    runGit(localDir, ['push', 'forgejo', 'main'])
+
+    runGit(remoteWorkDir, ['clone', bareDir, '.'])
+    runGit(remoteWorkDir, ['checkout', 'main'])
+    runGit(remoteWorkDir, ['config', 'user.name', 'Remote'])
+    runGit(remoteWorkDir, ['config', 'user.email', 'remote@example.com'])
+    await import('node:fs/promises').then((fs) => fs.writeFile(join(remoteWorkDir, 'case.md'), 'after merge\n'))
+    runGit(remoteWorkDir, ['add', 'case.md'])
+    runGit(remoteWorkDir, ['commit', '-m', 'merge pr'])
+    runGit(remoteWorkDir, ['push', 'origin', 'main'])
+    const remoteMainSha = gitOutput(remoteWorkDir, ['rev-parse', 'main'])
+
+    await import('node:fs/promises').then((fs) => fs.writeFile(join(localDir, 'case.md'), 'local unsaved work\n'))
+    runtimeSettingsMocks.projectRepoMap = { 1: localDir }
+    const taskId = createWorkflowReviewTask()
+    insertReviewPr(taskId, { remoteUrl: bareDir })
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'merged',
+      head: 'mc/task-1',
+      base: 'main',
+      mergeCommitSha: remoteMainSha,
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', now: 210 })
+
+    expect(result).toEqual({ checked: 1, merged: [taskId], closed: [], errors: [] })
+    await expect(import('node:fs/promises').then((fs) => fs.readFile(join(localDir, 'case.md'), 'utf8'))).resolves.toBe('local unsaved work\n')
+    expect(db.prepare(`SELECT content FROM comments WHERE task_id = ? AND content LIKE 'Local FirmVault mirror sync skipped%'`).get(taskId)).toMatchObject({
+      content: expect.stringContaining('case.md'),
+    })
+  })
+
   it('treats an open PR as merged when the local base branch contains the head commit as an ancestor', async () => {
     const repoDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-ancestor-'))
     tempDirs.push(repoDir)
@@ -307,6 +449,55 @@ describe('reconcileOpenReviewPrs', () => {
       state: 'merged',
       merge_commit_sha: gitOutput(repoDir, ['rev-parse', 'main']),
       last_checked_at: 207,
+    })
+  })
+
+  it('treats a closed PR as merged when the local base branch contains the head commit as an ancestor', async () => {
+    const repoDir = await mkdtemp(join(tmpdir(), 'mc-review-pr-closed-ancestor-'))
+    tempDirs.push(repoDir)
+    runGit(repoDir, ['init', '-b', 'main'])
+    runGit(repoDir, ['config', 'user.name', 'Test'])
+    runGit(repoDir, ['config', 'user.email', 'test@example.com'])
+    runGit(repoDir, ['commit', '--allow-empty', '-m', 'base'])
+    runGit(repoDir, ['checkout', '-b', 'mc/task-1'])
+    runGit(repoDir, ['commit', '--allow-empty', '-m', 'task'])
+    const headSha = gitOutput(repoDir, ['rev-parse', 'HEAD'])
+    runGit(repoDir, ['checkout', 'main'])
+    runGit(repoDir, ['merge', '--no-ff', 'mc/task-1', '-m', 'merge task'])
+    runGit(repoDir, ['remote', 'add', 'forgejo', 'ssh://git@localhost:2222/aaron/FirmVault.git'])
+    runtimeSettingsMocks.projectRepoMap = { 1: repoDir }
+
+    const taskId = createWorkflowReviewTask()
+    insertReviewPr(taskId)
+    forgejoMocks.getPullRequest.mockResolvedValue({
+      number: 12,
+      url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+      state: 'closed',
+      head: 'mc/task-1',
+      headSha,
+      base: 'main',
+      baseSha: gitOutput(repoDir, ['rev-parse', 'main']),
+      mergeCommitSha: null,
+    })
+
+    const result = await reconcileOpenReviewPrs(db, { actor: 'test-reconciler', now: 208 })
+
+    expect(result).toEqual({ checked: 1, merged: [taskId], closed: [], errors: [] })
+    expect(db.prepare(`
+      SELECT status, completed_at, github_pr_state
+      FROM tasks WHERE id = ?
+    `).get(taskId)).toMatchObject({
+      status: 'done',
+      completed_at: 208,
+      github_pr_state: 'merged',
+    })
+    expect(db.prepare(`
+      SELECT state, merge_commit_sha, last_checked_at
+      FROM task_review_prs WHERE task_id = ?
+    `).get(taskId)).toMatchObject({
+      state: 'merged',
+      merge_commit_sha: gitOutput(repoDir, ['rev-parse', 'main']),
+      last_checked_at: 208,
     })
   })
 

@@ -423,4 +423,27 @@ describe('buildDispatchPayload', () => {
     expect(p.prior_attempts).toBe(prior)
     expect(p.workspace_source).toEqual({ project_id: 1, base_ref: 'main' })
   })
+
+  it('includes task comments for the recipe agent task thread context', () => {
+    const comments = [
+      {
+        id: 10,
+        author: 'operator',
+        content: 'Sent by fax with confirmation.',
+        created_at: '2026-04-30T14:35:00.000Z',
+      },
+    ]
+    const p = buildDispatchPayload({
+      taskId: 1,
+      recipeSlug: 'r',
+      workspaceSource: null,
+      readOnlyMounts: [],
+      extraSkills: [],
+      newAttempt: 2,
+      priorAttempts: [],
+      runnerMaxAttempts: 3,
+      comments,
+    })
+    expect(p.comments).toBe(comments)
+  })
 })

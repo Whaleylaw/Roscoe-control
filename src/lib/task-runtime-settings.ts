@@ -34,6 +34,7 @@ export const TASK_RUNTIME_SETTING_KEYS = {
   REVIEW_PR_REMOTE_NAME: 'runtime.review_pr_remote_name',
   FORGEJO_BASE_URL: 'runtime.forgejo_base_url',
   FORGEJO_TOKEN: 'runtime.forgejo_token',
+  FORGEJO_WEBHOOK_SECRET: 'runtime.forgejo_webhook_secret',
   REVIEW_PR_AUTO_CREATE: 'runtime.review_pr_auto_create',
 } as const
 
@@ -48,6 +49,7 @@ export const DEFAULT_REVIEW_PR_PROVIDER = 'forgejo'
 export const DEFAULT_REVIEW_PR_REMOTE_NAME = 'forgejo'
 export const DEFAULT_FORGEJO_BASE_URL = ''
 export const DEFAULT_FORGEJO_TOKEN = ''
+export const DEFAULT_FORGEJO_WEBHOOK_SECRET = ''
 export const DEFAULT_REVIEW_PR_AUTO_CREATE = true
 
 function readSettingValue(key: string): string | undefined {
@@ -204,6 +206,7 @@ export function getReviewPrSettings(): {
   remoteName: string
   forgejoBaseUrl: string
   forgejoToken: string
+  forgejoWebhookSecret: string
   autoCreate: boolean
 } {
   const provider =
@@ -222,6 +225,9 @@ export function getReviewPrSettings(): {
   const forgejoToken =
     readSettingValue(TASK_RUNTIME_SETTING_KEYS.FORGEJO_TOKEN)?.trim() ||
     DEFAULT_FORGEJO_TOKEN
+  const forgejoWebhookSecret =
+    readSettingValue(TASK_RUNTIME_SETTING_KEYS.FORGEJO_WEBHOOK_SECRET)?.trim() ||
+    DEFAULT_FORGEJO_WEBHOOK_SECRET
   const autoCreateRaw = readSettingValue(TASK_RUNTIME_SETTING_KEYS.REVIEW_PR_AUTO_CREATE)
 
   return {
@@ -229,6 +235,7 @@ export function getReviewPrSettings(): {
     remoteName,
     forgejoBaseUrl,
     forgejoToken,
+    forgejoWebhookSecret,
     autoCreate: autoCreateRaw !== 'false',
   }
 }

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { readFile, stat } from 'fs/promises'
+import { readFile, readdir, stat } from 'fs/promises'
 import { join } from 'path'
 import { parse as parseYaml } from 'yaml'
 import { getLawFirmCasesRoot } from '@/lib/law-firm'
@@ -9,6 +9,14 @@ export type PassiveLandmarkResolution = {
   case_slug: string
   landmarks: Record<string, {
     satisfied: boolean
+    evidence: string[]
+  }>
+  providers: Record<string, {
+    records_received: boolean
+    bills_received: boolean
+    records_or_bills_received: boolean
+    records_and_bills_received: boolean
+    medical_chronology_updated: boolean
     evidence: string[]
   }>
 }
@@ -32,9 +40,11 @@ export type SatisfyPassiveFirmVaultLandmarksResult = {
 }
 
 type PendingConditionDependency = {
+  workflow_instance_id: number
   workspace_id: number
   subject_id: string
   condition: string
+  vars: Record<string, unknown>
 }
 
 export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promise<PassiveLandmarkResolution> {
@@ -45,10 +55,17 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
     readMarkdownFrontmatter(join(caseDir, 'client', 'contracts.md')),
     readMarkdownFrontmatter(join(caseDir, 'client', 'authorizations.md')),
   ])
+  const pipLedgers = await readInsuranceLedgerFrontmatter(caseDir, /^pip-/)
+  const claimLedgers = await readInsuranceLedgerFrontmatter(caseDir, /^(bi|um|uim)-/)
   const [feeAgreementShadow, hipaaShadow, medicalAuthorizationShadow] = await Promise.all([
     fileExists(join(caseDir, 'documents', 'shadows', 'client', 'fee-agreement-signed.md')),
     fileExists(join(caseDir, 'documents', 'shadows', 'client', 'hipaa-authorization-signed.md')),
     fileExists(join(caseDir, 'documents', 'shadows', 'client', 'medical-authorization-signed.md')),
+  ])
+  const [kacAcknowledgmentShadow, pipAcknowledgmentShadow, stateFarmAcknowledgmentShadow] = await Promise.all([
+    fileExists(join(caseDir, 'documents', 'received', 'insurance', 'kac-acknowledgment.md')),
+    fileExists(join(caseDir, 'documents', 'received', 'insurance', 'pip-acknowledgment.md')),
+    fileExists(join(caseDir, 'documents', 'received', 'insurance', 'state-farm-pip-acknowledgment.md')),
   ])
   const caseSetupEvidence = await caseSetupEvidenceList(caseDir, caseSlug)
 
@@ -65,6 +82,30 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
     || hipaaShadow
     || medicalAuthorizationShadow
     || landmarkSatisfied(caseLandmarks.medical_auth_signed)
+  const pipApprovedEvidence = pipLedgers
+    .filter((ledger) => pipLedgerSupportsApproval(ledger.frontmatter))
+    .map((ledger) => ledger.path)
+  const pipApproved = pipApprovedEvidence.length > 0
+    || kacAcknowledgmentShadow
+    || pipAcknowledgmentShadow
+    || stateFarmAcknowledgmentShadow
+    || landmarkSatisfied(caseLandmarks.pip_approved)
+  const demandSentEvidence = await demandSentEvidenceList(caseDir, claimLedgers)
+  const demandSent = demandSentEvidence.length > 0
+    || landmarkSatisfied(caseLandmarks.demand_sent)
+  const initialOfferEvidence = await initialOfferEvidenceList(caseDir, claimLedgers)
+  const initialOfferReceived = initialOfferEvidence.length > 0
+    || landmarkSatisfied(caseLandmarks.initial_offer_received)
+
+  const providerFacts = await resolveProviderFacts(caseDir)
+  const providerEntries = Object.entries(providerFacts)
+  const allRecordsReceived = providerEntries.length > 0
+    && providerEntries.every(([, provider]) => provider.records_received)
+  const allBillsReceived = providerEntries.length > 0
+    && providerEntries.every(([, provider]) => provider.bills_received)
+  const medicalChronologyUpdated = providerEntries.length > 0
+    && providerEntries.every(([, provider]) => provider.medical_chronology_updated)
+  const allProviderEvidence = providerEntries.flatMap(([, provider]) => provider.evidence)
 
   return {
     case_slug: caseSlug,
@@ -98,7 +139,43 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
           ])
           : [],
       },
+      pip_approved: {
+        satisfied: pipApproved,
+        evidence: pipApproved
+          ? evidenceList(caseFrontmatter, `${caseSlug}.md`, [
+            ...pipApprovedEvidence,
+            kacAcknowledgmentShadow ? 'documents/received/insurance/kac-acknowledgment.md' : null,
+            pipAcknowledgmentShadow ? 'documents/received/insurance/pip-acknowledgment.md' : null,
+            stateFarmAcknowledgmentShadow ? 'documents/received/insurance/state-farm-pip-acknowledgment.md' : null,
+          ])
+          : [],
+      },
+      all_records_received: {
+        satisfied: allRecordsReceived,
+        evidence: allRecordsReceived ? [...new Set(allProviderEvidence)] : [],
+      },
+      all_bills_received: {
+        satisfied: allBillsReceived,
+        evidence: allBillsReceived ? [...new Set(allProviderEvidence)] : [],
+      },
+      medical_chronology_updated: {
+        satisfied: medicalChronologyUpdated,
+        evidence: medicalChronologyUpdated ? [...new Set(allProviderEvidence)] : [],
+      },
+      demand_sent: {
+        satisfied: demandSent,
+        evidence: demandSent
+          ? evidenceList(caseFrontmatter, `${caseSlug}.md`, demandSentEvidence)
+          : [],
+      },
+      initial_offer_received: {
+        satisfied: initialOfferReceived,
+        evidence: initialOfferReceived
+          ? evidenceList(caseFrontmatter, `${caseSlug}.md`, initialOfferEvidence)
+          : [],
+      },
     },
+    providers: providerFacts,
   }
 }
 
@@ -119,6 +196,39 @@ export async function satisfyPassiveFirmVaultLandmarks(
       resolution = await resolveFirmVaultPassiveLandmarks(dependency.subject_id)
       resolutionByCase.set(dependency.subject_id, resolution)
     }
+    const providerFact = providerFactRequiredByCondition(dependency.condition)
+    if (providerFact) {
+      const providerSlug = stringValue(dependency.vars.provider_slug)
+      if (!providerSlug) continue
+      const provider = resolution.providers[providerSlug]
+      if (!provider?.[providerFact]) continue
+
+      const result = satisfyWorkflowCondition(db, {
+        subjectType: 'law_firm_case',
+        subjectId: dependency.subject_id,
+        condition: dependency.condition,
+        workflowInstanceId: dependency.workflow_instance_id,
+        actor,
+        workspaceId: dependency.workspace_id,
+        status: input.status ?? 'inbox',
+        now,
+        payload: {
+          source: 'firmvault_passive_provider_fact',
+          provider_slug: providerSlug,
+          fact: providerFact,
+          evidence: provider.evidence,
+        },
+      })
+      if (result.satisfied_dependencies === 0) continue
+      satisfied.push({
+        case_slug: dependency.subject_id,
+        landmark: `provider.${providerFact}`,
+        condition: dependency.condition,
+        satisfied_dependencies: result.satisfied_dependencies,
+      })
+      continue
+    }
+
     const landmarks = landmarksRequiredByCondition(dependency.condition)
     if (landmarks.length === 0) continue
     if (!landmarks.every((landmark) => resolution.landmarks[landmark]?.satisfied)) continue
@@ -159,7 +269,10 @@ function listPendingFirmVaultConditionDependencies(
     AND wi.status = 'active'
     AND wnd.dependency_type = 'condition'
     AND wnd.status IN ('pending', 'scheduled')
-    AND wnd.dependency_key LIKE 'condition:law_firm_case:%:law_firm.landmarks.% == true%'
+    AND (
+      wnd.dependency_key LIKE 'condition:law_firm_case:%:law_firm.landmarks.% == true%'
+      OR wnd.dependency_key LIKE 'condition:law_firm_case:%:law_firm.provider.% == true%'
+    )
   `
   if (input.workspaceId !== undefined) {
     where += ' AND wnd.workspace_id = ?'
@@ -172,7 +285,7 @@ function listPendingFirmVaultConditionDependencies(
   }
 
   return db.prepare(`
-    SELECT DISTINCT wnd.workspace_id, wi.subject_id, substr(
+    SELECT DISTINCT wnd.workflow_instance_id, wnd.workspace_id, wi.subject_id, wi.vars_json, substr(
       wnd.dependency_key,
       length('condition:' || wi.subject_type || ':' || wi.subject_id || ':') + 1
     ) AS condition
@@ -180,7 +293,13 @@ function listPendingFirmVaultConditionDependencies(
     JOIN workflow_instances wi ON wi.id = wnd.workflow_instance_id
     WHERE ${where}
     ORDER BY wi.subject_id ASC, condition ASC
-  `).all(...params) as PendingConditionDependency[]
+  `).all(...params).map((row: any) => ({
+    workflow_instance_id: Number(row.workflow_instance_id),
+    workspace_id: Number(row.workspace_id),
+    subject_id: String(row.subject_id),
+    condition: String(row.condition),
+    vars: parseObjectJson(row.vars_json),
+  })) as PendingConditionDependency[]
 }
 
 function landmarksRequiredByCondition(condition: string): string[] {
@@ -192,6 +311,66 @@ function landmarksRequiredByCondition(condition: string): string[] {
     landmarks.push(match[1])
   }
   return landmarks
+}
+
+type ProviderPassiveFact = 'records_or_bills_received' | 'records_and_bills_received'
+
+function providerFactRequiredByCondition(condition: string): ProviderPassiveFact | null {
+  const match = condition.match(/^law_firm\.provider\.(records_or_bills_received|records_and_bills_received)\s*==\s*true$/)
+  return match ? match[1] as ProviderPassiveFact : null
+}
+
+async function resolveProviderFacts(caseDir: string): Promise<PassiveLandmarkResolution['providers']> {
+  const providersDir = join(caseDir, 'medical-providers')
+  let entries: string[]
+  try {
+    entries = await readdir(providersDir)
+  } catch {
+    return {}
+  }
+
+  const providers: PassiveLandmarkResolution['providers'] = {}
+  for (const entry of entries) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry)) continue
+    const providerDir = join(providersDir, entry)
+    if (!(await dirExists(providerDir))) continue
+
+    const ledger = await readMarkdownFrontmatter(join(providerDir, 'records-bills.md'))
+    const recordsPath = `medical-providers/${entry}/documents/records.md`
+    const billsPath = `medical-providers/${entry}/documents/bills.md`
+    const chronologyPath = `medical-providers/${entry}/chronology.md`
+    const [recordsFile, billsFile, chronologyFile] = await Promise.all([
+      fileExists(join(caseDir, recordsPath)),
+      fileExists(join(caseDir, billsPath)),
+      fileExists(join(caseDir, chronologyPath)),
+    ])
+    const receiptStatus = stringValue(ledger.receipt_status)?.toLowerCase()
+    const completeReceipt = receiptStatus
+      ? ['received', 'complete', 'processed', 'records_and_bills_received'].includes(receiptStatus)
+      : false
+    const recordsReceived = recordsFile
+      || completeReceipt
+      || booleanValue(ledger.records_received)
+      || Boolean(stringValue(ledger.records_received_date))
+    const billsReceived = billsFile
+      || completeReceipt
+      || booleanValue(ledger.bills_received)
+      || Boolean(stringValue(ledger.bills_received_date))
+
+    providers[entry] = {
+      records_received: recordsReceived,
+      bills_received: billsReceived,
+      records_or_bills_received: recordsReceived || billsReceived,
+      records_and_bills_received: recordsReceived && billsReceived,
+      medical_chronology_updated: chronologyFile,
+      evidence: evidenceList(ledger, `medical-providers/${entry}/records-bills.md`, [
+        recordsFile ? recordsPath : null,
+        billsFile ? billsPath : null,
+        chronologyFile ? chronologyPath : null,
+      ]),
+    }
+  }
+  return providers
 }
 
 async function readMarkdownFrontmatter(path: string): Promise<Record<string, unknown>> {
@@ -208,10 +387,134 @@ async function readMarkdownFrontmatter(path: string): Promise<Record<string, unk
   }
 }
 
+async function readInsuranceLedgerFrontmatter(
+  caseDir: string,
+  pattern: RegExp,
+): Promise<Array<{ path: string; frontmatter: Record<string, unknown> }>> {
+  const insuranceDir = join(caseDir, 'insurance')
+  let entries: string[]
+  try {
+    entries = await readdir(insuranceDir)
+  } catch {
+    return []
+  }
+
+  const ledgers: Array<{ path: string; frontmatter: Record<string, unknown> }> = []
+  for (const entry of entries) {
+    if (!entry.endsWith('.md')) continue
+    if (!pattern.test(entry.replace(/\.md$/, ''))) continue
+    const relativePath = `insurance/${entry}`
+    ledgers.push({
+      path: relativePath,
+      frontmatter: await readMarkdownFrontmatter(join(caseDir, relativePath)),
+    })
+  }
+  return ledgers
+}
+
+function pipLedgerSupportsApproval(frontmatter: Record<string, unknown>): boolean {
+  const positiveStatuses = new Set(['approved', 'active', 'acknowledged', 'opened', 'assigned', 'accepted'])
+  const statusValues = [
+    frontmatter.claim_status,
+    frontmatter.approval_status,
+    frontmatter.pip_status,
+    frontmatter.application_status,
+    frontmatter.assignment_status,
+  ]
+  return statusValues.some((value) => typeof value === 'string' && positiveStatuses.has(value.trim().toLowerCase()))
+    || booleanValue(frontmatter.pip_approved)
+    || booleanValue(frontmatter.approved)
+    || booleanValue(frontmatter.acknowledged)
+}
+
+async function demandSentEvidenceList(
+  caseDir: string,
+  claimLedgers: Array<{ path: string; frontmatter: Record<string, unknown> }>,
+): Promise<string[]> {
+  const evidence: string[] = []
+  for (const ledger of claimLedgers) {
+    if (
+      booleanValue(ledger.frontmatter.demand_sent)
+      || Boolean(stringValue(ledger.frontmatter.demand_sent_date))
+      || ['sent', 'mailed', 'delivered'].includes(stringValue(ledger.frontmatter.demand_status)?.toLowerCase() ?? '')
+    ) {
+      evidence.push(ledger.path)
+    }
+  }
+  evidence.push(...await matchingFiles(join(caseDir, 'documents', 'sent', 'insurance'), /demand-sent\.md$/i, 'documents/sent/insurance'))
+  return [...new Set(evidence)]
+}
+
+async function initialOfferEvidenceList(
+  caseDir: string,
+  claimLedgers: Array<{ path: string; frontmatter: Record<string, unknown> }>,
+): Promise<string[]> {
+  const evidence: string[] = []
+  for (const ledger of claimLedgers) {
+    if (
+      booleanValue(ledger.frontmatter.initial_offer_received)
+      || Boolean(stringValue(ledger.frontmatter.initial_offer_amount))
+      || Boolean(stringValue(ledger.frontmatter.current_offer_amount))
+      || Boolean(stringValue(ledger.frontmatter.last_offer_amount))
+      || (Array.isArray(ledger.frontmatter.offers) && ledger.frontmatter.offers.length > 0)
+    ) {
+      evidence.push(ledger.path)
+    }
+  }
+
+  const offers = await readMarkdown(join(caseDir, 'negotiation', 'offers.md'))
+  if (offers && /\$\s*\d[\d,]*(?:\.\d{2})?/.test(offers) && !/No offers logged\./i.test(offers)) {
+    evidence.push('negotiation/offers.md')
+  }
+
+  evidence.push(...await matchingFiles(join(caseDir, 'documents', 'received', 'insurance'), /offer.*\.md$/i, 'documents/received/insurance'))
+  evidence.push(...await matchingFiles(join(caseDir, 'documents', 'shadows', 'insurance'), /offer.*\.md$/i, 'documents/shadows/insurance'))
+  return [...new Set(evidence)]
+}
+
+async function matchingFiles(dir: string, pattern: RegExp, relativeDir: string): Promise<string[]> {
+  let entries: string[]
+  try {
+    entries = await readdir(dir)
+  } catch {
+    return []
+  }
+  const matches: string[] = []
+  for (const entry of entries) {
+    if (!pattern.test(entry)) continue
+    if (await fileExists(join(dir, entry))) matches.push(`${relativeDir}/${entry}`)
+  }
+  return matches
+}
+
+async function readMarkdown(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch {
+    return null
+  }
+}
+
 function objectRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {}
+}
+
+function parseObjectJson(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>
+  if (typeof value !== 'string' || !value.trim()) return {}
+  try {
+    return objectRecord(JSON.parse(value))
+  } catch {
+    return {}
+  }
+}
+
+function stringValue(value: unknown): string | null {
+  if (value == null) return null
+  const str = String(value).trim()
+  return str || null
 }
 
 function booleanValue(value: unknown): boolean {

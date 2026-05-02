@@ -74,12 +74,18 @@ type ReviewPrReconcileRow = {
   pr_url: string
 }
 
+type ReviewPrTransitionRow = ReviewPrReconcileRow
+
 export type ReviewPrReconcileResult = {
   checked: number
   merged: number[]
   closed: number[]
   errors: Array<{ task_id: number; error: string }>
 }
+
+export type ReviewPrWebhookTransitionResult =
+  | { matched: false; action: 'not_found' }
+  | { matched: true; task_id: number; action: 'already_merged' | 'merged' | 'merged_without_task_transition' | 'closed' }
 
 export async function publishApprovedWorktreeForReview(
   db: Database.Database,
@@ -286,7 +292,7 @@ export async function reconcileOpenReviewPrs(
         number: row.pr_number,
       })
 
-      const baseAlreadyContainsHead = pr.state === 'open'
+      const baseAlreadyContainsHead = (pr.state === 'open' || pr.state === 'closed')
         && Boolean(pr.headSha)
         && (
           pr.headSha === pr.baseSha
@@ -300,81 +306,16 @@ export async function reconcileOpenReviewPrs(
 
       if (pr.state === 'merged' || baseAlreadyContainsHead) {
         const mergeCommitSha = pr.mergeCommitSha ?? pr.baseSha
-        const transitioned = db.transaction(() => {
-          db.prepare(`
-            UPDATE task_review_prs
-            SET state = 'merged',
-                merge_commit_sha = ?,
-                last_checked_at = ?,
-                updated_at = ?
-            WHERE id = ?
-          `).run(mergeCommitSha, now, now, row.id)
-
-          const taskUpdate = db.prepare(`
-            UPDATE tasks
-            SET status = 'done',
-                container_id = NULL,
-                error_message = NULL,
-                completed_at = COALESCE(completed_at, ?),
-                github_pr_state = 'merged',
-                updated_at = ?
-            WHERE id = ?
-              AND status = 'quality_review'
-          `).run(now, now, row.task_id)
-
-          if (taskUpdate.changes === 0) {
-            db.prepare(`
-              UPDATE tasks
-              SET github_pr_state = 'merged',
-                  updated_at = ?
-              WHERE id = ?
-            `).run(now, row.task_id)
-            return false
-          }
-
-          advanceWorkflowAfterTaskApproval(db, {
-            taskId: row.task_id,
-            actor: input.actor,
-            payload: {
-              source: 'review_pr_merged',
-              review_pr_id: row.id,
-              pr_number: row.pr_number,
-              merge_commit_sha: mergeCommitSha,
-              merge_detection: baseAlreadyContainsHead ? 'base_contains_head' : 'forgejo_merged',
-            },
-            now,
-            status: 'inbox',
-          })
-          return true
-        })()
+        const transitioned = markReviewPrMerged(db, row, {
+          actor: input.actor,
+          now,
+          mergeCommitSha,
+          mergeDetection: baseAlreadyContainsHead ? 'base_contains_head' : 'forgejo_merged',
+        })
 
         if (transitioned) merged.push(row.task_id)
       } else if (pr.state === 'closed') {
-        db.transaction(() => {
-          db.prepare(`
-            UPDATE task_review_prs
-            SET state = 'closed',
-                last_checked_at = ?,
-                updated_at = ?
-            WHERE id = ?
-          `).run(now, now, row.id)
-          db.prepare(`
-            UPDATE tasks
-            SET github_pr_state = 'closed',
-                updated_at = ?
-            WHERE id = ?
-          `).run(now, row.task_id)
-          db.prepare(`
-            INSERT INTO comments (task_id, author, content, created_at, workspace_id)
-            VALUES (?, ?, ?, ?, ?)
-          `).run(
-            row.task_id,
-            input.actor,
-            `Review PR closed without merge: ${row.pr_url}`,
-            now,
-            row.workspace_id,
-          )
-        })()
+        markReviewPrClosed(db, row, { actor: input.actor, now })
         closed.push(row.task_id)
       } else {
         db.prepare(`
@@ -393,6 +334,154 @@ export async function reconcileOpenReviewPrs(
   }
 
   return { checked: rows.length, merged, closed, errors }
+}
+
+export function handleForgejoReviewPrWebhook(
+  db: Database.Database,
+  input: {
+    repoOwner: string
+    repoName: string
+    prNumber: number
+    action: 'merged' | 'closed'
+    actor: string
+    now?: number
+    mergeCommitSha?: string | null
+  },
+): ReviewPrWebhookTransitionResult {
+  const now = input.now ?? unixNow()
+  const row = db.prepare(`
+    SELECT id, task_id, workspace_id, remote_url, repo_owner, repo_name, base_ref, branch_name, pr_number, pr_url
+    FROM task_review_prs
+    WHERE provider = 'forgejo'
+      AND repo_owner = ?
+      AND repo_name = ?
+      AND pr_number = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(input.repoOwner, input.repoName, input.prNumber) as ReviewPrTransitionRow | undefined
+
+  if (!row) return { matched: false, action: 'not_found' }
+
+  const current = db.prepare(`
+    SELECT state FROM task_review_prs WHERE id = ?
+  `).get(row.id) as { state: string } | undefined
+  if (current?.state === 'merged') {
+    return { matched: true, task_id: row.task_id, action: 'already_merged' }
+  }
+
+  if (input.action === 'merged') {
+    const transitioned = markReviewPrMerged(db, row, {
+      actor: input.actor,
+      now,
+      mergeCommitSha: input.mergeCommitSha ?? null,
+      mergeDetection: 'forgejo_webhook',
+    })
+    return {
+      matched: true,
+      task_id: row.task_id,
+      action: transitioned ? 'merged' : 'merged_without_task_transition',
+    }
+  }
+
+  markReviewPrClosed(db, row, { actor: input.actor, now })
+  return { matched: true, task_id: row.task_id, action: 'closed' }
+}
+
+function markReviewPrMerged(
+  db: Database.Database,
+  row: ReviewPrTransitionRow,
+  input: {
+    actor: string
+    now: number
+    mergeCommitSha?: string | null
+    mergeDetection: 'forgejo_merged' | 'base_contains_head' | 'forgejo_webhook'
+  },
+): boolean {
+  const transitioned = db.transaction(() => {
+    db.prepare(`
+      UPDATE task_review_prs
+      SET state = 'merged',
+          merge_commit_sha = ?,
+          last_checked_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(input.mergeCommitSha ?? null, input.now, input.now, row.id)
+
+    const taskUpdate = db.prepare(`
+      UPDATE tasks
+      SET status = 'done',
+          container_id = NULL,
+          error_message = NULL,
+          completed_at = COALESCE(completed_at, ?),
+          github_pr_state = 'merged',
+          updated_at = ?
+      WHERE id = ?
+        AND status IN ('quality_review', 'review')
+    `).run(input.now, input.now, row.task_id)
+
+    if (taskUpdate.changes === 0) {
+      db.prepare(`
+        UPDATE tasks
+        SET github_pr_state = 'merged',
+            updated_at = ?
+        WHERE id = ?
+      `).run(input.now, row.task_id)
+      return false
+    }
+
+    advanceWorkflowAfterTaskApproval(db, {
+      taskId: row.task_id,
+      actor: input.actor,
+      payload: {
+        source: 'review_pr_merged',
+        review_pr_id: row.id,
+        pr_number: row.pr_number,
+        merge_commit_sha: input.mergeCommitSha ?? null,
+        merge_detection: input.mergeDetection,
+      },
+      now: input.now,
+      status: 'inbox',
+    })
+    return true
+  })()
+  syncMergedReviewPrIntoLocalRepo(db, row, {
+    actor: input.actor,
+    now: input.now,
+    mergeCommitSha: input.mergeCommitSha ?? null,
+  })
+  return transitioned
+}
+
+function markReviewPrClosed(
+  db: Database.Database,
+  row: ReviewPrTransitionRow,
+  input: { actor: string; now: number },
+): void {
+  db.transaction(() => {
+    db.prepare(`
+      UPDATE task_review_prs
+      SET state = 'closed',
+          last_checked_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(input.now, input.now, row.id)
+    db.prepare(`
+      UPDATE tasks
+      SET github_pr_state = 'closed',
+          updated_at = ?
+      WHERE id = ?
+    `).run(input.now, row.task_id)
+    db.prepare(`
+      INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      row.task_id,
+      input.actor,
+      `Review PR closed without merge: ${row.pr_url}`,
+      input.now,
+      row.workspace_id,
+    )
+  })()
 }
 
 function persistReviewPr(
@@ -455,6 +544,7 @@ function parseWorkspaceSource(raw: string): WorkspaceSource | null {
 
 function validateTaskWorktreeForReview(task: ReviewPrTask): void {
   validateFirmVaultAppendOnlyAuditLogs(task)
+  validateFirmVaultDraftDemandArtifacts(task)
   if (task.recipe_slug !== 'firmvault-case-setup-create-shell') return
   if (!task.worktree_path) return
 
@@ -514,21 +604,34 @@ function validateTaskWorktreeForReview(task: ReviewPrTask): void {
   }
 }
 
+function validateFirmVaultDraftDemandArtifacts(task: ReviewPrTask): void {
+  if (task.recipe_slug !== 'firmvault-demand-draft-letter') return
+  if (!task.worktree_path) return
+
+  const caseSlug = taskCaseSlug(task)
+  if (!caseSlug) {
+    throw new Error('draft demand PR is incomplete: missing law_firm.case_slug task metadata')
+  }
+
+  const required = [
+    `cases/${caseSlug}/demand/demand-letter.md`,
+    `cases/${caseSlug}/demand/damages-summary.md`,
+    `cases/${caseSlug}/demand/demand-package.md`,
+  ]
+  const missing = required.filter((path) => !existsSync(`${task.worktree_path}/${path}`))
+  if (missing.length > 0) {
+    throw new Error(
+      `draft demand PR is incomplete: missing required artifact(s) ${missing.join(', ')}. ` +
+      'The Draft Demand recipe must prepare the complete demand artifact set before attorney review.',
+    )
+  }
+}
+
 function validateFirmVaultAppendOnlyAuditLogs(task: ReviewPrTask): void {
   if (!task.worktree_path) return
   if (!isFirmVaultTask(task)) return
 
-  const result = spawnSync('git', ['-C', task.worktree_path, 'status', '--porcelain', '--', 'cases'], {
-    encoding: 'utf8',
-  })
-  if (result.status !== 0) {
-    throw new Error(`git status --porcelain failed while validating FirmVault audit logs: ${(result.stderr || result.stdout || '').slice(-1000)}`)
-  }
-
-  const modifiedAuditLogs = (result.stdout || '')
-    .split(/\r?\n/)
-    .map((line) => line.trimEnd())
-    .filter(Boolean)
+  const modifiedAuditLogs = firmVaultStatusLines(task.worktree_path, 'cases')
     .filter((line) => {
       const status = line.slice(0, 2)
       const filePath = line.slice(3).trim()
@@ -541,6 +644,27 @@ function validateFirmVaultAppendOnlyAuditLogs(task: ReviewPrTask): void {
   if (modifiedAuditLogs.length > 0) {
     throw new Error(`FirmVault audit logs are append-only; restore existing log entries before review PR publication: ${modifiedAuditLogs.slice(0, 8).join(', ')}${modifiedAuditLogs.length > 8 ? `, and ${modifiedAuditLogs.length - 8} more` : ''}`)
   }
+}
+
+function changedFirmVaultPaths(worktreePath: string, pathspec: string): Set<string> {
+  return new Set(
+    firmVaultStatusLines(worktreePath, pathspec)
+      .map((line) => line.slice(3).trim())
+      .filter(Boolean),
+  )
+}
+
+function firmVaultStatusLines(worktreePath: string, pathspec: string): string[] {
+  const result = spawnSync('git', ['-C', worktreePath, 'status', '--porcelain', '--', pathspec], {
+    encoding: 'utf8',
+  })
+  if (result.status !== 0) {
+    throw new Error(`git status --porcelain failed while validating FirmVault review PR: ${(result.stderr || result.stdout || '').slice(-1000)}`)
+  }
+  return (result.stdout || '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
 }
 
 function isFirmVaultTask(task: ReviewPrTask): boolean {
@@ -688,6 +812,77 @@ function repoPathForRemote(remoteUrl: string): string | null {
     }
   }
   return null
+}
+
+function syncMergedReviewPrIntoLocalRepo(
+  db: Database.Database,
+  row: ReviewPrTransitionRow,
+  input: { actor: string; now: number; mergeCommitSha?: string | null },
+): void {
+  const repoPath = repoPathForRemote(row.remote_url)
+  if (!repoPath) return
+
+  const remoteName = getReviewPrSettings().remoteName
+  const fetch = spawnSync('git', ['-C', repoPath, 'fetch', remoteName, row.base_ref], { encoding: 'utf8' })
+  if (fetch.status !== 0) {
+    insertReviewPrSyncComment(db, row, input, `Local FirmVault mirror sync skipped: git fetch ${remoteName} ${row.base_ref} failed: ${String(fetch.stderr || fetch.stdout || '').slice(-1000)}`)
+    return
+  }
+
+  const remoteRef = `${remoteName}/${row.base_ref}`
+  const localSha = gitOutput(repoPath, ['rev-parse', '--verify', '--quiet', row.base_ref])
+  const remoteSha = gitOutput(repoPath, ['rev-parse', '--verify', '--quiet', remoteRef])
+    || input.mergeCommitSha
+    || ''
+  if (!remoteSha) {
+    insertReviewPrSyncComment(db, row, input, `Local FirmVault mirror sync skipped: could not resolve ${remoteRef}.`)
+    return
+  }
+  if (localSha && localSha === remoteSha) return
+
+  const diffRange = localSha ? `${localSha}..${remoteSha}` : remoteSha
+  const changedPaths = gitOutput(repoPath, ['diff', '--name-only', diffRange])
+    .split(/\r?\n/)
+    .map((path) => path.trim())
+    .filter(Boolean)
+  if (changedPaths.length === 0) return
+
+  const dirty = spawnSync('git', ['-C', repoPath, 'status', '--porcelain', '--', ...changedPaths], {
+    encoding: 'utf8',
+  })
+  if (dirty.status !== 0) {
+    insertReviewPrSyncComment(db, row, input, `Local FirmVault mirror sync skipped: git status failed: ${String(dirty.stderr || dirty.stdout || '').slice(-1000)}`)
+    return
+  }
+  const dirtyPaths = String(dirty.stdout || '').trim()
+  if (dirtyPaths) {
+    insertReviewPrSyncComment(
+      db,
+      row,
+      input,
+      `Local FirmVault mirror sync skipped because the merged PR touches paths with local changes:\n\n${dirtyPaths.split(/\r?\n/).slice(0, 20).join('\n')}`,
+    )
+    return
+  }
+
+  const restore = spawnSync('git', ['-C', repoPath, 'restore', '--source', remoteSha, '--worktree', '--', ...changedPaths], {
+    encoding: 'utf8',
+  })
+  if (restore.status !== 0) {
+    insertReviewPrSyncComment(db, row, input, `Local FirmVault mirror sync skipped: git restore from ${remoteSha.slice(0, 12)} failed: ${String(restore.stderr || restore.stdout || '').slice(-1000)}`)
+  }
+}
+
+function insertReviewPrSyncComment(
+  db: Database.Database,
+  row: ReviewPrTransitionRow,
+  input: { actor: string; now: number },
+  content: string,
+): void {
+  db.prepare(`
+    INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(row.task_id, input.actor, content, input.now, row.workspace_id)
 }
 
 function gitOutputRequired(cwd: string, args: string[]): string {

@@ -6,6 +6,8 @@ import { logger } from './logger'
 import { config } from './config'
 import { syncTaskOutbound } from './github-sync-engine'
 import { promoteApprovedWorktree } from './worktree-promotion'
+import { advanceWorkflowAfterTaskApproval } from './workflow-engine'
+import { revokeTokensForTask } from './runner-tokens'
 
 /** Sync task to GitHub/GNAP and broadcast escalation if task failed */
 function syncAndEscalateIfFailed(task: { id: number; title: string; status: string; priority: string; project_id?: number | null; workspace_id: number; description?: string | null }, newStatus: string, errorMsg?: string, dispatchAttempts?: number): void {
@@ -39,6 +41,17 @@ interface DispatchableTask {
   project_ticket_no: number | null
   project_id: number | null
   tags?: string[]
+}
+
+interface HumanWorkflowReviewTask {
+  id: number
+  title: string
+  status: string
+  priority: string
+  workspace_id: number
+  project_id: number | null
+  created_at: number
+  metadata: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -494,6 +507,7 @@ function parseReviewVerdict(text: string): { status: 'approved' | 'rejected'; no
  */
 export async function runAegisReviews(): Promise<{ ok: boolean; message: string }> {
   const db = getDatabase()
+  const humanReviewResult = approveHumanWorkflowReviews(db)
 
   const tasks = db.prepare(`
     SELECT t.id, t.title, t.description, t.status, t.priority, t.resolution, t.assigned_to, t.workspace_id,
@@ -529,6 +543,12 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
   `).all() as ReviewableTask[]
 
   if (tasks.length === 0) {
+    if (humanReviewResult.approved > 0 || humanReviewResult.blocked > 0) {
+      return {
+        ok: humanReviewResult.errors === 0,
+        message: `Human workflow reviews: ${humanReviewResult.approved} approved, ${humanReviewResult.blocked} blocked${humanReviewResult.errors ? `, ${humanReviewResult.errors} error(s)` : ''}`,
+      }
+    }
     return { ok: true, message: 'No tasks awaiting review' }
   }
 
@@ -730,9 +750,148 @@ export async function runAegisReviews(): Promise<{ ok: boolean; message: string 
   const errors = results.filter(r => r.verdict === 'error').length
 
   return {
-    ok: errors === 0,
-    message: `Reviewed ${tasks.length}: ${approved} approved, ${rejected} rejected${errors ? `, ${errors} error(s)` : ''}`,
+    ok: errors === 0 && humanReviewResult.errors === 0,
+    message: `${humanReviewResult.approved || humanReviewResult.blocked || humanReviewResult.errors ? `Human workflow reviews: ${humanReviewResult.approved} approved, ${humanReviewResult.blocked} blocked${humanReviewResult.errors ? `, ${humanReviewResult.errors} error(s)` : ''} | ` : ''}Reviewed ${tasks.length}: ${approved} approved, ${rejected} rejected${errors ? `, ${errors} error(s)` : ''}`,
   }
+}
+
+function approveHumanWorkflowReviews(db: ReturnType<typeof getDatabase>): { approved: number; blocked: number; errors: number } {
+  const tasks = db.prepare(`
+    SELECT id, title, status, priority, workspace_id, project_id, created_at, metadata
+    FROM tasks
+    WHERE status = 'quality_review'
+      AND recipe_slug IS NULL
+      AND json_extract(metadata, '$.workflow.node_type') = 'review'
+      AND COALESCE(json_extract(metadata, '$.workflow.recipe_slug'), '') = ''
+    ORDER BY updated_at ASC
+    LIMIT 10
+  `).all() as HumanWorkflowReviewTask[]
+
+  let approved = 0
+  let blocked = 0
+  let errors = 0
+
+  for (const task of tasks) {
+    try {
+      const comment = latestHumanCommentForTask(db, task)
+      if (!comment) {
+        const now = Math.floor(Date.now() / 1000)
+        const message = 'Human workflow review requires an owner comment before quality approval can advance the workflow.'
+        db.prepare(`
+          UPDATE tasks
+          SET error_message = ?, updated_at = ?
+          WHERE id = ? AND status = 'quality_review'
+        `).run(message, now, task.id)
+        eventBus.broadcast('task.status_changed', {
+          id: task.id,
+          status: 'quality_review',
+          previous_status: 'quality_review',
+          error_message: message,
+          reason: 'human_review_comment_required',
+          workspace_id: task.workspace_id,
+          updated_at: now,
+        })
+        blocked++
+        continue
+      }
+
+      const now = Math.floor(Date.now() / 1000)
+      const notes = `Human workflow review approved from owner comment by ${comment.author}:\n${comment.content}`
+      const result = db.transaction(() => {
+        const review = db.prepare(`
+          INSERT INTO quality_reviews (task_id, reviewer, status, notes, workspace_id)
+          VALUES (?, 'human-workflow-review', 'approved', ?, ?)
+        `).run(task.id, notes, task.workspace_id)
+        const reviewId = Number(review.lastInsertRowid)
+
+        db.prepare(`
+          UPDATE tasks
+          SET status = 'done',
+              container_id = NULL,
+              error_message = NULL,
+              completed_at = COALESCE(completed_at, ?),
+              updated_at = ?
+          WHERE id = ? AND status = 'quality_review'
+        `).run(now, now, task.id)
+
+        revokeTokensForTask(db, task.id, now)
+        const advancement = advanceWorkflowAfterTaskApproval(db, {
+          taskId: task.id,
+          actor: 'human-workflow-review',
+          payload: {
+            source: 'human_workflow_review',
+            quality_review_id: reviewId,
+            reviewer: 'human-workflow-review',
+            status: 'approved',
+            comment_id: comment.id,
+            comment_author: comment.author,
+            notes,
+          },
+          status: 'inbox',
+          now,
+        })
+        return { reviewId, advancement }
+      })()
+
+      db_helpers.logActivity(
+        'quality_review',
+        'task',
+        task.id,
+        'human-workflow-review',
+        `Human workflow review approved task: ${task.title}`,
+        { status: 'approved', comment_id: comment.id, quality_review_id: result.reviewId },
+        task.workspace_id,
+      )
+      eventBus.broadcast('task.status_changed', {
+        id: task.id,
+        status: 'done',
+        previous_status: 'quality_review',
+        reason: 'human_workflow_review_approved',
+        workflow_advancement: result.advancement,
+        workspace_id: task.workspace_id,
+        updated_at: now,
+      })
+      syncAndEscalateIfFailed(task, 'done')
+      approved++
+    } catch (err: any) {
+      const now = Math.floor(Date.now() / 1000)
+      const message = `Human workflow review error: ${err?.message || String(err)}`
+      db.prepare(`
+        UPDATE tasks
+        SET error_message = ?, updated_at = ?
+        WHERE id = ? AND status = 'quality_review'
+      `).run(message, now, task.id)
+      logger.error({ taskId: task.id, err }, 'Human workflow review approval failed')
+      errors++
+    }
+  }
+
+  return { approved, blocked, errors }
+}
+
+function latestHumanCommentForTask(
+  db: ReturnType<typeof getDatabase>,
+  task: HumanWorkflowReviewTask,
+): { id: number; author: string; content: string; created_at: number } | null {
+  const row = db.prepare(`
+    SELECT id, author, content, created_at
+    FROM comments
+    WHERE task_id = ?
+      AND created_at >= ?
+      AND TRIM(COALESCE(content, '')) <> ''
+      AND lower(author) NOT IN (
+        'system',
+        'codex',
+        'aegis',
+        'runner',
+        'workflow-engine',
+        'human-workflow-review',
+        'codex-quality-review'
+      )
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).get(task.id, task.created_at) as { id: number; author: string; content: string; created_at: number } | undefined
+  return row ?? null
 }
 
 /**

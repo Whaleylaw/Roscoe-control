@@ -1279,6 +1279,7 @@ async function runContainer(dispatch) {
         description: task.description ?? null,
         tags: task.tags ?? null,
         metadata: task.metadata ?? null,
+        comments: task.comments ?? [],
         workspace_source: task.workspace_source ?? null,
         recipe_slug: task.recipe_slug,
         attempt,
