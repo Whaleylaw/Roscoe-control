@@ -853,7 +853,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col" role="status" aria-live="polite">
+      <div className="h-full min-h-0 overflow-hidden flex flex-col" role="status" aria-live="polite">
         <div className="flex justify-between items-center p-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-7 w-28 bg-surface-1 rounded-md animate-pulse" />
@@ -892,7 +892,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div data-testid="task-board-panel" className="h-full min-h-0 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-center p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -1067,10 +1067,11 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
       <RunnerStatusBanner />
 
       {/* Kanban Board */}
-      <div className="flex-1 min-h-0 flex gap-4 p-4 overflow-x-auto" role="region" aria-label={t('taskBoard')}>
+      <div className="flex-1 min-h-0 flex gap-4 p-4 overflow-x-auto overflow-y-hidden" role="region" aria-label={t('taskBoard')}>
         {statusColumns.map(column => (
           <div
             key={column.key}
+            data-testid={`task-column-${column.key}`}
             role="region"
             aria-label={t('columnAriaLabel', { title: column.title, count: tasksByStatus[column.key]?.length || 0 })}
             className="flex-1 min-w-80 min-h-0 bg-surface-0 border border-border/60 rounded-xl flex flex-col transition-colors duration-200 [&.drag-over]:border-primary/40 [&.drag-over]:bg-primary/[0.02]"
@@ -1088,7 +1089,7 @@ export function TaskBoardPanel({ scope }: { scope?: TaskBoardScope } = {}) {
             </div>
 
             {/* Column Body */}
-            <div className="flex-1 p-2.5 space-y-2.5 min-h-32 h-full overflow-y-auto">
+            <div data-testid={`task-column-body-${column.key}`} className="flex-1 min-h-0 p-2.5 space-y-2.5 overflow-y-auto">
               {tasksByStatus[column.key]?.map(task => (
                 <div
                   key={task.id}

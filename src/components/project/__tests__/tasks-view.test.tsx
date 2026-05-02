@@ -240,6 +240,31 @@ describe('TasksView', () => {
         expect(screen.getAllByText(key).length).toBeGreaterThan(0)
       }
     })
+
+    it('keeps the Kanban board in a fixed-height internal scroll frame', async () => {
+      mockStoreState = buildStoreState({
+        tasks: Array.from({ length: 48 }, (_, idx) => ({
+          ...seedTasks[0],
+          id: 1_000 + idx,
+          title: `Done task ${idx + 1}`,
+          status: 'done',
+        })),
+      })
+      await renderView()
+
+      const panel = screen.getByTestId('task-board-panel')
+      expect(panel.className).toContain('overflow-hidden')
+      expect(panel.className).toContain('min-h-0')
+
+      const board = screen.getByRole('region', { name: 'taskBoard' })
+      expect(board.className).toContain('overflow-x-auto')
+      expect(board.className).toContain('overflow-y-hidden')
+
+      const doneColumn = screen.getByTestId('task-column-done')
+      const doneBody = doneColumn.querySelector('[data-testid="task-column-body-done"]')
+      expect(doneBody?.className).toContain('overflow-y-auto')
+      expect(doneBody?.className).toContain('min-h-0')
+    })
   })
 
   describe('TASK-01: card project label hidden in workspace mode', () => {
