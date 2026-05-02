@@ -11,6 +11,7 @@ export type WaypointCommandName =
   | 'doctor'
   | 'forensics'
   | 'routes'
+  | 'route'
   | 'pause'
   | 'resume'
   | 'help'
@@ -34,6 +35,7 @@ export type WaypointParsedCommand =
       limit?: number
       offset?: number
     }
+  | { name: 'route'; routeId: number }
   | { name: 'pause'; routeId: number }
   | { name: 'resume'; routeId: number }
   | { name: 'help' }
@@ -99,6 +101,13 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     }
 
     return { name: 'discuss', taskId }
+  }
+
+  if (head === 'route') {
+    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id' || t === '--id')
+    const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
+    if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
+    return { name: 'route', routeId }
   }
 
   if (head === 'routes') {
@@ -292,6 +301,112 @@ export function listWaypointRoutes(db: Database.Database, input: ListWaypointRou
   return rows
 }
 
+export interface WaypointRouteDetailNode {
+  id: number
+  node_key: string
+  node_type: string
+  status: string
+  recipe_slug: string | null
+  task_id: number | null
+  review_task_id: number | null
+  due_at: number | null
+  started_at: number | null
+  completed_at: number | null
+  updated_at: number
+}
+
+export interface WaypointRouteDetail {
+  route: WaypointRouteSummary
+  vars: Record<string, unknown>
+  nodes: WaypointRouteDetailNode[]
+}
+
+export function getWaypointRouteDetail(
+  db: Database.Database,
+  input: { workspaceId: number; projectId: number; routeId: number },
+): WaypointRouteDetail {
+  const route = db
+    .prepare(
+      `
+    SELECT
+      wi.id,
+      wi.workflow_key,
+      wi.subject_type,
+      wi.subject_id,
+      wi.status,
+      wd.slug AS definition_slug,
+      wd.name AS definition_name,
+      wd.version AS definition_version,
+      wi.started_at,
+      wi.completed_at,
+      wi.updated_at,
+      wi.vars_json
+    FROM workflow_instances wi
+    JOIN workflow_definitions wd ON wd.id = wi.definition_id
+    WHERE wi.id = ?
+      AND wi.workspace_id = ?
+      AND json_extract(wi.vars_json, '$.project_id') = ?
+      AND wi.subject_type IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    LIMIT 1
+  `,
+    )
+    .get(
+      input.routeId,
+      input.workspaceId,
+      input.projectId,
+      WAYPOINT_SUBJECT_TYPES.project,
+      WAYPOINT_SUBJECT_TYPES.workstream,
+      WAYPOINT_SUBJECT_TYPES.milestone,
+      WAYPOINT_SUBJECT_TYPES.phase,
+      WAYPOINT_SUBJECT_TYPES.plan,
+      'gsd_project',
+      'gsd_workstream',
+      'gsd_milestone',
+      'gsd_phase',
+      'gsd_plan',
+    ) as (WaypointRouteSummary & { vars_json?: string | null }) | undefined
+
+  if (!route) throw new Error(`Route ${input.routeId} not found for project ${input.projectId}`)
+
+  const nodes = db
+    .prepare(
+      `
+    SELECT
+      id,
+      node_key,
+      node_type,
+      status,
+      recipe_slug,
+      task_id,
+      review_task_id,
+      due_at,
+      started_at,
+      completed_at,
+      updated_at
+    FROM workflow_node_instances
+    WHERE workflow_instance_id = ?
+    ORDER BY id ASC
+  `,
+    )
+    .all(input.routeId) as WaypointRouteDetailNode[]
+
+  let vars: Record<string, unknown> = {}
+  if (route.vars_json) {
+    try {
+      vars = JSON.parse(route.vars_json) as Record<string, unknown>
+    } catch {
+      vars = {}
+    }
+  }
+
+  const { vars_json: _varsJson, ...routeSummary } = route
+  return {
+    route: routeSummary,
+    vars,
+    nodes,
+  }
+}
+
 export function setWaypointRoutePausedState(
   db: Database.Database,
   input: {
@@ -410,7 +525,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     }
   }
 
@@ -505,6 +620,23 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       route,
+    }
+  }
+
+  if (parsed.name === 'route') {
+    const detail = getWaypointRouteDetail(input.db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      routeId: parsed.routeId,
+    })
+
+    return {
+      ok: true,
+      command: parsed,
+      route: detail.route,
+      vars: detail.vars,
+      nodes: detail.nodes,
+      node_count: detail.nodes.length,
     }
   }
 

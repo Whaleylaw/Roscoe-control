@@ -328,6 +328,18 @@ nodes:
     expect(listBody.ok).toBe(true)
     expect(listBody.count).toBeGreaterThan(0)
 
+    const detailRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint route --route-id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(detailRes.status).toBe(200)
+    const detailBody = await detailRes.json()
+    expect(detailBody.ok).toBe(true)
+    expect(detailBody.route.id).toBe(routeId)
+    expect(detailBody.node_count).toBeGreaterThanOrEqual(1)
+
     const pauseRes = await POST(
       req(`/api/projects/${projectId}/waypoint/command`, {
         command: `/waypoint pause --route-id ${routeId}`,
