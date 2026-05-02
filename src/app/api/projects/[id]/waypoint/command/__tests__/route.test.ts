@@ -340,6 +340,18 @@ nodes:
     expect(detailBody.route.id).toBe(routeId)
     expect(detailBody.node_count).toBeGreaterThanOrEqual(1)
 
+    const eventsRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint route-events --route-id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(eventsRes.status).toBe(200)
+    const eventsBody = await eventsRes.json()
+    expect(eventsBody.ok).toBe(true)
+    expect(eventsBody.route_id).toBe(routeId)
+    expect(eventsBody.count).toBeGreaterThanOrEqual(1)
+
     const pauseRes = await POST(
       req(`/api/projects/${projectId}/waypoint/command`, {
         command: `/waypoint pause --route-id ${routeId}`,

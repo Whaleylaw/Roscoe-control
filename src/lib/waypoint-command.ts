@@ -14,6 +14,7 @@ export type WaypointCommandName =
   | 'route'
   | 'pause'
   | 'resume'
+  | 'route_events'
   | 'help'
 
 export type WaypointParsedCommand =
@@ -38,6 +39,7 @@ export type WaypointParsedCommand =
   | { name: 'route'; routeId: number }
   | { name: 'pause'; routeId: number }
   | { name: 'resume'; routeId: number }
+  | { name: 'route_events'; routeId: number; limit?: number; offset?: number }
   | { name: 'help' }
 
 export interface ExecuteWaypointCommandInput {
@@ -108,6 +110,33 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
     if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
     return { name: 'route', routeId }
+  }
+
+  if (head === 'route-events' || head === 'events') {
+    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id' || t === '--id')
+    const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
+    if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
+
+    const limitFlagIdx = tokens.findIndex((t) => t === '--limit')
+    const offsetFlagIdx = tokens.findIndex((t) => t === '--offset')
+    const parsed: { name: 'route_events'; routeId: number; limit?: number; offset?: number } = {
+      name: 'route_events',
+      routeId,
+    }
+
+    if (limitFlagIdx >= 0) {
+      const limit = asPositiveInt(tokens[limitFlagIdx + 1])
+      if (limit == null) throw new Error('Invalid --limit value')
+      parsed.limit = Math.min(limit, 500)
+    }
+
+    if (offsetFlagIdx >= 0) {
+      const offset = asPositiveInt(tokens[offsetFlagIdx + 1])
+      if (offset == null) throw new Error('Invalid --offset value')
+      parsed.offset = offset
+    }
+
+    return parsed
   }
 
   if (head === 'routes') {
@@ -321,6 +350,80 @@ export interface WaypointRouteDetail {
   nodes: WaypointRouteDetailNode[]
 }
 
+export interface WaypointRouteEvent {
+  id: number
+  workflow_instance_id: number
+  node_instance_id: number | null
+  task_id: number | null
+  node_key: string | null
+  event_type: string
+  actor_type: string
+  actor_id: string | null
+  payload_json: string
+  workspace_id: number
+  created_at: number
+}
+
+export function listWaypointRouteEvents(
+  db: Database.Database,
+  input: { workspaceId: number; projectId: number; routeId: number; limit?: number; offset?: number },
+): WaypointRouteEvent[] {
+  const routeExists = db
+    .prepare(
+      `
+    SELECT wi.id
+    FROM workflow_instances wi
+    WHERE wi.id = ?
+      AND wi.workspace_id = ?
+      AND wi.subject_type IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    LIMIT 1
+  `,
+    )
+    .get(
+      input.routeId,
+      input.workspaceId,
+      WAYPOINT_SUBJECT_TYPES.project,
+      WAYPOINT_SUBJECT_TYPES.workstream,
+      WAYPOINT_SUBJECT_TYPES.milestone,
+      WAYPOINT_SUBJECT_TYPES.phase,
+      WAYPOINT_SUBJECT_TYPES.plan,
+      'gsd_project',
+      'gsd_workstream',
+      'gsd_milestone',
+      'gsd_phase',
+      'gsd_plan',
+    ) as { id: number } | undefined
+
+  if (!routeExists) throw new Error(`Route ${input.routeId} not found for project ${input.projectId}`)
+
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 500)
+  const offset = Math.max(input.offset ?? 0, 0)
+
+  return db
+    .prepare(
+      `
+    SELECT
+      id,
+      workflow_instance_id,
+      node_instance_id,
+      task_id,
+      node_key,
+      event_type,
+      actor_type,
+      actor_id,
+      payload_json,
+      workspace_id,
+      created_at
+    FROM workflow_events
+    WHERE workflow_instance_id = ?
+      AND workspace_id = ?
+    ORDER BY id DESC
+    LIMIT ? OFFSET ?
+  `,
+    )
+    .all(input.routeId, input.workspaceId, limit, offset) as WaypointRouteEvent[]
+}
+
 export function getWaypointRouteDetail(
   db: Database.Database,
   input: { workspaceId: number; projectId: number; routeId: number },
@@ -525,7 +628,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     }
   }
 
@@ -637,6 +740,27 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       vars: detail.vars,
       nodes: detail.nodes,
       node_count: detail.nodes.length,
+    }
+  }
+
+  if (parsed.name === 'route_events') {
+    const events = listWaypointRouteEvents(input.db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      routeId: parsed.routeId,
+      limit: parsed.limit,
+      offset: parsed.offset,
+    })
+    return {
+      ok: true,
+      command: parsed,
+      route_id: parsed.routeId,
+      events,
+      count: events.length,
+      pagination: {
+        limit: Math.min(Math.max(parsed.limit ?? 50, 1), 500),
+        offset: Math.max(parsed.offset ?? 0, 0),
+      },
     }
   }
 

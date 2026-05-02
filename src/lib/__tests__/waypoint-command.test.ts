@@ -51,7 +51,7 @@ describe('waypoint command parser', () => {
     })
   })
 
-  it('parses routes/route/pause/resume commands', () => {
+  it('parses routes/route/route-events/pause/resume commands', () => {
     expect(parseWaypointCommand('/waypoint routes')).toEqual({ name: 'routes' })
     expect(parseWaypointCommand('/waypoint routes --status blocked')).toEqual({ name: 'routes', status: 'blocked' })
     expect(parseWaypointCommand('/waypoint routes --status active --limit 20 --offset 5')).toEqual({
@@ -62,6 +62,16 @@ describe('waypoint command parser', () => {
     })
     expect(parseWaypointCommand('/waypoint route --route-id 19')).toEqual({ name: 'route', routeId: 19 })
     expect(parseWaypointCommand('/waypoint route --id 19')).toEqual({ name: 'route', routeId: 19 })
+    expect(parseWaypointCommand('/waypoint route-events --route-id 19')).toEqual({
+      name: 'route_events',
+      routeId: 19,
+    })
+    expect(parseWaypointCommand('/waypoint events --id 19 --limit 10 --offset 2')).toEqual({
+      name: 'route_events',
+      routeId: 19,
+      limit: 10,
+      offset: 2,
+    })
     expect(parseWaypointCommand('/waypoint pause --route-id 19')).toEqual({ name: 'pause', routeId: 19 })
     expect(parseWaypointCommand('/waypoint resume --route-id 19')).toEqual({ name: 'resume', routeId: 19 })
   })
