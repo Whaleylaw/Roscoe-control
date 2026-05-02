@@ -1,0 +1,48 @@
+schema_version: 1
+
+routing:
+  name: gsd-orchestrator-routing
+  description: Task-class to recipe mapping for Hermes gsd-orchestrator profile.
+
+  defaults:
+    fallback_recipe_slug: gsd-generalist
+    require_output_contract: true
+
+  classes:
+    code_review:
+      recipe_slug: gsd-reviewer
+      priority_default: high
+    implementation:
+      recipe_slug: gsd-coder
+      priority_default: medium
+    debug_incident:
+      recipe_slug: gsd-debugger
+      priority_default: high
+    research:
+      recipe_slug: gsd-researcher
+      priority_default: medium
+    ops_triage:
+      recipe_slug: gsd-ops-triage
+      priority_default: high
+    legal_intake_ops:
+      recipe_slug: gsd-paralegal-intake
+      priority_default: high
+    doc_drafting:
+      recipe_slug: gsd-doc-drafter
+      priority_default: medium
+
+  guardrails:
+    require_owner_approval_for:
+      - destructive_file_ops
+      - external_side_effects
+      - credential_rotation
+      - production_changes
+
+  telemetry:
+    emit_fields:
+      - orchestrator_session_key
+      - orchestrator_platform
+      - orchestrator_chat_id
+      - orchestrator_thread_id
+      - task_class
+      - recipe_slug

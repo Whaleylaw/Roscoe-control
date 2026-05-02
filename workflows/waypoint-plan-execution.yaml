@@ -1,0 +1,74 @@
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+
+vars:
+  project_id:
+    required: true
+    type: number
+  workstream_id:
+    required: false
+    type: number
+  milestone_id:
+    required: true
+    type: number
+  phase_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  objective:
+    required: true
+    type: string
+  source_platform:
+    required: false
+    type: string
+  source_chat_id:
+    required: false
+    type: string
+  source_thread_id:
+    required: false
+    type: string
+
+triggers:
+  - type: manual
+
+nodes:
+  inspect_context:
+    type: recipe
+    recipe: gsd-researcher
+    description: Inspect project context, lifecycle graph, repo state, acceptance criteria, and prior artifacts.
+    config:
+      task_goal: Produce a concise context brief for this Waypoint plan.
+
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+    description: Implement the smallest safe change satisfying the active Waypoint plan.
+    depends_on:
+      nodes:
+        - inspect_context
+    config:
+      task_goal: Execute the Waypoint plan with tests and artifacts.
+
+  review_plan:
+    type: recipe
+    recipe: gsd-reviewer
+    description: Review implementation against the plan and acceptance criteria.
+    depends_on:
+      nodes:
+        - implement_plan
+    config:
+      task_goal: Produce pass/fail review and required fixes.
+
+  human_acceptance_gate:
+    type: review
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - review_plan
+    description: Human/operator acceptance gate before marking the Waypoint plan done.

@@ -1,0 +1,45 @@
+schema_version: 1
+id: waypoint-project-intake
+name: Waypoint Project Intake
+version: 1
+subject_type: waypoint_project
+
+vars:
+  project_id:
+    required: true
+    type: number
+  objective:
+    required: false
+    type: string
+
+triggers:
+  - type: manual
+
+nodes:
+  discuss_objective:
+    type: recipe
+    recipe: gsd-doc-drafter
+    description: Discuss and refine the project objective and acceptance criteria with the operator.
+    config:
+      waypoint:
+        discussion:
+          enabled: true
+          agent: gsd-doc-drafter
+          prompt: Ask targeted questions until the project objective and acceptance criteria are clear.
+
+  draft_intake_summary:
+    type: recipe
+    recipe: gsd-doc-drafter
+    description: Summarize the clarified objective, constraints, acceptance criteria, and proposed next waypoint.
+    depends_on:
+      nodes:
+        - discuss_objective
+
+  human_acceptance_gate:
+    type: review
+    review:
+      mode: human
+    description: Operator accepts the intake summary before planning proceeds.
+    depends_on:
+      nodes:
+        - draft_intake_summary
