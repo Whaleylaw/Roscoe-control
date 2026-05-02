@@ -51,6 +51,13 @@ describe('waypoint command parser', () => {
     })
   })
 
+  it('parses routes/pause/resume commands', () => {
+    expect(parseWaypointCommand('/waypoint routes')).toEqual({ name: 'routes' })
+    expect(parseWaypointCommand('/waypoint routes --status blocked')).toEqual({ name: 'routes', status: 'blocked' })
+    expect(parseWaypointCommand('/waypoint pause --route-id 19')).toEqual({ name: 'pause', routeId: 19 })
+    expect(parseWaypointCommand('/waypoint resume --route-id 19')).toEqual({ name: 'resume', routeId: 19 })
+  })
+
   it('parses doctor and forensics with defaults and overrides', () => {
     expect(parseWaypointCommand('/waypoint doctor')).toEqual({
       name: 'doctor',

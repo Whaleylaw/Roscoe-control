@@ -282,6 +282,71 @@ nodes:
     expect(body.route.instanceId).toBeTypeOf('number')
   })
 
+  it('lists routes and supports pause/resume', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-doctor
+name: Waypoint Doctor
+version: 1
+subject_type: waypoint_project
+vars:
+  project_id:
+    required: true
+    type: number
+nodes:
+  diagnose:
+    type: recipe
+    recipe: gsd-debugger
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const startRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint doctor',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    const startBody = await startRes.json()
+    const routeId = Number(startBody.route.instanceId)
+
+    const listRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint routes',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(listRes.status).toBe(200)
+    const listBody = await listRes.json()
+    expect(listBody.ok).toBe(true)
+    expect(listBody.count).toBeGreaterThan(0)
+
+    const pauseRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint pause --route-id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    const pauseBody = await pauseRes.json()
+    expect(pauseBody.route.status).toBe('blocked')
+
+    const resumeRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint resume --route-id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    const resumeBody = await resumeRes.json()
+    expect(resumeBody.route.status).toBe('active')
+  })
+
   it('starts task discussion and posts a message', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
     const inserted = db
