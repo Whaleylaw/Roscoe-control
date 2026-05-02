@@ -34,6 +34,10 @@ function req(path: string, body: Record<string, unknown>) {
   })
 }
 
+function getReq(path: string) {
+  return new NextRequest(`http://localhost${path}`, { method: 'GET' })
+}
+
 function seedProject(input: { gsdEnabled: number }): number {
   const result = db.prepare(
     `INSERT INTO projects (
@@ -178,5 +182,69 @@ nodes:
       reused: false,
     })
     expect(body.workflow_instance_id).toBeTypeOf('number')
+  })
+})
+
+describe('GET /api/projects/:id/waypoint/routes', () => {
+  it('lists routes with status filter and pagination', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  workstream_id:
+    required: false
+    type: number
+  milestone_id:
+    required: true
+    type: number
+  phase_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+nodes:
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST, GET } = await loadRoute()
+    await POST(
+      req(`/api/projects/${projectId}/waypoint/routes`, {
+        subject: 'plan',
+        plan_id: planId,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes?status=active&limit=10&offset=0`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.action).toBe('list_routes')
+    expect(body.filters).toMatchObject({ status: 'active' })
+    expect(body.pagination).toMatchObject({ limit: 10, offset: 0 })
+    expect(body.count).toBeGreaterThanOrEqual(1)
   })
 })

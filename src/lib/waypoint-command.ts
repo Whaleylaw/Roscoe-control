@@ -28,7 +28,12 @@ export type WaypointParsedCommand =
   | { name: 'discuss'; taskId: number; message?: string }
   | { name: 'doctor'; definitionSlug: string; definitionVersion: number }
   | { name: 'forensics'; definitionSlug: string; definitionVersion: number }
-  | { name: 'routes'; status?: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed' }
+  | {
+      name: 'routes'
+      status?: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
+      limit?: number
+      offset?: number
+    }
   | { name: 'pause'; routeId: number }
   | { name: 'resume'; routeId: number }
   | { name: 'help' }
@@ -98,14 +103,37 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
 
   if (head === 'routes') {
     const statusFlagIdx = tokens.findIndex((t) => t === '--status')
+    const limitFlagIdx = tokens.findIndex((t) => t === '--limit')
+    const offsetFlagIdx = tokens.findIndex((t) => t === '--offset')
+
+    const parsed: {
+      name: 'routes'
+      status?: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
+      limit?: number
+      offset?: number
+    } = { name: 'routes' }
+
     if (statusFlagIdx >= 0) {
       const status = (tokens[statusFlagIdx + 1] || '').toLowerCase()
       if (!['active', 'blocked', 'complete', 'cancelled', 'failed'].includes(status)) {
         throw new Error('Invalid --status value')
       }
-      return { name: 'routes', status: status as 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed' }
+      parsed.status = status as 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
     }
-    return { name: 'routes' }
+
+    if (limitFlagIdx >= 0) {
+      const limit = asPositiveInt(tokens[limitFlagIdx + 1])
+      if (limit == null) throw new Error('Invalid --limit value')
+      parsed.limit = Math.min(limit, 200)
+    }
+
+    if (offsetFlagIdx >= 0) {
+      const offset = asPositiveInt(tokens[offsetFlagIdx + 1])
+      if (offset == null) throw new Error('Invalid --offset value')
+      parsed.offset = offset
+    }
+
+    return parsed
   }
 
   if (head === 'pause') {
@@ -203,16 +231,24 @@ export interface WaypointRouteSummary {
   updated_at: number
 }
 
-function listWaypointRoutes(
-  db: Database.Database,
-  input: { workspaceId: number; projectId: number; status?: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed' },
-): WaypointRouteSummary[] {
+export interface ListWaypointRoutesInput {
+  workspaceId: number
+  projectId: number
+  status?: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
+  limit?: number
+  offset?: number
+}
+
+export function listWaypointRoutes(db: Database.Database, input: ListWaypointRoutesInput): WaypointRouteSummary[] {
   const where: string[] = ['wi.workspace_id = ?', "json_extract(wi.vars_json, '$.project_id') = ?"]
   const params: Array<number | string> = [input.workspaceId, input.projectId]
   if (input.status) {
     where.push('wi.status = ?')
     params.push(input.status)
   }
+
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 200)
+  const offset = Math.max(input.offset ?? 0, 0)
 
   const rows = db
     .prepare(
@@ -234,7 +270,7 @@ function listWaypointRoutes(
     WHERE ${where.join(' AND ')}
       AND wi.subject_type IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ORDER BY wi.updated_at DESC, wi.id DESC
-    LIMIT 200
+    LIMIT ? OFFSET ?
   `,
     )
     .all(
@@ -249,6 +285,8 @@ function listWaypointRoutes(
       'gsd_milestone',
       'gsd_phase',
       'gsd_plan',
+      limit,
+      offset,
     ) as WaypointRouteSummary[]
 
   return rows
@@ -372,7 +410,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     }
   }
 
@@ -475,12 +513,18 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       status: parsed.status,
+      limit: parsed.limit,
+      offset: parsed.offset,
     })
     return {
       ok: true,
       command: parsed,
       routes,
       count: routes.length,
+      pagination: {
+        limit: Math.min(Math.max(parsed.limit ?? 50, 1), 200),
+        offset: Math.max(parsed.offset ?? 0, 0),
+      },
     }
   }
 
