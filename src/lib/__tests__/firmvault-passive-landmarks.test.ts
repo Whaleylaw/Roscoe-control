@@ -164,6 +164,36 @@ received_date: "2020-02-26"
 `)
 }
 
+function writeFinalDistributionEvidence(root: string, slug: string) {
+  const caseDir = join(root, 'cases', slug)
+  mkdirSync(join(caseDir, 'settlement'), { recursive: true })
+  mkdirSync(join(caseDir, 'documents', 'received', 'settlement'), { recursive: true })
+  writeFileSync(join(caseDir, 'settlement', 'distribution.md'), `---
+schema_version: 3
+ledger: settlement_distribution
+case_slug: ${slug}
+status: final_distribution_complete
+final_distribution_status: complete
+trust_account_status: zeroed
+---
+
+# Distribution
+
+Final distribution status: complete
+Final trust-account balance: $0.00
+`)
+  writeFileSync(join(caseDir, 'documents', 'received', 'settlement', 'client-distribution-receipt.md'), `---
+schema_version: 3
+document_type: client_distribution_receipt
+case_slug: ${slug}
+final_distribution_complete: true
+received_date: "2026-05-02"
+---
+
+# Client Distribution Receipt
+`)
+}
+
 function writeProviderRecordsAndBills(root: string, slug: string, providerSlug: string) {
   const providerDir = join(root, 'cases', slug, 'medical-providers', providerSlug)
   mkdirSync(join(providerDir, 'documents'), { recursive: true })
@@ -384,6 +414,30 @@ describe('FirmVault passive landmarks', () => {
               'insurance/bi-progressive.md',
               'negotiation/offers.md',
               'documents/received/insurance/progressive-offer-letter.md',
+            ]),
+          },
+        },
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves final distribution complete from canonical settlement evidence', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'firmvault-passive-'))
+    try {
+      process.env.MISSION_CONTROL_LAW_FIRM_ROOT = root
+      writeCase(root, 'test-case', { contractSigned: false, medicalAuthSigned: false })
+      writeFinalDistributionEvidence(root, 'test-case')
+
+      await expect(resolveFirmVaultPassiveLandmarks('test-case')).resolves.toMatchObject({
+        case_slug: 'test-case',
+        landmarks: {
+          final_distribution_complete: {
+            satisfied: true,
+            evidence: expect.arrayContaining([
+              'settlement/distribution.md',
+              'documents/received/settlement/client-distribution-receipt.md',
             ]),
           },
         },

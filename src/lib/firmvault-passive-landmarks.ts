@@ -96,6 +96,9 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
   const initialOfferEvidence = await initialOfferEvidenceList(caseDir, claimLedgers)
   const initialOfferReceived = initialOfferEvidence.length > 0
     || landmarkSatisfied(caseLandmarks.initial_offer_received)
+  const finalDistributionEvidence = await finalDistributionEvidenceList(caseDir)
+  const finalDistributionComplete = finalDistributionEvidence.length > 0
+    || landmarkSatisfied(caseLandmarks.final_distribution_complete)
 
   const providerFacts = await resolveProviderFacts(caseDir)
   const providerEntries = Object.entries(providerFacts)
@@ -172,6 +175,12 @@ export async function resolveFirmVaultPassiveLandmarks(caseSlug: string): Promis
         satisfied: initialOfferReceived,
         evidence: initialOfferReceived
           ? evidenceList(caseFrontmatter, `${caseSlug}.md`, initialOfferEvidence)
+          : [],
+      },
+      final_distribution_complete: {
+        satisfied: finalDistributionComplete,
+        evidence: finalDistributionComplete
+          ? evidenceList(caseFrontmatter, `${caseSlug}.md`, finalDistributionEvidence)
           : [],
       },
     },
@@ -472,6 +481,63 @@ async function initialOfferEvidenceList(
   return [...new Set(evidence)]
 }
 
+async function finalDistributionEvidenceList(caseDir: string): Promise<string[]> {
+  const evidence: string[] = []
+  const canonicalPaths = [
+    'settlement/distribution.md',
+    'settlement/settlement.md',
+  ]
+
+  for (const relativePath of canonicalPaths) {
+    const doc = await readMarkdownWithFrontmatter(join(caseDir, relativePath))
+    if (!doc) continue
+    if (frontmatterSupportsFinalDistributionComplete(doc.frontmatter) || bodySupportsFinalDistributionComplete(doc.body)) {
+      evidence.push(relativePath)
+    }
+  }
+
+  evidence.push(...await matchingFinalDistributionFiles(join(caseDir, 'documents', 'sent', 'settlement'), 'documents/sent/settlement'))
+  evidence.push(...await matchingFinalDistributionFiles(join(caseDir, 'documents', 'received', 'settlement'), 'documents/received/settlement'))
+  return [...new Set(evidence)]
+}
+
+function frontmatterSupportsFinalDistributionComplete(frontmatter: Record<string, unknown>): boolean {
+  const positiveStatuses = new Set(['complete', 'completed', 'final_distribution_complete', 'trust_zeroed', 'zeroed'])
+  const statusValues = [
+    frontmatter.status,
+    frontmatter.final_distribution_status,
+    frontmatter.distribution_status,
+    frontmatter.trust_account_status,
+  ]
+  return statusValues.some((value) => typeof value === 'string' && positiveStatuses.has(value.trim().toLowerCase()))
+    || booleanValue(frontmatter.final_distribution_complete)
+    || booleanValue(frontmatter.trust_account_zeroed)
+}
+
+function bodySupportsFinalDistributionComplete(body: string): boolean {
+  return /final distribution status:\s*(?:complete|completed)/i.test(body)
+    || /trust account (?:is )?zeroed/i.test(body)
+    || /final trust-account balance:\s*\$?0(?:\.00)?\b/i.test(body)
+}
+
+async function matchingFinalDistributionFiles(dir: string, relativeDir: string): Promise<string[]> {
+  let entries: string[]
+  try {
+    entries = await readdir(dir)
+  } catch {
+    return []
+  }
+  const matches: string[] = []
+  for (const entry of entries) {
+    if (!/(distribution|settlement|trust).+\.md$/i.test(entry)) continue
+    const doc = await readMarkdownWithFrontmatter(join(dir, entry))
+    if (doc && (frontmatterSupportsFinalDistributionComplete(doc.frontmatter) || bodySupportsFinalDistributionComplete(doc.body))) {
+      matches.push(`${relativeDir}/${entry}`)
+    }
+  }
+  return matches
+}
+
 async function matchingFiles(dir: string, pattern: RegExp, relativeDir: string): Promise<string[]> {
   let entries: string[]
   try {
@@ -492,6 +558,20 @@ async function readMarkdown(path: string): Promise<string | null> {
     return await readFile(path, 'utf8')
   } catch {
     return null
+  }
+}
+
+async function readMarkdownWithFrontmatter(path: string): Promise<{ frontmatter: Record<string, unknown>; body: string } | null> {
+  const raw = await readMarkdown(path)
+  if (raw === null) return null
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  if (!match) return { frontmatter: {}, body: raw }
+  const parsed = parseYaml(match[1])
+  return {
+    frontmatter: parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {},
+    body: match[2] ?? '',
   }
 }
 
