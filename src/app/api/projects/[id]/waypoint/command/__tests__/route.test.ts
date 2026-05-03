@@ -545,4 +545,21 @@ nodes:
     const body = await res.json()
     expect(body.error).toBe('Invalid request body')
   })
+
+  it('returns consistent error envelope when command execution fails', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/command`, { command: '/waypoint nope' }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Unknown Waypoint command: nope',
+    })
+  })
 })

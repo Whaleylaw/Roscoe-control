@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/auth'
 import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
-import { executeWaypointCommand } from '@/lib/waypoint-command'
+import { executeWaypointCommand, parseWaypointCommand } from '@/lib/waypoint-command'
 
 const Body = z.object({
   command: z.string().min(1),
@@ -79,12 +79,32 @@ export async function POST(
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return NextResponse.json({ ok: false, action: 'error', error: error.message }, { status: error.status })
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      const body = await request.json().catch(() => null)
+      const rawCommand = typeof body?.command === 'string' ? body.command : null
+      const parsedCommand = rawCommand
+        ? (() => {
+            try {
+              return parseWaypointCommand(rawCommand)
+            } catch {
+              return null
+            }
+          })()
+        : null
+
+      return NextResponse.json(
+        {
+          ok: false,
+          action: 'error',
+          command: parsedCommand,
+          error: error.message,
+        },
+        { status: 400 },
+      )
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/command error')
-    return NextResponse.json({ error: 'Failed to execute Waypoint command' }, { status: 500 })
+    return NextResponse.json({ ok: false, action: 'error', error: 'Failed to execute Waypoint command' }, { status: 500 })
   }
 }
