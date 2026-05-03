@@ -257,9 +257,11 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     return { name: 'forensics', definitionSlug, definitionVersion }
   }
 
-  if (head === 'start') {
-    const target = (tokens[1] || '').toLowerCase()
-    if (target !== 'plan') throw new Error('Only `start plan` is currently supported')
+  if (head === 'start' || head === 'execute') {
+    if (head === 'start') {
+      const target = (tokens[1] || '').toLowerCase()
+      if (target !== 'plan') throw new Error('Only `start plan` is currently supported')
+    }
 
     const planFlagIdx = tokens.findIndex((t) => t === '--plan-id')
     const planId = asPositiveInt(tokens[planFlagIdx + 1])
@@ -820,7 +822,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
   if (parsed.name === 'help') {
     return ok({
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint gate --route-id <id> --node <node_key> (--approve|--reject) [--note <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint execute --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint gate --route-id <id> --node <node_key> (--approve|--reject) [--note <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     })
   }
 

@@ -26,6 +26,16 @@ describe('waypoint command parser', () => {
     })
   })
 
+  it('parses execute alias for plan execution', () => {
+    expect(parseWaypointCommand('/waypoint execute --plan-id 88')).toEqual({
+      name: 'start',
+      target: 'plan',
+      planId: 88,
+      definitionSlug: 'waypoint-plan-execution',
+      definitionVersion: 1,
+    })
+  })
+
   it('parses start plan with explicit definition/version', () => {
     expect(
       parseWaypointCommand('/waypoint start plan --plan-id 88 --definition waypoint-project-intake --version 2'),
