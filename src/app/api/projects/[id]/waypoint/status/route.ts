@@ -52,12 +52,32 @@ export async function GET(
     }
 
     const status = getWaypointStatus(db, { projectId, workspaceId })
-    return NextResponse.json(status)
+    const activeRoutes = status.routes.filter((route) => route.status === 'active').length
+    const blockedRoutes = status.routes.filter((route) => route.status === 'blocked').length
+    const completeRoutes = status.routes.filter((route) => route.status === 'complete').length
+    const cancelledRoutes = status.routes.filter((route) => route.status === 'cancelled').length
+    const failedRoutes = status.routes.filter((route) => route.status === 'failed').length
+
+    return NextResponse.json({
+      ok: true,
+      action: 'status',
+      status,
+      summary: {
+        total_routes: status.routes.length,
+        active_routes: activeRoutes,
+        blocked_routes: blockedRoutes,
+        complete_routes: completeRoutes,
+        cancelled_routes: cancelledRoutes,
+        failed_routes: failedRoutes,
+        pending_gates: status.lifecycle.blocked_gates.length,
+        waiting_on_gate_tasks: status.tasks.waiting_on_gate.length,
+      },
+    })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return NextResponse.json({ ok: false, action: 'status', error: error.message }, { status: error.status })
     }
     logger.error({ err: error }, 'GET /api/projects/[id]/waypoint/status error')
-    return NextResponse.json({ error: 'Failed to build Waypoint status' }, { status: 500 })
+    return NextResponse.json({ ok: false, action: 'status', error: 'Failed to build Waypoint status' }, { status: 500 })
   }
 }

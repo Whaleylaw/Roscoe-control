@@ -93,7 +93,19 @@ describe('GET /api/projects/:id/waypoint/status', () => {
 
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.project).toMatchObject({ id: projectId, waypoint_enabled: true })
-    expect(Array.isArray(body.next_actions)).toBe(true)
+    expect(body.ok).toBe(true)
+    expect(body.action).toBe('status')
+    expect(body.status.project).toMatchObject({ id: projectId, waypoint_enabled: true })
+    expect(Array.isArray(body.status.next_actions)).toBe(true)
+    expect(body.summary).toMatchObject({
+      total_routes: expect.any(Number),
+      active_routes: expect.any(Number),
+      blocked_routes: expect.any(Number),
+      complete_routes: expect.any(Number),
+      cancelled_routes: expect.any(Number),
+      failed_routes: expect.any(Number),
+      pending_gates: expect.any(Number),
+      waiting_on_gate_tasks: expect.any(Number),
+    })
   })
 })
