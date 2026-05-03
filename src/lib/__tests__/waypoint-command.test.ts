@@ -318,4 +318,109 @@ nodes:
       db.close()
     }
   })
+
+  it('returns consistent ok/command/action envelope for pause/resume and gate decision', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      createWorkflowDefinition(db, `
+schema_version: 1
+id: waypoint-review-flow
+name: Waypoint Review Flow
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  objective:
+    required: true
+    type: string
+nodes:
+  quality_gate:
+    type: gate
+`, 'tester', 1, 1)
+
+      const route = startOrReuseWaypointRoute(db, {
+        workspaceId: 1,
+        tenantId: 1,
+        actor: 'tester',
+        projectId: project!.id,
+        subjectType: WAYPOINT_SUBJECT_TYPES.plan,
+        subjectId: 100,
+        definitionSlug: 'waypoint-review-flow',
+        definitionVersion: 1,
+        vars: { project_id: project!.id, plan_id: 100, objective: 'needs review' },
+      })
+
+      db.prepare(`UPDATE workflow_instances SET status = 'active', completed_at = NULL WHERE id = ?`).run(route.instanceId)
+      db.prepare(`UPDATE workflow_node_instances SET status = 'pending', completed_at = NULL WHERE workflow_instance_id = ?`).run(
+        route.instanceId,
+      )
+
+      const paused = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint pause --route-id ${route.instanceId}`,
+      })
+      expect(paused).toMatchObject({
+        ok: true,
+        action: 'pause',
+        command: { name: 'pause', routeId: route.instanceId },
+        route: { id: route.instanceId, status: 'blocked' },
+      })
+
+      const resumed = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint resume --route-id ${route.instanceId}`,
+      })
+      expect(resumed).toMatchObject({
+        ok: true,
+        action: 'resume',
+        command: { name: 'resume', routeId: route.instanceId },
+        route: { id: route.instanceId, status: 'active' },
+      })
+
+      const approved = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint gate --route-id ${route.instanceId} --node quality_gate --approve --note looks good`,
+      })
+      expect(approved).toMatchObject({
+        ok: true,
+        action: 'gate',
+        command: {
+          name: 'gate',
+          routeId: route.instanceId,
+          nodeKey: 'quality_gate',
+          decision: 'approve',
+          note: 'looks good',
+        },
+      })
+      expect(approved).toHaveProperty('route.id', route.instanceId)
+      expect(approved).toHaveProperty('node.node_key', 'quality_gate')
+      expect(approved).toHaveProperty('node.status', 'complete')
+    } finally {
+      db.close()
+    }
+  })
 })
