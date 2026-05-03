@@ -18,6 +18,11 @@ export interface RunWaypointAutopilotResult {
   changed: boolean
   stopReason: WaypointAutopilotStopReason
   nextActions: string[]
+  timerCompletions: number
+  materializedTasks: number
+  routesTouched: number
+  startedAt: number
+  completedAt: number
 }
 
 interface WaypointAutopilotRoute {
@@ -58,10 +63,14 @@ export function runWaypointAutopilot(
   const maxIterations = Math.max(1, Math.min(input.maxIterations ?? 1, 100))
   const deps: WaypointAutopilotDeps = { ...defaultDeps, ...(input.deps ?? {}) }
 
+  const startedAt = Math.floor(Date.now() / 1000)
   let iterations = 0
   let changed = false
   let stopReason: WaypointAutopilotStopReason = 'max_iterations'
   let nextActions: string[] = []
+  let timerCompletions = 0
+  let materializedTasks = 0
+  let routesTouched = 0
 
   for (let index = 0; index < maxIterations; index += 1) {
     iterations += 1
@@ -82,8 +91,10 @@ export function runWaypointAutopilot(
       actor: input.actor,
       now: input.now,
     })
+    timerCompletions += timerResult.completed.length
 
     const createdCounts: number[] = []
+    routesTouched += status.routes.length
     for (const route of status.routes) {
       const materialized = deps.materializeRoute(db, {
         workflowInstanceId: route.workflow_instance_id,
@@ -93,6 +104,7 @@ export function runWaypointAutopilot(
         now: input.now,
       })
       createdCounts.push(materialized.created.length)
+      materializedTasks += materialized.created.length
     }
 
     const progressed = hasProgress(timerResult.completed, createdCounts)
@@ -114,10 +126,41 @@ export function runWaypointAutopilot(
     }
   }
 
-  return {
+  const completedAt = Math.floor(Date.now() / 1000)
+  const result: RunWaypointAutopilotResult = {
     iterations,
     changed,
     stopReason,
     nextActions,
+    timerCompletions,
+    materializedTasks,
+    routesTouched,
+    startedAt,
+    completedAt,
   }
+
+  try {
+    const statusAfter = deps.getStatus(db, {
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+    })
+    const anchorRouteId = statusAfter.routes[0]?.workflow_instance_id
+
+    if (anchorRouteId) {
+      db.prepare(`
+        INSERT INTO workflow_events (workflow_instance_id, node_instance_id, task_id, node_key, event_type, actor_type, actor_id, payload_json, workspace_id, created_at)
+        VALUES (?, NULL, NULL, NULL, 'waypoint.autopilot.run', 'human', ?, ?, ?, ?)
+      `).run(
+        anchorRouteId,
+        input.actor,
+        JSON.stringify({ project_id: input.projectId, workspace_id: input.workspaceId, ...result }),
+        input.workspaceId,
+        completedAt,
+      )
+    }
+  } catch {
+    // best-effort telemetry only
+  }
+
+  return result
 }

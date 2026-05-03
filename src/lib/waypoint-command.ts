@@ -7,6 +7,7 @@ export type WaypointCommandName =
   | 'status'
   | 'start'
   | 'auto'
+  | 'auto_status'
   | 'discuss'
   | 'doctor'
   | 'forensics'
@@ -27,6 +28,7 @@ export type WaypointParsedCommand =
       definitionVersion: number
     }
   | { name: 'auto'; maxIterations?: number }
+  | { name: 'auto_status'; limit?: number; offset?: number }
   | { name: 'discuss'; taskId: number; message?: string }
   | { name: 'doctor'; definitionSlug: string; definitionVersion: number }
   | { name: 'forensics'; definitionSlug: string; definitionVersion: number }
@@ -59,6 +61,14 @@ function asPositiveInt(value: string | undefined): number | null {
   return n
 }
 
+function asNonNegativeInt(value: string | undefined): number | null {
+  if (value == null) return null
+  if (!/^\d+$/.test(value)) return null
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
+}
+
 function tokenize(command: string): string[] {
   return command.trim().split(/\s+/).filter(Boolean)
 }
@@ -81,6 +91,24 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
   if (head === 'help') return { name: 'help' }
 
   if (head === 'auto') {
+    const statusAlias = (tokens[1] || '').toLowerCase()
+    if (statusAlias === 'status') {
+      const limitFlagIdx = tokens.findIndex((t) => t === '--limit')
+      const offsetFlagIdx = tokens.findIndex((t) => t === '--offset')
+      const parsed: { name: 'auto_status'; limit?: number; offset?: number } = { name: 'auto_status' }
+      if (limitFlagIdx >= 0) {
+        const limit = asPositiveInt(tokens[limitFlagIdx + 1])
+        if (limit == null) throw new Error('Invalid --limit value')
+        parsed.limit = Math.min(limit, 200)
+      }
+      if (offsetFlagIdx >= 0) {
+        const offset = asNonNegativeInt(tokens[offsetFlagIdx + 1])
+        if (offset == null) throw new Error('Invalid --offset value')
+        parsed.offset = offset
+      }
+      return parsed
+    }
+
     const idx = tokens.findIndex((t) => t === '--max-iterations')
     if (idx >= 0) {
       const parsed = asPositiveInt(tokens[idx + 1])
@@ -131,7 +159,7 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     }
 
     if (offsetFlagIdx >= 0) {
-      const offset = asPositiveInt(tokens[offsetFlagIdx + 1])
+      const offset = asNonNegativeInt(tokens[offsetFlagIdx + 1])
       if (offset == null) throw new Error('Invalid --offset value')
       parsed.offset = offset
     }
@@ -166,7 +194,7 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     }
 
     if (offsetFlagIdx >= 0) {
-      const offset = asPositiveInt(tokens[offsetFlagIdx + 1])
+      const offset = asNonNegativeInt(tokens[offsetFlagIdx + 1])
       if (offset == null) throw new Error('Invalid --offset value')
       parsed.offset = offset
     }
@@ -362,6 +390,50 @@ export interface WaypointRouteEvent {
   payload_json: string
   workspace_id: number
   created_at: number
+}
+
+export interface WaypointAutopilotRunEvent {
+  id: number
+  event_type: string
+  actor_id: string | null
+  payload_json: string
+  created_at: number
+}
+
+export function listWaypointAutopilotRuns(
+  db: Database.Database,
+  input: { workspaceId: number; projectId: number; limit?: number; offset?: number },
+): WaypointAutopilotRunEvent[] {
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 200)
+  const offset = Math.max(input.offset ?? 0, 0)
+
+  const rows = db
+    .prepare(
+      `
+    SELECT
+      id,
+      event_type,
+      actor_id,
+      payload_json,
+      created_at
+    FROM workflow_events
+    WHERE workspace_id = ?
+      AND event_type = 'waypoint.autopilot.run'
+    ORDER BY id DESC
+  `,
+    )
+    .all(input.workspaceId) as WaypointAutopilotRunEvent[]
+
+  const filtered = rows.filter((row) => {
+    try {
+      const payload = JSON.parse(row.payload_json) as { project_id?: unknown }
+      return Number(payload.project_id) === input.projectId
+    } catch {
+      return false
+    }
+  })
+
+  return filtered.slice(offset, offset + limit)
 }
 
 export function listWaypointRouteEvents(
@@ -628,7 +700,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     }
   }
 
@@ -653,6 +725,26 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
         actor: input.actor,
         maxIterations: parsed.maxIterations,
       }),
+    }
+  }
+
+  if (parsed.name === 'auto_status') {
+    const runs = listWaypointAutopilotRuns(input.db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      limit: parsed.limit,
+      offset: parsed.offset,
+    })
+
+    return {
+      ok: true,
+      command: parsed,
+      runs,
+      count: runs.length,
+      pagination: {
+        limit: Math.min(Math.max(parsed.limit ?? 20, 1), 200),
+        offset: Math.max(parsed.offset ?? 0, 0),
+      },
     }
   }
 

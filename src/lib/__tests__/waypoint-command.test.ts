@@ -42,6 +42,15 @@ describe('waypoint command parser', () => {
     })
   })
 
+  it('parses auto status with optional pagination', () => {
+    expect(parseWaypointCommand('/waypoint auto status')).toEqual({ name: 'auto_status' })
+    expect(parseWaypointCommand('/waypoint auto status --limit 15 --offset 3')).toEqual({
+      name: 'auto_status',
+      limit: 15,
+      offset: 3,
+    })
+  })
+
   it('parses discuss with and without message', () => {
     expect(parseWaypointCommand('/waypoint discuss --task-id 42')).toEqual({ name: 'discuss', taskId: 42 })
     expect(parseWaypointCommand('/waypoint discuss --task-id 42 --message hello there')).toEqual({

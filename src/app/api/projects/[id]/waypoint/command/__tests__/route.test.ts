@@ -398,6 +398,65 @@ nodes:
     expect(body.discussion.message_count).toBe(1)
   })
 
+  it('returns autopilot run history via auto status command', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-doctor
+name: Waypoint Doctor
+version: 1
+subject_type: waypoint_project
+vars:
+  project_id:
+    required: true
+    type: number
+nodes:
+  diagnose:
+    type: recipe
+    recipe: gsd-debugger
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+
+    const startRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint doctor',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(startRes.status).toBe(200)
+
+    const autoRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint auto --max-iterations 1',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(autoRes.status).toBe(200)
+
+    const statusRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint auto status --limit 5 --offset 0',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(statusRes.status).toBe(200)
+    const statusBody = await statusRes.json()
+    expect(statusBody.ok).toBe(true)
+    expect(statusBody.command).toEqual({ name: 'auto_status', limit: 5, offset: 0 })
+    expect(Array.isArray(statusBody.runs)).toBe(true)
+    expect(statusBody.count).toBeGreaterThanOrEqual(1)
+    expect(statusBody.pagination).toEqual({ limit: 5, offset: 0 })
+  })
+
   it('returns 400 for malformed command payload', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 

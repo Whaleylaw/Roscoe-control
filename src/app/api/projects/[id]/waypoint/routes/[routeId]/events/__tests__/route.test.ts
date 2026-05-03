@@ -87,7 +87,7 @@ nodes:
     tenantId: 1,
   })
 
-  return started.instanceId
+  return started.instance_id
 }
 
 async function loadRoute() {
