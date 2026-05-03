@@ -202,6 +202,45 @@ describe('waypoint command execution envelope', () => {
     }
   })
 
+  it('returns consistent ok/command/action envelope for discuss', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      const now = 8000
+      const taskId = Number(db.prepare(`
+        INSERT INTO tasks (title, description, status, priority, project_id, assigned_to, created_by, created_at, updated_at, workspace_id)
+        VALUES ('Discuss scope', 'Clarify acceptance criteria', 'inbox', 'medium', ?, 'gsd-doc-drafter', 'tester', ?, ?, 1)
+      `).run(project!.id, now, now).lastInsertRowid)
+
+      const result = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint discuss --task-id ${taskId} --message hello`,
+      })
+
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'discuss',
+        command: { name: 'discuss', taskId, message: 'hello' },
+      })
+      expect(result).toHaveProperty('discussion.task_id', taskId)
+      expect(result).toHaveProperty('discussion.posted_message_id')
+      expect(result).toHaveProperty('discussion.message_count', 1)
+      expect(result).toHaveProperty('discussion.messages.0.content', 'hello')
+    } finally {
+      db.close()
+    }
+  })
+
   it('returns consistent ok/command/action envelope for routes pagination', () => {
     const db = new Database(':memory:')
     try {
