@@ -22,12 +22,24 @@ const Query = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 })
 
+function routesError(status: number, error: string, details?: unknown) {
+  return NextResponse.json(
+    {
+      ok: false,
+      action: 'error',
+      error,
+      ...(details !== undefined ? { details } : {}),
+    },
+    { status },
+  )
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return routesError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   try {
     const db = getDatabase()
@@ -46,12 +58,12 @@ export async function GET(
     const { id } = await params
     const projectId = parseStrictId(id)
     if (projectId == null) {
-      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+      return routesError(400, 'Invalid project ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return routesError(404, 'Project not found')
     }
 
     const lifecycleState = db
@@ -66,10 +78,7 @@ export async function GET(
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
 
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json(
-        { error: 'Waypoint lifecycle is not enabled for this project' },
-        { status: 409 },
-      )
+      return routesError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const parsed = Query.safeParse({
@@ -78,7 +87,7 @@ export async function GET(
       offset: request.nextUrl.searchParams.get('offset') ?? undefined,
     })
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid query params', details: parsed.error.issues }, { status: 400 })
+      return routesError(400, 'Invalid query params', parsed.error.issues)
     }
 
     const routes = listWaypointRoutes(db, {
@@ -104,13 +113,13 @@ export async function GET(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return routesError(error.status, error.message)
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return routesError(400, error.message)
     }
     logger.error({ err: error }, 'GET /api/projects/[id]/waypoint/routes error')
-    return NextResponse.json({ error: 'Failed to list Waypoint routes' }, { status: 500 })
+    return routesError(500, 'Failed to list Waypoint routes')
   }
 }
 
@@ -119,7 +128,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return routesError(auth.status ?? 403, auth.error ?? 'Forbidden')
   const rateCheck = mutationLimiter(request)
   if (rateCheck) return rateCheck
 
@@ -140,12 +149,12 @@ export async function POST(
     const { id } = await params
     const projectId = parseStrictId(id)
     if (projectId == null) {
-      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+      return routesError(400, 'Invalid project ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return routesError(404, 'Project not found')
     }
 
     const lifecycleState = db
@@ -160,16 +169,13 @@ export async function POST(
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
 
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json(
-        { error: 'Waypoint lifecycle is not enabled for this project' },
-        { status: 409 },
-      )
+      return routesError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const body = await request.json().catch(() => ({}))
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: parsed.error.issues }, { status: 400 })
+      return routesError(400, 'Invalid request body', parsed.error.issues)
     }
 
     const scope = resolveWaypointPlanRouteScope(db, {
@@ -210,12 +216,12 @@ export async function POST(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return routesError(error.status, error.message)
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return routesError(400, error.message)
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/routes error')
-    return NextResponse.json({ error: 'Failed to start Waypoint route' }, { status: 500 })
+    return routesError(500, 'Failed to start Waypoint route')
   }
 }

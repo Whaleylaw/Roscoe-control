@@ -6,12 +6,23 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { getWaypointRouteDetail } from '@/lib/waypoint-command'
 
+function routeDetailError(status: number, error: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      action: 'error',
+      error,
+    },
+    { status },
+  )
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; routeId: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return routeDetailError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   try {
     const db = getDatabase()
@@ -31,12 +42,12 @@ export async function GET(
     const projectId = parseStrictId(id)
     const parsedRouteId = parseStrictId(routeId)
     if (projectId == null || parsedRouteId == null) {
-      return NextResponse.json({ error: 'Invalid project or route ID' }, { status: 400 })
+      return routeDetailError(400, 'Invalid project or route ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return routeDetailError(404, 'Project not found')
     }
 
     const lifecycleState = db
@@ -51,7 +62,7 @@ export async function GET(
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
 
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json({ error: 'Waypoint lifecycle is not enabled for this project' }, { status: 409 })
+      return routeDetailError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const detail = getWaypointRouteDetail(db, {
@@ -70,12 +81,12 @@ export async function GET(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return routeDetailError(error.status, error.message)
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return routeDetailError(400, error.message)
     }
     logger.error({ err: error }, 'GET /api/projects/[id]/waypoint/routes/[routeId] error')
-    return NextResponse.json({ error: 'Failed to fetch Waypoint route detail' }, { status: 500 })
+    return routeDetailError(500, 'Failed to fetch Waypoint route detail')
   }
 }

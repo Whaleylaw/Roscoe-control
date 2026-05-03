@@ -144,6 +144,19 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId', () => {
       params: Promise.resolve({ id: String(projectId), routeId: '1' }),
     })
     expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toMatchObject({ ok: false, action: 'error', error: 'Forbidden' })
+  })
+
+  it('returns consistent error envelope for invalid route id', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/nope`), {
+      params: Promise.resolve({ id: String(projectId), routeId: 'nope' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toMatchObject({ ok: false, action: 'error', error: 'Invalid project or route ID' })
   })
 
   it('returns route detail with nodes', async () => {

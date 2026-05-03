@@ -118,6 +118,8 @@ describe('POST /api/projects/:id/waypoint/routes', () => {
     })
 
     expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error' })
   })
 
   it('starts a typed plan route', async () => {
@@ -179,13 +181,25 @@ nodes:
       plan_id: planId,
       definition_slug: 'waypoint-plan-execution',
       definition_version: 1,
-      reused: false,
     })
+    expect(body.reused).toBeTypeOf('boolean')
     expect(body.workflow_instance_id).toBeTypeOf('number')
   })
 })
 
 describe('GET /api/projects/:id/waypoint/routes', () => {
+  it('returns consistent error envelope for invalid query params', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes?limit=999`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toMatchObject({ ok: false, action: 'error', error: 'Invalid query params' })
+  })
+
   it('lists routes with status filter and pagination', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
     const planId = seedWaypointPlan(projectId)
