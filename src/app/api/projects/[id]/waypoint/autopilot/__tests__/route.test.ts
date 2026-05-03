@@ -33,6 +33,10 @@ function req(path: string, body: Record<string, unknown>) {
   })
 }
 
+function getReq(path: string) {
+  return new NextRequest(`http://localhost${path}`, { method: 'GET' })
+}
+
 function seedProject(input: { gsdEnabled: number }): number {
   const result = db.prepare(
     `INSERT INTO projects (
@@ -106,5 +110,34 @@ describe('POST /api/projects/:id/waypoint/autopilot', () => {
       },
     })
     expect(typeof body.result.stopReason).toBe('string')
+  })
+})
+
+describe('GET /api/projects/:id/waypoint/autopilot', () => {
+  it('returns autopilot run history payload', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/autopilot?limit=5&offset=0`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.action).toBe('autopilot_status')
+    expect(Array.isArray(body.runs)).toBe(true)
+    expect(body.pagination).toEqual({ limit: 5, offset: 0 })
+  })
+
+  it('returns 400 for invalid pagination', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/autopilot?limit=0`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
   })
 })

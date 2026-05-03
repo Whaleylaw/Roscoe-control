@@ -16,6 +16,7 @@ export type WaypointCommandName =
   | 'pause'
   | 'resume'
   | 'route_events'
+  | 'gate'
   | 'help'
 
 export type WaypointParsedCommand =
@@ -42,6 +43,7 @@ export type WaypointParsedCommand =
   | { name: 'pause'; routeId: number }
   | { name: 'resume'; routeId: number }
   | { name: 'route_events'; routeId: number; limit?: number; offset?: number }
+  | { name: 'gate'; routeId: number; nodeKey: string; decision: 'approve' | 'reject'; note?: string }
   | { name: 'help' }
 
 export interface ExecuteWaypointCommandInput {
@@ -214,6 +216,21 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
     const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
     if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
     return { name: 'resume', routeId }
+  }
+
+  if (head === 'gate') {
+    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id')
+    const nodeFlagIdx = tokens.findIndex((t) => t === '--node')
+    const approve = tokens.includes('--approve')
+    const reject = tokens.includes('--reject')
+    const noteFlagIdx = tokens.findIndex((t) => t === '--note')
+    const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
+    const nodeKey = tokens[nodeFlagIdx + 1]
+    if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
+    if (nodeFlagIdx < 0 || !nodeKey) throw new Error('Missing or invalid --node')
+    if ((approve && reject) || (!approve && !reject)) throw new Error('Specify exactly one of --approve or --reject')
+    const note = noteFlagIdx >= 0 ? tokens.slice(noteFlagIdx + 1).join(' ').trim() : undefined
+    return { name: 'gate', routeId, nodeKey, decision: approve ? 'approve' : 'reject', ...(note ? { note } : {}) }
   }
 
   if (head === 'doctor') {
@@ -647,6 +664,105 @@ export function setWaypointRoutePausedState(
   }
 }
 
+export function setWaypointGateDecision(
+  db: Database.Database,
+  input: {
+    workspaceId: number
+    projectId: number
+    routeId: number
+    nodeKey: string
+    actor: string
+    decision: 'approve' | 'reject'
+    note?: string
+  },
+) {
+  const route = db
+    .prepare(
+      `
+    SELECT id, status
+    FROM workflow_instances
+    WHERE id = ?
+      AND workspace_id = ?
+      AND json_extract(vars_json, '$.project_id') = ?
+    LIMIT 1
+  `,
+    )
+    .get(input.routeId, input.workspaceId, input.projectId) as
+    | { id: number; status: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed' }
+    | undefined
+
+  if (!route) throw new Error(`Route ${input.routeId} not found for project ${input.projectId}`)
+  if (route.status === 'complete' || route.status === 'cancelled' || route.status === 'failed') {
+    throw new Error(`Route ${input.routeId} is terminal (${route.status})`)
+  }
+
+  const node = db
+    .prepare(
+      `
+    SELECT id, node_type, status
+    FROM workflow_node_instances
+    WHERE workflow_instance_id = ?
+      AND node_key = ?
+    LIMIT 1
+  `,
+    )
+    .get(input.routeId, input.nodeKey) as
+    | { id: number; node_type: string; status: string }
+    | undefined
+
+  if (!node) throw new Error(`Node ${input.nodeKey} not found on route ${input.routeId}`)
+  if (!['review', 'gate'].includes(node.node_type)) {
+    throw new Error(`Node ${input.nodeKey} is type ${node.node_type}; only review/gate nodes are supported`)
+  }
+
+  const now = Math.floor(Date.now() / 1000)
+  const payload = JSON.stringify({ decision: input.decision, note: input.note ?? null })
+
+  if (input.decision === 'approve') {
+    db.prepare(
+      `UPDATE workflow_node_instances
+       SET status = 'complete', completed_at = COALESCE(completed_at, ?), output_json = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(now, payload, now, node.id)
+
+    db.prepare(
+      `UPDATE workflow_node_dependencies
+       SET status = 'satisfied', satisfied_at = COALESCE(satisfied_at, ?), payload_json = ?, updated_at = ?
+       WHERE workflow_instance_id = ?
+         AND dependency_type = 'node'
+         AND dependency_key = ?
+         AND status IN ('pending', 'scheduled')`,
+    ).run(now, payload, now, input.routeId, `node:${input.nodeKey}`)
+
+    db.prepare(
+      `INSERT INTO workflow_events (workflow_instance_id, node_instance_id, task_id, node_key, event_type, actor_type, actor_id, payload_json, workspace_id, created_at)
+       VALUES (?, ?, NULL, ?, 'waypoint.gate.approved', 'human', ?, ?, ?, ?)`,
+    ).run(input.routeId, node.id, input.nodeKey, input.actor, payload, input.workspaceId, now)
+  } else {
+    db.prepare(
+      `UPDATE workflow_node_instances
+       SET status = 'blocked', output_json = ?, updated_at = ?
+       WHERE id = ?`,
+    ).run(payload, now, node.id)
+
+    db.prepare(`UPDATE workflow_instances SET status = 'blocked', updated_at = ? WHERE id = ?`).run(now, input.routeId)
+
+    db.prepare(
+      `INSERT INTO workflow_events (workflow_instance_id, node_instance_id, task_id, node_key, event_type, actor_type, actor_id, payload_json, workspace_id, created_at)
+       VALUES (?, ?, NULL, ?, 'waypoint.gate.rejected', 'human', ?, ?, ?, ?)`,
+    ).run(input.routeId, node.id, input.nodeKey, input.actor, payload, input.workspaceId, now)
+  }
+
+  return {
+    route: db
+      .prepare(`SELECT id, workflow_key, status, updated_at, completed_at FROM workflow_instances WHERE id = ?`)
+      .get(input.routeId),
+    node: db
+      .prepare(`SELECT id, node_key, node_type, status, updated_at, completed_at FROM workflow_node_instances WHERE id = ?`)
+      .get(node.id),
+  }
+}
+
 export function resolveWaypointPlanRouteScope(
   db: Database.Database,
   input: ResolveWaypointPlanRouteScopeInput,
@@ -700,7 +816,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       message:
-        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint gate --route-id <id> --node <node_key> (--approve|--reject) [--note <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
     }
   }
 
@@ -888,6 +1004,23 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       ok: true,
       command: parsed,
       route,
+    }
+  }
+
+  if (parsed.name === 'gate') {
+    const result = setWaypointGateDecision(input.db, {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      routeId: parsed.routeId,
+      nodeKey: parsed.nodeKey,
+      actor: input.actor,
+      decision: parsed.decision,
+      note: parsed.note,
+    })
+    return {
+      ok: true,
+      command: parsed,
+      ...result,
     }
   }
 

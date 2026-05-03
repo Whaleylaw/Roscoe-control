@@ -83,6 +83,19 @@ describe('waypoint command parser', () => {
     })
     expect(parseWaypointCommand('/waypoint pause --route-id 19')).toEqual({ name: 'pause', routeId: 19 })
     expect(parseWaypointCommand('/waypoint resume --route-id 19')).toEqual({ name: 'resume', routeId: 19 })
+    expect(parseWaypointCommand('/waypoint gate --route-id 19 --node quality_gate --approve')).toEqual({
+      name: 'gate',
+      routeId: 19,
+      nodeKey: 'quality_gate',
+      decision: 'approve',
+    })
+    expect(parseWaypointCommand('/waypoint gate --route-id 19 --node quality_gate --reject --note needs changes')).toEqual({
+      name: 'gate',
+      routeId: 19,
+      nodeKey: 'quality_gate',
+      decision: 'reject',
+      note: 'needs changes',
+    })
   })
 
   it('parses doctor and forensics with defaults and overrides', () => {
