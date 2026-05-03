@@ -103,6 +103,8 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     const { POST } = await loadRoute()
     const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/1/gate`, { node_key: 'quality_gate', decision: 'approve' }), { params: Promise.resolve({ id: String(projectId), routeId: '1' }) })
     expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'route_gate', error: 'Forbidden' })
   })
 
   it('approves a gate node', async () => {
