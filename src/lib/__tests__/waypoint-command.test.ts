@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { runMigrations } from '../migrations'
 import { executeWaypointCommand, parseWaypointCommand } from '../waypoint-command'
+import { startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from '../waypoint'
+import { createWorkflowDefinition } from '../workflow-engine'
 
 describe('waypoint command parser', () => {
   it('parses status with and without prefix', () => {
@@ -227,6 +229,91 @@ describe('waypoint command execution envelope', () => {
       expect(result).toHaveProperty('routes')
       expect(result).toHaveProperty('count')
       expect(result).toHaveProperty('pagination', { limit: 10, offset: 0 })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('returns consistent ok/command/action envelope for route detail and route events', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      createWorkflowDefinition(db, `
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  objective:
+    required: true
+    type: string
+nodes:
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+`, 'tester', 1, 1)
+
+      const route = startOrReuseWaypointRoute(db, {
+        workspaceId: 1,
+        tenantId: 1,
+        actor: 'tester',
+        projectId: project!.id,
+        subjectType: WAYPOINT_SUBJECT_TYPES.plan,
+        subjectId: 99,
+        definitionSlug: 'waypoint-plan-execution',
+        definitionVersion: 1,
+        vars: { project_id: project!.id, plan_id: 99, objective: 'test objective' },
+      })
+
+      const routeDetail = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint route --route-id ${route.instanceId}`,
+      })
+
+      expect(routeDetail).toMatchObject({
+        ok: true,
+        action: 'route',
+        command: { name: 'route', routeId: route.instanceId },
+      })
+      expect(routeDetail).toHaveProperty('route.id', route.instanceId)
+      expect(routeDetail).toHaveProperty('nodes')
+      expect(routeDetail).toHaveProperty('node_count')
+
+      const routeEvents = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint route-events --route-id ${route.instanceId} --limit 10 --offset 0`,
+      })
+
+      expect(routeEvents).toMatchObject({
+        ok: true,
+        action: 'route_events',
+        command: { name: 'route_events', routeId: route.instanceId, limit: 10, offset: 0 },
+        route_id: route.instanceId,
+      })
+      expect(routeEvents).toHaveProperty('events')
+      expect(routeEvents).toHaveProperty('count')
+      expect(routeEvents).toHaveProperty('pagination', { limit: 10, offset: 0 })
     } finally {
       db.close()
     }
