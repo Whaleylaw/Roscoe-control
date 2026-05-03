@@ -458,6 +458,75 @@ nodes:
     expect(statusBody.pagination).toEqual({ limit: 5, offset: 0 })
   })
 
+  it('applies gate approve decision with consistent command/action envelope', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-review-flow
+name: Waypoint Review Flow
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  objective:
+    required: true
+    type: string
+nodes:
+  quality_gate:
+    type: gate
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const planId = seedWaypointPlan(projectId)
+    const { POST } = await loadRoute()
+
+    const startRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint start plan --plan-id ${planId} --definition waypoint-review-flow`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(startRes.status).toBe(200)
+    const startBody = await startRes.json()
+    const routeId = Number(startBody.route.instanceId)
+
+    db.prepare(`UPDATE workflow_instances SET status = 'active', completed_at = NULL WHERE id = ?`).run(routeId)
+    db.prepare(`UPDATE workflow_node_instances SET status = 'pending', completed_at = NULL WHERE workflow_instance_id = ?`).run(routeId)
+
+    const gateRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint gate --route-id ${routeId} --node quality_gate --approve --note looks good`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(gateRes.status).toBe(200)
+    const gateBody = await gateRes.json()
+    expect(gateBody.ok).toBe(true)
+    expect(gateBody.action).toBe('gate')
+    expect(gateBody.command).toEqual({
+      name: 'gate',
+      routeId,
+      nodeKey: 'quality_gate',
+      decision: 'approve',
+      note: 'looks good',
+    })
+    expect(gateBody.route.id).toBe(routeId)
+    expect(gateBody.node.node_key).toBe('quality_gate')
+    expect(gateBody.node.status).toBe('complete')
+  })
+
   it('returns 400 for malformed command payload', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
