@@ -230,18 +230,31 @@ nodes:
     )
 
     const { POST } = await loadRoute()
-    const res = await POST(
+    const started = await POST(
       req(`/api/projects/${projectId}/waypoint/command`, {
         command: `/waypoint start plan --plan-id ${planId}`,
       }),
       { params: Promise.resolve({ id: String(projectId) }) },
     )
 
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.ok).toBe(true)
-    expect(body.command).toMatchObject({ name: 'start', target: 'plan', planId })
-    expect(body.route.instanceId).toBeTypeOf('number')
+    expect(started.status).toBe(200)
+    const startedBody = await started.json()
+    expect(startedBody.ok).toBe(true)
+    expect(startedBody.command).toMatchObject({ name: 'start', target: 'plan', planId })
+    expect(startedBody.route.instanceId).toBeTypeOf('number')
+
+    const executed = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint execute --plan-id ${planId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(executed.status).toBe(200)
+    const executedBody = await executed.json()
+    expect(executedBody.ok).toBe(true)
+    expect(executedBody.command).toMatchObject({ name: 'start', target: 'plan', planId })
+    expect(executedBody.route.instanceId).toBeTypeOf('number')
   })
 
   it('starts a project doctor route', async () => {

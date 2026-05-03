@@ -503,6 +503,21 @@ nodes:
       })
       expect(started).toHaveProperty('route.instanceId')
 
+      const executed = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint execute --plan-id ${planId}`,
+      })
+      expect(executed).toMatchObject({
+        ok: true,
+        action: 'start',
+        command: { name: 'start', planId, definitionSlug: 'waypoint-plan-execution', definitionVersion: 1 },
+      })
+      expect(executed).toHaveProperty('route.instanceId')
+
       const doctor = executeWaypointCommand({
         db,
         workspaceId: 1,
