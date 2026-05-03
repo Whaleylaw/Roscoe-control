@@ -123,8 +123,28 @@ describe('POST /api/projects/:id/waypoint/command', () => {
 
     expect(res.status).toBe(409)
     await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: null,
       error: 'Waypoint lifecycle is not enabled for this project',
     })
+  })
+
+  it('returns structured envelope for invalid request body', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/command`, { command: '' }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.action).toBe('error')
+    expect(body.command).toBeNull()
+    expect(body.error).toBe('Invalid request body')
+    expect(Array.isArray(body.details)).toBe(true)
   })
 
   it('returns status command output when lifecycle is enabled', async () => {

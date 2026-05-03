@@ -11,12 +11,24 @@ const Body = z.object({
   command: z.string().min(1),
 })
 
+function commandError(status: number, error: string, command: ReturnType<typeof parseWaypointCommand> | null = null) {
+  return NextResponse.json(
+    {
+      ok: false,
+      action: 'error',
+      command,
+      error,
+    },
+    { status },
+  )
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return commandError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   try {
     const db = getDatabase()
@@ -35,18 +47,27 @@ export async function POST(
     const { id } = await params
     const projectId = parseStrictId(id)
     if (projectId == null) {
-      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+      return commandError(400, 'Invalid project ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return commandError(404, 'Project not found')
     }
 
     const body = await request.json().catch(() => ({}))
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: parsed.error.issues }, { status: 400 })
+      return NextResponse.json(
+        {
+          ok: false,
+          action: 'error',
+          command: null,
+          error: 'Invalid request body',
+          details: parsed.error.issues,
+        },
+        { status: 400 },
+      )
     }
 
     const lifecycleState = db
@@ -60,10 +81,7 @@ export async function POST(
       )
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json(
-        { error: 'Waypoint lifecycle is not enabled for this project' },
-        { status: 409 },
-      )
+      return commandError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const actor = auth.user.display_name || auth.user.username || 'operator'
@@ -79,7 +97,7 @@ export async function POST(
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ ok: false, action: 'error', error: error.message }, { status: error.status })
+      return commandError(error.status, error.message)
     }
     if (error instanceof Error) {
       const body = await request.json().catch(() => null)
@@ -94,17 +112,9 @@ export async function POST(
           })()
         : null
 
-      return NextResponse.json(
-        {
-          ok: false,
-          action: 'error',
-          command: parsedCommand,
-          error: error.message,
-        },
-        { status: 400 },
-      )
+      return commandError(400, error.message, parsedCommand)
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/command error')
-    return NextResponse.json({ ok: false, action: 'error', error: 'Failed to execute Waypoint command' }, { status: 500 })
+    return commandError(500, 'Failed to execute Waypoint command')
   }
 }
