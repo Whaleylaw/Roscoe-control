@@ -13,12 +13,23 @@ const Body = z.object({
   max_iterations: z.number().int().positive().max(100).optional(),
 })
 
+function autopilotError(status: number, error: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      action: 'error',
+      error,
+    },
+    { status },
+  )
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return autopilotError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   try {
     const db = getDatabase()
@@ -37,12 +48,12 @@ export async function GET(
     const { id } = await params
     const projectId = parseStrictId(id)
     if (projectId == null) {
-      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+      return autopilotError(400, 'Invalid project ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return autopilotError(404, 'Project not found')
     }
 
     const lifecycleState = db
@@ -57,10 +68,7 @@ export async function GET(
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
 
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json(
-        { error: 'Waypoint lifecycle is not enabled for this project' },
-        { status: 409 },
-      )
+      return autopilotError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const { searchParams } = new URL(request.url)
@@ -71,7 +79,7 @@ export async function GET(
 
     if ((limitRaw && (!Number.isFinite(limit) || limit == null || limit <= 0)) ||
         (offsetRaw && (!Number.isFinite(offset) || offset == null || offset < 0))) {
-      return NextResponse.json({ error: 'Invalid pagination parameters' }, { status: 400 })
+      return autopilotError(400, 'Invalid pagination parameters')
     }
 
     const runs = listWaypointAutopilotRuns(db, {
@@ -93,13 +101,13 @@ export async function GET(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return autopilotError(error.status, error.message)
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return autopilotError(400, error.message)
     }
     logger.error({ err: error }, 'GET /api/projects/[id]/waypoint/autopilot error')
-    return NextResponse.json({ error: 'Failed to fetch Waypoint Autopilot status' }, { status: 500 })
+    return autopilotError(500, 'Failed to fetch Waypoint Autopilot status')
   }
 }
 
@@ -108,7 +116,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return autopilotError(auth.status ?? 403, auth.error ?? 'Forbidden')
   const rateCheck = mutationLimiter(request)
   if (rateCheck) return rateCheck
 
@@ -129,12 +137,12 @@ export async function POST(
     const { id } = await params
     const projectId = parseStrictId(id)
     if (projectId == null) {
-      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+      return autopilotError(400, 'Invalid project ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return autopilotError(404, 'Project not found')
     }
 
     const lifecycleState = db
@@ -149,16 +157,21 @@ export async function POST(
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
 
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json(
-        { error: 'Waypoint lifecycle is not enabled for this project' },
-        { status: 409 },
-      )
+      return autopilotError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const body = await request.json().catch(() => ({}))
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Invalid request body', details: parsed.error.issues }, { status: 400 })
+      return NextResponse.json(
+        {
+          ok: false,
+          action: 'error',
+          error: 'Invalid request body',
+          details: parsed.error.issues,
+        },
+        { status: 400 },
+      )
     }
 
     const actor = auth.user.display_name || auth.user.username || 'operator'
@@ -177,12 +190,12 @@ export async function POST(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
+      return autopilotError(error.status, error.message)
     }
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return autopilotError(400, error.message)
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/autopilot error')
-    return NextResponse.json({ error: 'Failed to run Waypoint Autopilot' }, { status: 500 })
+    return autopilotError(500, 'Failed to run Waypoint Autopilot')
   }
 }

@@ -79,6 +79,7 @@ describe('POST /api/projects/:id/waypoint/autopilot', () => {
     })
 
     expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toMatchObject({ ok: false, action: 'error', error: 'Forbidden' })
   })
 
   it('returns 409 when waypoint lifecycle is not enabled', async () => {
@@ -90,6 +91,11 @@ describe('POST /api/projects/:id/waypoint/autopilot', () => {
     })
 
     expect(res.status).toBe(409)
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      action: 'error',
+      error: 'Waypoint lifecycle is not enabled for this project',
+    })
   })
 
   it('runs bounded autopilot and returns result', async () => {
@@ -139,5 +145,10 @@ describe('GET /api/projects/:id/waypoint/autopilot', () => {
     })
 
     expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      action: 'error',
+      error: 'Invalid pagination parameters',
+    })
   })
 })
