@@ -1,0 +1,101 @@
+import Database from 'better-sqlite3'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { NextRequest } from 'next/server'
+import { runMigrations } from '@/lib/migrations'
+import { startTaskDiscussion } from '@/lib/waypoint-task-discussion'
+
+let db: Database.Database
+
+const broadcast = vi.fn()
+
+vi.mock('@/lib/db', () => ({
+  getDatabase: () => db,
+}))
+
+vi.mock('@/lib/auth', () => ({
+  requireRole: vi.fn(() => ({
+    user: { id: 1, username: 'operator', display_name: 'Operator', role: 'operator', workspace_id: 1, tenant_id: 1 },
+  })),
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  mutationLimiter: vi.fn(() => null),
+}))
+
+vi.mock('@/lib/event-bus', () => ({
+  eventBus: {
+    broadcast,
+  },
+}))
+
+function req(path: string, body: Record<string, unknown>) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+function seedTask(): number {
+  const result = db.prepare(`
+    INSERT INTO tasks (title, description, status, priority, project_id, assigned_to, created_by, created_at, updated_at, workspace_id)
+    VALUES ('Task A', 'desc', 'todo', 'medium', NULL, 'Aegis', 'operator', unixepoch(), unixepoch(), 1)
+  `).run()
+  return Number(result.lastInsertRowid)
+}
+
+async function loadRoute() {
+  return import('@/app/api/tasks/[id]/discussion/messages/route')
+}
+
+beforeEach(() => {
+  vi.resetModules()
+  db = new Database(':memory:')
+  runMigrations(db)
+  broadcast.mockReset()
+})
+
+afterEach(() => {
+  db.close()
+  vi.clearAllMocks()
+})
+
+describe('POST /api/tasks/:id/discussion/messages', () => {
+  it('returns 409 when waypoint discussion is not enabled for the task', async () => {
+    const taskId = seedTask()
+    const { POST } = await loadRoute()
+
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'hello' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(409)
+    await expect(res.json()).resolves.toEqual({
+      error: 'Waypoint discussion is not enabled for this task',
+    })
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('posts a discussion message and emits chat.message event', async () => {
+    const taskId = seedTask()
+    startTaskDiscussion(db, {
+      taskId,
+      workspaceId: 1,
+      actor: 'operator',
+      agent: 'Aegis',
+    })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'Ship it', to: 'Aegis' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.discussion).toMatchObject({ enabled: true, status: 'active', agent: 'Aegis' })
+    expect(body.message.content).toBe('Ship it')
+    expect(body.message.metadata).toMatchObject({ kind: 'waypoint_task_discussion', waypoint: true, task_id: taskId })
+    expect(broadcast).toHaveBeenCalledTimes(1)
+    expect(broadcast).toHaveBeenCalledWith('chat.message', expect.objectContaining({ id: body.message.id, content: 'Ship it' }))
+  })
+})
