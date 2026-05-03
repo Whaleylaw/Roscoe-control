@@ -79,7 +79,23 @@ describe('GET /api/projects/:id/waypoint/status', () => {
 
     expect(res.status).toBe(409)
     await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
       error: 'Waypoint lifecycle is not enabled for this project',
+    })
+  })
+
+  it('returns consistent error envelope for invalid project id', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(req('/api/projects/not-a-number/waypoint/status'), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project ID',
     })
   })
 

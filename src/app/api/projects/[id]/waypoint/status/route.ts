@@ -6,12 +6,23 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { getWaypointStatus } from '@/lib/waypoint'
 
+function statusError(status: number, error: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      action: 'error',
+      error,
+    },
+    { status },
+  )
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'viewer')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return statusError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   try {
     const db = getDatabase()
@@ -31,12 +42,12 @@ export async function GET(
     const { id } = await params
     const projectId = parseStrictId(id)
     if (projectId == null) {
-      return NextResponse.json({ error: 'Invalid project ID' }, { status: 400 })
+      return statusError(400, 'Invalid project ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      return statusError(404, 'Project not found')
     }
     const lifecycleState = db.prepare(`
       SELECT COALESCE(gsd_enabled, 0) AS gsd_enabled
@@ -45,10 +56,7 @@ export async function GET(
       LIMIT 1
     `).get(projectId, workspaceId) as { gsd_enabled: number } | undefined
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json(
-        { error: 'Waypoint lifecycle is not enabled for this project' },
-        { status: 409 },
-      )
+      return statusError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const status = getWaypointStatus(db, { projectId, workspaceId })
@@ -75,9 +83,9 @@ export async function GET(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ ok: false, action: 'status', error: error.message }, { status: error.status })
+      return statusError(error.status, error.message)
     }
     logger.error({ err: error }, 'GET /api/projects/[id]/waypoint/status error')
-    return NextResponse.json({ ok: false, action: 'status', error: 'Failed to build Waypoint status' }, { status: 500 })
+    return statusError(500, 'Failed to build Waypoint status')
   }
 }
