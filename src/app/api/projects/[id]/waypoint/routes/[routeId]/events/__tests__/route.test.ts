@@ -118,9 +118,11 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
     })
 
     expect(res.status).toBe(403)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error', error: 'Forbidden' })
   })
 
-  it('returns 400 when waypoint lifecycle is not enabled', async () => {
+  it('returns 409 when waypoint lifecycle is not enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 0 })
     const routeId = seedDoctorRoute(projectId)
 
@@ -129,10 +131,31 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
       params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
     })
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: false,
+      action: 'error',
+      error: 'Waypoint lifecycle is not enabled for this project',
+    })
   })
 
   it('returns route events request error as 400 when route lookup fails', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const routeId = seedDoctorRoute(projectId)
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/${routeId + 1}/events?limit=5&offset=0`), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId + 1) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error' })
+    expect(body.error).toContain('not found')
+  })
+
+  it('returns route events with success envelope', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
     const routeId = seedDoctorRoute(projectId)
 
@@ -141,6 +164,14 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
       params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
     })
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: true,
+      action: 'list_route_events',
+      route_id: routeId,
+      pagination: { limit: 5, offset: 0 },
+    })
+    expect(Array.isArray(body.events)).toBe(true)
   })
 })
