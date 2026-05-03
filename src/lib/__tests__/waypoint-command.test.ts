@@ -96,8 +96,16 @@ describe('waypoint command parser', () => {
       offset: 2,
     })
     expect(parseWaypointCommand('/waypoint pause --route-id 19')).toEqual({ name: 'pause', routeId: 19 })
+    expect(parseWaypointCommand('/waypoint pause --id 19')).toEqual({ name: 'pause', routeId: 19 })
     expect(parseWaypointCommand('/waypoint resume --route-id 19')).toEqual({ name: 'resume', routeId: 19 })
+    expect(parseWaypointCommand('/waypoint resume --id 19')).toEqual({ name: 'resume', routeId: 19 })
     expect(parseWaypointCommand('/waypoint gate --route-id 19 --node quality_gate --approve')).toEqual({
+      name: 'gate',
+      routeId: 19,
+      nodeKey: 'quality_gate',
+      decision: 'approve',
+    })
+    expect(parseWaypointCommand('/waypoint gate --id 19 --node quality_gate --approve')).toEqual({
       name: 'gate',
       routeId: 19,
       nodeKey: 'quality_gate',
@@ -598,7 +606,7 @@ nodes:
         tenantId: 1,
         projectId: project!.id,
         actor: 'tester',
-        rawCommand: `/waypoint pause --route-id ${route.instanceId}`,
+        rawCommand: `/waypoint pause --id ${route.instanceId}`,
       })
       expect(paused).toMatchObject({
         ok: true,
@@ -613,7 +621,7 @@ nodes:
         tenantId: 1,
         projectId: project!.id,
         actor: 'tester',
-        rawCommand: `/waypoint resume --route-id ${route.instanceId}`,
+        rawCommand: `/waypoint resume --id ${route.instanceId}`,
       })
       expect(resumed).toMatchObject({
         ok: true,
@@ -628,7 +636,7 @@ nodes:
         tenantId: 1,
         projectId: project!.id,
         actor: 'tester',
-        rawCommand: `/waypoint gate --route-id ${route.instanceId} --node quality_gate --approve --note looks good`,
+        rawCommand: `/waypoint gate --id ${route.instanceId} --node quality_gate --approve --note looks good`,
       })
       expect(approved).toMatchObject({
         ok: true,

@@ -205,21 +205,21 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
   }
 
   if (head === 'pause') {
-    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id')
+    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id' || t === '--id')
     const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
     if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
     return { name: 'pause', routeId }
   }
 
   if (head === 'resume') {
-    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id')
+    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id' || t === '--id')
     const routeId = asPositiveInt(tokens[routeFlagIdx + 1])
     if (routeFlagIdx < 0 || routeId == null) throw new Error('Missing or invalid --route-id')
     return { name: 'resume', routeId }
   }
 
   if (head === 'gate') {
-    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id')
+    const routeFlagIdx = tokens.findIndex((t) => t === '--route-id' || t === '--id')
     const nodeFlagIdx = tokens.findIndex((t) => t === '--node')
     const approve = tokens.includes('--approve')
     const reject = tokens.includes('--reject')
