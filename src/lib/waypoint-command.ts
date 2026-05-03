@@ -825,11 +825,18 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
   }
 
   if (parsed.name === 'status') {
+    const status = getWaypointStatus(input.db, {
+      projectId: input.projectId,
+      workspaceId: input.workspaceId,
+    })
     return ok({
-      status: getWaypointStatus(input.db, {
-        projectId: input.projectId,
-        workspaceId: input.workspaceId,
-      }),
+      status,
+      summary: {
+        active_routes: status.routes.filter((route) => route.status === 'active').length,
+        blocked_routes: status.routes.filter((route) => route.status === 'blocked').length,
+        pending_gates: status.lifecycle.blocked_gates.length,
+        waiting_on_gate_tasks: status.tasks.waiting_on_gate.length,
+      },
     })
   }
 

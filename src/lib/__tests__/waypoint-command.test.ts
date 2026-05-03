@@ -165,6 +165,10 @@ describe('waypoint command execution envelope', () => {
 
       expect(result).toMatchObject({ ok: true, action: 'status', command: { name: 'status' } })
       expect(result).toHaveProperty('status.project.id', project!.id)
+      expect(result).toHaveProperty('summary.active_routes')
+      expect(result).toHaveProperty('summary.blocked_routes')
+      expect(result).toHaveProperty('summary.pending_gates')
+      expect(result).toHaveProperty('summary.waiting_on_gate_tasks')
     } finally {
       db.close()
     }

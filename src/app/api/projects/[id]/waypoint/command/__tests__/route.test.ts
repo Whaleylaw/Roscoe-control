@@ -140,6 +140,12 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     expect(body.ok).toBe(true)
     expect(body.command).toEqual({ name: 'status' })
     expect(body.status.project).toMatchObject({ id: projectId, waypoint_enabled: true })
+    expect(body.summary).toMatchObject({
+      active_routes: expect.any(Number),
+      blocked_routes: expect.any(Number),
+      pending_gates: expect.any(Number),
+      waiting_on_gate_tasks: expect.any(Number),
+    })
   })
 
   it('starts a plan route', async () => {
