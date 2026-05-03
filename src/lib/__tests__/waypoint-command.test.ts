@@ -8,6 +8,7 @@ import { createWorkflowDefinition } from '../workflow-engine'
 describe('waypoint command parser', () => {
   it('parses status with and without prefix', () => {
     expect(parseWaypointCommand('/waypoint status')).toEqual({ name: 'status' })
+    expect(parseWaypointCommand('/wp status')).toEqual({ name: 'status' })
     expect(parseWaypointCommand('wp status')).toEqual({ name: 'status' })
   })
 
@@ -157,6 +158,9 @@ describe('waypoint command execution envelope', () => {
 
       expect(result).toMatchObject({ ok: true, action: 'help', command: { name: 'help' } })
       expect(result).toHaveProperty('message')
+      const message = (result as { message: string }).message
+      expect(message).toContain('alias: /wp')
+      expect(message).toContain('alias: /waypoint events --id <id>')
     } finally {
       db.close()
     }
