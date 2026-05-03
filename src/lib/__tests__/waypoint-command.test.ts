@@ -167,4 +167,68 @@ describe('waypoint command execution envelope', () => {
       db.close()
     }
   })
+
+  it('returns consistent ok/command/action envelope for auto status', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      const result = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: '/waypoint auto status --limit 5 --offset 0',
+      })
+
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'auto_status',
+        command: { name: 'auto_status', limit: 5, offset: 0 },
+      })
+      expect(result).toHaveProperty('runs')
+      expect(result).toHaveProperty('count')
+      expect(result).toHaveProperty('pagination', { limit: 5, offset: 0 })
+    } finally {
+      db.close()
+    }
+  })
+
+  it('returns consistent ok/command/action envelope for routes pagination', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      const result = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: '/waypoint routes --limit 10 --offset 0',
+      })
+
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'routes',
+        command: { name: 'routes', limit: 10, offset: 0 },
+      })
+      expect(result).toHaveProperty('routes')
+      expect(result).toHaveProperty('count')
+      expect(result).toHaveProperty('pagination', { limit: 10, offset: 0 })
+    } finally {
+      db.close()
+    }
+  })
 })
