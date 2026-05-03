@@ -451,6 +451,7 @@ nodes:
     expect(statusRes.status).toBe(200)
     const statusBody = await statusRes.json()
     expect(statusBody.ok).toBe(true)
+    expect(statusBody.action).toBe('auto_status')
     expect(statusBody.command).toEqual({ name: 'auto_status', limit: 5, offset: 0 })
     expect(Array.isArray(statusBody.runs)).toBe(true)
     expect(statusBody.count).toBeGreaterThanOrEqual(1)
