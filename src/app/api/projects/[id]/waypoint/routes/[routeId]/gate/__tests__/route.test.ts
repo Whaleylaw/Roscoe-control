@@ -107,6 +107,41 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     expect(body).toMatchObject({ ok: false, action: 'route_gate', error: 'Forbidden' })
   })
 
+  it('returns 409 when waypoint lifecycle is not enabled', async () => {
+    const projectId = seedProject(0)
+    const { POST } = await loadRoute()
+
+    const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/1/gate`, { node_key: 'quality_gate', decision: 'approve' }), {
+      params: Promise.resolve({ id: String(projectId), routeId: '1' }),
+    })
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toEqual({
+      ok: false,
+      action: 'route_gate',
+      error: 'Waypoint lifecycle is not enabled for this project',
+    })
+  })
+
+  it('returns structured envelope for invalid request body', async () => {
+    const projectId = seedProject(1)
+    const planId = seedPlan(projectId)
+    const routeId = seedRoute(projectId, planId)
+    const { POST } = await loadRoute()
+
+    const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/gate`, { node_key: '', decision: 'approve' }), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.action).toBe('route_gate')
+    expect(body.error).toBe('Invalid request body')
+    expect(Array.isArray(body.details)).toBe(true)
+  })
+
   it('approves a gate node', async () => {
     const projectId = seedProject(1)
     const planId = seedPlan(projectId)
