@@ -17,8 +17,15 @@ describe('waypoint command parser', () => {
     expect(parseWaypointCommand('')).toEqual({ name: 'help' })
   })
 
-  it('parses start plan with defaults', () => {
+  it('parses start plan with defaults and --id alias', () => {
     expect(parseWaypointCommand('/waypoint start plan --plan-id 88')).toEqual({
+      name: 'start',
+      target: 'plan',
+      planId: 88,
+      definitionSlug: 'waypoint-plan-execution',
+      definitionVersion: 1,
+    })
+    expect(parseWaypointCommand('/waypoint start plan --id 88')).toEqual({
       name: 'start',
       target: 'plan',
       planId: 88,

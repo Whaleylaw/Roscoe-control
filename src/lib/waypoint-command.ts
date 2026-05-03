@@ -263,7 +263,7 @@ export function parseWaypointCommand(rawCommand: string): WaypointParsedCommand 
       if (target !== 'plan') throw new Error('Only `start plan` is currently supported')
     }
 
-    const planFlagIdx = tokens.findIndex((t) => t === '--plan-id')
+    const planFlagIdx = tokens.findIndex((t) => t === '--plan-id' || t === '--id')
     const planId = asPositiveInt(tokens[planFlagIdx + 1])
     if (planFlagIdx < 0 || planId == null) throw new Error('Missing or invalid --plan-id')
 
@@ -822,7 +822,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
   if (parsed.name === 'help') {
     return ok({
       message:
-        'Commands: /waypoint (alias: /wp) status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint execute --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> (alias: --id) | /waypoint route-events --route-id <id> (alias: /waypoint events --id <id>) [--limit N] [--offset N] | /waypoint pause --route-id <id> (alias: --id) | /waypoint resume --route-id <id> (alias: --id) | /waypoint gate --route-id <id> (alias: --id) --node <node_key> (--approve|--reject) [--note <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
+        'Commands: /waypoint (alias: /wp) status | /waypoint start plan --plan-id <id> (alias: --id) [--definition waypoint-plan-execution] [--version 1] | /waypoint execute --plan-id <id> (alias: --id) [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> (alias: --id) | /waypoint route-events --route-id <id> (alias: /waypoint events --id <id>) [--limit N] [--offset N] | /waypoint pause --route-id <id> (alias: --id) | /waypoint resume --route-id <id> (alias: --id) | /waypoint gate --route-id <id> (alias: --id) --node <node_key> (--approve|--reject) [--note <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help'
     })
   }
 
