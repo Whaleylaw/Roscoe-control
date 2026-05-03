@@ -30,6 +30,8 @@ export async function POST(
   const auth = requireRole(request, 'operator')
   if ('error' in auth) return commandError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
+  let rawCommand: string | null = null
+
   try {
     const db = getDatabase()
     const workspaceId = auth.user.workspace_id ?? 1
@@ -57,6 +59,9 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}))
     const parsed = Body.safeParse(body)
+    if (parsed.success) {
+      rawCommand = parsed.data.command
+    }
     if (!parsed.success) {
       return NextResponse.json(
         {
@@ -100,8 +105,6 @@ export async function POST(
       return commandError(error.status, error.message)
     }
     if (error instanceof Error) {
-      const body = await request.json().catch(() => null)
-      const rawCommand = typeof body?.command === 'string' ? body.command : null
       const parsedCommand = rawCommand
         ? (() => {
             try {

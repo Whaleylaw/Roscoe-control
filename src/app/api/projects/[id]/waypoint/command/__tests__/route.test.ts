@@ -147,6 +147,26 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     expect(Array.isArray(body.details)).toBe(true)
   })
 
+  it('returns parsed command envelope when execution fails after body parse', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/waypoint route --route-id 999999',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: { name: 'route', routeId: 999999 },
+      error: `Route 999999 not found for project ${projectId}`, 
+    })
+  })
+
   it('returns status command output when lifecycle is enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
