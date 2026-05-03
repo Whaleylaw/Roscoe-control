@@ -358,6 +358,159 @@ nodes:
     }
   })
 
+  it('returns consistent ok/command/action envelope for auto execution', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      const result = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: '/waypoint auto --max-iterations 1',
+      })
+
+      expect(result).toMatchObject({
+        ok: true,
+        action: 'auto',
+        command: { name: 'auto', maxIterations: 1 },
+      })
+      expect(result).toHaveProperty('autopilot')
+      expect(result).toHaveProperty('autopilot.iterations')
+    } finally {
+      db.close()
+    }
+  })
+
+  it('returns consistent ok/command/action envelope for start and doctor/forensics routes', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      const workstreamId = Number(db.prepare(`
+        INSERT INTO gsd_workstreams (project_id, key, name, status)
+        VALUES (?, 'core', 'Core', 'active')
+      `).run(project!.id).lastInsertRowid)
+      const milestoneId = Number(db.prepare(`
+        INSERT INTO gsd_milestones (project_id, workstream_id, version_label, title, status)
+        VALUES (?, ?, 'v1', 'Milestone 1', 'active')
+      `).run(project!.id, workstreamId).lastInsertRowid)
+      const phaseId = Number(db.prepare(`
+        INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status)
+        VALUES (?, 'execute', 'execute', 'delivery', 1, 'active')
+      `).run(milestoneId).lastInsertRowid)
+      const planId = Number(db.prepare(`
+        INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status)
+        VALUES (?, 'P1', 'Plan 1', 'wave-1', 'in_progress')
+      `).run(phaseId).lastInsertRowid)
+
+      createWorkflowDefinition(db, `
+ schema_version: 1
+ id: waypoint-plan-execution
+ name: Waypoint Plan Execution
+ version: 1
+ subject_type: waypoint_plan
+ vars:
+   project_id:
+     required: true
+     type: number
+   plan_id:
+     required: true
+     type: number
+   objective:
+     required: true
+     type: string
+ nodes:
+   implement_plan:
+     type: recipe
+     recipe: gsd-coder
+ `, 'tester', 1, 1)
+
+      createWorkflowDefinition(db, `
+ schema_version: 1
+ id: waypoint-doctor
+ name: Waypoint Doctor
+ version: 1
+ subject_type: waypoint_project
+ vars:
+   project_id:
+     required: true
+     type: number
+ nodes:
+   inspect:
+     type: recipe
+     recipe: gsd-generalist
+ `, 'tester', 1, 1)
+
+      createWorkflowDefinition(db, `
+ schema_version: 1
+ id: waypoint-forensics
+ name: Waypoint Forensics
+ version: 1
+ subject_type: waypoint_project
+ vars:
+   project_id:
+     required: true
+     type: number
+ nodes:
+   inspect:
+     type: recipe
+     recipe: gsd-generalist
+ `, 'tester', 1, 1)
+
+      const started = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: `/waypoint start plan --plan-id ${planId}`,
+      })
+      expect(started).toMatchObject({
+        ok: true,
+        action: 'start',
+        command: { name: 'start', planId, definitionSlug: 'waypoint-plan-execution', definitionVersion: 1 },
+      })
+      expect(started).toHaveProperty('route.instanceId')
+
+      const doctor = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: '/waypoint doctor',
+      })
+      expect(doctor).toMatchObject({ ok: true, action: 'doctor', command: { name: 'doctor', definitionSlug: 'waypoint-doctor', definitionVersion: 1 } })
+      expect(doctor).toHaveProperty('route.instanceId')
+
+      const forensics = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: '/waypoint forensics',
+      })
+      expect(forensics).toMatchObject({ ok: true, action: 'forensics', command: { name: 'forensics', definitionSlug: 'waypoint-forensics', definitionVersion: 1 } })
+      expect(forensics).toHaveProperty('route.instanceId')
+    } finally {
+      db.close()
+    }
+  })
+
   it('returns consistent ok/command/action envelope for pause/resume and gate decision', () => {
     const db = new Database(':memory:')
     try {
