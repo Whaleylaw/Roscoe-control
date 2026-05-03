@@ -171,7 +171,7 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
     const { POST } = await loadRoute()
-    const res = await POST(req(`/api/projects/${projectId}/waypoint/command`, { command: '/waypoint status' }), {
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/command`, { command: '/wp status' }), {
       params: Promise.resolve({ id: String(projectId) }),
     })
 
@@ -245,7 +245,7 @@ nodes:
 
     const executed = await POST(
       req(`/api/projects/${projectId}/waypoint/command`, {
-        command: `/waypoint execute --plan-id ${planId}`,
+        command: `/wp execute --id ${planId}`,
       }),
       { params: Promise.resolve({ id: String(projectId) }) },
     )
@@ -401,7 +401,7 @@ nodes:
 
     const eventsRes = await POST(
       req(`/api/projects/${projectId}/waypoint/command`, {
-        command: `/waypoint route-events --route-id ${routeId}`,
+        command: `/waypoint events --id ${routeId}`,
       }),
       { params: Promise.resolve({ id: String(projectId) }) },
     )
