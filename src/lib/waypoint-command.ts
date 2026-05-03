@@ -829,11 +829,21 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       projectId: input.projectId,
       workspaceId: input.workspaceId,
     })
+    const activeRoutes = status.routes.filter((route) => route.status === 'active').length
+    const blockedRoutes = status.routes.filter((route) => route.status === 'blocked').length
+    const completeRoutes = status.routes.filter((route) => route.status === 'complete').length
+    const cancelledRoutes = status.routes.filter((route) => route.status === 'cancelled').length
+    const failedRoutes = status.routes.filter((route) => route.status === 'failed').length
+
     return ok({
       status,
       summary: {
-        active_routes: status.routes.filter((route) => route.status === 'active').length,
-        blocked_routes: status.routes.filter((route) => route.status === 'blocked').length,
+        total_routes: status.routes.length,
+        active_routes: activeRoutes,
+        blocked_routes: blockedRoutes,
+        complete_routes: completeRoutes,
+        cancelled_routes: cancelledRoutes,
+        failed_routes: failedRoutes,
         pending_gates: status.lifecycle.blocked_gates.length,
         waiting_on_gate_tasks: status.tasks.waiting_on_gate.length,
       },
