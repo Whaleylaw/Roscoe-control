@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { parseWaypointCommand } from '../waypoint-command'
+import Database from 'better-sqlite3'
+import { runMigrations } from '../migrations'
+import { executeWaypointCommand, parseWaypointCommand } from '../waypoint-command'
 
 describe('waypoint command parser', () => {
   it('parses status with and without prefix', () => {
@@ -116,5 +118,53 @@ describe('waypoint command parser', () => {
     expect(() => parseWaypointCommand('/waypoint start plan')).toThrow(/--plan-id/)
     expect(() => parseWaypointCommand('/waypoint auto --max-iterations nope')).toThrow(/max-iterations/)
     expect(() => parseWaypointCommand('/waypoint discuss --task-id nope')).toThrow(/--task-id/)
+  })
+})
+
+describe('waypoint command execution envelope', () => {
+  it('returns consistent ok/command/action envelope for help', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const result = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: 1,
+        actor: 'tester',
+        rawCommand: '/waypoint help',
+      })
+
+      expect(result).toMatchObject({ ok: true, action: 'help', command: { name: 'help' } })
+      expect(result).toHaveProperty('message')
+    } finally {
+      db.close()
+    }
+  })
+
+  it('returns consistent ok/command/action envelope for status', () => {
+    const db = new Database(':memory:')
+    try {
+      runMigrations(db)
+      const project = db.prepare(`SELECT id FROM projects WHERE workspace_id = 1 AND slug = 'general' LIMIT 1`).get() as
+        | { id: number }
+        | undefined
+      expect(project).toBeTruthy()
+      db.prepare(`UPDATE projects SET gsd_enabled = 1 WHERE id = ?`).run(project!.id)
+
+      const result = executeWaypointCommand({
+        db,
+        workspaceId: 1,
+        tenantId: 1,
+        projectId: project!.id,
+        actor: 'tester',
+        rawCommand: '/waypoint status',
+      })
+
+      expect(result).toMatchObject({ ok: true, action: 'status', command: { name: 'status' } })
+      expect(result).toHaveProperty('status.project.id', project!.id)
+    } finally {
+      db.close()
+    }
   })
 })

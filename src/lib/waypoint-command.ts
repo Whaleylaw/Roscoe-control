@@ -810,38 +810,38 @@ export function resolveWaypointPlanRouteScope(
 
 export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
   const parsed = parseWaypointCommand(input.rawCommand)
+  const ok = <T extends Record<string, unknown>>(payload: T) => ({
+    ok: true as const,
+    action: parsed.name,
+    command: parsed,
+    ...payload,
+  })
 
   if (parsed.name === 'help') {
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       message:
         'Commands: /waypoint status | /waypoint start plan --plan-id <id> [--definition waypoint-plan-execution] [--version 1] | /waypoint auto [--max-iterations N] | /waypoint auto status [--limit N] [--offset N] | /waypoint discuss --task-id <id> [--message <text>] | /waypoint routes [--status active|blocked|complete|cancelled|failed] [--limit N] [--offset N] | /waypoint route --route-id <id> | /waypoint route-events --route-id <id> [--limit N] [--offset N] | /waypoint pause --route-id <id> | /waypoint resume --route-id <id> | /waypoint gate --route-id <id> --node <node_key> (--approve|--reject) [--note <text>] | /waypoint doctor [--definition waypoint-doctor] [--version 1] | /waypoint forensics [--definition waypoint-forensics] [--version 1] | /waypoint help',
-    }
+    })
   }
 
   if (parsed.name === 'status') {
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       status: getWaypointStatus(input.db, {
         projectId: input.projectId,
         workspaceId: input.workspaceId,
       }),
-    }
+    })
   }
 
   if (parsed.name === 'auto') {
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       autopilot: runWaypointAutopilot(input.db, {
         projectId: input.projectId,
         workspaceId: input.workspaceId,
         actor: input.actor,
         maxIterations: parsed.maxIterations,
       }),
-    }
+    })
   }
 
   if (parsed.name === 'auto_status') {
@@ -852,16 +852,14 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       offset: parsed.offset,
     })
 
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       runs,
       count: runs.length,
       pagination: {
         limit: Math.min(Math.max(parsed.limit ?? 20, 1), 200),
         offset: Math.max(parsed.offset ?? 0, 0),
       },
-    }
+    })
   }
 
   if (parsed.name === 'discuss') {
@@ -886,9 +884,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       limit: 100,
     })
 
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       discussion: {
         task_id: started.task.id,
         conversation_id: started.discussion.conversation_id,
@@ -898,7 +894,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
         message_count: listed.messages.length,
         messages: listed.messages,
       },
-    }
+    })
   }
 
   if (parsed.name === 'start') {
@@ -927,11 +923,9 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       },
     })
 
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       route,
-    }
+    })
   }
 
   if (parsed.name === 'route') {
@@ -941,14 +935,12 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       routeId: parsed.routeId,
     })
 
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       route: detail.route,
       vars: detail.vars,
       nodes: detail.nodes,
       node_count: detail.nodes.length,
-    }
+    })
   }
 
   if (parsed.name === 'route_events') {
@@ -959,9 +951,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       limit: parsed.limit,
       offset: parsed.offset,
     })
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       route_id: parsed.routeId,
       events,
       count: events.length,
@@ -969,7 +959,7 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
         limit: Math.min(Math.max(parsed.limit ?? 50, 1), 500),
         offset: Math.max(parsed.offset ?? 0, 0),
       },
-    }
+    })
   }
 
   if (parsed.name === 'routes') {
@@ -980,16 +970,14 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       limit: parsed.limit,
       offset: parsed.offset,
     })
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       routes,
       count: routes.length,
       pagination: {
         limit: Math.min(Math.max(parsed.limit ?? 50, 1), 200),
         offset: Math.max(parsed.offset ?? 0, 0),
       },
-    }
+    })
   }
 
   if (parsed.name === 'pause' || parsed.name === 'resume') {
@@ -1000,11 +988,9 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       actor: input.actor,
       action: parsed.name,
     })
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       route,
-    }
+    })
   }
 
   if (parsed.name === 'gate') {
@@ -1017,11 +1003,9 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       decision: parsed.decision,
       note: parsed.note,
     })
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       ...result,
-    }
+    })
   }
 
   if (parsed.name === 'doctor' || parsed.name === 'forensics') {
@@ -1041,11 +1025,9 @@ export function executeWaypointCommand(input: ExecuteWaypointCommandInput) {
       },
     })
 
-    return {
-      ok: true,
-      command: parsed,
+    return ok({
       route,
-    }
+    })
   }
 
   throw new Error(`Unhandled Waypoint command: ${(parsed as { name: string }).name}`)
