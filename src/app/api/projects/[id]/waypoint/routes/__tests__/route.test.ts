@@ -42,6 +42,14 @@ function getReq(path: string) {
   return new NextRequest(`http://localhost${path}`, { method: 'GET' })
 }
 
+function malformedJsonReq(path: string) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{"subject":"plan",',
+  })
+}
+
 function seedProject(input: { gsdEnabled: number }): number {
   const result = db.prepare(
     `INSERT INTO projects (
@@ -187,6 +195,22 @@ describe('POST /api/projects/:id/waypoint/routes', () => {
       ok: false,
       action: 'error',
       error: 'Project not found',
+    })
+  })
+
+  it('returns consistent error envelope for malformed JSON body', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(malformedJsonReq(`/api/projects/${projectId}/waypoint/routes`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid JSON body',
     })
   })
 

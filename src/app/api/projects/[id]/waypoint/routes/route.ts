@@ -172,7 +172,13 @@ export async function POST(
       return routesError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
-    const body = await request.json().catch(() => ({}))
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return routesError(400, 'Invalid JSON body')
+    }
+
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
       return routesError(400, 'Invalid request body', parsed.error.issues)
