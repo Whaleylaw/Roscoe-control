@@ -203,6 +203,26 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     })
   })
 
+  it('returns null command envelope for auto status parse failures', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: '/wp auto status --limit nope',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Invalid --limit value',
+    })
+  })
+
   it('returns status command output when lifecycle is enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
