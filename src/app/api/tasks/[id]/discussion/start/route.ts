@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
+import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
 import { startTaskDiscussion } from '@/lib/waypoint-task-discussion'
 
 function discussionStartError(status: number, error: string) {
@@ -15,7 +16,7 @@ export async function POST(
   const auth = requireRole(request, 'operator')
   if ('error' in auth) return discussionStartError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
-  const rateCheck = mutationLimiter(request)
+  const rateCheck = normalizeWaypointRateLimitError(mutationLimiter(request))
   if (rateCheck) return rateCheck
 
   const resolvedParams = await params

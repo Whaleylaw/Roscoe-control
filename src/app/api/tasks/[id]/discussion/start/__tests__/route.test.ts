@@ -1,10 +1,11 @@
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 
 let db: Database.Database
 let authRole: 'operator' | 'viewer' = 'operator'
+const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
 
 vi.mock('@/lib/db', () => ({
   getDatabase: () => db,
@@ -23,7 +24,7 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
-  mutationLimiter: vi.fn(() => null),
+  mutationLimiter: mutationLimiterMock,
 }))
 
 function req(path: string, body: Record<string, unknown>) {
@@ -57,6 +58,8 @@ async function loadRoute() {
 beforeEach(() => {
   vi.resetModules()
   authRole = 'operator'
+  mutationLimiterMock.mockReset()
+  mutationLimiterMock.mockReturnValue(null)
   db = new Database(':memory:')
   runMigrations(db)
 })
@@ -100,6 +103,23 @@ describe('POST /api/tasks/:id/discussion/start', () => {
 
     expect(res.status).toBe(400)
     await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid JSON body' })
+  })
+
+  it('normalizes rate-limit responses into the waypoint error envelope', async () => {
+    const taskId = seedTask()
+    mutationLimiterMock.mockReturnValueOnce(NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 }))
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/start`, { agent: 'Aegis' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(429)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Too many requests. Please try again later.',
+    })
   })
 
   it('starts task discussion and returns standard success envelope', async () => {

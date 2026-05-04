@@ -1,7 +1,9 @@
 import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
+
+const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
@@ -24,6 +26,10 @@ vi.mock('@/lib/workspaces', () => ({
 }))
 
 vi.mock('@/lib/logger', () => ({ logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } }))
+
+vi.mock('@/lib/rate-limit', () => ({
+  mutationLimiter: mutationLimiterMock,
+}))
 
 function req(path: string, body: Record<string, unknown>) {
   return new NextRequest(`http://localhost${path}`, {
@@ -67,6 +73,8 @@ async function loadRoute() {
 beforeEach(() => {
   vi.resetModules()
   authRole = 'operator'
+  mutationLimiterMock.mockReset()
+  mutationLimiterMock.mockReturnValue(null)
   db = new Database(':memory:')
   runMigrations(db)
 })
@@ -103,6 +111,23 @@ describe('POST /api/projects/:id/waypoint/autopilot', () => {
       ok: false,
       action: 'error',
       error: 'Waypoint lifecycle is not enabled for this project',
+    })
+  })
+
+  it('normalizes rate-limit errors to waypoint error envelope', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    mutationLimiterMock.mockReturnValueOnce(NextResponse.json({ error: 'custom limiter message' }, { status: 429 }))
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/autopilot`, {}), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(429)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Too many requests. Please try again later.',
     })
   })
 

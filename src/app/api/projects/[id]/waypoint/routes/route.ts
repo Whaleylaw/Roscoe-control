@@ -8,6 +8,7 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { listWaypointRoutes, resolveWaypointPlanRouteScope } from '@/lib/waypoint-command'
 import { startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from '@/lib/waypoint'
+import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
 
 const Body = z.object({
   subject: z.literal('plan'),
@@ -129,7 +130,7 @@ export async function POST(
 ) {
   const auth = requireRole(request, 'operator')
   if ('error' in auth) return routesError(auth.status ?? 403, auth.error ?? 'Forbidden')
-  const rateCheck = mutationLimiter(request)
+  const rateCheck = normalizeWaypointRateLimitError(mutationLimiter(request))
   if (rateCheck) return rateCheck
 
   try {

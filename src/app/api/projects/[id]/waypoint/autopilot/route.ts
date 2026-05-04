@@ -8,6 +8,7 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { runWaypointAutopilot } from '@/lib/waypoint-autopilot'
 import { listWaypointAutopilotRuns } from '@/lib/waypoint-command'
+import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
 
 const Body = z.object({
   max_iterations: z.number().int().positive().max(100).optional(),
@@ -117,7 +118,7 @@ export async function POST(
 ) {
   const auth = requireRole(request, 'operator')
   if ('error' in auth) return autopilotError(auth.status ?? 403, auth.error ?? 'Forbidden')
-  const rateCheck = mutationLimiter(request)
+  const rateCheck = normalizeWaypointRateLimitError(mutationLimiter(request))
   if (rateCheck) return rateCheck
 
   try {
