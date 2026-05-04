@@ -75,6 +75,33 @@ describe('GET /api/tasks/:id/discussion', () => {
     await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
   })
 
+  it('returns 404 envelope when discussion task is not found', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(req('/api/tasks/999999/discussion'), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Task not found' })
+  })
+
+  it('returns 500 envelope when discussion read fails unexpectedly', async () => {
+    const taskId = seedTask()
+    const discussionModule = await import('@/lib/waypoint-task-discussion')
+    const listSpy = vi.spyOn(discussionModule, 'listTaskDiscussion').mockImplementationOnce(() => {
+      throw new Error('db offline')
+    })
+
+    const { GET } = await loadRoute()
+    const res = await GET(req(`/api/tasks/${taskId}/discussion`), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(500)
+    await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Failed to fetch discussion' })
+    listSpy.mockRestore()
+  })
+
   it('returns discussion transcript with parsed metadata', async () => {
     const taskId = seedTask()
     startTaskDiscussion(db, {
