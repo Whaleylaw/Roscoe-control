@@ -759,6 +759,153 @@ nodes:
     })
   })
 
+  it('supports /wp pause and /wp resume aliases with --id parity', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  workstream_id:
+    required: false
+    type: number
+  milestone_id:
+    required: true
+    type: number
+  phase_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+nodes:
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const startRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint start plan --plan-id ${planId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(startRes.status).toBe(200)
+    const startBody = await startRes.json()
+    const routeId = Number(startBody.route.instanceId)
+
+    const pauseRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/wp pause --id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(pauseRes.status).toBe(200)
+    await expect(pauseRes.json()).resolves.toMatchObject({
+      ok: true,
+      action: 'pause',
+      command: { name: 'pause', routeId },
+      route: { id: routeId, status: 'blocked' },
+    })
+
+    const resumeRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/wp resume --id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(resumeRes.status).toBe(200)
+    await expect(resumeRes.json()).resolves.toMatchObject({
+      ok: true,
+      action: 'resume',
+      command: { name: 'resume', routeId },
+      route: { id: routeId, status: 'active' },
+    })
+  })
+
+  it('supports /wp gate alias with --id parity', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-review-flow
+name: Waypoint Review Flow
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  objective:
+    required: true
+    type: string
+nodes:
+  quality_gate:
+    type: gate
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const startRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint start plan --plan-id ${planId} --definition waypoint-review-flow`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(startRes.status).toBe(200)
+    const startBody = await startRes.json()
+    const routeId = Number(startBody.route.instanceId)
+
+    db.prepare(`UPDATE workflow_instances SET status = 'active', completed_at = NULL WHERE id = ?`).run(routeId)
+    db.prepare(`UPDATE workflow_node_instances SET status = 'pending', completed_at = NULL WHERE workflow_instance_id = ?`).run(routeId)
+
+    const gateRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/wp gate --id ${routeId} --node quality_gate --approve --note alias parity`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(gateRes.status).toBe(200)
+    await expect(gateRes.json()).resolves.toMatchObject({
+      ok: true,
+      action: 'gate',
+      command: {
+        name: 'gate',
+        routeId,
+        nodeKey: 'quality_gate',
+        decision: 'approve',
+        note: 'alias parity',
+      },
+      node: { node_key: 'quality_gate', status: 'complete' },
+    })
+  })
+
   it('returns 400 for malformed command payload', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
