@@ -8,7 +8,7 @@ import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { executeWaypointCommand, parseWaypointCommand } from '@/lib/waypoint-command'
 
 const Body = z.object({
-  command: z.string().min(1),
+  command: z.string().trim().min(1),
 })
 
 function commandError(status: number, error: string, command: ReturnType<typeof parseWaypointCommand> | null = null) {
