@@ -10,8 +10,9 @@ This checklist is the final acceptance gate for declaring **Waypoint runtime rea
 
 - [x] Branch is up to date and based on `feat/waypoint-runtime-slice` tip.
 - [x] No uncommitted changes in the working tree.
-- [ ] Required environment variables for deployment are present.
+- [ ] Required environment variables for deployment are present and verified per target environment.
 - [ ] Rollback owner is assigned for release window.
+- [ ] Release approver is assigned for release window.
 
 ---
 
@@ -94,14 +95,26 @@ If release must be reverted:
 
 ## 7) Final GO / NO-GO Gate
 
-## Decision
+### Release sign-off fields (required)
 
-- [ ] **GO** — all checklist items complete, tests green, rollback owner assigned.
+- **Release approver (name + handle):** ____________________
+- **Rollback owner (name + handle):** ____________________
+- **Release target(s):** ____________________
+- **Date/Time (UTC):** ____________________
+
+### Deployment env-var verification record (required)
+
+Record explicit verification for each release target (staging/prod/etc):
+
+- `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED = ______`
+- Verification method (dashboard/secret manager/manifest): ______
+- Verified by: ______
+- Verified at (UTC): ______
+
+### Decision
+
+- [ ] **GO** — all checklist items complete, tests green, rollback owner + release approver assigned, env vars verified per target.
 - [x] **NO-GO** — any blocking failure remains.
-
-**Release approver:** ____________________
-
-**Date/Time:** ____________________
 
 **Notes:**
 
