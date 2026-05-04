@@ -151,7 +151,7 @@ describe('POST /api/tasks/:id/discussion/start', () => {
     expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid request body' })
     expect(body.details?.[0]).toMatchObject({
       code: expect.any(String),
-      path: expect.any(String),
+      path: 'agent',
       message: expect.any(String),
     })
   })

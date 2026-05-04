@@ -115,7 +115,7 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
     expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid request body' })
     expect(body.details?.[0]).toMatchObject({
       code: expect.any(String),
-      path: expect.any(String),
+      path: 'content',
       message: expect.any(String),
     })
     expect(broadcast).not.toHaveBeenCalled()
