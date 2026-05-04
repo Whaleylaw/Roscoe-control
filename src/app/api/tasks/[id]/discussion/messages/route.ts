@@ -22,6 +22,13 @@ function parseMetadata(raw: string | null | undefined) {
   try { return JSON.parse(raw) } catch { return null }
 }
 
+function isAutoResponseGloballyEnabled() {
+  const value = process.env.WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED
+  if (typeof value !== 'string') return false
+  const normalized = value.trim().toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -61,7 +68,10 @@ export async function POST(
       // best-effort broadcast; do not fail message persistence on transport errors
     }
 
-    const autoResponseRequested = result.discussion.auto_response?.enabled === true && typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
+    const autoResponseRequested = isAutoResponseGloballyEnabled()
+      && result.discussion.auto_response?.enabled === true
+      && typeof result.discussion.agent === 'string'
+      && result.discussion.agent.trim().length > 0
     const autoResponse = autoResponseRequested
       ? { requested: true, agent: result.discussion.agent }
       : {
