@@ -74,6 +74,25 @@ afterEach(() => {
 })
 
 describe('GET /api/projects/:id/waypoint/status', () => {
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const { GET } = await loadRoute()
+    const res = await GET(req('/api/projects/1/waypoint/status'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
   it('returns consistent auth error envelope when unauthorized', async () => {
     authFailure = { error: 'Forbidden', status: 403 }
 
