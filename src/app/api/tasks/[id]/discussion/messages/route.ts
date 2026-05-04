@@ -72,12 +72,16 @@ export async function POST(
     const metadataOptIn = result.discussion.auto_response?.enabled === true
     const globalOptIn = isAutoResponseGloballyEnabled()
     const autoResponseRequested = globalOptIn && metadataOptIn && hasAgent
+    const autoResponseSkipReason = metadataOptIn
+      ? (globalOptIn ? (hasAgent ? undefined : 'missing_agent') : 'global_disabled')
+      : 'metadata_disabled'
+
     const autoResponse = autoResponseRequested
       ? { requested: true, agent: result.discussion.agent }
       : {
           requested: false,
           ...(hasAgent ? { agent: result.discussion.agent } : {}),
-          ...(metadataOptIn && !globalOptIn ? { reason: 'global_disabled' } : {}),
+          ...(autoResponseSkipReason ? { reason: autoResponseSkipReason } : {}),
         }
 
     if (autoResponseRequested) {

@@ -192,11 +192,33 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.discussion).toMatchObject({ enabled: true, status: 'active', agent: 'Aegis' })
-    expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis' })
+    expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis', reason: 'metadata_disabled' })
     expect(body.message.content).toBe('Ship it')
     expect(body.message.metadata).toMatchObject({ kind: 'waypoint_task_discussion', waypoint: true, task_id: taskId })
     expect(broadcast).toHaveBeenCalledTimes(1)
     expect(broadcast).toHaveBeenCalledWith('chat.message', expect.objectContaining({ id: body.message.id, content: 'Ship it' }))
+  })
+
+  it('does not request auto-response when metadata is disabled', async () => {
+    vi.stubEnv('WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED', '1')
+    const taskId = seedTask()
+    startTaskDiscussion(db, {
+      taskId,
+      workspaceId: 1,
+      actor: 'operator',
+      agent: 'Aegis',
+    })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'No auto response configured' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis', reason: 'metadata_disabled' })
+    expect(broadcast).toHaveBeenCalledTimes(1)
+    expect(broadcast).toHaveBeenCalledWith('chat.message', expect.objectContaining({ id: body.message.id }))
   })
 
   it('does not request auto-response when globally disabled even if task metadata enables it', async () => {
