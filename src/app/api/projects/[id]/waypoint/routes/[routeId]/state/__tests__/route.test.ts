@@ -35,6 +35,14 @@ function postReq(path: string, body: Record<string, unknown>) {
   })
 }
 
+function postMalformedJsonReq(path: string, rawBody: string) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: rawBody,
+  })
+}
+
 function seedProject(input: { gsdEnabled: number }): number {
   const result = db.prepare(
     `INSERT INTO projects (
@@ -227,6 +235,24 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/state', () => {
     expect(body.action).toBe('error')
     expect(body.error).toBe('Invalid request body')
     expect(Array.isArray(body.details)).toBe(true)
+  })
+
+  it('returns consistent parse envelope for malformed JSON body', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+    const routeId = seedRoute(projectId, planId)
+
+    const { POST } = await loadStateRoute()
+    const res = await POST(postMalformedJsonReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/state`, '{'), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid JSON body',
+    })
   })
 
   it('pauses and resumes a route', async () => {
