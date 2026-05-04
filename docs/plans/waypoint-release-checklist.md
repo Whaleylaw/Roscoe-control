@@ -8,8 +8,8 @@ This checklist is the final acceptance gate for declaring **Waypoint runtime rea
 
 ## 1) Preconditions
 
-- [ ] Branch is up to date and based on `feat/waypoint-runtime-slice` tip.
-- [ ] No uncommitted changes in the working tree.
+- [x] Branch is up to date and based on `feat/waypoint-runtime-slice` tip.
+- [x] No uncommitted changes in the working tree.
 - [ ] Required environment variables for deployment are present.
 - [ ] Rollback owner is assigned for release window.
 
@@ -17,13 +17,13 @@ This checklist is the final acceptance gate for declaring **Waypoint runtime rea
 
 ## 2) Contract and API Readiness
 
-- [ ] `docs/waypoint-envelope-parity-matrix.md` is current.
-- [ ] Error envelope contract is consistent on all Waypoint and discussion mutation surfaces:
+- [x] `docs/waypoint-envelope-parity-matrix.md` is current.
+- [x] Error envelope contract is consistent on all Waypoint and discussion mutation surfaces:
   - `{ ok:false, action:'error', error, details? }`
-- [ ] Validation details normalization is locked:
+- [x] Validation details normalization is locked:
   - `details[]` entries are `{ code, path, message }`
   - root path fallback is `$`
-- [ ] Command and typed endpoint parity has been re-verified for current HEAD.
+- [x] Command and typed endpoint parity has been re-verified for current HEAD.
 
 ---
 
@@ -47,29 +47,29 @@ pnpm typecheck
 pnpm lint
 ```
 
-- [ ] All targeted suites pass.
-- [ ] `pnpm typecheck` passes.
-- [ ] `pnpm lint` reports 0 errors (warnings may match known baseline).
+- [x] All targeted suites pass.
+- [x] `pnpm typecheck` passes.
+- [x] `pnpm lint` reports 0 errors (warnings may match known baseline).
 
 ---
 
 ## 4) Migration and Data Safety Checks
 
-- [ ] No destructive schema changes in this release scope.
-- [ ] Any metadata shape changes are backward compatible.
-- [ ] Discussion conversation IDs remain canonical:
+- [x] No destructive schema changes in this release scope.
+- [x] Any metadata shape changes are backward compatible.
+- [x] Discussion conversation IDs remain canonical:
   - `task:{task_id}:discussion:{agent_slug}`
-- [ ] Autopilot run telemetry writes are anchored to valid workflow instance IDs.
+- [x] Autopilot run telemetry writes are anchored to valid workflow instance IDs.
 
 ---
 
 ## 5) Runtime Safety Gates
 
-- [ ] Discussion auto-response remains safe by default (not requested unless explicitly enabled).
-- [ ] Global auto-response kill switch verified:
+- [x] Discussion auto-response remains safe by default (not requested unless explicitly enabled).
+- [x] Global auto-response kill switch verified:
   - `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED` controls dispatch eligibility.
-- [ ] Best-effort event bus dispatch behavior verified (message persistence not blocked by broadcast failure).
-- [ ] Gate decisions still require explicit approve/reject actions.
+- [x] Best-effort event bus dispatch behavior verified (message persistence not blocked by broadcast failure).
+- [x] Gate decisions still require explicit approve/reject actions.
 
 ---
 
@@ -97,7 +97,7 @@ If release must be reverted:
 ## Decision
 
 - [ ] **GO** — all checklist items complete, tests green, rollback owner assigned.
-- [ ] **NO-GO** — any blocking failure remains.
+- [x] **NO-GO** — any blocking failure remains.
 
 **Release approver:** ____________________
 
@@ -106,4 +106,10 @@ If release must be reverted:
 **Notes:**
 
 - Blocking issues (if NO-GO):
+  - Release approver not yet assigned.
+  - Rollback owner not yet assigned.
+  - Deployment env-var readiness not yet explicitly confirmed for release target(s).
 - Post-release monitoring focus:
+  - Discussion message persistence vs broadcast side-effects (best-effort dispatch).
+  - Auto-response gating behavior (`metadata` + `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED`).
+  - Waypoint command/typed endpoint error-envelope parity regressions.
