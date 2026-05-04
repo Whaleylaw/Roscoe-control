@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
-import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
+import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 import { eventBus } from '@/lib/event-bus'
 import { postTaskDiscussionMessage } from '@/lib/waypoint-task-discussion'
 
-function discussionMessageError(status: number, error: string) {
-  return NextResponse.json({ ok: false, action: 'error', error }, { status })
+const Body = z.object({
+  content: z.string().trim().min(1),
+  from: z.string().trim().min(1).optional(),
+  to: z.string().trim().min(1).optional(),
+})
+
+function discussionMessageError(status: number, error: string, details?: unknown) {
+  return NextResponse.json({ ok: false, action: 'error', error, ...(details !== undefined ? { details } : {}) }, { status })
 }
 
 function parseMetadata(raw: string | null | undefined) {
@@ -29,18 +36,20 @@ export async function POST(
   const taskId = Number.parseInt(resolvedParams.id, 10)
   if (!Number.isFinite(taskId)) return discussionMessageError(400, 'Invalid task ID')
 
-  const body = await request.json().catch(() => null) as { content?: unknown; from?: unknown; to?: unknown } | null
+  const body = await request.json().catch(() => null) as unknown
   if (body == null) return discussionMessageError(400, 'Invalid JSON body')
-  const content = typeof body.content === 'string' ? body.content : ''
-  if (!content.trim()) return discussionMessageError(400, 'Message content is required')
+  const parsed = Body.safeParse(body)
+  if (!parsed.success) {
+    return discussionMessageError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
+  }
 
   try {
     const result = postTaskDiscussionMessage(getDatabase(), {
       taskId,
       workspaceId: auth.user.workspace_id ?? 1,
-      from: typeof body.from === 'string' ? body.from : auth.user.display_name || auth.user.username || 'operator',
-      to: typeof body.to === 'string' ? body.to : undefined,
-      content,
+      from: parsed.data.from ?? (auth.user.display_name || auth.user.username || 'operator'),
+      to: parsed.data.to,
+      content: parsed.data.content,
     })
     const message = {
       ...result.message,
