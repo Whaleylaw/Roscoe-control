@@ -606,6 +606,89 @@ nodes:
     expect(gateBody.node.status).toBe('complete')
   })
 
+  it('supports /wp route and /wp events aliases with --id parity', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  workstream_id:
+    required: false
+    type: number
+  milestone_id:
+    required: true
+    type: number
+  phase_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+nodes:
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const startRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/waypoint start plan --plan-id ${planId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+    expect(startRes.status).toBe(200)
+    const startBody = await startRes.json()
+    const routeId = Number(startBody.route.instanceId)
+
+    const routeRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/wp route --id ${routeId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(routeRes.status).toBe(200)
+    await expect(routeRes.json()).resolves.toMatchObject({
+      ok: true,
+      action: 'route',
+      command: { name: 'route', routeId },
+      route: { id: routeId },
+    })
+
+    const eventsRes = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/wp events --id ${routeId} --limit 5 --offset 0`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(eventsRes.status).toBe(200)
+    await expect(eventsRes.json()).resolves.toMatchObject({
+      ok: true,
+      action: 'route_events',
+      command: { name: 'route_events', routeId, limit: 5, offset: 0 },
+      pagination: { limit: 5, offset: 0 },
+    })
+  })
+
   it('returns 400 for malformed command payload', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
