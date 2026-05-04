@@ -493,6 +493,34 @@ nodes:
     expect(body.discussion.message_count).toBe(1)
   })
 
+  it('supports /wp discuss alias without message and returns consistent envelope', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const inserted = db
+      .prepare(`INSERT INTO tasks (title, status, priority, workspace_id, project_id) VALUES ('Discuss risks', 'todo', 'medium', 1, ?)`)
+      .run(projectId)
+    const taskId = Number(inserted.lastInsertRowid)
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/command`, {
+        command: `/wp discuss --task-id ${taskId}`,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: true,
+      action: 'discuss',
+      command: { name: 'discuss', taskId },
+    })
+    expect(body.discussion.task_id).toBe(taskId)
+    expect(body.discussion.posted_message_id).toBeNull()
+    expect(body.discussion.message_count).toBe(0)
+    expect(Array.isArray(body.discussion.messages)).toBe(true)
+  })
+
   it('returns autopilot run history via auto status command', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
