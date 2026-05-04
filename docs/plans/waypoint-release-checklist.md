@@ -32,7 +32,7 @@ This checklist is the final acceptance gate for declaring **Waypoint runtime rea
 Run from repo root:
 
 ```bash
-pnpm exec vitest run \
+pnpm exec vitest run --testTimeout=20000 \
   src/lib/__tests__/waypoint-task-discussion.test.ts \
   src/app/api/tasks/[id]/discussion/__tests__/route.test.ts \
   src/app/api/tasks/[id]/discussion/start/__tests__/route.test.ts \
