@@ -1,12 +1,13 @@
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 import { startTaskDiscussion } from '@/lib/waypoint-task-discussion'
 
 let db: Database.Database
 
 const broadcast = vi.fn()
+const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
 
 vi.mock('@/lib/db', () => ({
   getDatabase: () => db,
@@ -19,7 +20,7 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
-  mutationLimiter: vi.fn(() => null),
+  mutationLimiter: mutationLimiterMock,
 }))
 
 vi.mock('@/lib/event-bus', () => ({
@@ -58,6 +59,8 @@ async function loadRoute() {
 
 beforeEach(() => {
   vi.resetModules()
+  mutationLimiterMock.mockReset()
+  mutationLimiterMock.mockReturnValue(null)
   db = new Database(':memory:')
   runMigrations(db)
   broadcast.mockReset()
@@ -95,6 +98,24 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
       ok: false,
       action: 'error',
       error: 'Waypoint discussion is not enabled for this task',
+    })
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
+  it('normalizes rate-limit responses into waypoint error envelope', async () => {
+    const taskId = seedTask()
+    mutationLimiterMock.mockReturnValueOnce(NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 }))
+    const { POST } = await loadRoute()
+
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'hello' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(429)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Too many requests. Please try again later.',
     })
     expect(broadcast).not.toHaveBeenCalled()
   })
