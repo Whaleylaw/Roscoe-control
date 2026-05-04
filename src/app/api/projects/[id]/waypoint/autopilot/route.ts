@@ -160,7 +160,10 @@ export async function POST(
       return autopilotError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
-    const body = await request.json().catch(() => ({}))
+    const body = await request.json().catch(() => null)
+    if (body == null) {
+      return autopilotError(400, 'Invalid JSON body')
+    }
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
       return NextResponse.json(
