@@ -6,11 +6,15 @@ import { createWorkflowDefinition } from '@/lib/workflow-engine'
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
+let authFailure: { error: string; status: number } | null = null
 
 vi.mock('@/lib/db', () => ({ getDatabase: () => db }))
 
 vi.mock('@/lib/auth', () => ({
   requireRole: vi.fn((_req: unknown, required: 'viewer' | 'operator' | 'admin') => {
+    if (authFailure) {
+      return authFailure
+    }
     const order = { viewer: 0, operator: 1, admin: 2 }
     if (order[authRole] < order[required]) return { error: 'Forbidden', status: 403 }
     return { user: { id: 1, username: 'operator', role: authRole, workspace_id: 1, tenant_id: 1 } }
@@ -87,6 +91,7 @@ async function loadRoute() {
 beforeEach(() => {
   vi.resetModules()
   authRole = 'operator'
+  authFailure = null
   db = new Database(':memory:')
   runMigrations(db)
 })
@@ -97,6 +102,41 @@ afterEach(() => {
 })
 
 describe('POST /api/projects/:id/waypoint/routes', () => {
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/1/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
+  it('returns consistent auth error envelope when unauthorized', async () => {
+    authFailure = { error: 'Forbidden', status: 403 }
+
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/1/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Forbidden',
+    })
+  })
+
   it('rejects viewer role', async () => {
     authRole = 'viewer'
     const projectId = seedProject({ gsdEnabled: 1 })
@@ -120,6 +160,34 @@ describe('POST /api/projects/:id/waypoint/routes', () => {
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body).toMatchObject({ ok: false, action: 'error' })
+  })
+
+  it('returns consistent error envelope for invalid project id', async () => {
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/not-a-number/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project ID',
+    })
+  })
+
+  it('returns consistent error envelope when project is missing', async () => {
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/999999/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Project not found',
+    })
   })
 
   it('starts a typed plan route', async () => {
@@ -188,6 +256,69 @@ nodes:
 })
 
 describe('GET /api/projects/:id/waypoint/routes', () => {
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/1/waypoint/routes'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
+  it('returns consistent auth error envelope when unauthorized', async () => {
+    authFailure = { error: 'Forbidden', status: 403 }
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/1/waypoint/routes'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Forbidden',
+    })
+  })
+
+  it('returns consistent error envelope for invalid project id', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/not-a-number/waypoint/routes'), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project ID',
+    })
+  })
+
+  it('returns consistent error envelope when project is missing', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/999999/waypoint/routes'), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Project not found',
+    })
+  })
+
   it('returns consistent error envelope for invalid query params', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
