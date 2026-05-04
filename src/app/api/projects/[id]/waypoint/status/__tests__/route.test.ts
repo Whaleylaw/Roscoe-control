@@ -5,6 +5,7 @@ import { runMigrations } from '@/lib/migrations'
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'viewer'
+let authFailure: { error: string; status: number } | null = null
 
 vi.mock('@/lib/db', () => ({
   getDatabase: () => db,
@@ -12,6 +13,9 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/auth', () => ({
   requireRole: vi.fn((_req: unknown, required: 'viewer' | 'operator' | 'admin') => {
+    if (authFailure) {
+      return authFailure
+    }
     const order = { viewer: 0, operator: 1, admin: 2 }
     if (order[authRole] < order[required]) {
       return { error: 'Forbidden', status: 403 }
@@ -59,6 +63,7 @@ async function loadRoute() {
 beforeEach(() => {
   vi.resetModules()
   authRole = 'viewer'
+  authFailure = null
   db = new Database(':memory:')
   runMigrations(db)
 })
@@ -69,6 +74,22 @@ afterEach(() => {
 })
 
 describe('GET /api/projects/:id/waypoint/status', () => {
+  it('returns consistent auth error envelope when unauthorized', async () => {
+    authFailure = { error: 'Forbidden', status: 403 }
+
+    const { GET } = await loadRoute()
+    const res = await GET(req('/api/projects/1/waypoint/status'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Forbidden',
+    })
+  })
+
   it('returns 409 when project lifecycle is not enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 0 })
 
