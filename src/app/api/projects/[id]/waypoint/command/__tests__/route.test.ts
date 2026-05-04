@@ -101,7 +101,7 @@ afterEach(() => {
 })
 
 describe('POST /api/projects/:id/waypoint/command', () => {
-  it('rejects viewer role', async () => {
+  it('rejects viewer role with a consistent error envelope', async () => {
     authRole = 'viewer'
     const projectId = seedProject({ gsdEnabled: 1 })
 
@@ -111,6 +111,12 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     })
 
     expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Forbidden',
+    })
   })
 
   it('returns 409 when waypoint lifecycle is not enabled', async () => {
