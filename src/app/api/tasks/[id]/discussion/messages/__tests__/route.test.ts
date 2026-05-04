@@ -197,4 +197,43 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
     expect(broadcast).toHaveBeenCalledTimes(1)
     expect(broadcast).toHaveBeenCalledWith('chat.message', expect.objectContaining({ id: body.message.id, content: 'Ship it' }))
   })
+
+  it('requests auto-response only when explicitly enabled in discussion metadata', async () => {
+    const taskId = seedTask()
+    const started = startTaskDiscussion(db, {
+      taskId,
+      workspaceId: 1,
+      actor: 'operator',
+      agent: 'Aegis',
+    })
+
+    const metadata = JSON.parse(started.task.metadata || '{}')
+    metadata.waypoint = metadata.waypoint || {}
+    metadata.waypoint.discussion = {
+      ...(metadata.waypoint.discussion || {}),
+      auto_response: {
+        enabled: true,
+      },
+    }
+    db.prepare('UPDATE tasks SET metadata = ?, updated_at = unixepoch() WHERE id = ?').run(JSON.stringify(metadata), taskId)
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'Please draft acceptance criteria' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.auto_response).toEqual({ requested: true, agent: 'Aegis' })
+    expect(broadcast).toHaveBeenCalledWith('chat.message', expect.objectContaining({ id: body.message.id }))
+    expect(broadcast).toHaveBeenCalledWith(
+      'waypoint.discussion.auto_response.requested',
+      expect.objectContaining({
+        task_id: taskId,
+        conversation_id: started.discussion.conversation_id,
+        agent: 'Aegis',
+        message_id: body.message.id,
+      }),
+    )
+  })
 })

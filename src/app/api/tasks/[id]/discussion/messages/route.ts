@@ -56,7 +56,23 @@ export async function POST(
       metadata: parseMetadata(result.message.metadata),
     }
     eventBus.broadcast('chat.message', message)
-    return NextResponse.json({ ok: true, action: 'post_discussion_message', message, discussion: result.discussion }, { status: 201 })
+
+    const autoResponseRequested = result.discussion.auto_response?.enabled === true && typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
+    const autoResponse = autoResponseRequested
+      ? { requested: true, agent: result.discussion.agent }
+      : { requested: false }
+
+    if (autoResponseRequested) {
+      eventBus.broadcast('waypoint.discussion.auto_response.requested', {
+        task_id: result.task.id,
+        workspace_id: auth.user.workspace_id ?? 1,
+        conversation_id: result.discussion.conversation_id,
+        message_id: result.message.id,
+        agent: result.discussion.agent,
+      })
+    }
+
+    return NextResponse.json({ ok: true, action: 'post_discussion_message', message, discussion: result.discussion, auto_response: autoResponse }, { status: 201 })
   } catch (error: any) {
     const message = String(error?.message || '')
     if (message.includes('not found')) return discussionMessageError(404, 'Task not found')

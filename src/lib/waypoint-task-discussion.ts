@@ -3,6 +3,10 @@ import type { Message, Task } from '@/lib/db'
 
 export type WaypointTaskDiscussionStatus = 'pending' | 'active' | 'summarized' | 'closed'
 
+export type WaypointTaskDiscussionAutoResponseMetadata = {
+  enabled: boolean
+}
+
 export type WaypointTaskDiscussionMetadata = {
   enabled: boolean
   mode?: 'agent_chat'
@@ -12,6 +16,7 @@ export type WaypointTaskDiscussionMetadata = {
   started_at?: number
   status?: WaypointTaskDiscussionStatus
   summary_comment_id?: number | null
+  auto_response?: WaypointTaskDiscussionAutoResponseMetadata
 }
 
 type TaskDiscussionInput = {
@@ -77,6 +82,7 @@ export function parseTaskDiscussionMetadata(raw: unknown): WaypointTaskDiscussio
   const waypoint = parseJsonObject(metadata.waypoint)
   const discussion = parseJsonObject(waypoint.discussion)
   if (Object.keys(discussion).length === 0) return { enabled: false }
+  const autoResponse = parseJsonObject(discussion.auto_response)
   return {
     enabled: discussion.enabled === true,
     mode: discussion.mode === 'agent_chat' ? 'agent_chat' : undefined,
@@ -86,6 +92,7 @@ export function parseTaskDiscussionMetadata(raw: unknown): WaypointTaskDiscussio
     started_at: typeof discussion.started_at === 'number' ? discussion.started_at : undefined,
     status: parseStatus(discussion.status),
     summary_comment_id: typeof discussion.summary_comment_id === 'number' ? discussion.summary_comment_id : null,
+    auto_response: autoResponse.enabled === true ? { enabled: true } : undefined,
   }
 }
 

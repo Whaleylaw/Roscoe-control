@@ -62,6 +62,7 @@ export type EventType =
   | 'recipe.removed'            // SCHED-06 — emitted from recipe-watcher scheduleReindex
   | 'gsd.plan.tasks_activated'  // Phase 19 QUEUE-02 — plan transition auto-activates linked tasks
   | 'task.blocker_transition'   // Phase 20 ROUTE-02 — unified owner-intervention pause/resume event shape across recipe + legacy paths
+  | 'waypoint.discussion.auto_response.requested'
 
 class ServerEventBus extends EventEmitter {
   private static instance: ServerEventBus | null = null
