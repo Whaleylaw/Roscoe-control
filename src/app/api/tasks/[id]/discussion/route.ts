@@ -21,7 +21,7 @@ export async function GET(
 
   const resolvedParams = await params
   const taskId = Number.parseInt(resolvedParams.id, 10)
-  if (!Number.isFinite(taskId)) return discussionError(400, 'Invalid task ID')
+  if (!Number.isFinite(taskId) || taskId <= 0) return discussionError(400, 'Invalid task ID')
 
   try {
     const result = listTaskDiscussion(getDatabase(), {

@@ -75,6 +75,21 @@ describe('GET /api/tasks/:id/discussion', () => {
     await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
   })
 
+  it('returns 400 for non-positive task ids', async () => {
+    const { GET } = await loadRoute()
+    const zero = await GET(req('/api/tasks/0/discussion'), {
+      params: Promise.resolve({ id: '0' }),
+    })
+    const negative = await GET(req('/api/tasks/-2/discussion'), {
+      params: Promise.resolve({ id: '-2' }),
+    })
+
+    expect(zero.status).toBe(400)
+    await expect(zero.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
+    expect(negative.status).toBe(400)
+    await expect(negative.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
+  })
+
   it('returns 404 envelope when discussion task is not found', async () => {
     const { GET } = await loadRoute()
     const res = await GET(req('/api/tasks/999999/discussion'), {

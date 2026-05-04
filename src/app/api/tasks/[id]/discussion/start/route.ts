@@ -29,7 +29,7 @@ export async function POST(
 
   const resolvedParams = await params
   const taskId = Number.parseInt(resolvedParams.id, 10)
-  if (!Number.isFinite(taskId)) return discussionStartError(400, 'Invalid task ID')
+  if (!Number.isFinite(taskId) || taskId <= 0) return discussionStartError(400, 'Invalid task ID')
 
   const body = await request.json().catch(() => null)
   if (body == null) return discussionStartError(400, 'Invalid JSON body')

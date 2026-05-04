@@ -72,6 +72,23 @@ afterEach(() => {
 })
 
 describe('POST /api/tasks/:id/discussion/messages', () => {
+  it('returns 400 for non-positive task ids', async () => {
+    const { POST } = await loadRoute()
+
+    const zero = await POST(req('/api/tasks/0/discussion/messages', { content: 'hello' }), {
+      params: Promise.resolve({ id: '0' }),
+    })
+    const negative = await POST(req('/api/tasks/-7/discussion/messages', { content: 'hello' }), {
+      params: Promise.resolve({ id: '-7' }),
+    })
+
+    expect(zero.status).toBe(400)
+    await expect(zero.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
+    expect(negative.status).toBe(400)
+    await expect(negative.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
   it('returns 400 for malformed JSON body with standard error envelope', async () => {
     const taskId = seedTask()
     const { POST } = await loadRoute()
