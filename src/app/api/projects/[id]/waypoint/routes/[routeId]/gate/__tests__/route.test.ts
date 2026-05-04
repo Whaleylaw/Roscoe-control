@@ -1,12 +1,13 @@
 import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 import { createWorkflowDefinition } from '@/lib/workflow-engine'
 import { startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from '@/lib/waypoint'
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
+const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
 
 vi.mock('@/lib/db', () => ({ getDatabase: () => db }))
 vi.mock('@/lib/auth', () => ({
@@ -21,6 +22,9 @@ vi.mock('@/lib/workspaces', () => ({
   ForbiddenError: class ForbiddenError extends Error {
     status = 403
   },
+}))
+vi.mock('@/lib/rate-limit', () => ({
+  mutationLimiter: mutationLimiterMock,
 }))
 vi.mock('@/lib/logger', () => ({ logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } }))
 
@@ -88,6 +92,8 @@ async function loadRoute() {
 beforeEach(() => {
   vi.resetModules()
   authRole = 'operator'
+  mutationLimiterMock.mockReset()
+  mutationLimiterMock.mockReturnValue(null)
   db = new Database(':memory:')
   runMigrations(db)
 })
@@ -191,6 +197,25 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     expect(body.action).toBe('error')
     expect(body.error).toBe('Invalid request body')
     expect(Array.isArray(body.details)).toBe(true)
+  })
+
+  it('normalizes rate-limit responses into waypoint error envelope', async () => {
+    const projectId = seedProject(1)
+    const planId = seedPlan(projectId)
+    const routeId = seedRoute(projectId, planId)
+    mutationLimiterMock.mockReturnValueOnce(NextResponse.json({ error: 'rate limited' }, { status: 429 }))
+
+    const { POST } = await loadRoute()
+    const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/gate`, { node_key: 'quality_gate', decision: 'approve' }), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(429)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Too many requests. Please try again later.',
+    })
   })
 
   it('approves a gate node', async () => {
