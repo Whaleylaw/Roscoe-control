@@ -191,7 +191,11 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
     expect(body.ok).toBe(false)
     expect(body.action).toBe('error')
     expect(body.error).toBe('Invalid query params')
-    expect(Array.isArray(body.details)).toBe(true)
+    expect(body.details?.[0]).toMatchObject({
+      code: expect.any(String),
+      path: expect.any(String),
+      message: expect.any(String),
+    })
   })
 
   it('returns route events with success envelope', async () => {
