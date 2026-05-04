@@ -55,7 +55,11 @@ export async function POST(
       ...result.message,
       metadata: parseMetadata(result.message.metadata),
     }
-    eventBus.broadcast('chat.message', message)
+    try {
+      eventBus.broadcast('chat.message', message)
+    } catch {
+      // best-effort broadcast; do not fail message persistence on transport errors
+    }
 
     const autoResponseRequested = result.discussion.auto_response?.enabled === true && typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
     const autoResponse = autoResponseRequested
@@ -68,14 +72,18 @@ export async function POST(
         }
 
     if (autoResponseRequested) {
-      eventBus.broadcast('waypoint.discussion.auto_response.requested', {
-        task_id: result.task.id,
-        workspace_id: auth.user.workspace_id ?? 1,
-        conversation_id: result.discussion.conversation_id,
-        message_id: result.message.id,
-        agent: result.discussion.agent,
-        content: result.message.content,
-      })
+      try {
+        eventBus.broadcast('waypoint.discussion.auto_response.requested', {
+          task_id: result.task.id,
+          workspace_id: auth.user.workspace_id ?? 1,
+          conversation_id: result.discussion.conversation_id,
+          message_id: result.message.id,
+          agent: result.discussion.agent,
+          content: result.message.content,
+        })
+      } catch {
+        // best-effort dispatch; do not fail persisted discussion messages
+      }
     }
 
     return NextResponse.json({ ok: true, action: 'post_discussion_message', message, discussion: result.discussion, auto_response: autoResponse }, { status: 201 })

@@ -238,4 +238,47 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
       }),
     )
   })
+
+  it('does not fail message persistence when auto-response dispatch broadcast throws', async () => {
+    const taskId = seedTask()
+    const started = startTaskDiscussion(db, {
+      taskId,
+      workspaceId: 1,
+      actor: 'operator',
+      agent: 'Aegis',
+    })
+
+    const metadata = JSON.parse(started.task.metadata || '{}')
+    metadata.waypoint = metadata.waypoint || {}
+    metadata.waypoint.discussion = {
+      ...(metadata.waypoint.discussion || {}),
+      auto_response: { enabled: true },
+    }
+    db.prepare('UPDATE tasks SET metadata = ?, updated_at = unixepoch() WHERE id = ?').run(JSON.stringify(metadata), taskId)
+
+    broadcast.mockImplementation((eventName: string) => {
+      if (eventName === 'waypoint.discussion.auto_response.requested') {
+        throw new Error('dispatch unavailable')
+      }
+      return undefined
+    })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'Keep message even if dispatch fails' }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: true,
+      action: 'post_discussion_message',
+      auto_response: { requested: true, agent: 'Aegis' },
+    })
+
+    const persisted = db
+      .prepare('SELECT content FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1')
+      .get(started.discussion.conversation_id) as { content: string } | undefined
+    expect(persisted?.content).toBe('Keep message even if dispatch fails')
+  })
 })
