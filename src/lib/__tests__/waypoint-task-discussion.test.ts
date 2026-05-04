@@ -86,6 +86,30 @@ describe('waypoint task discussion service', () => {
     }
   })
 
+  it('rewrites malformed conversation ids to strict task-scoped format', () => {
+    const { db, taskId } = setupDb()
+    try {
+      const raw = JSON.stringify({
+        waypoint: {
+          discussion: {
+            enabled: true,
+            mode: 'agent_chat',
+            agent: 'GSD Reviewer',
+            conversation_id: 'legacy-conversation-id',
+            status: 'active',
+            started_at: 7000,
+          },
+        },
+      })
+      db.prepare('UPDATE tasks SET metadata = ?, updated_at = ? WHERE id = ?').run(raw, 8001, taskId)
+
+      const started = startTaskDiscussion(db, { taskId, workspaceId: 1, actor: 'tester', now: 9000 })
+      expect(started.discussion.conversation_id).toBe(`task:${taskId}:discussion:gsd-reviewer`)
+    } finally {
+      db.close()
+    }
+  })
+
   it('lists and appends discussion messages using the messages table', () => {
     const { db, taskId, projectId } = setupDb()
     try {

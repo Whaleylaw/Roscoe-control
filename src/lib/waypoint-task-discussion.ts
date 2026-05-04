@@ -49,6 +49,11 @@ export function buildTaskDiscussionConversationId(taskId: number, agent: string 
   return `task:${taskId}:discussion:${slugifyAgent(agent)}`
 }
 
+function isStrictTaskDiscussionConversationId(value: unknown, taskId: number): value is string {
+  if (typeof value !== 'string') return false
+  return value.startsWith(`task:${taskId}:discussion:`) && value.length > `task:${taskId}:discussion:`.length
+}
+
 export function parseJsonObject(raw: unknown): Record<string, unknown> {
   if (!raw) return {}
   if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
@@ -122,11 +127,15 @@ export function startTaskDiscussion(
   const task = requireTask(db, input.taskId, input.workspaceId)
   const existing = parseTaskDiscussionMetadata(task.metadata)
   const agent = input.agent?.trim() || existing.agent || task.assigned_to || 'agent'
+  const conversationId = isStrictTaskDiscussionConversationId(existing.conversation_id, task.id)
+    ? existing.conversation_id
+    : buildTaskDiscussionConversationId(task.id, agent)
+
   const discussion: WaypointTaskDiscussionMetadata = {
     ...existing,
     enabled: true,
     mode: 'agent_chat',
-    conversation_id: existing.conversation_id || buildTaskDiscussionConversationId(task.id, agent),
+    conversation_id: conversationId,
     agent,
     started_at: existing.started_at ?? now,
     status: existing.status === 'closed' || existing.status === 'summarized' ? existing.status : 'active',
