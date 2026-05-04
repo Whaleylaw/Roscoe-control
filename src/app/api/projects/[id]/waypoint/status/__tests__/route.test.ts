@@ -178,4 +178,26 @@ describe('GET /api/projects/:id/waypoint/status', () => {
       waiting_on_gate_tasks: expect.any(Number),
     })
   })
+
+  it('returns consistent 500 envelope when status build fails', async () => {
+    vi.doMock('@/lib/waypoint', () => ({
+      getWaypointStatus: () => {
+        throw new Error('boom')
+      },
+    }))
+
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(req(`/api/projects/${projectId}/waypoint/status`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(500)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Failed to build Waypoint status',
+    })
+  })
 })
