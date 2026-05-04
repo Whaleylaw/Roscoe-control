@@ -155,6 +155,23 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
     expect(body.error).toContain('not found')
   })
 
+  it('returns consistent error envelope for invalid query params', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const routeId = seedDoctorRoute(projectId)
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/events?limit=0&offset=nope`), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.action).toBe('error')
+    expect(body.error).toBe('Invalid query params')
+    expect(Array.isArray(body.details)).toBe(true)
+  })
+
   it('returns route events with success envelope', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
     const routeId = seedDoctorRoute(projectId)

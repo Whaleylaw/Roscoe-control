@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { logger } from '@/lib/logger'
@@ -6,18 +7,18 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { listWaypointRouteEvents } from '@/lib/waypoint-command'
 
-function parseNonNegativeInt(value: string | null, fallback: number): number {
-  if (!value) return fallback
-  if (!/^\d+$/.test(value)) return fallback
-  return Number(value)
-}
+const Query = z.object({
+  limit: z.coerce.number().int().positive().max(500).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+})
 
-function routeEventsError(status: number, error: string) {
+function routeEventsError(status: number, error: string, details?: unknown) {
   return NextResponse.json(
     {
       ok: false,
       action: 'error',
       error,
+      ...(details !== undefined ? { details } : {}),
     },
     { status },
   )
@@ -71,8 +72,16 @@ export async function GET(
       return routeEventsError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
-    const limit = Math.min(Math.max(parseNonNegativeInt(request.nextUrl.searchParams.get('limit'), 50), 1), 500)
-    const offset = Math.max(parseNonNegativeInt(request.nextUrl.searchParams.get('offset'), 0), 0)
+    const parsed = Query.safeParse({
+      limit: request.nextUrl.searchParams.get('limit') ?? undefined,
+      offset: request.nextUrl.searchParams.get('offset') ?? undefined,
+    })
+    if (!parsed.success) {
+      return routeEventsError(400, 'Invalid query params', parsed.error.issues)
+    }
+
+    const limit = parsed.data.limit ?? 50
+    const offset = parsed.data.offset ?? 0
 
     const events = listWaypointRouteEvents(db, {
       workspaceId,
