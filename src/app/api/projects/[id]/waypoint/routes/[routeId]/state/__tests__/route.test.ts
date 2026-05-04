@@ -195,6 +195,40 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/state', () => {
     expect(body).toMatchObject({ ok: false, action: 'error' })
   })
 
+  it('returns consistent error envelope for invalid project or route ids', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadStateRoute()
+    const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/nope/state`, { action: 'pause' }), {
+      params: Promise.resolve({ id: String(projectId), routeId: 'nope' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project or route ID',
+    })
+  })
+
+  it('returns consistent validation envelope for malformed body', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+    const routeId = seedRoute(projectId, planId)
+
+    const { POST } = await loadStateRoute()
+    const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/state`, { action: 'hold' }), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.action).toBe('error')
+    expect(body.error).toBe('Invalid request body')
+    expect(Array.isArray(body.details)).toBe(true)
+  })
+
   it('pauses and resumes a route', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
     const planId = seedWaypointPlan(projectId)
