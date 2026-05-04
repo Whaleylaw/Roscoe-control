@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { mutationLimiter } from '@/lib/rate-limit'
-import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
+import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 import { startTaskDiscussion } from '@/lib/waypoint-task-discussion'
 
-function discussionStartError(status: number, error: string) {
-  return NextResponse.json({ ok: false, action: 'error', error }, { status })
+const Body = z.object({
+  agent: z.string().trim().min(1).optional(),
+})
+
+function discussionStartError(status: number, error: string, details?: unknown) {
+  return NextResponse.json(
+    { ok: false, action: 'error', error, ...(details !== undefined ? { details } : {}) },
+    { status },
+  )
 }
 
 export async function POST(
@@ -23,9 +31,13 @@ export async function POST(
   const taskId = Number.parseInt(resolvedParams.id, 10)
   if (!Number.isFinite(taskId)) return discussionStartError(400, 'Invalid task ID')
 
-  const body = await request.json().catch(() => null) as { agent?: unknown } | null
+  const body = await request.json().catch(() => null)
   if (body == null) return discussionStartError(400, 'Invalid JSON body')
-  const agent = typeof body.agent === 'string' ? body.agent : undefined
+  const parsed = Body.safeParse(body)
+  if (!parsed.success) {
+    return discussionStartError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
+  }
+  const agent = parsed.data.agent
 
   try {
     const result = startTaskDiscussion(getDatabase(), {
