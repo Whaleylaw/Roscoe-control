@@ -122,6 +122,28 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
     expect(body).toMatchObject({ ok: false, action: 'error', error: 'Forbidden' })
   })
 
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const routeId = seedDoctorRoute(projectId)
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/events`), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
   it('returns 409 when waypoint lifecycle is not enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 0 })
     const routeId = seedDoctorRoute(projectId)
@@ -190,5 +212,32 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
       pagination: { limit: 5, offset: 0 },
     })
     expect(Array.isArray(body.events)).toBe(true)
+  })
+
+  it('returns consistent 500 envelope for non-Error failures', async () => {
+    vi.doMock('@/lib/waypoint-command', async () => {
+      const actual = await vi.importActual<typeof import('@/lib/waypoint-command')>('@/lib/waypoint-command')
+      return {
+        ...actual,
+        listWaypointRouteEvents: () => {
+          throw 'boom'
+        },
+      }
+    })
+
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const routeId = seedDoctorRoute(projectId)
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/events`), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(500)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Failed to fetch Waypoint route events',
+    })
   })
 })
