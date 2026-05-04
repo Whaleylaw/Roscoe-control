@@ -183,6 +183,29 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     expect(Array.isArray(body.details)).toBe(true)
   })
 
+  it('returns structured envelope for malformed JSON body', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const malformed = new NextRequest(`http://localhost/api/projects/${projectId}/waypoint/command`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"command":',
+    })
+
+    const res = await POST(malformed, {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.action).toBe('error')
+    expect(body.command).toBeNull()
+    expect(body.error).toBe('Invalid request body')
+    expect(Array.isArray(body.details)).toBe(true)
+  })
+
   it('rejects whitespace-only command bodies instead of treating them as help', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
