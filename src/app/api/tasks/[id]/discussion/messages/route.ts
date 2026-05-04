@@ -5,6 +5,10 @@ import { mutationLimiter } from '@/lib/rate-limit'
 import { eventBus } from '@/lib/event-bus'
 import { postTaskDiscussionMessage } from '@/lib/waypoint-task-discussion'
 
+function discussionMessageError(status: number, error: string) {
+  return NextResponse.json({ ok: false, action: 'error', error }, { status })
+}
+
 function parseMetadata(raw: string | null | undefined) {
   if (!raw) return null
   try { return JSON.parse(raw) } catch { return null }
@@ -15,18 +19,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return discussionMessageError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   const rateCheck = mutationLimiter(request)
   if (rateCheck) return rateCheck
 
   const resolvedParams = await params
   const taskId = Number.parseInt(resolvedParams.id, 10)
-  if (!Number.isFinite(taskId)) return NextResponse.json({ error: 'Invalid task ID' }, { status: 400 })
+  if (!Number.isFinite(taskId)) return discussionMessageError(400, 'Invalid task ID')
 
   const body = await request.json().catch(() => ({})) as { content?: unknown; from?: unknown; to?: unknown }
   const content = typeof body.content === 'string' ? body.content : ''
-  if (!content.trim()) return NextResponse.json({ error: 'Message content is required' }, { status: 400 })
+  if (!content.trim()) return discussionMessageError(400, 'Message content is required')
 
   try {
     const result = postTaskDiscussionMessage(getDatabase(), {
@@ -41,11 +45,11 @@ export async function POST(
       metadata: parseMetadata(result.message.metadata),
     }
     eventBus.broadcast('chat.message', message)
-    return NextResponse.json({ message, discussion: result.discussion }, { status: 201 })
+    return NextResponse.json({ ok: true, action: 'post_discussion_message', message, discussion: result.discussion }, { status: 201 })
   } catch (error: any) {
     const message = String(error?.message || '')
-    if (message.includes('not found')) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-    if (message.includes('not enabled')) return NextResponse.json({ error: 'Waypoint discussion is not enabled for this task' }, { status: 409 })
-    return NextResponse.json({ error: 'Failed to post discussion message' }, { status: 500 })
+    if (message.includes('not found')) return discussionMessageError(404, 'Task not found')
+    if (message.includes('not enabled')) return discussionMessageError(409, 'Waypoint discussion is not enabled for this task')
+    return discussionMessageError(500, 'Failed to post discussion message')
   }
 }

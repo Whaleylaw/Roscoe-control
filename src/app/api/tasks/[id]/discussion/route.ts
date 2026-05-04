@@ -3,6 +3,10 @@ import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
 import { listTaskDiscussion } from '@/lib/waypoint-task-discussion'
 
+function discussionError(status: number, error: string) {
+  return NextResponse.json({ ok: false, action: 'error', error }, { status })
+}
+
 function parseMetadata(raw: string | null | undefined) {
   if (!raw) return null
   try { return JSON.parse(raw) } catch { return null }
@@ -13,11 +17,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const auth = requireRole(request, 'operator')
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
+  if ('error' in auth) return discussionError(auth.status ?? 403, auth.error ?? 'Forbidden')
 
   const resolvedParams = await params
   const taskId = Number.parseInt(resolvedParams.id, 10)
-  if (!Number.isFinite(taskId)) return NextResponse.json({ error: 'Invalid task ID' }, { status: 400 })
+  if (!Number.isFinite(taskId)) return discussionError(400, 'Invalid task ID')
 
   try {
     const result = listTaskDiscussion(getDatabase(), {
@@ -25,6 +29,8 @@ export async function GET(
       workspaceId: auth.user.workspace_id ?? 1,
     })
     return NextResponse.json({
+      ok: true,
+      action: 'list_discussion',
       discussion: result.discussion,
       messages: result.messages.map((message) => ({
         ...message,
@@ -33,8 +39,8 @@ export async function GET(
     })
   } catch (error: any) {
     if (String(error?.message || '').includes('not found')) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+      return discussionError(404, 'Task not found')
     }
-    return NextResponse.json({ error: 'Failed to fetch discussion' }, { status: 500 })
+    return discussionError(500, 'Failed to fetch discussion')
   }
 }

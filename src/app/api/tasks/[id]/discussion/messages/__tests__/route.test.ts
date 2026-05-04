@@ -71,6 +71,8 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
 
     expect(res.status).toBe(409)
     await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
       error: 'Waypoint discussion is not enabled for this task',
     })
     expect(broadcast).not.toHaveBeenCalled()
