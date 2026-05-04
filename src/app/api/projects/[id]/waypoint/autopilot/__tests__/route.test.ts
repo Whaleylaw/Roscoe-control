@@ -120,6 +120,50 @@ describe('POST /api/projects/:id/waypoint/autopilot', () => {
 })
 
 describe('GET /api/projects/:id/waypoint/autopilot', () => {
+  it('rejects viewer role with a consistent error envelope', async () => {
+    authRole = 'viewer'
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/1/waypoint/autopilot'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Forbidden',
+    })
+  })
+
+  it('returns 400 for invalid project id', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/not-a-number/waypoint/autopilot'), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project ID',
+    })
+  })
+
+  it('returns 404 when project is missing', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/999999/waypoint/autopilot'), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Project not found',
+    })
+  })
+
   it('returns autopilot run history payload', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
