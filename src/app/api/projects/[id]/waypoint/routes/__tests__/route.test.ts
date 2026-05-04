@@ -380,7 +380,7 @@ describe('GET /api/projects/:id/waypoint/routes', () => {
     expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid query params' })
     expect(body.details?.[0]).toMatchObject({
       code: expect.any(String),
-      path: expect.any(String),
+      path: 'limit',
       message: expect.any(String),
     })
   })

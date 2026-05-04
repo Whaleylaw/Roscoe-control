@@ -193,7 +193,7 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId/events', () => {
     expect(body.error).toBe('Invalid query params')
     expect(body.details?.[0]).toMatchObject({
       code: expect.any(String),
-      path: expect.any(String),
+      path: 'limit',
       message: expect.any(String),
     })
   })

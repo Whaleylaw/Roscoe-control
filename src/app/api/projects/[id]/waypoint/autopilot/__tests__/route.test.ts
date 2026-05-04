@@ -184,7 +184,7 @@ describe('POST /api/projects/:id/waypoint/autopilot', () => {
     })
     expect(body.details?.[0]).toMatchObject({
       code: expect.any(String),
-      path: expect.any(String),
+      path: 'max_iterations',
       message: expect.any(String),
     })
   })
