@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 import { createWorkflowDefinition } from '@/lib/workflow-engine'
 import { startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from '@/lib/waypoint'
+import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
@@ -157,6 +158,41 @@ describe('GET /api/projects/:id/waypoint/routes/:routeId', () => {
 
     expect(res.status).toBe(400)
     await expect(res.json()).resolves.toMatchObject({ ok: false, action: 'error', error: 'Invalid project or route ID' })
+  })
+
+  it('returns lifecycle-disabled error envelope', async () => {
+    const projectId = seedProject({ gsdEnabled: 0 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/1`), {
+      params: Promise.resolve({ id: String(projectId), routeId: '1' }),
+    })
+
+    expect(res.status).toBe(409)
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      action: 'error',
+      error: 'Waypoint lifecycle is not enabled for this project',
+    })
+  })
+
+  it('returns workspace-forbidden envelope from access guard', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes/1`), {
+      params: Promise.resolve({ id: String(projectId), routeId: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
   })
 
   it('returns route detail with nodes', async () => {
