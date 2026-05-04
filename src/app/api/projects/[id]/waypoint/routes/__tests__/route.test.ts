@@ -1,12 +1,13 @@
 import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 import { createWorkflowDefinition } from '@/lib/workflow-engine'
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
 let authFailure: { error: string; status: number } | null = null
+const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
 
 vi.mock('@/lib/db', () => ({ getDatabase: () => db }))
 
@@ -26,6 +27,10 @@ vi.mock('@/lib/workspaces', () => ({
   ForbiddenError: class ForbiddenError extends Error {
     status = 403
   },
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  mutationLimiter: mutationLimiterMock,
 }))
 
 vi.mock('@/lib/logger', () => ({ logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } }))
@@ -100,6 +105,8 @@ beforeEach(() => {
   vi.resetModules()
   authRole = 'operator'
   authFailure = null
+  mutationLimiterMock.mockReset()
+  mutationLimiterMock.mockReturnValue(null)
   db = new Database(':memory:')
   runMigrations(db)
 })
@@ -211,6 +218,23 @@ describe('POST /api/projects/:id/waypoint/routes', () => {
       ok: false,
       action: 'error',
       error: 'Invalid JSON body',
+    })
+  })
+
+  it('normalizes rate-limit responses into waypoint error envelope', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    mutationLimiterMock.mockReturnValueOnce(NextResponse.json({ error: 'rate limited' }, { status: 429 }))
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/routes`, { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(429)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Too many requests. Please try again later.',
     })
   })
 
