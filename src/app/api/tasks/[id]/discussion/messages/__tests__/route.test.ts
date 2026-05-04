@@ -192,6 +192,7 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.discussion).toMatchObject({ enabled: true, status: 'active', agent: 'Aegis' })
+    expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis' })
     expect(body.message.content).toBe('Ship it')
     expect(body.message.metadata).toMatchObject({ kind: 'waypoint_task_discussion', waypoint: true, task_id: taskId })
     expect(broadcast).toHaveBeenCalledTimes(1)

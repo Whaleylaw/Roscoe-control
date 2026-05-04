@@ -60,7 +60,12 @@ export async function POST(
     const autoResponseRequested = result.discussion.auto_response?.enabled === true && typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
     const autoResponse = autoResponseRequested
       ? { requested: true, agent: result.discussion.agent }
-      : { requested: false }
+      : {
+          requested: false,
+          ...(typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
+            ? { agent: result.discussion.agent }
+            : {}),
+        }
 
     if (autoResponseRequested) {
       eventBus.broadcast('waypoint.discussion.auto_response.requested', {
