@@ -120,6 +120,20 @@ describe('GET /api/projects/:id/waypoint/status', () => {
     })
   })
 
+  it('returns consistent error envelope when project is missing', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(req('/api/projects/999999/waypoint/status'), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Project not found',
+    })
+  })
+
   it('returns waypoint status payload when lifecycle is enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
