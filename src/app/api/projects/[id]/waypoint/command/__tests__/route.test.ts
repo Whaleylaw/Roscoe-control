@@ -119,6 +119,36 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     })
   })
 
+  it('returns consistent error envelope for invalid project id', async () => {
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/not-a-number/waypoint/command', { command: '/waypoint status' }), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Invalid project ID',
+    })
+  })
+
+  it('returns consistent error envelope when project is missing', async () => {
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/999999/waypoint/command', { command: '/waypoint status' }), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Project not found',
+    })
+  })
+
   it('returns 409 when waypoint lifecycle is not enabled', async () => {
     const projectId = seedProject({ gsdEnabled: 0 })
 
