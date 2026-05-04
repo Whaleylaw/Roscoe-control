@@ -226,7 +226,7 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
 
     expect(res.status).toBe(201)
     const body = await res.json()
-    expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis' })
+    expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis', reason: 'global_disabled' })
     expect(broadcast).toHaveBeenCalledTimes(1)
     expect(broadcast).toHaveBeenCalledWith('chat.message', expect.objectContaining({ id: body.message.id }))
   })

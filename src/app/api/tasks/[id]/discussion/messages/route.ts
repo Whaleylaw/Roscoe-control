@@ -68,17 +68,16 @@ export async function POST(
       // best-effort broadcast; do not fail message persistence on transport errors
     }
 
-    const autoResponseRequested = isAutoResponseGloballyEnabled()
-      && result.discussion.auto_response?.enabled === true
-      && typeof result.discussion.agent === 'string'
-      && result.discussion.agent.trim().length > 0
+    const hasAgent = typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
+    const metadataOptIn = result.discussion.auto_response?.enabled === true
+    const globalOptIn = isAutoResponseGloballyEnabled()
+    const autoResponseRequested = globalOptIn && metadataOptIn && hasAgent
     const autoResponse = autoResponseRequested
       ? { requested: true, agent: result.discussion.agent }
       : {
           requested: false,
-          ...(typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
-            ? { agent: result.discussion.agent }
-            : {}),
+          ...(hasAgent ? { agent: result.discussion.agent } : {}),
+          ...(metadataOptIn && !globalOptIn ? { reason: 'global_disabled' } : {}),
         }
 
     if (autoResponseRequested) {
