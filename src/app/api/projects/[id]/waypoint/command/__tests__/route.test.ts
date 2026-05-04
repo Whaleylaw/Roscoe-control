@@ -119,6 +119,27 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     })
   })
 
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/command`, { command: '/waypoint status' }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Workspace access denied',
+    })
+  })
+
   it('returns consistent error envelope for invalid project id', async () => {
     const { POST } = await loadRoute()
     const res = await POST(req('/api/projects/not-a-number/waypoint/command', { command: '/waypoint status' }), {
