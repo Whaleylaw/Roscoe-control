@@ -221,7 +221,11 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     expect(body.ok).toBe(false)
     expect(body.action).toBe('error')
     expect(body.error).toBe('Invalid request body')
-    expect(Array.isArray(body.details)).toBe(true)
+    expect(body.details?.[0]).toMatchObject({
+      code: expect.any(String),
+      path: expect.any(String),
+      message: expect.any(String),
+    })
   })
 
   it('rejects whitespace-only command bodies instead of treating them as help', async () => {

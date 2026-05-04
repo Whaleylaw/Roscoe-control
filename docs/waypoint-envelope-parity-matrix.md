@@ -21,3 +21,19 @@ Validation failures that include `details` are normalized to an array of `{ code
 | Route gate decision | `POST /api/projects/:id/waypoint/routes/:routeId/gate` | `{ ok:true, action:'approve_gate'|'reject_gate', ... }` | Standard contract, optional validation details; rate-limit 429 normalized | invalid ids/body (400), rate limited (429), missing project/route/node (404), lifecycle disabled (409), forbidden (403), internal (500) |
 | Route paused state | `POST /api/projects/:id/waypoint/routes/:routeId/state` | `{ ok:true, action:'pause_route'|'resume_route', ... }` | Standard contract, optional validation details; rate-limit 429 normalized | invalid ids/body (400), rate limited (429), missing project/route (404), lifecycle disabled (409), forbidden (403), internal (500) |
 | Task discussion (Waypoint-adjacent) | `GET /api/tasks/:id/discussion`, `POST /api/tasks/:id/discussion/start`, `POST /api/tasks/:id/discussion/messages` | endpoint-specific (`list_discussion`, `start_discussion`, `post_discussion_message`) | Standard contract; mutation rate-limit 429s normalized on start/messages | invalid task id/body (400), rate limited (429), task missing (404), discussion not enabled (409), internal (500) |
+
+## Command alias -> typed endpoint parity map
+
+Equivalent command and typed endpoint surfaces are contract-locked to the same error envelope semantics (`{ ok:false, action:'error', error, details? }`).
+
+| Command alias | Typed endpoint |
+|---|---|
+| `/waypoint auto` | `POST /api/projects/:id/waypoint/autopilot` |
+| `/waypoint auto status` | `GET /api/projects/:id/waypoint/autopilot` |
+| `/waypoint routes ...` | `GET /api/projects/:id/waypoint/routes` |
+| `/waypoint start plan ...`, `/waypoint doctor ...`, `/waypoint forensics ...` | `POST /api/projects/:id/waypoint/routes` |
+| `/waypoint route --route-id <id>` | `GET /api/projects/:id/waypoint/routes/:routeId` |
+| `/waypoint route-events --route-id <id>` | `GET /api/projects/:id/waypoint/routes/:routeId/events` |
+| `/waypoint pause --route-id <id>`, `/waypoint resume --route-id <id>` | `POST /api/projects/:id/waypoint/routes/:routeId/state` |
+| `/waypoint gate --route-id <id> --node <node_key> (--approve|--reject)` | `POST /api/projects/:id/waypoint/routes/:routeId/gate` |
+| `/waypoint discuss --task-id <id> [--message <text>]` | `POST /api/tasks/:id/discussion/start` then optional `POST /api/tasks/:id/discussion/messages` and `GET /api/tasks/:id/discussion` |
