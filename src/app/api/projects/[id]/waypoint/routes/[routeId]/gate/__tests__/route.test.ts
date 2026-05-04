@@ -104,7 +104,7 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/1/gate`, { node_key: 'quality_gate', decision: 'approve' }), { params: Promise.resolve({ id: String(projectId), routeId: '1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
-    expect(body).toMatchObject({ ok: false, action: 'route_gate', error: 'Forbidden' })
+    expect(body).toMatchObject({ ok: false, action: 'error', error: 'Forbidden' })
   })
 
   it('returns 409 when waypoint lifecycle is not enabled', async () => {
@@ -119,7 +119,7 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     const body = await res.json()
     expect(body).toEqual({
       ok: false,
-      action: 'route_gate',
+      action: 'error',
       error: 'Waypoint lifecycle is not enabled for this project',
     })
   })
@@ -137,7 +137,7 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.ok).toBe(false)
-    expect(body.action).toBe('route_gate')
+    expect(body.action).toBe('error')
     expect(body.error).toBe('Invalid request body')
     expect(Array.isArray(body.details)).toBe(true)
   })

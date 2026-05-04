@@ -179,7 +179,7 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/state', () => {
 
     expect(res.status).toBe(403)
     const body = await res.json()
-    expect(body).toMatchObject({ ok: false, action: 'route_state', error: 'Forbidden' })
+    expect(body).toMatchObject({ ok: false, action: 'error', error: 'Forbidden' })
   })
 
   it('returns 409 when waypoint lifecycle is not enabled', async () => {
@@ -192,7 +192,7 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/state', () => {
 
     expect(res.status).toBe(409)
     const body = await res.json()
-    expect(body).toMatchObject({ ok: false, action: 'route_state' })
+    expect(body).toMatchObject({ ok: false, action: 'error' })
   })
 
   it('pauses and resumes a route', async () => {

@@ -14,14 +14,25 @@ const Body = z.object({
   note: z.string().trim().min(1).max(1000).optional(),
 })
 
+function routeGateError(status: number, error: string, details?: unknown) {
+  return NextResponse.json(
+    {
+      ok: false,
+      action: 'error',
+      error,
+      ...(details !== undefined ? { details } : {}),
+    },
+    { status },
+  )
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; routeId: string }> },
 ) {
-  const action = 'route_gate'
   const auth = requireRole(request, 'operator')
   if ('error' in auth) {
-    return NextResponse.json({ ok: false, action, error: auth.error }, { status: auth.status })
+    return routeGateError(auth.status ?? 403, auth.error ?? 'Forbidden')
   }
   const rateCheck = mutationLimiter(request)
   if (rateCheck) return rateCheck
@@ -44,12 +55,12 @@ export async function POST(
     const projectId = parseStrictId(id)
     const parsedRouteId = parseStrictId(routeId)
     if (projectId == null || parsedRouteId == null) {
-      return NextResponse.json({ ok: false, action, error: 'Invalid project or route ID' }, { status: 400 })
+      return routeGateError(400, 'Invalid project or route ID')
     }
 
     const project = getScopedProject(db, projectId, workspaceId)
     if (!project) {
-      return NextResponse.json({ ok: false, action, error: 'Project not found' }, { status: 404 })
+      return routeGateError(404, 'Project not found')
     }
 
     const lifecycleState = db
@@ -59,16 +70,13 @@ export async function POST(
       .get(projectId, workspaceId) as { gsd_enabled: number } | undefined
 
     if (!lifecycleState?.gsd_enabled) {
-      return NextResponse.json({ ok: false, action, error: 'Waypoint lifecycle is not enabled for this project' }, { status: 409 })
+      return routeGateError(409, 'Waypoint lifecycle is not enabled for this project')
     }
 
     const body = await request.json().catch(() => ({}))
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        { ok: false, action, error: 'Invalid request body', details: parsed.error.issues },
-        { status: 400 },
-      )
+      return routeGateError(400, 'Invalid request body', parsed.error.issues)
     }
 
     const actor = auth.user.display_name || auth.user.username || 'operator'
@@ -90,12 +98,12 @@ export async function POST(
     })
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ ok: false, action, error: error.message }, { status: error.status })
+      return routeGateError(error.status, error.message)
     }
     if (error instanceof Error) {
-      return NextResponse.json({ ok: false, action, error: error.message }, { status: 400 })
+      return routeGateError(400, error.message)
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/routes/[routeId]/gate error')
-    return NextResponse.json({ ok: false, action, error: 'Failed to apply Waypoint gate decision' }, { status: 500 })
+    return routeGateError(500, 'Failed to apply Waypoint gate decision')
   }
 }
