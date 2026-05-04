@@ -18,7 +18,7 @@ type ValidationIssue = { code: string; path: PropertyKey[]; message: string }
 export function normalizeWaypointValidationDetails(issues: ValidationIssue[]) {
   return issues.map((issue) => ({
     code: issue.code,
-    path: issue.path.join('.'),
+    path: issue.path.length > 0 ? issue.path.join('.') : '$',
     message: issue.message,
   }))
 }

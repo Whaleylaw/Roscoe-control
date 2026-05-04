@@ -8,7 +8,7 @@ import { startTaskDiscussion } from '@/lib/waypoint-task-discussion'
 
 const Body = z.object({
   agent: z.string().trim().min(1).optional(),
-})
+}).strict()
 
 function discussionStartError(status: number, error: string, details?: unknown) {
   return NextResponse.json(

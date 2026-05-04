@@ -11,7 +11,7 @@ const Body = z.object({
   content: z.string().trim().min(1),
   from: z.string().trim().min(1).optional(),
   to: z.string().trim().min(1).optional(),
-})
+}).strict()
 
 function discussionMessageError(status: number, error: string, details?: unknown) {
   return NextResponse.json({ ok: false, action: 'error', error, ...(details !== undefined ? { details } : {}) }, { status })

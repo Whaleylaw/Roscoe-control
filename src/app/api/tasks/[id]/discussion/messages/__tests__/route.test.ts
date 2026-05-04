@@ -121,6 +121,25 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
     expect(broadcast).not.toHaveBeenCalled()
   })
 
+  it('rejects unknown request-body keys with normalized validation details', async () => {
+    const taskId = seedTask()
+    const { POST } = await loadRoute()
+
+    const res = await POST(req(`/api/tasks/${taskId}/discussion/messages`, { content: 'Ship it', junk: true }), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid request body' })
+    expect(body.details?.[0]).toMatchObject({
+      code: expect.any(String),
+      path: '$',
+      message: expect.any(String),
+    })
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
   it('returns 409 when waypoint discussion is not enabled for the task', async () => {
     const taskId = seedTask()
     const { POST } = await loadRoute()
