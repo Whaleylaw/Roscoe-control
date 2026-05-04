@@ -11,13 +11,17 @@ const Body = z.object({
   command: z.string().trim().min(1),
 })
 
-function commandError(status: number, error: string, command: ReturnType<typeof parseWaypointCommand> | null = null) {
+function commandError(
+  status: number,
+  error: string,
+  details?: unknown,
+) {
   return NextResponse.json(
     {
       ok: false,
       action: 'error',
-      command,
       error,
+      ...(details !== undefined ? { details } : {}),
     },
     { status },
   )
@@ -63,16 +67,7 @@ export async function POST(
       rawCommand = parsed.data.command
     }
     if (!parsed.success) {
-      return NextResponse.json(
-        {
-          ok: false,
-          action: 'error',
-          command: null,
-          error: 'Invalid request body',
-          details: parsed.error.issues,
-        },
-        { status: 400 },
-      )
+      return commandError(400, 'Invalid request body', parsed.error.issues)
     }
 
     const lifecycleState = db
@@ -115,7 +110,11 @@ export async function POST(
           })()
         : null
 
-      return commandError(400, error.message, parsedCommand)
+      return commandError(
+        400,
+        error.message,
+        parsedCommand ? { command: parsedCommand } : undefined,
+      )
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/command error')
     return commandError(500, 'Failed to execute Waypoint command')

@@ -114,7 +114,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Forbidden',
     })
   })
@@ -135,7 +134,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Workspace access denied',
     })
   })
@@ -150,7 +148,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Invalid project ID',
     })
   })
@@ -165,7 +162,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Project not found',
     })
   })
@@ -182,7 +178,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Waypoint lifecycle is not enabled for this project',
     })
   })
@@ -199,7 +194,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     const body = await res.json()
     expect(body.ok).toBe(false)
     expect(body.action).toBe('error')
-    expect(body.command).toBeNull()
     expect(body.error).toBe('Invalid request body')
     expect(Array.isArray(body.details)).toBe(true)
   })
@@ -222,7 +216,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     const body = await res.json()
     expect(body.ok).toBe(false)
     expect(body.action).toBe('error')
-    expect(body.command).toBeNull()
     expect(body.error).toBe('Invalid request body')
     expect(Array.isArray(body.details)).toBe(true)
   })
@@ -239,7 +232,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     const body = await res.json()
     expect(body.ok).toBe(false)
     expect(body.action).toBe('error')
-    expect(body.command).toBeNull()
     expect(body.error).toBe('Invalid request body')
   })
 
@@ -258,8 +250,10 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: { name: 'route', routeId: 999999 },
       error: `Route 999999 not found for project ${projectId}`,
+      details: {
+        command: { name: 'route', routeId: 999999 },
+      },
     })
   })
 
@@ -278,7 +272,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Missing or invalid --plan-id',
     })
   })
@@ -298,7 +291,6 @@ describe('POST /api/projects/:id/waypoint/command', () => {
     await expect(res.json()).resolves.toEqual({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Invalid --limit value',
     })
   })
@@ -992,7 +984,6 @@ nodes:
     await expect(res.json()).resolves.toMatchObject({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Invalid request body',
     })
   })
@@ -1009,7 +1000,6 @@ nodes:
     await expect(res.json()).resolves.toMatchObject({
       ok: false,
       action: 'error',
-      command: null,
       error: 'Unknown Waypoint command: nope',
     })
   })
