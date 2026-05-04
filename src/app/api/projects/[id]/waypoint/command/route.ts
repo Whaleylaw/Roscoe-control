@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { executeWaypointCommand, parseWaypointCommand } from '@/lib/waypoint-command'
+import { normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 
 const Body = z.object({
   command: z.string().trim().min(1),
@@ -67,7 +68,7 @@ export async function POST(
       rawCommand = parsed.data.command
     }
     if (!parsed.success) {
-      return commandError(400, 'Invalid request body', parsed.error.issues)
+      return commandError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const lifecycleState = db

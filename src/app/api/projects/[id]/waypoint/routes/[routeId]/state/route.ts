@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { setWaypointRoutePausedState } from '@/lib/waypoint-command'
-import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
+import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 
 const Body = z.object({
   action: z.enum(['pause', 'resume']),
@@ -85,7 +85,7 @@ export async function POST(
     }
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return routeStateError(400, 'Invalid request body', parsed.error.issues)
+      return routeStateError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const actor = auth.user.display_name || auth.user.username || 'operator'

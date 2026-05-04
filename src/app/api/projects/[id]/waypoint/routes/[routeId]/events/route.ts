@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { listWaypointRouteEvents } from '@/lib/waypoint-command'
+import { normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 
 const Query = z.object({
   limit: z.coerce.number().int().positive().max(500).optional(),
@@ -77,7 +78,7 @@ export async function GET(
       offset: request.nextUrl.searchParams.get('offset') ?? undefined,
     })
     if (!parsed.success) {
-      return routeEventsError(400, 'Invalid query params', parsed.error.issues)
+      return routeEventsError(400, 'Invalid query params', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const limit = parsed.data.limit ?? 50

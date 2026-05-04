@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
 import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { setWaypointGateDecision } from '@/lib/waypoint-command'
-import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
+import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 
 const Body = z.object({
   node_key: z.string().min(1),
@@ -77,7 +77,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return routeGateError(400, 'Invalid request body', parsed.error.issues)
+      return routeGateError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const actor = auth.user.display_name || auth.user.username || 'operator'

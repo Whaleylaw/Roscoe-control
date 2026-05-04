@@ -8,18 +8,19 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { runWaypointAutopilot } from '@/lib/waypoint-autopilot'
 import { listWaypointAutopilotRuns } from '@/lib/waypoint-command'
-import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
+import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 
 const Body = z.object({
   max_iterations: z.number().int().positive().max(100).optional(),
 })
 
-function autopilotError(status: number, error: string) {
+function autopilotError(status: number, error: string, details?: unknown) {
   return NextResponse.json(
     {
       ok: false,
       action: 'error',
       error,
+      ...(details !== undefined ? { details } : {}),
     },
     { status },
   )
@@ -167,15 +168,7 @@ export async function POST(
     }
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return NextResponse.json(
-        {
-          ok: false,
-          action: 'error',
-          error: 'Invalid request body',
-          details: parsed.error.issues,
-        },
-        { status: 400 },
-      )
+      return autopilotError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const actor = auth.user.display_name || auth.user.username || 'operator'

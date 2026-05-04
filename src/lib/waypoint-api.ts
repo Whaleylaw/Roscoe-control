@@ -12,3 +12,13 @@ export function normalizeWaypointRateLimitError(rateCheck: NextResponse | null):
     { status: 429 },
   )
 }
+
+type ValidationIssue = { code: string; path: PropertyKey[]; message: string }
+
+export function normalizeWaypointValidationDetails(issues: ValidationIssue[]) {
+  return issues.map((issue) => ({
+    code: issue.code,
+    path: issue.path.join('.'),
+    message: issue.message,
+  }))
+}

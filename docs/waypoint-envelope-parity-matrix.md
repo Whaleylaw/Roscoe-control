@@ -8,6 +8,8 @@ Established error contract for Waypoint surfaces:
 
 Success envelopes remain endpoint-specific.
 
+Validation failures that include `details` are normalized to an array of `{ code, path, message }` (with `path` as dotted string or `$` for root).
+
 | Surface | Path / Alias | Success envelope | Error envelope behavior | Key failure modes |
 |---|---|---|---|---|
 | Waypoint status | `GET /api/projects/:id/waypoint/status` | `{ ok:true, action:'status', status, summary }` | Standard `{ ok:false, action:'error', error }` | invalid project id (400), project missing (404), lifecycle disabled (409), forbidden (403), internal (500) |

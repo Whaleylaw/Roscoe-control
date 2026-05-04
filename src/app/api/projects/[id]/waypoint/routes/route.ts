@@ -8,7 +8,7 @@ import { ensureTenantWorkspaceAccess, ForbiddenError } from '@/lib/workspaces'
 import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { listWaypointRoutes, resolveWaypointPlanRouteScope } from '@/lib/waypoint-command'
 import { startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from '@/lib/waypoint'
-import { normalizeWaypointRateLimitError } from '@/lib/waypoint-api'
+import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 
 const Body = z.object({
   subject: z.literal('plan'),
@@ -88,7 +88,7 @@ export async function GET(
       offset: request.nextUrl.searchParams.get('offset') ?? undefined,
     })
     if (!parsed.success) {
-      return routesError(400, 'Invalid query params', parsed.error.issues)
+      return routesError(400, 'Invalid query params', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const routes = listWaypointRoutes(db, {
@@ -182,7 +182,7 @@ export async function POST(
 
     const parsed = Body.safeParse(body)
     if (!parsed.success) {
-      return routesError(400, 'Invalid request body', parsed.error.issues)
+      return routesError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
     const scope = resolveWaypointPlanRouteScope(db, {

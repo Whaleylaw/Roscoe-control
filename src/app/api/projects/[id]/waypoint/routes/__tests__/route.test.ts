@@ -376,7 +376,13 @@ describe('GET /api/projects/:id/waypoint/routes', () => {
     })
 
     expect(res.status).toBe(400)
-    await expect(res.json()).resolves.toMatchObject({ ok: false, action: 'error', error: 'Invalid query params' })
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid query params' })
+    expect(body.details?.[0]).toMatchObject({
+      code: expect.any(String),
+      path: expect.any(String),
+      message: expect.any(String),
+    })
   })
 
   it('lists routes with status filter and pagination', async () => {
