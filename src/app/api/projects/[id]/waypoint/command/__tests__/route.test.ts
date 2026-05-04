@@ -906,7 +906,7 @@ nodes:
     })
   })
 
-  it('returns 400 for malformed command payload', async () => {
+  it('returns consistent error envelope for malformed command payload', async () => {
     const projectId = seedProject({ gsdEnabled: 1 })
 
     const { POST } = await loadRoute()
@@ -915,8 +915,12 @@ nodes:
     })
 
     expect(res.status).toBe(400)
-    const body = await res.json()
-    expect(body.error).toBe('Invalid request body')
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      action: 'error',
+      command: null,
+      error: 'Invalid request body',
+    })
   })
 
   it('returns consistent error envelope when command execution fails', async () => {
