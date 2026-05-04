@@ -28,7 +28,8 @@ export async function POST(
   const taskId = Number.parseInt(resolvedParams.id, 10)
   if (!Number.isFinite(taskId)) return discussionMessageError(400, 'Invalid task ID')
 
-  const body = await request.json().catch(() => ({})) as { content?: unknown; from?: unknown; to?: unknown }
+  const body = await request.json().catch(() => null) as { content?: unknown; from?: unknown; to?: unknown } | null
+  if (body == null) return discussionMessageError(400, 'Invalid JSON body')
   const content = typeof body.content === 'string' ? body.content : ''
   if (!content.trim()) return discussionMessageError(400, 'Message content is required')
 

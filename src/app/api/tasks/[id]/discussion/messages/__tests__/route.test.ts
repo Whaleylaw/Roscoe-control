@@ -36,6 +36,14 @@ function req(path: string, body: Record<string, unknown>) {
   })
 }
 
+function reqMalformed(path: string) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{"content":',
+  })
+}
+
 function seedTask(): number {
   const result = db.prepare(`
     INSERT INTO tasks (title, description, status, priority, project_id, assigned_to, created_by, created_at, updated_at, workspace_id)
@@ -61,6 +69,19 @@ afterEach(() => {
 })
 
 describe('POST /api/tasks/:id/discussion/messages', () => {
+  it('returns 400 for malformed JSON body with standard error envelope', async () => {
+    const taskId = seedTask()
+    const { POST } = await loadRoute()
+
+    const res = await POST(reqMalformed(`/api/tasks/${taskId}/discussion/messages`), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid JSON body' })
+    expect(broadcast).not.toHaveBeenCalled()
+  })
+
   it('returns 409 when waypoint discussion is not enabled for the task', async () => {
     const taskId = seedTask()
     const { POST } = await loadRoute()

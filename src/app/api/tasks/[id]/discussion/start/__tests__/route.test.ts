@@ -34,6 +34,14 @@ function req(path: string, body: Record<string, unknown>) {
   })
 }
 
+function reqMalformed(path: string) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{"agent":',
+  })
+}
+
 function seedTask(): number {
   const result = db.prepare(`
     INSERT INTO tasks (title, description, status, priority, project_id, assigned_to, created_by, created_at, updated_at, workspace_id)
@@ -80,6 +88,18 @@ describe('POST /api/tasks/:id/discussion/start', () => {
 
     expect(res.status).toBe(400)
     await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid task ID' })
+  })
+
+  it('returns 400 for malformed JSON body with standard error envelope', async () => {
+    const taskId = seedTask()
+
+    const { POST } = await loadRoute()
+    const res = await POST(reqMalformed(`/api/tasks/${taskId}/discussion/start`), {
+      params: Promise.resolve({ id: String(taskId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({ ok: false, action: 'error', error: 'Invalid JSON body' })
   })
 
   it('starts task discussion and returns standard success envelope', async () => {

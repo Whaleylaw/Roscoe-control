@@ -22,7 +22,8 @@ export async function POST(
   const taskId = Number.parseInt(resolvedParams.id, 10)
   if (!Number.isFinite(taskId)) return discussionStartError(400, 'Invalid task ID')
 
-  const body = await request.json().catch(() => ({})) as { agent?: unknown }
+  const body = await request.json().catch(() => null) as { agent?: unknown } | null
+  if (body == null) return discussionStartError(400, 'Invalid JSON body')
   const agent = typeof body.agent === 'string' ? body.agent : undefined
 
   try {
