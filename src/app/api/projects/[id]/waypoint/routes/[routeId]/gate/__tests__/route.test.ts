@@ -97,6 +97,33 @@ afterEach(() => {
 })
 
 describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const projectId = seedProject(1)
+    const planId = seedPlan(projectId)
+    const routeId = seedRoute(projectId, planId)
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      postReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/gate`, {
+        node_key: 'quality_gate',
+        decision: 'approve',
+      }),
+      { params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }) },
+    )
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
   it('rejects viewer role', async () => {
     authRole = 'viewer'
     const projectId = seedProject(1)
@@ -131,6 +158,30 @@ describe('POST /api/projects/:id/waypoint/routes/:routeId/gate', () => {
     const { POST } = await loadRoute()
 
     const res = await POST(postReq(`/api/projects/${projectId}/waypoint/routes/${routeId}/gate`, { node_key: '', decision: 'approve' }), {
+      params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.action).toBe('error')
+    expect(body.error).toBe('Invalid request body')
+    expect(Array.isArray(body.details)).toBe(true)
+  })
+
+  it('returns structured envelope for malformed JSON body', async () => {
+    const projectId = seedProject(1)
+    const planId = seedPlan(projectId)
+    const routeId = seedRoute(projectId, planId)
+    const { POST } = await loadRoute()
+
+    const malformed = new NextRequest(`http://localhost/api/projects/${projectId}/waypoint/routes/${routeId}/gate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"node_key":',
+    })
+
+    const res = await POST(malformed, {
       params: Promise.resolve({ id: String(projectId), routeId: String(routeId) }),
     })
 
