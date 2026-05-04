@@ -233,6 +233,7 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
         conversation_id: started.discussion.conversation_id,
         agent: 'Aegis',
         message_id: body.message.id,
+        content: 'Please draft acceptance criteria',
       }),
     )
   })

@@ -69,6 +69,7 @@ export async function POST(
         conversation_id: result.discussion.conversation_id,
         message_id: result.message.id,
         agent: result.discussion.agent,
+        content: result.message.content,
       })
     }
 
