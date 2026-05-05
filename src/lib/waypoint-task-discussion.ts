@@ -5,7 +5,7 @@ import {
   mergeWaypointTaskDiscussionMetadata,
   parseWaypointJsonObject,
   parseWaypointTaskDiscussionMetadata,
-  parseWaypointWorkflowMetadataNumber,
+  buildWaypointTaskDiscussionMessageMetadata,
   isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
   type WaypointTaskDiscussionAutoResponseMetadata,
@@ -137,15 +137,12 @@ export function postTaskDiscussionMessage(
   const content = input.content.trim()
   if (!content) throw new Error('Discussion message content is required')
 
-  const metadata = {
-    kind: 'waypoint_task_discussion',
-    task_id: task.id,
-    task_title: task.title,
+  const metadata = buildWaypointTaskDiscussionMessageMetadata({
+    id: task.id,
+    title: task.title,
     project_id: task.project_id ?? null,
-    workflow_instance_id: parseWaypointWorkflowMetadataNumber(task.metadata, 'workflow_instance_id'),
-    workflow_node_instance_id: parseWaypointWorkflowMetadataNumber(task.metadata, 'node_instance_id'),
-    waypoint: true,
-  }
+    metadata: task.metadata,
+  })
   const result = db.prepare(`
     INSERT INTO messages (conversation_id, from_agent, to_agent, content, message_type, metadata, read_at, created_at, workspace_id)
     VALUES (?, ?, ?, ?, 'text', ?, NULL, ?, ?)

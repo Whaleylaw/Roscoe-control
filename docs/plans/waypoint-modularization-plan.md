@@ -184,6 +184,7 @@
 - ✅ Extracted strict task-discussion conversation-id validator to core (`isStrictWaypointTaskDiscussionConversationId`) and re-wired Mission Control discussion start flow to use the shared core rule.
 - ✅ Extracted task-discussion metadata parsing/merge/enabled helpers to core (`packages/waypoint-core/src/discussion/metadata.ts`) and re-wired Mission Control task-discussion metadata helpers to delegate through `@waypoint/core`.
 - ✅ Extracted workflow metadata numeric parsing helper to core (`parseWaypointWorkflowMetadataNumber`) and re-wired Mission Control task discussion message metadata construction to source workflow IDs via `@waypoint/core`.
+- ✅ Extracted task discussion message metadata builder to core (`buildWaypointTaskDiscussionMessageMetadata`) and re-wired Mission Control discussion message creation to delegate metadata shaping through `@waypoint/core`.
 
 **Acceptance:**
 - Existing autopilot command/API tests pass.

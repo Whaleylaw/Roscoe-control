@@ -99,4 +99,31 @@ describe('waypoint-core contracts export surface', () => {
     ).toBe(42)
     expect(core.parseWaypointWorkflowMetadataNumber({ workflow: { workflow_instance_id: '42' } }, 'workflow_instance_id')).toBeNull()
   })
+
+  it('exports task discussion message metadata helper', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('buildWaypointTaskDiscussionMessageMetadata')
+    expect(
+      core.buildWaypointTaskDiscussionMessageMetadata({
+        id: 77,
+        title: 'Ship checkpoint',
+        project_id: 9,
+        metadata: {
+          workflow: {
+            workflow_instance_id: 101,
+            node_instance_id: 202,
+          },
+        },
+      }),
+    ).toEqual({
+      kind: 'waypoint_task_discussion',
+      task_id: 77,
+      task_title: 'Ship checkpoint',
+      project_id: 9,
+      workflow_instance_id: 101,
+      workflow_node_instance_id: 202,
+      waypoint: true,
+    })
+  })
 })

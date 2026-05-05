@@ -16,6 +16,23 @@ export type WaypointTaskDiscussionMetadata = {
   auto_response?: WaypointTaskDiscussionAutoResponseMetadata
 }
 
+export type WaypointTaskDiscussionMessageTask = {
+  id: number
+  title: string
+  project_id: number | null
+  metadata: unknown
+}
+
+export type WaypointTaskDiscussionMessageMetadata = {
+  kind: 'waypoint_task_discussion'
+  task_id: number
+  task_title: string
+  project_id: number | null
+  workflow_instance_id: number | null
+  workflow_node_instance_id: number | null
+  waypoint: true
+}
+
 export function parseWaypointJsonObject(raw: unknown): Record<string, unknown> {
   if (!raw) return {}
   if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
@@ -82,4 +99,18 @@ export function parseWaypointWorkflowMetadataNumber(raw: unknown, key: string): 
   const workflow = parseWaypointJsonObject(metadata.workflow)
   const value = workflow[key]
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+export function buildWaypointTaskDiscussionMessageMetadata(
+  task: WaypointTaskDiscussionMessageTask,
+): WaypointTaskDiscussionMessageMetadata {
+  return {
+    kind: 'waypoint_task_discussion',
+    task_id: task.id,
+    task_title: task.title,
+    project_id: task.project_id,
+    workflow_instance_id: parseWaypointWorkflowMetadataNumber(task.metadata, 'workflow_instance_id'),
+    workflow_node_instance_id: parseWaypointWorkflowMetadataNumber(task.metadata, 'node_instance_id'),
+    waypoint: true,
+  }
 }

@@ -26,11 +26,14 @@ export {
   isWaypointTaskDiscussionEnabled,
   mergeWaypointTaskDiscussionMetadata,
   parseWaypointWorkflowMetadataNumber,
+  buildWaypointTaskDiscussionMessageMetadata,
 } from './discussion/metadata'
 export type {
   WaypointTaskDiscussionStatus,
   WaypointTaskDiscussionAutoResponseMetadata,
   WaypointTaskDiscussionMetadata,
+  WaypointTaskDiscussionMessageTask,
+  WaypointTaskDiscussionMessageMetadata,
 } from './discussion/metadata'
 
 export { WaypointSubjectType } from './contracts/system'
