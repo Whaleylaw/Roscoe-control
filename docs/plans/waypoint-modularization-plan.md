@@ -212,6 +212,11 @@
 **Files:**
 - Create: `src/lib/waypoint-adapter/__tests__/*.test.ts`
 
+**Progress:**
+- ✅ Initial coverage added for adapter assembly (`src/lib/waypoint-adapter/__tests__/index.test.ts`):
+  - validates dependency pass-through identity
+  - enforces explicit failure on missing required dependency
+
 ---
 
 ## Phase M5 — Second-host portability proof

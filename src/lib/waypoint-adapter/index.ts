@@ -11,12 +11,22 @@ export interface MissionControlWaypointAdapterDeps {
   recipeRuntime: IRecipeRuntime
 }
 
+function assertWaypointAdapterDependency<T>(value: T | undefined, key: string): T {
+  if (!value) {
+    throw new Error(`Missing required Waypoint adapter dependency: ${key}`)
+  }
+
+  return value
+}
+
 export function createMissionControlWaypointAdapters(deps: MissionControlWaypointAdapterDeps) {
   return {
-    store: createWaypointStoreAdapter(deps.store),
-    authz: createWaypointAuthzAdapter(deps.authz),
-    eventBus: createWaypointEventBusAdapter(deps.eventBus),
-    recipeRuntime: createWaypointRecipeRuntimeAdapter(deps.recipeRuntime),
+    store: createWaypointStoreAdapter(assertWaypointAdapterDependency(deps.store, 'store')),
+    authz: createWaypointAuthzAdapter(assertWaypointAdapterDependency(deps.authz, 'authz')),
+    eventBus: createWaypointEventBusAdapter(assertWaypointAdapterDependency(deps.eventBus, 'eventBus')),
+    recipeRuntime: createWaypointRecipeRuntimeAdapter(
+      assertWaypointAdapterDependency(deps.recipeRuntime, 'recipeRuntime')
+    ),
   }
 }
 
