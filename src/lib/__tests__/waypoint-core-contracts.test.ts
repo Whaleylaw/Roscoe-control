@@ -180,4 +180,20 @@ describe('waypoint-core contracts export surface', () => {
       }),
     ).toEqual({ requested: true, agent: 'planner' })
   })
+
+  it('exports discussion auto-response env flag parser', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('parseWaypointDiscussionAutoResponseEnvFlag')
+
+    // truthy variants (case + whitespace tolerant)
+    for (const value of ['1', 'true', 'TRUE', 'yes', 'On', '  true  ']) {
+      expect(core.parseWaypointDiscussionAutoResponseEnvFlag(value)).toBe(true)
+    }
+
+    // falsy / invalid variants
+    for (const value of ['0', 'false', 'no', 'off', '', '   ', 'garbage', undefined, null]) {
+      expect(core.parseWaypointDiscussionAutoResponseEnvFlag(value)).toBe(false)
+    }
+  })
 })

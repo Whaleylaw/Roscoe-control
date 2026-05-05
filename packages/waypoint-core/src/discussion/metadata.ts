@@ -134,6 +134,18 @@ export function normalizeWaypointTaskDiscussionMessageContent(content: string): 
   return content.trim()
 }
 
+/**
+ * Parse an environment variable value into a boolean flag for discussion
+ * auto-response gating. Recognized truthy values (case + whitespace tolerant):
+ *   '1', 'true', 'yes', 'on'
+ * Anything else (including undefined/null/empty/unknown tokens) → false.
+ */
+export function parseWaypointDiscussionAutoResponseEnvFlag(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const normalized = value.trim().toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
 export function resolveWaypointDiscussionAutoResponse(input: {
   metadataOptIn: boolean
   globalOptIn: boolean

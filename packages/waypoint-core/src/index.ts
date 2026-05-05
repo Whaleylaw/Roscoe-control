@@ -31,6 +31,7 @@ export {
   resolveWaypointTaskDiscussionAgent,
   normalizeWaypointTaskDiscussionListLimit,
   normalizeWaypointTaskDiscussionMessageContent,
+  parseWaypointDiscussionAutoResponseEnvFlag,
   buildWaypointTaskDiscussionStartMetadata,
   resolveWaypointDiscussionAutoResponse,
 } from './discussion/metadata'

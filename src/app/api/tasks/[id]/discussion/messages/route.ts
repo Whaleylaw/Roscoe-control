@@ -6,7 +6,7 @@ import { mutationLimiter } from '@/lib/rate-limit'
 import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 import { eventBus } from '@/lib/event-bus'
 import { postTaskDiscussionMessage } from '@/lib/waypoint-task-discussion'
-import { resolveWaypointDiscussionAutoResponse } from '@waypoint/core'
+import { resolveWaypointDiscussionAutoResponse, parseWaypointDiscussionAutoResponseEnvFlag } from '@waypoint/core'
 
 const Body = z.object({
   content: z.string().trim().min(1),
@@ -24,10 +24,7 @@ function parseMetadata(raw: string | null | undefined) {
 }
 
 function isAutoResponseGloballyEnabled() {
-  const value = process.env.WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED
-  if (typeof value !== 'string') return false
-  const normalized = value.trim().toLowerCase()
-  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+  return parseWaypointDiscussionAutoResponseEnvFlag(process.env.WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED)
 }
 
 export async function POST(
