@@ -51,3 +51,13 @@ export type { IWaypointStore, WaypointRouteRecord, WaypointEventRecord } from '.
 export type { IWaypointAuthz, WaypointActor } from './contracts/authz'
 export type { IEventBus } from './contracts/event-bus'
 export type { IRecipeRuntime, RecipeRunRequest, RecipeRunHandle } from './contracts/recipe-runtime'
+
+export {
+  WAYPOINT_DISCUSSION_MESSAGE_AUTHORED_BY_VALUES,
+  isWaypointDiscussionMessageAuthoredBy,
+} from './discussion/auto-response-contract'
+export type {
+  WaypointDiscussionMessageAuthoredBy,
+  WaypointDiscussionAutoResponseHistoryEntry,
+  WaypointDiscussionAutoResponseRequestPayload,
+} from './discussion/auto-response-contract'
