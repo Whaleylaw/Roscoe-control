@@ -186,6 +186,7 @@
 - ✅ Extracted workflow metadata numeric parsing helper to core (`parseWaypointWorkflowMetadataNumber`) and re-wired Mission Control task discussion message metadata construction to source workflow IDs via `@waypoint/core`.
 - ✅ Extracted task discussion message metadata builder to core (`buildWaypointTaskDiscussionMessageMetadata`) and re-wired Mission Control discussion message creation to delegate metadata shaping through `@waypoint/core`.
 - ✅ Extracted task discussion status resolution helper to core (`resolveWaypointTaskDiscussionStatus`) and re-wired Mission Control discussion start flow to preserve `closed`/`summarized` status via shared `@waypoint/core` behavior.
+- ✅ Extracted task discussion list limit normalization helper to core (`normalizeWaypointTaskDiscussionListLimit`) and re-wired Mission Control discussion listing flow to delegate limit clamping through `@waypoint/core`.
 
 **Acceptance:**
 - Existing autopilot command/API tests pass.

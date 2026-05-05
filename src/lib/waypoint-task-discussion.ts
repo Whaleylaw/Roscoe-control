@@ -7,6 +7,7 @@ import {
   parseWaypointTaskDiscussionMetadata,
   buildWaypointTaskDiscussionMessageMetadata,
   resolveWaypointTaskDiscussionStatus,
+  normalizeWaypointTaskDiscussionListLimit,
   isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
   type WaypointTaskDiscussionAutoResponseMetadata,
@@ -115,7 +116,7 @@ export function listTaskDiscussion(
   if (!discussion.enabled || !discussion.conversation_id) {
     return { task, discussion: { ...discussion, enabled: false }, messages: [] }
   }
-  const limit = Math.max(1, Math.min(input.limit ?? 100, 200))
+  const limit = normalizeWaypointTaskDiscussionListLimit(input.limit)
   const messages = db.prepare(`
     SELECT * FROM messages
     WHERE conversation_id = ? AND workspace_id = ?

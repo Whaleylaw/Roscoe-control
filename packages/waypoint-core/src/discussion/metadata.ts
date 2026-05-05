@@ -107,6 +107,10 @@ export function resolveWaypointTaskDiscussionStatus(
   return status === 'closed' || status === 'summarized' ? status : 'active'
 }
 
+export function normalizeWaypointTaskDiscussionListLimit(limit: number | null | undefined): number {
+  return Math.max(1, Math.min(limit ?? 100, 200))
+}
+
 export function buildWaypointTaskDiscussionMessageMetadata(
   task: WaypointTaskDiscussionMessageTask,
 ): WaypointTaskDiscussionMessageMetadata {
