@@ -111,6 +111,10 @@ export function normalizeWaypointTaskDiscussionListLimit(limit: number | null | 
   return Math.max(1, Math.min(limit ?? 100, 200))
 }
 
+export function normalizeWaypointTaskDiscussionMessageContent(content: string): string {
+  return content.trim()
+}
+
 export function buildWaypointTaskDiscussionMessageMetadata(
   task: WaypointTaskDiscussionMessageTask,
 ): WaypointTaskDiscussionMessageMetadata {

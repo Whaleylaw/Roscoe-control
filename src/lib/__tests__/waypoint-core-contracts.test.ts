@@ -106,6 +106,7 @@ describe('waypoint-core contracts export surface', () => {
     expect(core).toHaveProperty('buildWaypointTaskDiscussionMessageMetadata')
     expect(core).toHaveProperty('resolveWaypointTaskDiscussionStatus')
     expect(core).toHaveProperty('normalizeWaypointTaskDiscussionListLimit')
+    expect(core).toHaveProperty('normalizeWaypointTaskDiscussionMessageContent')
     expect(core.resolveWaypointTaskDiscussionStatus('closed')).toBe('closed')
     expect(core.resolveWaypointTaskDiscussionStatus('summarized')).toBe('summarized')
     expect(core.resolveWaypointTaskDiscussionStatus('active')).toBe('active')

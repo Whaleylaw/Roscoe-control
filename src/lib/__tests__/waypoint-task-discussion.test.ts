@@ -118,7 +118,7 @@ describe('waypoint task discussion service', () => {
         taskId,
         workspaceId: 1,
         from: 'Aaron',
-        content: 'Can you clarify the acceptance criteria?',
+        content: '  Can you clarify the acceptance criteria?  ',
         now: 9002,
       })
       const listed = listTaskDiscussion(db, { taskId, workspaceId: 1 })

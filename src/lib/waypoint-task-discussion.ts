@@ -8,6 +8,7 @@ import {
   buildWaypointTaskDiscussionMessageMetadata,
   resolveWaypointTaskDiscussionStatus,
   normalizeWaypointTaskDiscussionListLimit,
+  normalizeWaypointTaskDiscussionMessageContent,
   isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
   type WaypointTaskDiscussionAutoResponseMetadata,
@@ -136,7 +137,7 @@ export function postTaskDiscussionMessage(
   if (!discussion.enabled || !discussion.conversation_id) {
     throw new Error(`Waypoint discussion is not enabled for task ${input.taskId}`)
   }
-  const content = input.content.trim()
+  const content = normalizeWaypointTaskDiscussionMessageContent(input.content)
   if (!content) throw new Error('Discussion message content is required')
 
   const metadata = buildWaypointTaskDiscussionMessageMetadata({

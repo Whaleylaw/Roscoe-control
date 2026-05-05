@@ -187,6 +187,7 @@
 - ✅ Extracted task discussion message metadata builder to core (`buildWaypointTaskDiscussionMessageMetadata`) and re-wired Mission Control discussion message creation to delegate metadata shaping through `@waypoint/core`.
 - ✅ Extracted task discussion status resolution helper to core (`resolveWaypointTaskDiscussionStatus`) and re-wired Mission Control discussion start flow to preserve `closed`/`summarized` status via shared `@waypoint/core` behavior.
 - ✅ Extracted task discussion list limit normalization helper to core (`normalizeWaypointTaskDiscussionListLimit`) and re-wired Mission Control discussion listing flow to delegate limit clamping through `@waypoint/core`.
+- ✅ Extracted task discussion message content normalization helper to core (`normalizeWaypointTaskDiscussionMessageContent`) and re-wired Mission Control discussion posting flow to delegate content trimming through shared `@waypoint/core` behavior.
 
 **Acceptance:**
 - Existing autopilot command/API tests pass.
