@@ -6,6 +6,8 @@ export { parseWaypointCommand } from './commands/parser'
 export type { WaypointCommandName, WaypointParsedCommand } from './commands/parser'
 export { buildWaypointRouteKey } from './routes/route-key'
 export type { BuildWaypointRouteKeyInput } from './routes/route-key'
+export { normalizeWaypointScope, isWaypointSubjectType } from './routes/scope'
+export type { NormalizeWaypointScopeInput, WaypointScope } from './routes/scope'
 
 export { WaypointSubjectType } from './contracts/system'
 export type { WaypointSubjectType as WaypointSubjectTypeValue, IClock, IIdGenerator } from './contracts/system'

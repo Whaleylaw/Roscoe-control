@@ -1,5 +1,11 @@
 import type Database from 'better-sqlite3'
-import { buildWaypointRouteKey as buildWaypointRouteKeyFromCore } from '@waypoint/core'
+import {
+  buildWaypointRouteKey as buildWaypointRouteKeyFromCore,
+  isWaypointSubjectType as isWaypointSubjectTypeFromCore,
+  normalizeWaypointScope as normalizeWaypointScopeFromCore,
+  type NormalizeWaypointScopeInput,
+  type WaypointScope,
+} from '@waypoint/core'
 import { startWorkflowInstance } from './workflow-engine'
 
 export const WAYPOINT_SUBJECT_TYPES = {
@@ -29,19 +35,7 @@ export interface BuildWaypointRouteKeyInput {
   definitionVersion: string | number
 }
 
-export interface NormalizeWaypointScopeInput {
-  subjectType: string
-  subjectId: string | number
-  vars?: Record<string, unknown> | null
-}
-
-export interface WaypointScope {
-  projectId: number | null
-  workstreamId: number | null
-  milestoneId: number | null
-  phaseId: number | null
-  planId: number | null
-}
+export type { NormalizeWaypointScopeInput, WaypointScope } from '@waypoint/core'
 
 export interface GetWaypointStatusInput {
   projectId: number
@@ -91,44 +85,16 @@ export interface WaypointStatusReadModel {
   next_actions: string[]
 }
 
-const waypointSubjectTypeValues = new Set<string>([
-  ...Object.values(WAYPOINT_SUBJECT_TYPES),
-  ...Object.values(WAYPOINT_COMPAT_SUBJECT_TYPES),
-])
-
 export function isWaypointSubjectType(value: string): value is WaypointSubjectType {
-  return waypointSubjectTypeValues.has(value)
+  return isWaypointSubjectTypeFromCore(value)
 }
 
 export function buildWaypointRouteKey(input: BuildWaypointRouteKeyInput): string {
   return buildWaypointRouteKeyFromCore(input)
 }
 
-function numeric(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
-  return null
-}
-
-function subjectTypeIs(input: string, key: keyof typeof WAYPOINT_SUBJECT_TYPES): boolean {
-  return input === WAYPOINT_SUBJECT_TYPES[key] || input === WAYPOINT_COMPAT_SUBJECT_TYPES[key]
-}
-
 export function normalizeWaypointScope(input: NormalizeWaypointScopeInput): WaypointScope {
-  if (!isWaypointSubjectType(input.subjectType)) {
-    throw new Error(`Unsupported Waypoint subject type: ${input.subjectType}`)
-  }
-
-  const vars = input.vars ?? {}
-  const subjectId = numeric(input.subjectId)
-
-  return {
-    projectId: numeric(vars.project_id) ?? (subjectTypeIs(input.subjectType, 'project') ? subjectId : null),
-    workstreamId: numeric(vars.workstream_id) ?? (subjectTypeIs(input.subjectType, 'workstream') ? subjectId : null),
-    milestoneId: numeric(vars.milestone_id) ?? (subjectTypeIs(input.subjectType, 'milestone') ? subjectId : null),
-    phaseId: numeric(vars.phase_id) ?? (subjectTypeIs(input.subjectType, 'phase') ? subjectId : null),
-    planId: numeric(vars.plan_id) ?? (subjectTypeIs(input.subjectType, 'plan') ? subjectId : null),
-  }
+  return normalizeWaypointScopeFromCore(input)
 }
 
 export function startOrReuseWaypointRoute(

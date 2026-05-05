@@ -24,4 +24,23 @@ describe('waypoint-core contracts export surface', () => {
       }),
     ).toBe('waypoint:waypoint_plan:88:waypoint-plan-execution:v2')
   })
+
+  it('exports scope normalization helper with legacy subject compatibility', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('normalizeWaypointScope')
+    expect(
+      core.normalizeWaypointScope({
+        subjectType: 'gsd_plan',
+        subjectId: '88',
+        vars: { project_id: '42', milestone_id: '9', phase_id: '12' },
+      }),
+    ).toEqual({
+      projectId: 42,
+      workstreamId: null,
+      milestoneId: 9,
+      phaseId: 12,
+      planId: 88,
+    })
+  })
 })
