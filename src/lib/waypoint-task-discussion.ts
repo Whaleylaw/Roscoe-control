@@ -10,7 +10,7 @@ import {
   resolveWaypointTaskDiscussionAgent,
   normalizeWaypointTaskDiscussionListLimit,
   normalizeWaypointTaskDiscussionMessageContent,
-  isStrictWaypointTaskDiscussionConversationId,
+  buildWaypointTaskDiscussionStartMetadata,
   slugifyWaypointAgent,
   type WaypointTaskDiscussionAutoResponseMetadata,
   type WaypointTaskDiscussionMetadata,
@@ -92,20 +92,12 @@ export function startTaskDiscussion(
     existingAgent: existing.agent,
     assignedTo: task.assigned_to,
   })
-  const conversationId = isStrictWaypointTaskDiscussionConversationId(existing.conversation_id, task.id)
-    ? existing.conversation_id
-    : buildTaskDiscussionConversationId(task.id, agent)
-
-  const discussion: WaypointTaskDiscussionMetadata = {
-    ...existing,
-    enabled: true,
-    mode: 'agent_chat',
-    conversation_id: conversationId,
+  const discussion: WaypointTaskDiscussionMetadata = buildWaypointTaskDiscussionStartMetadata({
+    taskId: task.id,
+    now,
     agent,
-    started_at: existing.started_at ?? now,
-    status: resolveWaypointTaskDiscussionStatus(existing.status),
-    summary_comment_id: existing.summary_comment_id ?? null,
-  }
+    existing,
+  })
   const metadata = mergeTaskDiscussionMetadata(task.metadata, discussion)
   db.prepare('UPDATE tasks SET metadata = ?, updated_at = ? WHERE id = ? AND workspace_id = ?')
     .run(JSON.stringify(metadata), now, task.id, input.workspaceId)

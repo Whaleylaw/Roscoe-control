@@ -31,6 +31,7 @@ export {
   resolveWaypointTaskDiscussionAgent,
   normalizeWaypointTaskDiscussionListLimit,
   normalizeWaypointTaskDiscussionMessageContent,
+  buildWaypointTaskDiscussionStartMetadata,
 } from './discussion/metadata'
 export type {
   WaypointTaskDiscussionStatus,

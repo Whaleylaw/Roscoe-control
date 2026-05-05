@@ -189,6 +189,7 @@
 - ✅ Extracted task discussion list limit normalization helper to core (`normalizeWaypointTaskDiscussionListLimit`) and re-wired Mission Control discussion listing flow to delegate limit clamping through `@waypoint/core`.
 - ✅ Extracted task discussion message content normalization helper to core (`normalizeWaypointTaskDiscussionMessageContent`) and re-wired Mission Control discussion posting flow to delegate content trimming through shared `@waypoint/core` behavior.
 - ✅ Extracted task discussion agent resolution helper to core (`resolveWaypointTaskDiscussionAgent`) and re-wired Mission Control discussion start flow to delegate requested/existing/assigned agent fallback selection through shared `@waypoint/core` behavior.
+- ✅ Extracted task discussion start metadata builder to core (`buildWaypointTaskDiscussionStartMetadata`) and re-wired Mission Control discussion start flow to preserve strict conversation-id rewrite + status/start-time defaults via shared `@waypoint/core` behavior.
 
 **Acceptance:**
 - Existing autopilot command/API tests pass.

@@ -1,3 +1,8 @@
+import {
+  buildWaypointTaskDiscussionConversationId,
+  isStrictWaypointTaskDiscussionConversationId,
+} from './conversation'
+
 export type WaypointTaskDiscussionStatus = 'pending' | 'active' | 'summarized' | 'closed'
 
 export type WaypointTaskDiscussionAutoResponseMetadata = {
@@ -121,6 +126,28 @@ export function normalizeWaypointTaskDiscussionListLimit(limit: number | null | 
 
 export function normalizeWaypointTaskDiscussionMessageContent(content: string): string {
   return content.trim()
+}
+
+export function buildWaypointTaskDiscussionStartMetadata(input: {
+  taskId: number
+  now: number
+  agent: string
+  existing: WaypointTaskDiscussionMetadata
+}): WaypointTaskDiscussionMetadata {
+  const conversationId = isStrictWaypointTaskDiscussionConversationId(input.existing.conversation_id, input.taskId)
+    ? input.existing.conversation_id
+    : buildWaypointTaskDiscussionConversationId(input.taskId, input.agent)
+
+  return {
+    ...input.existing,
+    enabled: true,
+    mode: 'agent_chat',
+    conversation_id: conversationId,
+    agent: input.agent,
+    started_at: input.existing.started_at ?? input.now,
+    status: resolveWaypointTaskDiscussionStatus(input.existing.status),
+    summary_comment_id: input.existing.summary_comment_id ?? null,
+  }
 }
 
 export function buildWaypointTaskDiscussionMessageMetadata(
