@@ -219,6 +219,9 @@
 - ✅ Event bus adapter contract checks added (`src/lib/waypoint-adapter/__tests__/event-bus.test.ts`):
   - validates publish pass-through behavior
   - enforces explicit failure when `publish` is missing
+- ✅ Authz adapter contract checks added (`src/lib/waypoint-adapter/__tests__/authz.test.ts`):
+  - validates read/mutate access pass-through behavior
+  - enforces explicit failure when required authz methods are missing
 
 ---
 
