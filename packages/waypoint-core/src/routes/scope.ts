@@ -12,7 +12,7 @@ export interface WaypointScope {
   planId: number | null
 }
 
-const WAYPOINT_SUBJECT_TYPES = {
+export const WAYPOINT_SUBJECT_TYPES = {
   project: 'waypoint_project',
   workstream: 'waypoint_workstream',
   milestone: 'waypoint_milestone',
@@ -20,7 +20,7 @@ const WAYPOINT_SUBJECT_TYPES = {
   plan: 'waypoint_plan',
 } as const
 
-const WAYPOINT_COMPAT_SUBJECT_TYPES = {
+export const WAYPOINT_COMPAT_SUBJECT_TYPES = {
   project: 'gsd_project',
   workstream: 'gsd_workstream',
   milestone: 'gsd_milestone',

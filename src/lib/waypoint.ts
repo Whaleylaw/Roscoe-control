@@ -3,26 +3,14 @@ import {
   buildWaypointRouteKey as buildWaypointRouteKeyFromCore,
   isWaypointSubjectType as isWaypointSubjectTypeFromCore,
   normalizeWaypointScope as normalizeWaypointScopeFromCore,
+  WAYPOINT_SUBJECT_TYPES,
+  WAYPOINT_COMPAT_SUBJECT_TYPES,
   type NormalizeWaypointScopeInput,
   type WaypointScope,
 } from '@waypoint/core'
 import { startWorkflowInstance } from './workflow-engine'
 
-export const WAYPOINT_SUBJECT_TYPES = {
-  project: 'waypoint_project',
-  workstream: 'waypoint_workstream',
-  milestone: 'waypoint_milestone',
-  phase: 'waypoint_phase',
-  plan: 'waypoint_plan',
-} as const
-
-export const WAYPOINT_COMPAT_SUBJECT_TYPES = {
-  project: 'gsd_project',
-  workstream: 'gsd_workstream',
-  milestone: 'gsd_milestone',
-  phase: 'gsd_phase',
-  plan: 'gsd_plan',
-} as const
+export { WAYPOINT_SUBJECT_TYPES, WAYPOINT_COMPAT_SUBJECT_TYPES } from '@waypoint/core'
 
 export type WaypointSubjectType =
   | (typeof WAYPOINT_SUBJECT_TYPES)[keyof typeof WAYPOINT_SUBJECT_TYPES]

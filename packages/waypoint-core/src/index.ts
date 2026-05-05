@@ -6,7 +6,12 @@ export { parseWaypointCommand } from './commands/parser'
 export type { WaypointCommandName, WaypointParsedCommand } from './commands/parser'
 export { buildWaypointRouteKey } from './routes/route-key'
 export type { BuildWaypointRouteKeyInput } from './routes/route-key'
-export { normalizeWaypointScope, isWaypointSubjectType } from './routes/scope'
+export {
+  normalizeWaypointScope,
+  isWaypointSubjectType,
+  WAYPOINT_SUBJECT_TYPES,
+  WAYPOINT_COMPAT_SUBJECT_TYPES,
+} from './routes/scope'
 export type { NormalizeWaypointScopeInput, WaypointScope } from './routes/scope'
 export { hasWaypointAutopilotProgress } from './autopilot/progress'
 export type { WaypointAutopilotProgressInput } from './autopilot/progress'

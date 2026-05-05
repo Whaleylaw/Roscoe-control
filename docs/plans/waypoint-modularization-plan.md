@@ -307,6 +307,7 @@ pnpm exec vitest run packages/waypoint-core/src/__tests__/**/*.test.ts
 - ✅ Extracted route-key construction helper to core (`packages/waypoint-core/src/routes/route-key.ts`) and re-wired Mission Control `buildWaypointRouteKey` to delegate through `@waypoint/core`.
 - ✅ Added core export-surface contract coverage for route-key helper behavior in `src/lib/__tests__/waypoint-core-contracts.test.ts`.
 - ✅ Extracted scope normalization + subject-type guard into core (`packages/waypoint-core/src/routes/scope.ts`), re-wired Mission Control `normalizeWaypointScope`/`isWaypointSubjectType` to delegate through `@waypoint/core`, and added export-surface compatibility coverage for `gsd_*` aliases.
+- ✅ Promoted canonical + compatibility subject type constants to core exports (`WAYPOINT_SUBJECT_TYPES`, `WAYPOINT_COMPAT_SUBJECT_TYPES`) and re-wired Mission Control `src/lib/waypoint.ts` to source those constants directly from `@waypoint/core`.
 
 ---
 
