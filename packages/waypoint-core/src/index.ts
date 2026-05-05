@@ -15,6 +15,17 @@ export {
   buildWaypointTaskDiscussionConversationId,
   isStrictWaypointTaskDiscussionConversationId,
 } from './discussion/conversation'
+export {
+  parseWaypointJsonObject,
+  parseWaypointTaskDiscussionMetadata,
+  isWaypointTaskDiscussionEnabled,
+  mergeWaypointTaskDiscussionMetadata,
+} from './discussion/metadata'
+export type {
+  WaypointTaskDiscussionStatus,
+  WaypointTaskDiscussionAutoResponseMetadata,
+  WaypointTaskDiscussionMetadata,
+} from './discussion/metadata'
 
 export { WaypointSubjectType } from './contracts/system'
 export type { WaypointSubjectType as WaypointSubjectTypeValue, IClock, IIdGenerator } from './contracts/system'

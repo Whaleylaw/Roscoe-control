@@ -64,4 +64,31 @@ describe('waypoint-core contracts export surface', () => {
     expect(core.isStrictWaypointTaskDiscussionConversationId('task:123:discussion:gsd-researcher', 123)).toBe(true)
     expect(core.isStrictWaypointTaskDiscussionConversationId('legacy-conversation-id', 123)).toBe(false)
   })
+
+  it('exports task discussion metadata helpers', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('parseWaypointTaskDiscussionMetadata')
+    expect(core).toHaveProperty('mergeWaypointTaskDiscussionMetadata')
+    expect(core).toHaveProperty('isWaypointTaskDiscussionEnabled')
+
+    expect(core.parseWaypointTaskDiscussionMetadata('{bad json')).toEqual({ enabled: false })
+    expect(core.isWaypointTaskDiscussionEnabled({ waypoint: { discussion: { enabled: true } } })).toBe(true)
+    expect(
+      core.mergeWaypointTaskDiscussionMetadata(
+        { other: true },
+        { enabled: true, conversation_id: 'task:5:discussion:agent', status: 'active' },
+      ),
+    ).toMatchObject({
+      other: true,
+      waypoint: {
+        discussion: {
+          enabled: true,
+          conversation_id: 'task:5:discussion:agent',
+          status: 'active',
+          mode: 'agent_chat',
+        },
+      },
+    })
+  })
 })

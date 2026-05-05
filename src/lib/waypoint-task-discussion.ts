@@ -1,27 +1,22 @@
 import type Database from 'better-sqlite3'
 import {
   buildWaypointTaskDiscussionConversationId,
+  isWaypointTaskDiscussionEnabled,
+  mergeWaypointTaskDiscussionMetadata,
+  parseWaypointJsonObject,
+  parseWaypointTaskDiscussionMetadata,
   isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
+  type WaypointTaskDiscussionAutoResponseMetadata,
+  type WaypointTaskDiscussionMetadata,
+  type WaypointTaskDiscussionStatus,
 } from '@waypoint/core'
 import type { Message, Task } from '@/lib/db'
 
-export type WaypointTaskDiscussionStatus = 'pending' | 'active' | 'summarized' | 'closed'
-
-export type WaypointTaskDiscussionAutoResponseMetadata = {
-  enabled: boolean
-}
-
-export type WaypointTaskDiscussionMetadata = {
-  enabled: boolean
-  mode?: 'agent_chat'
-  conversation_id?: string
-  agent?: string
-  prompt?: string
-  started_at?: number
-  status?: WaypointTaskDiscussionStatus
-  summary_comment_id?: number | null
-  auto_response?: WaypointTaskDiscussionAutoResponseMetadata
+export type {
+  WaypointTaskDiscussionStatus,
+  WaypointTaskDiscussionAutoResponseMetadata,
+  WaypointTaskDiscussionMetadata,
 }
 
 type TaskDiscussionInput = {
@@ -56,64 +51,22 @@ export function buildTaskDiscussionConversationId(taskId: number, agent: string 
 }
 
 export function parseJsonObject(raw: unknown): Record<string, unknown> {
-  if (!raw) return {}
-  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
-  if (typeof raw !== 'string') return {}
-  try {
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
-  } catch {
-    return {}
-  }
-}
-
-function parseStatus(value: unknown): WaypointTaskDiscussionStatus | undefined {
-  return ['pending', 'active', 'summarized', 'closed'].includes(String(value))
-    ? value as WaypointTaskDiscussionStatus
-    : undefined
+  return parseWaypointJsonObject(raw)
 }
 
 export function parseTaskDiscussionMetadata(raw: unknown): WaypointTaskDiscussionMetadata {
-  const metadata = parseJsonObject(raw)
-  const waypoint = parseJsonObject(metadata.waypoint)
-  const discussion = parseJsonObject(waypoint.discussion)
-  if (Object.keys(discussion).length === 0) return { enabled: false }
-  const autoResponse = parseJsonObject(discussion.auto_response)
-  return {
-    enabled: discussion.enabled === true,
-    mode: discussion.mode === 'agent_chat' ? 'agent_chat' : undefined,
-    conversation_id: typeof discussion.conversation_id === 'string' ? discussion.conversation_id : undefined,
-    agent: typeof discussion.agent === 'string' ? discussion.agent : undefined,
-    prompt: typeof discussion.prompt === 'string' ? discussion.prompt : undefined,
-    started_at: typeof discussion.started_at === 'number' ? discussion.started_at : undefined,
-    status: parseStatus(discussion.status),
-    summary_comment_id: typeof discussion.summary_comment_id === 'number' ? discussion.summary_comment_id : null,
-    auto_response: autoResponse.enabled === true ? { enabled: true } : undefined,
-  }
+  return parseWaypointTaskDiscussionMetadata(raw)
 }
 
 export function isTaskDiscussionEnabled(raw: unknown): boolean {
-  return parseTaskDiscussionMetadata(raw).enabled
+  return isWaypointTaskDiscussionEnabled(raw)
 }
 
 export function mergeTaskDiscussionMetadata(
   raw: unknown,
   discussion: Omit<WaypointTaskDiscussionMetadata, 'mode'> & { mode?: 'agent_chat' },
 ): Record<string, unknown> {
-  const metadata = parseJsonObject(raw)
-  const waypoint = parseJsonObject(metadata.waypoint)
-  const existingDiscussion = parseJsonObject(waypoint.discussion)
-  return {
-    ...metadata,
-    waypoint: {
-      ...waypoint,
-      discussion: {
-        ...existingDiscussion,
-        mode: 'agent_chat',
-        ...discussion,
-      },
-    },
-  }
+  return mergeWaypointTaskDiscussionMetadata(raw, discussion)
 }
 
 function requireTask(db: Database.Database, taskId: number, workspaceId: number): Task {
