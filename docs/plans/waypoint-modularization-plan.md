@@ -178,6 +178,9 @@
 - Create: `packages/waypoint-core/src/autopilot/*.ts`
 - Modify: `src/lib/waypoint-autopilot.ts` adapter wrapper
 
+**Progress:**
+- ✅ Extracted host-agnostic autopilot progress helper to core (`packages/waypoint-core/src/autopilot/progress.ts`) and exported from `@waypoint/core`.
+
 **Acceptance:**
 - Existing autopilot command/API tests pass.
 

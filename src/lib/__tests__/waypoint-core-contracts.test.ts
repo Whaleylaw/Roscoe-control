@@ -43,4 +43,13 @@ describe('waypoint-core contracts export surface', () => {
       planId: 88,
     })
   })
+
+  it('exports autopilot progress helper', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('hasWaypointAutopilotProgress')
+    expect(core.hasWaypointAutopilotProgress({ timerCompleted: [], createdCounts: [0, 0] })).toBe(false)
+    expect(core.hasWaypointAutopilotProgress({ timerCompleted: [1], createdCounts: [0, 0] })).toBe(true)
+    expect(core.hasWaypointAutopilotProgress({ timerCompleted: [], createdCounts: [0, 2] })).toBe(true)
+  })
 })

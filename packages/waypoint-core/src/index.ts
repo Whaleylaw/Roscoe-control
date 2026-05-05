@@ -8,6 +8,8 @@ export { buildWaypointRouteKey } from './routes/route-key'
 export type { BuildWaypointRouteKeyInput } from './routes/route-key'
 export { normalizeWaypointScope, isWaypointSubjectType } from './routes/scope'
 export type { NormalizeWaypointScopeInput, WaypointScope } from './routes/scope'
+export { hasWaypointAutopilotProgress } from './autopilot/progress'
+export type { WaypointAutopilotProgressInput } from './autopilot/progress'
 
 export { WaypointSubjectType } from './contracts/system'
 export type { WaypointSubjectType as WaypointSubjectTypeValue, IClock, IIdGenerator } from './contracts/system'
