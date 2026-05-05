@@ -10,4 +10,18 @@ describe('waypoint-core contracts export surface', () => {
     // runtime interface modules should be exported once M2.1 is complete
     expect(core).toHaveProperty('WaypointSubjectType')
   })
+
+  it('exports route key helper with stable version normalization', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('buildWaypointRouteKey')
+    expect(
+      core.buildWaypointRouteKey({
+        subjectType: 'waypoint_plan',
+        subjectId: 88,
+        definitionSlug: 'waypoint-plan-execution',
+        definitionVersion: 'v2',
+      }),
+    ).toBe('waypoint:waypoint_plan:88:waypoint-plan-execution:v2')
+  })
 })

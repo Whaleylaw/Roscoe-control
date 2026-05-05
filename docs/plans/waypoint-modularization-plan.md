@@ -297,6 +297,10 @@ pnpm exec vitest run packages/waypoint-core/src/__tests__/**/*.test.ts
 4. M1.2 command parser extraction.
 5. M2.1 contract interfaces draft with unit tests.
 
+### Incremental progress log
+- ✅ Extracted route-key construction helper to core (`packages/waypoint-core/src/routes/route-key.ts`) and re-wired Mission Control `buildWaypointRouteKey` to delegate through `@waypoint/core`.
+- ✅ Added core export-surface contract coverage for route-key helper behavior in `src/lib/__tests__/waypoint-core-contracts.test.ts`.
+
 ---
 
 ## Operator Notes

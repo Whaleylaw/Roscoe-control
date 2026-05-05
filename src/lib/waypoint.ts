@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+import { buildWaypointRouteKey as buildWaypointRouteKeyFromCore } from '@waypoint/core'
 import { startWorkflowInstance } from './workflow-engine'
 
 export const WAYPOINT_SUBJECT_TYPES = {
@@ -100,13 +101,7 @@ export function isWaypointSubjectType(value: string): value is WaypointSubjectTy
 }
 
 export function buildWaypointRouteKey(input: BuildWaypointRouteKeyInput): string {
-  return [
-    'waypoint',
-    input.subjectType,
-    String(input.subjectId),
-    input.definitionSlug,
-    `v${String(input.definitionVersion).replace(/^v/i, '')}`,
-  ].join(':')
+  return buildWaypointRouteKeyFromCore(input)
 }
 
 function numeric(value: unknown): number | null {
