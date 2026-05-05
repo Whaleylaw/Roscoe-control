@@ -216,6 +216,9 @@
 - ✅ Initial coverage added for adapter assembly (`src/lib/waypoint-adapter/__tests__/index.test.ts`):
   - validates dependency pass-through identity
   - enforces explicit failure on missing required dependency
+- ✅ Event bus adapter contract checks added (`src/lib/waypoint-adapter/__tests__/event-bus.test.ts`):
+  - validates publish pass-through behavior
+  - enforces explicit failure when `publish` is missing
 
 ---
 
