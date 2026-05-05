@@ -222,6 +222,9 @@
 - ✅ Authz adapter contract checks added (`src/lib/waypoint-adapter/__tests__/authz.test.ts`):
   - validates read/mutate access pass-through behavior
   - enforces explicit failure when required authz methods are missing
+- ✅ Recipe runtime adapter contract checks added (`src/lib/waypoint-adapter/__tests__/recipe-runtime.test.ts`):
+  - validates start/get/cancel pass-through behavior
+  - enforces explicit failure when required runtime methods are missing
 
 ---
 
