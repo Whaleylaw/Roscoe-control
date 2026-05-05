@@ -1,0 +1,7 @@
+{
+  "name": "waypoint-host-minimal-example",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Minimal external host example demonstrating @waypoint/core portability.",
+  "type": "module"
+}
