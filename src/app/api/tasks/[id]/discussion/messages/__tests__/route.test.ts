@@ -8,15 +8,16 @@ let db: Database.Database
 
 const broadcast = vi.fn()
 const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
+const requireRoleMock = vi.fn(() => ({
+  user: { id: 1, username: 'operator', display_name: 'Operator', role: 'operator', workspace_id: 1, tenant_id: 1 },
+}))
 
 vi.mock('@/lib/db', () => ({
   getDatabase: () => db,
 }))
 
 vi.mock('@/lib/auth', () => ({
-  requireRole: vi.fn(() => ({
-    user: { id: 1, username: 'operator', display_name: 'Operator', role: 'operator', workspace_id: 1, tenant_id: 1 },
-  })),
+  requireRole: (...args: unknown[]) => requireRoleMock(...(args as [])),
 }))
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -61,6 +62,10 @@ beforeEach(() => {
   vi.resetModules()
   mutationLimiterMock.mockReset()
   mutationLimiterMock.mockReturnValue(null)
+  requireRoleMock.mockReset()
+  requireRoleMock.mockReturnValue({
+    user: { id: 1, username: 'operator', display_name: 'Operator', role: 'operator', workspace_id: 1, tenant_id: 1 },
+  })
   db = new Database(':memory:')
   runMigrations(db)
   broadcast.mockReset()
@@ -335,5 +340,181 @@ describe('POST /api/tasks/:id/discussion/messages', () => {
       .prepare('SELECT content FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1')
       .get(started.discussion.conversation_id) as { content: string } | undefined
     expect(persisted?.content).toBe('Keep message even if dispatch fails')
+  })
+
+  describe('agent authorship + loop prevention (W1)', () => {
+    function reqWithHeaders(
+      path: string,
+      body: Record<string, unknown>,
+      headers: Record<string, string>,
+    ) {
+      return new NextRequest(`http://localhost${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+      })
+    }
+
+    it('accepts agent-authored message with valid service token and bypasses user auth', async () => {
+      vi.stubEnv('WAYPOINT_AUTORESPONSE_SERVICE_TOKEN', 'svc-secret-xyz')
+      const taskId = seedTask()
+      startTaskDiscussion(db, {
+        taskId,
+        workspaceId: 1,
+        actor: 'operator',
+        agent: 'Aegis',
+      })
+
+      // Simulate user auth failure — service token path must NOT require it
+      requireRoleMock.mockReturnValue({ error: 'Forbidden', status: 403 } as any)
+
+      const { POST } = await loadRoute()
+      const res = await POST(
+        reqWithHeaders(
+          `/api/tasks/${taskId}/discussion/messages`,
+          { content: 'Hi from agent', authored_by: 'agent', from: 'Aegis' },
+          { 'X-Waypoint-Service-Token': 'svc-secret-xyz' },
+        ),
+        { params: Promise.resolve({ id: String(taskId) }) },
+      )
+
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body).toMatchObject({
+        ok: true,
+        action: 'post_discussion_message',
+      })
+      expect(body.message.metadata).toMatchObject({
+        kind: 'waypoint_task_discussion',
+        authored_by: 'agent',
+        agent: 'Aegis',
+      })
+    })
+
+    it('rejects agent-authored body with 401 when service token is missing', async () => {
+      vi.stubEnv('WAYPOINT_AUTORESPONSE_SERVICE_TOKEN', 'svc-secret-xyz')
+      const taskId = seedTask()
+      startTaskDiscussion(db, {
+        taskId,
+        workspaceId: 1,
+        actor: 'operator',
+        agent: 'Aegis',
+      })
+
+      const { POST } = await loadRoute()
+      const res = await POST(
+        req(`/api/tasks/${taskId}/discussion/messages`, {
+          content: 'pretend agent',
+          authored_by: 'agent',
+          from: 'Aegis',
+        }),
+        { params: Promise.resolve({ id: String(taskId) }) },
+      )
+
+      expect(res.status).toBe(401)
+      await expect(res.json()).resolves.toEqual({
+        ok: false,
+        action: 'error',
+        error: 'Service token required for agent-authored messages',
+      })
+      expect(broadcast).not.toHaveBeenCalled()
+    })
+
+    it('rejects agent-authored body with 401 when service token is wrong', async () => {
+      vi.stubEnv('WAYPOINT_AUTORESPONSE_SERVICE_TOKEN', 'svc-secret-xyz')
+      const taskId = seedTask()
+      startTaskDiscussion(db, {
+        taskId,
+        workspaceId: 1,
+        actor: 'operator',
+        agent: 'Aegis',
+      })
+
+      const { POST } = await loadRoute()
+      const res = await POST(
+        reqWithHeaders(
+          `/api/tasks/${taskId}/discussion/messages`,
+          { content: 'nope', authored_by: 'agent', from: 'Aegis' },
+          { 'X-Waypoint-Service-Token': 'wrong-secret' },
+        ),
+        { params: Promise.resolve({ id: String(taskId) }) },
+      )
+
+      expect(res.status).toBe(401)
+      await expect(res.json()).resolves.toEqual({
+        ok: false,
+        action: 'error',
+        error: 'Service token required for agent-authored messages',
+      })
+      expect(broadcast).not.toHaveBeenCalled()
+    })
+
+    it('does not retrigger auto-response event for agent-authored messages even when metadata and global are enabled', async () => {
+      vi.stubEnv('WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED', '1')
+      vi.stubEnv('WAYPOINT_AUTORESPONSE_SERVICE_TOKEN', 'svc-secret-xyz')
+      const taskId = seedTask()
+      const started = startTaskDiscussion(db, {
+        taskId,
+        workspaceId: 1,
+        actor: 'operator',
+        agent: 'Aegis',
+      })
+
+      // Enable auto-response metadata on the task
+      const metadata = JSON.parse(started.task.metadata || '{}')
+      metadata.waypoint = metadata.waypoint || {}
+      metadata.waypoint.discussion = {
+        ...(metadata.waypoint.discussion || {}),
+        auto_response: { enabled: true },
+      }
+      db.prepare('UPDATE tasks SET metadata = ?, updated_at = unixepoch() WHERE id = ?').run(
+        JSON.stringify(metadata),
+        taskId,
+      )
+
+      const { POST } = await loadRoute()
+      const res = await POST(
+        reqWithHeaders(
+          `/api/tasks/${taskId}/discussion/messages`,
+          { content: 'Agent reply', authored_by: 'agent', from: 'Aegis' },
+          { 'X-Waypoint-Service-Token': 'svc-secret-xyz' },
+        ),
+        { params: Promise.resolve({ id: String(taskId) }) },
+      )
+
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body.auto_response).toEqual({ requested: false, agent: 'Aegis', reason: 'agent_authored' })
+
+      // chat.message broadcast should still happen
+      expect(broadcast).toHaveBeenCalledWith('chat.message', expect.any(Object))
+      // but auto_response event MUST NOT fire for agent-authored messages
+      const calls = broadcast.mock.calls.map((c) => c[0])
+      expect(calls).not.toContain('waypoint.discussion.auto_response.requested')
+    })
+
+    it('rejects invalid authored_by values with normalized validation details', async () => {
+      const taskId = seedTask()
+      startTaskDiscussion(db, {
+        taskId,
+        workspaceId: 1,
+        actor: 'operator',
+        agent: 'Aegis',
+      })
+
+      const { POST } = await loadRoute()
+      const res = await POST(
+        req(`/api/tasks/${taskId}/discussion/messages`, { content: 'hi', authored_by: 'system' }),
+        { params: Promise.resolve({ id: String(taskId) }) },
+      )
+
+      expect(res.status).toBe(400)
+      const body = await res.json()
+      expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid request body' })
+      expect(body.details?.[0]).toMatchObject({
+        code: expect.any(String),
+        path: 'authored_by',
+      })
+    })
   })
 })
