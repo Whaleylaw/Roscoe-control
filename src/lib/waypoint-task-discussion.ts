@@ -1,4 +1,8 @@
 import type Database from 'better-sqlite3'
+import {
+  buildWaypointTaskDiscussionConversationId,
+  slugifyWaypointAgent,
+} from '@waypoint/core'
 import type { Message, Task } from '@/lib/db'
 
 export type WaypointTaskDiscussionStatus = 'pending' | 'active' | 'summarized' | 'closed'
@@ -43,15 +47,11 @@ type TaskDiscussionListInput = {
 }
 
 export function slugifyAgent(value: string | null | undefined): string {
-  return (value || 'agent')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'agent'
+  return slugifyWaypointAgent(value)
 }
 
 export function buildTaskDiscussionConversationId(taskId: number, agent: string | null | undefined): string {
-  return `task:${taskId}:discussion:${slugifyAgent(agent)}`
+  return buildWaypointTaskDiscussionConversationId(taskId, agent)
 }
 
 function isStrictTaskDiscussionConversationId(value: unknown, taskId: number): value is string {

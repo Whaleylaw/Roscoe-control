@@ -10,6 +10,10 @@ export { normalizeWaypointScope, isWaypointSubjectType } from './routes/scope'
 export type { NormalizeWaypointScopeInput, WaypointScope } from './routes/scope'
 export { hasWaypointAutopilotProgress } from './autopilot/progress'
 export type { WaypointAutopilotProgressInput } from './autopilot/progress'
+export {
+  slugifyWaypointAgent,
+  buildWaypointTaskDiscussionConversationId,
+} from './discussion/conversation'
 
 export { WaypointSubjectType } from './contracts/system'
 export type { WaypointSubjectType as WaypointSubjectTypeValue, IClock, IIdGenerator } from './contracts/system'

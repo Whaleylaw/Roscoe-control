@@ -52,4 +52,13 @@ describe('waypoint-core contracts export surface', () => {
     expect(core.hasWaypointAutopilotProgress({ timerCompleted: [1], createdCounts: [0, 0] })).toBe(true)
     expect(core.hasWaypointAutopilotProgress({ timerCompleted: [], createdCounts: [0, 2] })).toBe(true)
   })
+
+  it('exports task discussion conversation id helpers', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('slugifyWaypointAgent')
+    expect(core).toHaveProperty('buildWaypointTaskDiscussionConversationId')
+    expect(core.slugifyWaypointAgent('  GSD Researcher  ')).toBe('gsd-researcher')
+    expect(core.buildWaypointTaskDiscussionConversationId(123, 'GSD Researcher')).toBe('task:123:discussion:gsd-researcher')
+  })
 })
