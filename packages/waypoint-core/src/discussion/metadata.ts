@@ -76,3 +76,10 @@ export function mergeWaypointTaskDiscussionMetadata(
     },
   }
 }
+
+export function parseWaypointWorkflowMetadataNumber(raw: unknown, key: string): number | null {
+  const metadata = parseWaypointJsonObject(raw)
+  const workflow = parseWaypointJsonObject(metadata.workflow)
+  const value = workflow[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}

@@ -183,6 +183,7 @@
 - ✅ Extracted task-discussion conversation-id helpers to core (`packages/waypoint-core/src/discussion/conversation.ts`), re-wired Mission Control `slugifyAgent`/`buildTaskDiscussionConversationId` to delegate through `@waypoint/core`, and added export-surface contract coverage.
 - ✅ Extracted strict task-discussion conversation-id validator to core (`isStrictWaypointTaskDiscussionConversationId`) and re-wired Mission Control discussion start flow to use the shared core rule.
 - ✅ Extracted task-discussion metadata parsing/merge/enabled helpers to core (`packages/waypoint-core/src/discussion/metadata.ts`) and re-wired Mission Control task-discussion metadata helpers to delegate through `@waypoint/core`.
+- ✅ Extracted workflow metadata numeric parsing helper to core (`parseWaypointWorkflowMetadataNumber`) and re-wired Mission Control task discussion message metadata construction to source workflow IDs via `@waypoint/core`.
 
 **Acceptance:**
 - Existing autopilot command/API tests pass.

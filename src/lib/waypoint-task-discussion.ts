@@ -5,6 +5,7 @@ import {
   mergeWaypointTaskDiscussionMetadata,
   parseWaypointJsonObject,
   parseWaypointTaskDiscussionMetadata,
+  parseWaypointWorkflowMetadataNumber,
   isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
   type WaypointTaskDiscussionAutoResponseMetadata,
@@ -141,8 +142,8 @@ export function postTaskDiscussionMessage(
     task_id: task.id,
     task_title: task.title,
     project_id: task.project_id ?? null,
-    workflow_instance_id: parseWorkflowMetadataNumber(task.metadata, 'workflow_instance_id'),
-    workflow_node_instance_id: parseWorkflowMetadataNumber(task.metadata, 'node_instance_id'),
+    workflow_instance_id: parseWaypointWorkflowMetadataNumber(task.metadata, 'workflow_instance_id'),
+    workflow_node_instance_id: parseWaypointWorkflowMetadataNumber(task.metadata, 'node_instance_id'),
     waypoint: true,
   }
   const result = db.prepare(`
@@ -162,9 +163,3 @@ export function postTaskDiscussionMessage(
   return { task, discussion, message }
 }
 
-function parseWorkflowMetadataNumber(raw: unknown, key: string): number | null {
-  const metadata = parseJsonObject(raw)
-  const workflow = parseJsonObject(metadata.workflow)
-  const value = workflow[key]
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}

@@ -71,6 +71,7 @@ describe('waypoint-core contracts export surface', () => {
     expect(core).toHaveProperty('parseWaypointTaskDiscussionMetadata')
     expect(core).toHaveProperty('mergeWaypointTaskDiscussionMetadata')
     expect(core).toHaveProperty('isWaypointTaskDiscussionEnabled')
+    expect(core).toHaveProperty('parseWaypointWorkflowMetadataNumber')
 
     expect(core.parseWaypointTaskDiscussionMetadata('{bad json')).toEqual({ enabled: false })
     expect(core.isWaypointTaskDiscussionEnabled({ waypoint: { discussion: { enabled: true } } })).toBe(true)
@@ -90,5 +91,12 @@ describe('waypoint-core contracts export surface', () => {
         },
       },
     })
+    expect(
+      core.parseWaypointWorkflowMetadataNumber(
+        { workflow: { workflow_instance_id: 42, node_instance_id: 'invalid' } },
+        'workflow_instance_id',
+      ),
+    ).toBe(42)
+    expect(core.parseWaypointWorkflowMetadataNumber({ workflow: { workflow_instance_id: '42' } }, 'workflow_instance_id')).toBeNull()
   })
 })
