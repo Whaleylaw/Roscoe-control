@@ -27,6 +27,7 @@ export {
   mergeWaypointTaskDiscussionMetadata,
   parseWaypointWorkflowMetadataNumber,
   buildWaypointTaskDiscussionMessageMetadata,
+  resolveWaypointTaskDiscussionStatus,
 } from './discussion/metadata'
 export type {
   WaypointTaskDiscussionStatus,

@@ -6,6 +6,7 @@ import {
   parseWaypointJsonObject,
   parseWaypointTaskDiscussionMetadata,
   buildWaypointTaskDiscussionMessageMetadata,
+  resolveWaypointTaskDiscussionStatus,
   isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
   type WaypointTaskDiscussionAutoResponseMetadata,
@@ -95,7 +96,7 @@ export function startTaskDiscussion(
     conversation_id: conversationId,
     agent,
     started_at: existing.started_at ?? now,
-    status: existing.status === 'closed' || existing.status === 'summarized' ? existing.status : 'active',
+    status: resolveWaypointTaskDiscussionStatus(existing.status),
     summary_comment_id: existing.summary_comment_id ?? null,
   }
   const metadata = mergeTaskDiscussionMetadata(task.metadata, discussion)

@@ -104,6 +104,11 @@ describe('waypoint-core contracts export surface', () => {
     const core = await import('@waypoint/core')
 
     expect(core).toHaveProperty('buildWaypointTaskDiscussionMessageMetadata')
+    expect(core).toHaveProperty('resolveWaypointTaskDiscussionStatus')
+    expect(core.resolveWaypointTaskDiscussionStatus('closed')).toBe('closed')
+    expect(core.resolveWaypointTaskDiscussionStatus('summarized')).toBe('summarized')
+    expect(core.resolveWaypointTaskDiscussionStatus('active')).toBe('active')
+    expect(core.resolveWaypointTaskDiscussionStatus(undefined)).toBe('active')
     expect(
       core.buildWaypointTaskDiscussionMessageMetadata({
         id: 77,

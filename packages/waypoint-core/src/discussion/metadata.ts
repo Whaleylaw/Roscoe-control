@@ -101,6 +101,12 @@ export function parseWaypointWorkflowMetadataNumber(raw: unknown, key: string): 
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+export function resolveWaypointTaskDiscussionStatus(
+  status: WaypointTaskDiscussionStatus | null | undefined,
+): WaypointTaskDiscussionStatus {
+  return status === 'closed' || status === 'summarized' ? status : 'active'
+}
+
 export function buildWaypointTaskDiscussionMessageMetadata(
   task: WaypointTaskDiscussionMessageTask,
 ): WaypointTaskDiscussionMessageMetadata {
