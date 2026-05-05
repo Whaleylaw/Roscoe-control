@@ -28,6 +28,7 @@ export {
   parseWaypointWorkflowMetadataNumber,
   buildWaypointTaskDiscussionMessageMetadata,
   resolveWaypointTaskDiscussionStatus,
+  resolveWaypointTaskDiscussionAgent,
   normalizeWaypointTaskDiscussionListLimit,
   normalizeWaypointTaskDiscussionMessageContent,
 } from './discussion/metadata'

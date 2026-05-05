@@ -107,6 +107,14 @@ export function resolveWaypointTaskDiscussionStatus(
   return status === 'closed' || status === 'summarized' ? status : 'active'
 }
 
+export function resolveWaypointTaskDiscussionAgent(input: {
+  requestedAgent?: string | null
+  existingAgent?: string | null
+  assignedTo?: string | null
+}): string {
+  return input.requestedAgent?.trim() || input.existingAgent?.trim() || input.assignedTo?.trim() || 'agent'
+}
+
 export function normalizeWaypointTaskDiscussionListLimit(limit: number | null | undefined): number {
   return Math.max(1, Math.min(limit ?? 100, 200))
 }

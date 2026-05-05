@@ -7,6 +7,7 @@ import {
   parseWaypointTaskDiscussionMetadata,
   buildWaypointTaskDiscussionMessageMetadata,
   resolveWaypointTaskDiscussionStatus,
+  resolveWaypointTaskDiscussionAgent,
   normalizeWaypointTaskDiscussionListLimit,
   normalizeWaypointTaskDiscussionMessageContent,
   isStrictWaypointTaskDiscussionConversationId,
@@ -86,7 +87,11 @@ export function startTaskDiscussion(
   const now = input.now ?? Math.floor(Date.now() / 1000)
   const task = requireTask(db, input.taskId, input.workspaceId)
   const existing = parseTaskDiscussionMetadata(task.metadata)
-  const agent = input.agent?.trim() || existing.agent || task.assigned_to || 'agent'
+  const agent = resolveWaypointTaskDiscussionAgent({
+    requestedAgent: input.agent,
+    existingAgent: existing.agent,
+    assignedTo: task.assigned_to,
+  })
   const conversationId = isStrictWaypointTaskDiscussionConversationId(existing.conversation_id, task.id)
     ? existing.conversation_id
     : buildTaskDiscussionConversationId(task.id, agent)
