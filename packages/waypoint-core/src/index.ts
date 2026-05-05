@@ -13,6 +13,7 @@ export type { WaypointAutopilotProgressInput } from './autopilot/progress'
 export {
   slugifyWaypointAgent,
   buildWaypointTaskDiscussionConversationId,
+  isStrictWaypointTaskDiscussionConversationId,
 } from './discussion/conversation'
 
 export { WaypointSubjectType } from './contracts/system'

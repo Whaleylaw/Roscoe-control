@@ -12,3 +12,8 @@ export function buildWaypointTaskDiscussionConversationId(
 ): string {
   return `task:${taskId}:discussion:${slugifyWaypointAgent(agent)}`
 }
+
+export function isStrictWaypointTaskDiscussionConversationId(value: unknown, taskId: number): value is string {
+  if (typeof value !== 'string') return false
+  return value.startsWith(`task:${taskId}:discussion:`) && value.length > `task:${taskId}:discussion:`.length
+}

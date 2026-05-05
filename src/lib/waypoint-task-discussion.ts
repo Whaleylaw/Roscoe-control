@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import {
   buildWaypointTaskDiscussionConversationId,
+  isStrictWaypointTaskDiscussionConversationId,
   slugifyWaypointAgent,
 } from '@waypoint/core'
 import type { Message, Task } from '@/lib/db'
@@ -52,11 +53,6 @@ export function slugifyAgent(value: string | null | undefined): string {
 
 export function buildTaskDiscussionConversationId(taskId: number, agent: string | null | undefined): string {
   return buildWaypointTaskDiscussionConversationId(taskId, agent)
-}
-
-function isStrictTaskDiscussionConversationId(value: unknown, taskId: number): value is string {
-  if (typeof value !== 'string') return false
-  return value.startsWith(`task:${taskId}:discussion:`) && value.length > `task:${taskId}:discussion:`.length
 }
 
 export function parseJsonObject(raw: unknown): Record<string, unknown> {
@@ -134,7 +130,7 @@ export function startTaskDiscussion(
   const task = requireTask(db, input.taskId, input.workspaceId)
   const existing = parseTaskDiscussionMetadata(task.metadata)
   const agent = input.agent?.trim() || existing.agent || task.assigned_to || 'agent'
-  const conversationId = isStrictTaskDiscussionConversationId(existing.conversation_id, task.id)
+  const conversationId = isStrictWaypointTaskDiscussionConversationId(existing.conversation_id, task.id)
     ? existing.conversation_id
     : buildTaskDiscussionConversationId(task.id, agent)
 

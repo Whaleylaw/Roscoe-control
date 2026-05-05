@@ -58,7 +58,10 @@ describe('waypoint-core contracts export surface', () => {
 
     expect(core).toHaveProperty('slugifyWaypointAgent')
     expect(core).toHaveProperty('buildWaypointTaskDiscussionConversationId')
+    expect(core).toHaveProperty('isStrictWaypointTaskDiscussionConversationId')
     expect(core.slugifyWaypointAgent('  GSD Researcher  ')).toBe('gsd-researcher')
     expect(core.buildWaypointTaskDiscussionConversationId(123, 'GSD Researcher')).toBe('task:123:discussion:gsd-researcher')
+    expect(core.isStrictWaypointTaskDiscussionConversationId('task:123:discussion:gsd-researcher', 123)).toBe(true)
+    expect(core.isStrictWaypointTaskDiscussionConversationId('legacy-conversation-id', 123)).toBe(false)
   })
 })
