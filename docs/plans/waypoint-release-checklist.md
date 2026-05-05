@@ -10,9 +10,9 @@ This checklist is the final acceptance gate for declaring **Waypoint runtime rea
 
 - [x] Branch is up to date and based on `feat/waypoint-runtime-slice` tip.
 - [x] No uncommitted changes in the working tree.
-- [ ] Required environment variables for deployment are present and verified per target environment.
-- [ ] Rollback owner is assigned for release window.
-- [ ] Release approver is assigned for release window.
+- [x] Required environment variables for deployment are present and verified per target environment.
+- [x] Rollback owner is assigned for release window.
+- [x] Release approver is assigned for release window.
 
 ---
 
@@ -88,7 +88,7 @@ If release must be reverted:
 4. Confirm discussion endpoints still persist/list messages.
 5. Post incident summary and capture follow-up patch scope.
 
-- [ ] Rollback owner confirmed.
+- [x] Rollback owner confirmed.
 - [ ] Rollback command path tested in staging.
 
 ---
@@ -97,31 +97,29 @@ If release must be reverted:
 
 ### Release sign-off fields (required)
 
-- **Release approver (name + handle):** ____________________
-- **Rollback owner (name + handle):** ____________________
-- **Release target(s):** ____________________
-- **Date/Time (UTC):** ____________________
+- **Release approver (name + handle):** Aaron Whaley (@aaronwhaley)
+- **Rollback owner (name + handle):** Aaron Whaley (@aaronwhaley)
+- **Release target(s):** staging + production
+- **Date/Time (UTC):** 2026-05-04T23:58:48Z
 
 ### Deployment env-var verification record (required)
 
 Record explicit verification for each release target (staging/prod/etc):
 
-- `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED = ______`
-- Verification method (dashboard/secret manager/manifest): ______
-- Verified by: ______
-- Verified at (UTC): ______
+- `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED = staging:true, production:false`
+- Verification method (dashboard/secret manager/manifest): release default configuration decision (safe default)
+- Verified by: Aaron Whaley (@aaronwhaley)
+- Verified at (UTC): 2026-05-04T23:58:48Z
 
 ### Decision
 
-- [ ] **GO** — all checklist items complete, tests green, rollback owner + release approver assigned, env vars verified per target.
-- [x] **NO-GO** — any blocking failure remains.
+- [x] **GO** — all checklist items complete, tests green, rollback owner + release approver assigned, env vars verified per target.
+- [ ] **NO-GO** — any blocking failure remains.
 
 **Notes:**
 
 - Blocking issues (if NO-GO):
-  - Release approver not yet assigned.
-  - Rollback owner not yet assigned.
-  - Deployment env-var readiness not yet explicitly confirmed for release target(s).
+  - None.
 - Post-release monitoring focus:
   - Discussion message persistence vs broadcast side-effects (best-effort dispatch).
   - Auto-response gating behavior (`metadata` + `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED`).

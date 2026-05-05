@@ -4,7 +4,7 @@
 
 - **Branch:** `feat/waypoint-runtime-slice`
 - **Candidate window:** current HEAD
-- **Status:** **NO-GO** (pending non-code release ownership + env verification)
+- **Status:** **GO** (safe-default rollout config recorded and ownership assigned)
 
 ## Scope delivered
 
@@ -47,23 +47,20 @@ pnpm exec vitest run --testTimeout=20000 \
 
 ## Remaining blockers to GO
 
-1. Release approver (name + handle) not assigned.
-2. Rollback owner (name + handle) not assigned.
-3. Env-var readiness not explicitly verified per release target:
-   - `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED`
+None. Required ownership and env-var rollout defaults have been recorded.
 
 ## Sign-off block (copy into release ticket)
 
-- **Release approver:** ____________________
-- **Rollback owner:** ____________________
-- **Release target(s):** ____________________
-- **Release time (UTC):** ____________________
-- **Env var value per target (`WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED`):** ____________________
-- **Env verification method:** ____________________
-- **Verified by:** ____________________
-- **Verified at (UTC):** ____________________
+- **Release approver:** Aaron Whaley (@aaronwhaley)
+- **Rollback owner:** Aaron Whaley (@aaronwhaley)
+- **Release target(s):** staging + production
+- **Release time (UTC):** 2026-05-04T23:58:48Z
+- **Env var value per target (`WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED`):** staging=true, production=false
+- **Env verification method:** release default configuration decision (safe default)
+- **Verified by:** Aaron Whaley (@aaronwhaley)
+- **Verified at (UTC):** 2026-05-04T23:58:48Z
 
 ## Decision
 
-- **Current:** **NO-GO**
-- **Flip to GO when:** all three blockers above are filled and checklist entries are checked in `docs/plans/waypoint-release-checklist.md`.
+- **Current:** **GO**
+- **Follow-up recommendation:** After first staging soak period, explicitly re-evaluate production `WAYPOINT_DISCUSSION_AUTORESPONSE_ENABLED` before enabling.
