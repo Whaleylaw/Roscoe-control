@@ -6,6 +6,7 @@ import { mutationLimiter } from '@/lib/rate-limit'
 import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
 import { eventBus } from '@/lib/event-bus'
 import { postTaskDiscussionMessage } from '@/lib/waypoint-task-discussion'
+import { resolveWaypointDiscussionAutoResponse } from '@waypoint/core'
 
 const Body = z.object({
   content: z.string().trim().min(1),
@@ -68,23 +69,13 @@ export async function POST(
       // best-effort broadcast; do not fail message persistence on transport errors
     }
 
-    const hasAgent = typeof result.discussion.agent === 'string' && result.discussion.agent.trim().length > 0
-    const metadataOptIn = result.discussion.auto_response?.enabled === true
-    const globalOptIn = isAutoResponseGloballyEnabled()
-    const autoResponseRequested = globalOptIn && metadataOptIn && hasAgent
-    const autoResponseSkipReason = metadataOptIn
-      ? (globalOptIn ? (hasAgent ? undefined : 'missing_agent') : 'global_disabled')
-      : 'metadata_disabled'
+    const autoResponse = resolveWaypointDiscussionAutoResponse({
+      metadataOptIn: result.discussion.auto_response?.enabled === true,
+      globalOptIn: isAutoResponseGloballyEnabled(),
+      agent: result.discussion.agent,
+    })
 
-    const autoResponse = autoResponseRequested
-      ? { requested: true, agent: result.discussion.agent }
-      : {
-          requested: false,
-          ...(hasAgent ? { agent: result.discussion.agent } : {}),
-          ...(autoResponseSkipReason ? { reason: autoResponseSkipReason } : {}),
-        }
-
-    if (autoResponseRequested) {
+    if (autoResponse.requested) {
       try {
         eventBus.broadcast('waypoint.discussion.auto_response.requested', {
           task_id: result.task.id,

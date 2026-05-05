@@ -9,6 +9,12 @@ export type WaypointTaskDiscussionAutoResponseMetadata = {
   enabled: boolean
 }
 
+export type WaypointDiscussionAutoResponseSkipReason = 'metadata_disabled' | 'global_disabled' | 'missing_agent'
+
+export type WaypointDiscussionAutoResponseDecision =
+  | { requested: true; agent: string }
+  | { requested: false; agent?: string; reason: WaypointDiscussionAutoResponseSkipReason }
+
 export type WaypointTaskDiscussionMetadata = {
   enabled: boolean
   mode?: 'agent_chat'
@@ -126,6 +132,41 @@ export function normalizeWaypointTaskDiscussionListLimit(limit: number | null | 
 
 export function normalizeWaypointTaskDiscussionMessageContent(content: string): string {
   return content.trim()
+}
+
+export function resolveWaypointDiscussionAutoResponse(input: {
+  metadataOptIn: boolean
+  globalOptIn: boolean
+  agent?: string | null
+}): WaypointDiscussionAutoResponseDecision {
+  const normalizedAgent = typeof input.agent === 'string' ? input.agent.trim() : ''
+  if (!input.metadataOptIn) {
+    return {
+      requested: false,
+      ...(normalizedAgent ? { agent: normalizedAgent } : {}),
+      reason: 'metadata_disabled',
+    }
+  }
+
+  if (!input.globalOptIn) {
+    return {
+      requested: false,
+      ...(normalizedAgent ? { agent: normalizedAgent } : {}),
+      reason: 'global_disabled',
+    }
+  }
+
+  if (!normalizedAgent) {
+    return {
+      requested: false,
+      reason: 'missing_agent',
+    }
+  }
+
+  return {
+    requested: true,
+    agent: normalizedAgent,
+  }
 }
 
 export function buildWaypointTaskDiscussionStartMetadata(input: {

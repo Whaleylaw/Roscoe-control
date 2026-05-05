@@ -32,10 +32,13 @@ export {
   normalizeWaypointTaskDiscussionListLimit,
   normalizeWaypointTaskDiscussionMessageContent,
   buildWaypointTaskDiscussionStartMetadata,
+  resolveWaypointDiscussionAutoResponse,
 } from './discussion/metadata'
 export type {
   WaypointTaskDiscussionStatus,
   WaypointTaskDiscussionAutoResponseMetadata,
+  WaypointDiscussionAutoResponseDecision,
+  WaypointDiscussionAutoResponseSkipReason,
   WaypointTaskDiscussionMetadata,
   WaypointTaskDiscussionMessageTask,
   WaypointTaskDiscussionMessageMetadata,

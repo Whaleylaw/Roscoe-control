@@ -142,4 +142,42 @@ describe('waypoint-core contracts export surface', () => {
       waypoint: true,
     })
   })
+
+  it('exports discussion auto-response gating resolver semantics', async () => {
+    const core = await import('@waypoint/core')
+
+    expect(core).toHaveProperty('resolveWaypointDiscussionAutoResponse')
+
+    expect(
+      core.resolveWaypointDiscussionAutoResponse({
+        metadataOptIn: false,
+        globalOptIn: true,
+        agent: 'planner',
+      }),
+    ).toEqual({ requested: false, agent: 'planner', reason: 'metadata_disabled' })
+
+    expect(
+      core.resolveWaypointDiscussionAutoResponse({
+        metadataOptIn: true,
+        globalOptIn: false,
+        agent: 'planner',
+      }),
+    ).toEqual({ requested: false, agent: 'planner', reason: 'global_disabled' })
+
+    expect(
+      core.resolveWaypointDiscussionAutoResponse({
+        metadataOptIn: true,
+        globalOptIn: true,
+        agent: '   ',
+      }),
+    ).toEqual({ requested: false, reason: 'missing_agent' })
+
+    expect(
+      core.resolveWaypointDiscussionAutoResponse({
+        metadataOptIn: true,
+        globalOptIn: true,
+        agent: 'planner',
+      }),
+    ).toEqual({ requested: true, agent: 'planner' })
+  })
 })
