@@ -225,6 +225,9 @@
 - ✅ Recipe runtime adapter contract checks added (`src/lib/waypoint-adapter/__tests__/recipe-runtime.test.ts`):
   - validates start/get/cancel pass-through behavior
   - enforces explicit failure when required runtime methods are missing
+- ✅ Store adapter contract checks added (`src/lib/waypoint-adapter/__tests__/store.test.ts`):
+  - validates get/list/append pass-through behavior
+  - enforces explicit failure when required store methods are missing
 
 ---
 
