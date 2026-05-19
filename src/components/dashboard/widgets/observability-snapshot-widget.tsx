@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { buildObservabilityDiagnosticSummary } from '@/lib/observability-diagnostic-summary'
 import type { DashboardData } from '../widget-primitives'
 
 type Tone = 'good' | 'warn' | 'bad' | 'info'
@@ -104,6 +105,7 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
   const [apiSnapshot, setApiSnapshot] = useState<ApiSnapshot | null>(null)
   const [apiError, setApiError] = useState(false)
   const [detail, setDetail] = useState<DetailState>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
 
   useEffect(() => {
     let cancelled = false
@@ -220,6 +222,27 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
   }
 
   const signals = apiSignals || fallbackSignals
+
+  const copyDiagnosticSummary = async () => {
+    const summary = buildObservabilityDiagnosticSummary({
+      generatedAt: new Date().toISOString(),
+      snapshotSource: apiSnapshot ? 'server' : 'client-fallback',
+      snapshot: apiSnapshot,
+      signals,
+      detailKind: detail?.data ? detail.kind : null,
+      detail: detail?.data || null,
+    })
+
+    try {
+      await navigator.clipboard.writeText(summary)
+      setCopyStatus('copied')
+      window.setTimeout(() => setCopyStatus('idle'), 2_000)
+    } catch {
+      setCopyStatus('error')
+      window.setTimeout(() => setCopyStatus('idle'), 2_000)
+    }
+  }
+
   const badSignals = signals.filter((signal) => signal.tone === 'bad')
   const warnSignals = signals.filter((signal) => signal.tone === 'warn')
   const headline = badSignals.length > 0
@@ -264,6 +287,14 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
             {detail?.kind === kind && detail.loading ? `Loading ${kind}…` : detail?.kind === kind && detail.data ? `Hide ${kind}` : `Inspect ${kind}`}
           </Button>
         ))}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={copyDiagnosticSummary}
+          className="h-7 rounded-md px-2 text-2xs"
+        >
+          {copyStatus === 'copied' ? 'Copied summary' : copyStatus === 'error' ? 'Copy failed' : 'Copy diagnostic summary'}
+        </Button>
       </div>
 
       {detail && (
