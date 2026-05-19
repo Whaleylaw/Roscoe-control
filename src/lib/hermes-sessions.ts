@@ -74,16 +74,25 @@ function hasHermesCliBinary(): boolean {
   ].filter((v): v is string => Boolean(v && v.trim()))
   const installed = candidates.some((bin) => {
     try {
-      // First check if the file exists (fast path for absolute paths)
-      if (bin.startsWith('/') && !existsSync(bin)) {
-        logger.debug({ bin }, 'hermes candidate not found on disk')
-        return false
+      // Keep dashboard capability checks cheap. Spawning `hermes --help` from
+      // /api/status?action=capabilities can take many seconds on a loaded Mac,
+      // which blocks Mission Control boot/navigation. For absolute candidates,
+      // existence is enough; for PATH candidates, use `command -v` with a short
+      // timeout instead of launching the Python CLI.
+      if (bin.startsWith('/')) {
+        const found = existsSync(bin)
+        if (found) logger.info({ bin }, 'hermes binary detected')
+        else logger.debug({ bin }, 'hermes candidate not found on disk')
+        return found
       }
-      // hermes CLI doesn't support --version (exits 2). Use --help as probe.
-      const res = spawnSync(bin, ['--help'], { stdio: 'pipe', timeout: 5000 })
-      const found = res.status === 0
+
+      const res = spawnSync('/bin/sh', ['-lc', `command -v ${JSON.stringify(bin)}`], {
+        stdio: 'pipe',
+        timeout: 500,
+      })
+      const found = res.status === 0 && Boolean((res.stdout || '').toString().trim())
       if (found) {
-        logger.info({ bin, stdout: (res.stdout || '').toString().trim().slice(0, 60) }, 'hermes binary detected')
+        logger.info({ bin }, 'hermes binary detected on PATH')
       }
       return found
     } catch (err) {

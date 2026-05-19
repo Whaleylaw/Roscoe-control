@@ -370,14 +370,24 @@ export default function Home() {
           if (agentsData?.agents) setAgents(agentsData.agents)
         })
         .finally(() => { markStep('agents') }),
-      // Sessions can be slow with many JSONL files — don't block boot
+      // Sessions can be slow with many JSONL files. Mark boot complete now and
+      // defer the scan until after the first interactive paint so it doesn't
+      // monopolize the Next server while the user is trying to navigate.
       (() => {
         markStep('sessions')
-        return fetch('/api/sessions')
-          .then(r => r.ok ? r.json() : null)
-          .then((sessionsData) => {
-            if (sessionsData?.sessions) setSessions(sessionsData.sessions)
-          })
+        const schedule =
+          typeof window !== 'undefined' && 'requestIdleCallback' in window
+            ? (cb: () => void) => window.requestIdleCallback(cb, { timeout: 3_000 })
+            : (cb: () => void) => window.setTimeout(cb, 1_500)
+        schedule(() => {
+          fetch('/api/sessions')
+            .then(r => r.ok ? r.json() : null)
+            .then((sessionsData) => {
+              if (sessionsData?.sessions) setSessions(sessionsData.sessions)
+            })
+            .catch(() => {})
+        })
+        return Promise.resolve(null)
       })(),
       fetch('/api/projects')
         .then(r => r.ok ? r.json() : null)

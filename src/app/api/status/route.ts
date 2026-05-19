@@ -12,7 +12,7 @@ import { MODEL_CATALOG } from '@/lib/models'
 import { logger } from '@/lib/logger'
 import { detectProviderSubscriptions, getPrimarySubscription } from '@/lib/provider-subscriptions'
 import { APP_VERSION } from '@/lib/version'
-import { isHermesInstalled, scanHermesSessions } from '@/lib/hermes-sessions'
+import { isHermesGatewayRunning, isHermesInstalled, scanHermesSessions } from '@/lib/hermes-sessions'
 import { registerMcAsDashboard } from '@/lib/gateway-runtime'
 
 export async function GET(request: NextRequest) {
@@ -683,12 +683,11 @@ async function getCapabilities(request?: NextRequest) {
   }
 
   const hermesInstalled = isHermesInstalled()
-  let hermesSessions = 0
-  if (hermesInstalled) {
-    try {
-      hermesSessions = scanHermesSessions(50).filter(s => s.isActive).length
-    } catch { /* ignore */ }
-  }
+  // Keep the capabilities endpoint light. A full Hermes session scan opens and
+  // queries the Hermes state DB (including per-session message lookups), and this
+  // endpoint is on the first-load critical path. The sessions panel still uses
+  // /api/sessions for the detailed scan; capabilities only needs a quick signal.
+  const hermesSessions = hermesInstalled && isHermesGatewayRunning() ? 1 : 0
 
   // Auto-register MC as default dashboard when gateway + openclaw home detected
   let dashboardRegistration: { registered: boolean; alreadySet: boolean } | null = null

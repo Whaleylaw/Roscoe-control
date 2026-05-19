@@ -83,21 +83,28 @@ function detectAnthropicFromFile(): ProviderSubscription | null {
     }
   }
 
-  // Fallback: Claude Code 2.x stores OAuth in keychain — use CLI to query
-  try {
-    const raw = execFileSync('claude', ['auth', 'status'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, HOME: os.homedir() },
-    })
-    const status = JSON.parse(raw.trim())
-    const subType = typeof status?.subscriptionType === 'string' ? status.subscriptionType : ''
-    if (isPositiveSubscription(subType)) {
-      return { provider: 'anthropic', type: normalizeType(subType), source: 'file' }
+  // Claude Code 2.x may store OAuth in the macOS keychain, but probing it via
+  // `claude auth status` is too expensive for dashboard request paths. On a busy
+  // workstation the child process/keychain round-trip can add 10–50s to
+  // /api/status?action=capabilities, which blocks the Mission Control boot
+  // sequence and makes navigation feel unresponsive. Keep this opt-in for manual
+  // diagnostics instead of running it during normal UI loads.
+  if (process.env.MC_ENABLE_CLAUDE_AUTH_PROBE === '1') {
+    try {
+      const raw = execFileSync('claude', ['auth', 'status'], {
+        encoding: 'utf-8',
+        timeout: 1000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, HOME: os.homedir() },
+      })
+      const status = JSON.parse(raw.trim())
+      const subType = typeof status?.subscriptionType === 'string' ? status.subscriptionType : ''
+      if (isPositiveSubscription(subType)) {
+        return { provider: 'anthropic', type: normalizeType(subType), source: 'file' }
+      }
+    } catch {
+      // claude CLI not available, timed out, or auth check failed
     }
-  } catch {
-    // claude CLI not available or auth check failed
   }
 
   return null

@@ -28,6 +28,15 @@ export const WIDGET_CATALOG: DashboardWidget[] = [
     component: 'ActivityTimelineWidget',
   },
   {
+    id: 'observability-snapshot',
+    label: 'Observable Snapshot',
+    description: 'Golden signals — traffic, errors, saturation, latency, queue pressure',
+    category: 'health',
+    modes: ['local', 'full'],
+    defaultSize: 'full',
+    component: 'ObservabilitySnapshotWidget',
+  },
+  {
     id: 'fleet-status',
     label: 'Fleet Status',
     description: 'Per-runtime activity sparklines, session counts, and cost',
@@ -148,6 +157,7 @@ export const WIDGET_CATALOG: DashboardWidget[] = [
 
 export const LOCAL_DEFAULT_LAYOUT = [
   'briefing-bar',
+  'observability-snapshot',
   'activity-timeline',
   'fleet-status',
   'task-pipeline',
@@ -157,6 +167,7 @@ export const LOCAL_DEFAULT_LAYOUT = [
 
 export const GATEWAY_DEFAULT_LAYOUT = [
   'briefing-bar',
+  'observability-snapshot',
   'activity-timeline',
   'fleet-status',
   'task-pipeline',
