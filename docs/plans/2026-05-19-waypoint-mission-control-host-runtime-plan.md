@@ -17,6 +17,23 @@
 3. **First Quest scope:** Start with `referral-package`, then generalize to full Quest integration.
 4. **Execution scope:** Mission Control should invoke local Waypoint package functionality for safe deterministic runtime work, not merely verify externally-created artifacts.
 5. **Ad hoc Quest generation:** Later full Quest integration should include a dedicated orchestrator agent that drafts Quests/Recipes/Handoffs under Mission Control review/gates.
+6. **State ownership:** Mission Control owns host records, review state, route/task visibility, and audit events. Waypoint owns portable Quest/Recipe/Wizard/FirmVault/referral-package semantics.
+7. **Chronology rule:** The referral-package chronology path is staged data first (`date-of-service-ledger.json` → `visit-content.json` → deterministic renderer), never agent-authored final HTML as source truth.
+
+## Definition of done for this integration track
+
+This plan is complete only when Mission Control can prove this end-to-end journey from a clean test fixture:
+
+1. Install/import pinned Waypoint packages without local-path hacks.
+2. Bind an MC project to a trusted case/source root with source-readonly defaults.
+3. Load the package-backed `referral-package` Quest and resolve its Recipes/artifact metadata.
+4. Start or reuse a route using existing MC workflow instance/task/event tables.
+5. Invoke deterministic local Waypoint package functions for safe runtime work.
+6. Dispatch agent tasks only for structured data drafting/review work.
+7. Block on missing required artifacts with auditable blocker payloads.
+8. Resume from the blocked task after operator/package resolution without starting a duplicate route.
+9. Reach an attorney-handoff gate that cannot complete without human approval.
+10. Pass targeted route/runtime tests, typecheck, lint, build, and an end-to-end fixture smoke.
 
 ---
 
@@ -59,6 +76,15 @@ Mission Control already has an older embedded Waypoint extraction/adaptor seam:
 - `docs/plans/waypoint-modularization-plan.md`
 
 That embedded core is useful as historical migration context but must not become the new source of truth for current standalone Waypoint features.
+
+Additional schema facts verified while completing this plan:
+
+- `projects.metadata` exists via migration `027_enhanced_projects`; use it first for project Waypoint host bindings rather than adding a table in P3 unless tests prove a query/integrity need.
+- `tasks.metadata` exists in the base schema; use it for task-level Waypoint execution metadata, artifact checks, and blocker payloads.
+- Workflow Engine tables exist via migration `063_workflow_engine_v1`: `workflow_definitions`, `workflow_instances`, `workflow_node_instances`, and `workflow_events`.
+- `workflow_instances.vars_json` exists via migration `066_workflow_instance_vars`; use it for route-level binding/package/Quest inputs.
+- UI copy must go through `messages/*.json`; exact current message files include `messages/en.json` plus translated locale files.
+- Mission Control package scripts include `pnpm test`, `pnpm typecheck`, `pnpm lint`, and `pnpm build`; per-slice gates below reference those exact scripts.
 
 ### Standalone Waypoint repo
 
@@ -200,7 +226,7 @@ Candidate JSON metadata shape:
 }
 ```
 
-If Mission Control does not have suitable project metadata columns, add a narrow `waypoint_project_bindings` table later. The first implementation task should inspect current schema before choosing metadata vs table.
+Implementation default: store this binding in `projects.metadata.waypoint.host_runtime` and access it through a narrow service (`src/lib/waypoint-project-binding.ts`). Do **not** add a `waypoint_project_bindings` table in the first pass. Add a table only if P3/P10 tests prove metadata cannot support required uniqueness/query semantics.
 
 ### Task metadata
 
@@ -287,6 +313,95 @@ Chronology staged artifact contract:
 03-medical/medical-chronology-output/extracted-visit-pdfs/
 ```
 
+## Runtime adapter contracts
+
+### Package catalog adapter
+
+Create `src/lib/waypoint-catalog.ts` as the only MC service that imports package catalog APIs directly. Other MC services should depend on its MC-friendly methods so package-version changes are isolated.
+
+Required methods:
+
+```ts
+type MissionControlWaypointCatalog = {
+  getQuest(slug: string): unknown
+  listQuests(): unknown[]
+  listQuestPlans(slug: string): Array<{
+    plan_ref: string
+    kind: 'recipe' | 'discussion' | 'gate' | 'checkpoint' | 'agent' | string
+    recipe_slug?: string
+    required_artifacts?: Array<{ path: string; required_when: string }>
+    metadata?: Record<string, unknown>
+  }>
+  resolveQuestRecipes(slug: string): { ok: true } | { ok: false; errors: string[] }
+  getRequiredArtifacts(slug: string): Array<{ plan_ref: string; path: string; required_when: string }>
+}
+```
+
+### Local package runtime adapter
+
+Create `src/lib/waypoint-local-package-runtime.ts` for deterministic functions only. Its input should be task/route metadata plus trusted project binding; its output should be serializable into `workflow_events.payload_json` and `tasks.metadata`.
+
+Allowed first mappings:
+
+- `runReferralPackageBuilder`
+- `checkFirmVaultEvidencePath`
+- `setFirmVaultCaseFact` only behind an explicit approved task/gate rule
+- artifact existence/hash checks under trusted roots
+
+Explicitly forbidden in this adapter:
+
+- shelling out to `waypoint` CLI as the normal runtime path;
+- arbitrary local command execution;
+- email/fax/filing/payment/call/API side effects;
+- direct writes to `.waypoint/firmvault/*.yaml`;
+- marking FirmVault landmarks directly.
+
+### Agent/orchestrator adapter
+
+Agent-backed tasks should remain MC-managed task/session work, not package side effects. The agent contract is structured output only:
+
+- draft or complete JSON inputs (`date-of-service-ledger.json`, `visit-content.json`, QC findings, dashboard summary data);
+- ask/answer one question at a time where ambiguity blocks progress;
+- write reviewable artifacts under Waypoint-owned output paths;
+- never perform attorney/client/provider/insurer-facing external actions.
+
+### Blocker/resume contract
+
+A blocked package-backed route must persist enough evidence to resume without restarting:
+
+```json
+{
+  "status": "blocked",
+  "reason": "missing_required_artifacts",
+  "task_id": 123,
+  "route_id": 456,
+  "plan_ref": "medical-chronology-update",
+  "missing_artifacts": [
+    "03-medical/medical-chronology-output/reports/date-of-service-ledger.json"
+  ],
+  "resolution": {
+    "mode": "recheck_required_artifacts",
+    "operator_note": null,
+    "resolved_at": null
+  }
+}
+```
+
+Resuming means re-checking the existing task/route blocker and advancing from the blocked node. It must not create a duplicate route unless the operator explicitly starts a new route/version.
+
+### Human gate contract
+
+Handoff/attorney-facing completion requires a human gate event:
+
+- approve/reject/revise decision;
+- reviewer identity;
+- timestamp;
+- note;
+- exact route/task/node ids;
+- package pin and Quest slug/version.
+
+No package or agent task may infer handoff approval from artifact existence alone.
+
 ---
 
 ## Phase Plan
@@ -323,29 +438,39 @@ git commit -m "docs(waypoint): plan mission control host runtime integration"
 
 ### Task P0.2: Verify ForgeJo package consumption mode
 
-**Objective:** Determine the exact pinned dependency format Mission Control will use.
+**Objective:** Determine and prove the exact pinned dependency format Mission Control will use before implementation imports are merged.
 
 **Files:**
-- Create: `docs/plans/2026-05-19-waypoint-forgejo-dependency-notes.md` only if needed.
-- Modify later: `package.json`, `.npmrc` only after verification.
+- Create: `docs/plans/2026-05-19-waypoint-forgejo-dependency-notes.md` if registry/tag testing produces evidence too detailed for this plan.
+- Modify later: `package.json`, `.npmrc`, `pnpm-lock.yaml` only after verification.
 
-**Options to test in order:**
+**Decision order:**
 
-1. ForgeJo private npm package registry:
-   - preferred target;
+1. **Preferred — ForgeJo private npm package registry**
    - package names: `@waypoint/core`, `@waypoint/folder-host`;
-   - pinned exact version, e.g. `0.1.0-mc.0`.
-2. Pinned Git tag/commit dependency:
-   - acceptable fallback;
-   - must prove pnpm can resolve workspace package boundaries cleanly.
-3. Local path:
-   - allowed only as a temporary spike path;
-   - not merge-ready.
+   - dependency spec: exact version only, e.g. `"@waypoint/core": "0.1.0-mc.0"`;
+   - `.npmrc` may define registry routing, but tokens must come from environment/user-level config and must not be committed.
+2. **Fallback — pinned Git tag/commit dependency**
+   - allowed only if private package registry is not available yet;
+   - pin tag or commit, never branch;
+   - prove pnpm can resolve the standalone workspace packages cleanly from a clean Mission Control install.
+3. **Spike-only — local path**
+   - allowed only to debug TypeScript/API shape while package publishing is being prepared;
+   - not merge-ready and must be removed before P1.2 is accepted.
+
+**Required verification commands:**
+
+```bash
+pnpm install --frozen-lockfile
+pnpm exec vitest run src/lib/__tests__/waypoint-package-import.test.ts
+pnpm typecheck
+```
 
 **Acceptance:**
-- Decision written down.
-- Consumption path can install/import in a temp Mission Control checkout or isolated fixture.
+- Dependency source/version/pin is written down.
+- Clean install resolves `@waypoint/core` and `@waypoint/folder-host` types.
 - No credentials committed.
+- Lockfile records an exact source/version, not a floating branch.
 
 ---
 
@@ -961,6 +1086,27 @@ If full lint/build is too slow for every small slice, run targeted tests/typeche
 3. Quest-level rollback: disable `referral-package` start in MC catalog bridge without removing existing route history.
 4. Route-level rollback: blocked/failed routes remain auditable in MC; do not delete route/task/event evidence.
 5. No source-folder rollback should be needed because source roots are read-only by default.
+
+## Execution ledger
+
+Use this as the small-slice checklist. Check boxes only in commits that include source-of-truth verification for the slice.
+
+- [x] P0.1 — Initial host-runtime plan committed (`e24a11b docs(waypoint): plan mission control host runtime integration`).
+- [ ] P0.2 — ForgeJo dependency mode verified and written down.
+- [ ] P1 — Pinned package import smoke + installed dependencies.
+- [ ] P2 — Package-backed `referral-package` catalog bridge.
+- [ ] P3 — Trusted project/case binding stored in `projects.metadata`.
+- [ ] P4 — `referral-package` route/task/event materialization in MC.
+- [ ] P5 — deterministic local package runtime adapter.
+- [ ] P6 — artifact blocker/resume service.
+- [ ] P7 — staged chronology runtime constraints.
+- [ ] P8 — API route start/manage surface.
+- [ ] P9 — UI/operator review surface.
+- [ ] P10 — end-to-end referral-package MC smoke.
+- [ ] P11 — general Quest catalog/start support.
+- [ ] P12 — ad hoc Quest orchestrator and reviewed Quest install path.
+
+**Next executable task:** P0.2. Do not start P1 until dependency mode is proven without committing credentials.
 
 ---
 
