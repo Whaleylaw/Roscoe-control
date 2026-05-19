@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { buildObservabilityDiagnosticSummary } from '@/lib/observability-diagnostic-summary'
 import type { DashboardData } from '../widget-primitives'
@@ -22,6 +22,11 @@ type ApiSnapshot = {
 }
 
 type DetailKind = 'cron' | 'logs' | 'memory'
+
+type RefreshState = 'idle' | 'loading' | 'cooldown'
+
+const SNAPSHOT_REFRESH_DEBOUNCE_MS = 1_000
+const SNAPSHOT_REFRESH_BACKOFF_MS = 5_000
 
 type CronDetail = {
   generatedAt?: string
@@ -106,27 +111,69 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
   const [apiError, setApiError] = useState(false)
   const [detail, setDetail] = useState<DetailState>(null)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [refreshState, setRefreshState] = useState<RefreshState>('idle')
+  const cancelledRef = useRef(false)
+  const refreshInFlightRef = useRef(false)
+  const refreshTimerRef = useRef<number | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/observability?scope=snapshot')
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`observability ${res.status}`)
-        return res.json()
-      })
-      .then((snapshot) => {
-        if (!cancelled) {
-          setApiSnapshot(snapshot)
-          setApiError(false)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setApiError(true)
-      })
-    return () => {
-      cancelled = true
+  const clearRefreshTimer = useCallback(() => {
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
     }
   }, [])
+
+  const fetchSnapshot = useCallback(async (options?: { manual?: boolean }) => {
+    const manual = options?.manual ?? false
+    if (refreshInFlightRef.current) return
+
+    if (manual) {
+      setRefreshState('loading')
+    }
+
+    refreshInFlightRef.current = true
+    try {
+      const res = await fetch('/api/observability?scope=snapshot')
+      if (!res.ok) throw new Error(`observability ${res.status}`)
+      const snapshot = await res.json()
+      if (!cancelledRef.current) {
+        setApiSnapshot(snapshot)
+        setApiError(false)
+        if (manual) {
+          setRefreshState('cooldown')
+          clearRefreshTimer()
+          refreshTimerRef.current = window.setTimeout(() => {
+            refreshTimerRef.current = null
+            if (!cancelledRef.current) setRefreshState('idle')
+          }, SNAPSHOT_REFRESH_DEBOUNCE_MS)
+        }
+      }
+    } catch {
+      if (!cancelledRef.current) {
+        // Preserve the existing snapshot/detail panes; only mark the endpoint as unavailable.
+        setApiError(true)
+        if (manual) {
+          setRefreshState('cooldown')
+          clearRefreshTimer()
+          refreshTimerRef.current = window.setTimeout(() => {
+            refreshTimerRef.current = null
+            if (!cancelledRef.current) setRefreshState('idle')
+          }, SNAPSHOT_REFRESH_BACKOFF_MS)
+        }
+      }
+    } finally {
+      refreshInFlightRef.current = false
+    }
+  }, [clearRefreshTimer])
+
+  useEffect(() => {
+    cancelledRef.current = false
+    void fetchSnapshot()
+    return () => {
+      cancelledRef.current = true
+      clearRefreshTimer()
+    }
+  }, [clearRefreshTimer, fetchSnapshot])
 
   const {
     activeSessions,
@@ -276,6 +323,15 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
       </div>
 
       <div className="px-4 pb-3 flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void fetchSnapshot({ manual: true })}
+          disabled={refreshState !== 'idle'}
+          className="h-7 rounded-md px-2 text-2xs"
+        >
+          {refreshState === 'loading' ? 'Refreshing…' : refreshState === 'cooldown' ? 'Refresh cooling down' : 'Refresh snapshot'}
+        </Button>
         {(['cron', 'logs', 'memory'] as DetailKind[]).map((kind) => (
           <Button
             key={kind}
