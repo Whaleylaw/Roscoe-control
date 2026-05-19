@@ -12,6 +12,7 @@ function makeJsonResponse(body: unknown, init: ResponseInit = {}): Response {
 
 const snapshot = {
   generatedAt: '2026-05-19T20:00:00Z',
+  status: 'healthy',
   signals: {
     traffic: { tone: 'good', value: '7 events', detail: '2 active sessions' },
     errors: { tone: 'good', value: '0', detail: '0 recent' },
@@ -19,6 +20,13 @@ const snapshot = {
     latency: { tone: 'good', value: '20ms', detail: 'gateway connected' },
     queue: { tone: 'good', value: '0', detail: '0 running · 0 review' },
   },
+  services: {
+    hermesApi: { name: 'Hermes API', status: 'healthy', port: 8642, httpStatus: 200 },
+    paperclip: { name: 'Paperclip', status: 'down', port: 3100, note: 'port closed' },
+  },
+  hermes: { profileCount: 4, gatewaysHealthy: 3, gatewaysDown: 1, gatewaysUnknown: 0, homePresent: true, profilesPathPresent: true },
+  cron: { jobCount: 9, enabledCount: 7, pausedCount: 2, failureCount: 1, jobsPathPresent: true },
+  safeguards: { readOnly: true, localOnlyProbes: true, secretsRedacted: true, caseScopedOverview: true },
 }
 
 let fetchMock: ReturnType<typeof vi.fn>
@@ -107,5 +115,28 @@ describe('ObservabilitySnapshotWidget refresh control', () => {
       await vi.advanceTimersByTimeAsync(5_000)
     })
     expect(screen.getByRole('button', { name: 'Refresh snapshot' })).not.toBeDisabled()
+  })
+
+  it('opens diagnostics details with bounded server health and on-demand detail', async () => {
+    fetchMock
+      .mockResolvedValueOnce(makeJsonResponse(snapshot))
+      .mockResolvedValueOnce(makeJsonResponse({ generatedAt: '2026-05-19T20:01:00Z', counts: { total: 1, enabled: 1, paused: 0, failures: 0 }, jobs: [] }))
+
+    render(<ObservabilitySnapshotWidget data={makeDashboardData()} />)
+    await waitFor(() => expect(screen.getByText('7 events')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Diagnostics details' }))
+
+    expect(screen.getByRole('dialog', { name: 'Observability diagnostics' })).toBeTruthy()
+    expect(screen.getByText('Hermes runtime')).toBeTruthy()
+    expect(screen.getByText('Cron scheduler')).toBeTruthy()
+    expect(screen.getByText('Local services')).toBeTruthy()
+    expect(screen.getByText('Hermes API')).toBeTruthy()
+    expect(screen.getByText('Paperclip')).toBeTruthy()
+    expect(screen.getByText('secretsRedacted')).toBeTruthy()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Inspect cron' })[0])
+    await waitFor(() => expect(screen.getAllByText('Loaded detail').length).toBeGreaterThan(0))
+    await waitFor(() => expect(screen.getAllByText((content) => content.includes('jobs path missing')).length).toBeGreaterThan(0))
   })
 })

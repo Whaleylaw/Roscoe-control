@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { buildObservabilityDiagnosticSummary } from '@/lib/observability-diagnostic-summary'
+import { useFocusTrap } from '@/lib/use-focus-trap'
 import type { DashboardData } from '../widget-primitives'
 
 type Tone = 'good' | 'warn' | 'bad' | 'info'
@@ -17,8 +18,10 @@ type ApiSnapshot = {
   generatedAt?: string
   status?: string
   signals?: Record<string, ApiSignal>
-  hermes?: { profileCount?: number; gatewaysHealthy?: number; gatewaysDown?: number }
-  cron?: { jobCount?: number; enabledCount?: number; failureCount?: number }
+  services?: Record<string, { name?: string; status?: string; port?: number; httpStatus?: number; note?: string }>
+  hermes?: { profileCount?: number; gatewaysHealthy?: number; gatewaysDown?: number; gatewaysUnknown?: number; homePresent?: boolean; profilesPathPresent?: boolean }
+  cron?: { jobCount?: number; enabledCount?: number; pausedCount?: number; failureCount?: number; jobsPathPresent?: boolean }
+  safeguards?: Record<string, boolean>
 }
 
 type DetailKind = 'cron' | 'logs' | 'memory'
@@ -112,6 +115,7 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
   const [detail, setDetail] = useState<DetailState>(null)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
   const [refreshState, setRefreshState] = useState<RefreshState>('idle')
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const cancelledRef = useRef(false)
   const refreshInFlightRef = useRef(false)
   const refreshTimerRef = useRef<number | null>(null)
@@ -332,6 +336,14 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
         >
           {refreshState === 'loading' ? 'Refreshing…' : refreshState === 'cooldown' ? 'Refresh cooling down' : 'Refresh snapshot'}
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDiagnosticsOpen(true)}
+          className="h-7 rounded-md px-2 text-2xs"
+        >
+          Diagnostics details
+        </Button>
         {(['cron', 'logs', 'memory'] as DetailKind[]).map((kind) => (
           <Button
             key={kind}
@@ -367,6 +379,172 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
           {!detail.loading && !detail.error && detail.data && <DetailPanel kind={detail.kind} data={detail.data} />}
         </div>
       )}
+
+      {diagnosticsOpen && (
+        <DiagnosticsDetailsModal
+          snapshot={apiSnapshot}
+          apiError={apiError}
+          signals={signals}
+          detail={detail}
+          refreshState={refreshState}
+          onClose={() => setDiagnosticsOpen(false)}
+          onRefresh={() => void fetchSnapshot({ manual: true })}
+          onLoadDetail={loadDetail}
+          onClearDetail={() => setDetail(null)}
+          onCopySummary={copyDiagnosticSummary}
+          copyStatus={copyStatus}
+        />
+      )}
+    </div>
+  )
+}
+
+type SignalSummary = Array<{ label: string; value: string; detail: string; tone: Tone }>
+
+function DiagnosticsDetailsModal({
+  snapshot,
+  apiError,
+  signals,
+  detail,
+  refreshState,
+  onClose,
+  onRefresh,
+  onLoadDetail,
+  onClearDetail,
+  onCopySummary,
+  copyStatus,
+}: {
+  snapshot: ApiSnapshot | null
+  apiError: boolean
+  signals: SignalSummary
+  detail: DetailState
+  refreshState: RefreshState
+  onClose: () => void
+  onRefresh: () => void
+  onLoadDetail: (kind: DetailKind) => void
+  onClearDetail: () => void
+  onCopySummary: () => void
+  copyStatus: 'idle' | 'copied' | 'error'
+}) {
+  const dialogRef = useFocusTrap(onClose)
+  const services = Object.entries(snapshot?.services || {})
+  const safeguards = Object.entries(snapshot?.safeguards || {}).filter(([, enabled]) => enabled)
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="observability-diagnostics-title"
+        className="h-full w-full max-w-3xl overflow-y-auto border-l border-border bg-card shadow-2xl"
+      >
+        <div className="sticky top-0 z-10 border-b border-border bg-card/95 backdrop-blur p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 id="observability-diagnostics-title" className="text-lg font-semibold text-foreground">Observability diagnostics</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {snapshot ? `Server snapshot generated ${formatGeneratedAt(snapshot.generatedAt)}.` : apiError ? 'Server endpoint unavailable; showing client fallback.' : 'Waiting for server snapshot.'}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-xl">&times;</Button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshState !== 'idle'} className="h-7 rounded-md px-2 text-2xs">
+              {refreshState === 'loading' ? 'Refreshing…' : refreshState === 'cooldown' ? 'Refresh cooling down' : 'Refresh snapshot'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={onCopySummary} className="h-7 rounded-md px-2 text-2xs">
+              {copyStatus === 'copied' ? 'Copied summary' : copyStatus === 'error' ? 'Copy failed' : 'Copy diagnostic summary'}
+            </Button>
+            {(['cron', 'logs', 'memory'] as DetailKind[]).map((kind) => (
+              <Button key={kind} variant="outline" size="sm" onClick={() => onLoadDetail(kind)} className="h-7 rounded-md px-2 text-2xs capitalize">
+                {detail?.kind === kind && detail.loading ? `Loading ${kind}…` : detail?.kind === kind && detail.data ? `Reload ${kind}` : `Inspect ${kind}`}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <section className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold">Golden signals</h4>
+              <span className={`rounded border px-2 py-0.5 text-2xs ${toneClasses(snapshot?.status === 'down' ? 'bad' : snapshot?.status === 'degraded' ? 'warn' : snapshot ? 'good' : 'info')}`}>{snapshot?.status || 'fallback'}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+              {signals.map((signal) => (
+                <div key={signal.label} className={`rounded-lg border p-2 ${toneClasses(signal.tone)}`}>
+                  <div className="text-2xs uppercase tracking-wide opacity-70">{signal.label}</div>
+                  <div className="mt-1 font-mono-tight text-base font-semibold">{signal.value}</div>
+                  <div className="mt-1 text-2xs opacity-75">{signal.detail}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+              <h4 className="mb-2 text-sm font-semibold">Hermes runtime</h4>
+              <div className="grid grid-cols-2 gap-2 text-2xs">
+                <DetailStat label="Profiles" value={snapshot?.hermes?.profileCount ?? 'n/a'} />
+                <DetailStat label="Healthy gateways" value={snapshot?.hermes?.gatewaysHealthy ?? 'n/a'} />
+                <DetailStat label="Gateway issues" value={snapshot?.hermes?.gatewaysDown ?? 'n/a'} alert={(snapshot?.hermes?.gatewaysDown ?? 0) > 0} />
+                <DetailStat label="Unknown gateways" value={snapshot?.hermes?.gatewaysUnknown ?? 'n/a'} />
+              </div>
+              <p className="mt-2 text-2xs text-muted-foreground">Hermes home {snapshot?.hermes?.homePresent ? 'present' : snapshot ? 'missing' : 'not loaded'} · profiles path {snapshot?.hermes?.profilesPathPresent ? 'present' : snapshot ? 'missing' : 'not loaded'}</p>
+            </div>
+
+            <div className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+              <h4 className="mb-2 text-sm font-semibold">Cron scheduler</h4>
+              <div className="grid grid-cols-2 gap-2 text-2xs">
+                <DetailStat label="Jobs" value={snapshot?.cron?.jobCount ?? 'n/a'} />
+                <DetailStat label="Enabled" value={snapshot?.cron?.enabledCount ?? 'n/a'} />
+                <DetailStat label="Paused" value={snapshot?.cron?.pausedCount ?? 'n/a'} />
+                <DetailStat label="Failures" value={snapshot?.cron?.failureCount ?? 'n/a'} alert={(snapshot?.cron?.failureCount ?? 0) > 0} />
+              </div>
+              <p className="mt-2 text-2xs text-muted-foreground">Jobs file {snapshot?.cron?.jobsPathPresent ? 'present' : snapshot ? 'missing' : 'not loaded'}.</p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+            <h4 className="mb-2 text-sm font-semibold">Local services</h4>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {services.map(([key, service]) => (
+                <div key={key} className="rounded border border-border/60 bg-background/50 p-2 text-2xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-foreground">{service.name || key}</span>
+                    <span className={service.status === 'healthy' ? 'text-green-300' : service.status === 'degraded' ? 'text-amber-300' : service.status === 'down' ? 'text-red-300' : 'text-muted-foreground'}>{service.status || 'unknown'}</span>
+                  </div>
+                  <div className="mt-1 text-muted-foreground">port {service.port ?? 'n/a'}{service.httpStatus ? ` · HTTP ${service.httpStatus}` : ''}{service.note ? ` · ${service.note}` : ''}</div>
+                </div>
+              ))}
+              {services.length === 0 && <div className="rounded border border-border/60 bg-background/50 p-2 text-2xs text-muted-foreground">No server service probes loaded.</div>}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-semibold">Loaded detail</h4>
+                <p className="text-2xs text-muted-foreground">Cron, log, and memory detail remain on-demand and redacted.</p>
+              </div>
+              {detail && <Button variant="outline" size="sm" onClick={onClearDetail} className="h-7 px-2 text-2xs">Clear detail</Button>}
+            </div>
+            {detail?.loading && <div className="text-xs text-muted-foreground">Loading {detail.kind}…</div>}
+            {detail?.error && <div className="text-xs text-red-300">{detail.error}</div>}
+            {!detail && <div className="text-xs text-muted-foreground">No detail pane loaded yet.</div>}
+            {!detail?.loading && !detail?.error && detail?.data && <DetailPanel kind={detail.kind} data={detail.data} />}
+          </section>
+
+          <section className="rounded-lg border border-border/70 bg-secondary/20 p-3">
+            <h4 className="mb-2 text-sm font-semibold">Safeguards</h4>
+            <div className="flex flex-wrap gap-2 text-2xs text-muted-foreground">
+              {(safeguards.length ? safeguards : [['readOnly', true], ['secretsRedacted', true], ['boundedDetail', true]]).map(([name]) => (
+                <span key={String(name)} className="rounded border border-green-500/20 bg-green-500/10 px-2 py-1 text-green-300">{String(name)}</span>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   )
 }
