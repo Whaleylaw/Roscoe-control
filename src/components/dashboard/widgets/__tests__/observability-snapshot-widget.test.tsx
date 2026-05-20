@@ -56,14 +56,14 @@ describe('ObservabilitySnapshotWidget refresh control', () => {
 
     await waitFor(() => expect(screen.getByText('7 events')).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: 'Diagnostics details' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect cron' }))
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Observability diagnostics' })).toBeTruthy())
-    await waitFor(() => expect(screen.getByText('Loaded detail')).toBeTruthy())
+    fireEvent.click(screen.getByRole('tab', { name: 'cron' }))
+    await waitFor(() => expect(screen.getByText('cron detail')).toBeTruthy())
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Refresh snapshot' })[1])
 
     await waitFor(() => expect(screen.getAllByText('8 events').length).toBeGreaterThan(0))
-    expect(screen.getByText('Loaded detail')).toBeTruthy()
+    expect(screen.getByText('cron detail')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith('/api/observability?scope=snapshot')
   })
 
@@ -136,9 +136,13 @@ describe('ObservabilitySnapshotWidget refresh control', () => {
     expect(screen.getByText('Hermes API')).toBeTruthy()
     expect(screen.getByText('Paperclip')).toBeTruthy()
     expect(screen.getByText('secretsRedacted')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'overview' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: 'cron' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'logs' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'memory' })).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect cron' }))
-    await waitFor(() => expect(screen.getAllByText('Loaded detail').length).toBeGreaterThan(0))
+    fireEvent.click(screen.getByRole('tab', { name: 'cron' }))
+    await waitFor(() => expect(screen.getByText('cron detail')).toBeTruthy())
     await waitFor(() => expect(screen.getAllByText((content) => content.includes('jobs path missing')).length).toBeGreaterThan(0))
   })
 })
