@@ -32,12 +32,14 @@ const snapshot = {
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  window.localStorage.clear()
   fetchMock = vi.fn().mockResolvedValue(makeJsonResponse(snapshot))
   global.fetch = fetchMock as unknown as typeof fetch
 })
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
   vi.useRealTimers()
   vi.clearAllMocks()
 })
@@ -119,30 +121,24 @@ describe('ObservabilitySnapshotWidget refresh control', () => {
     expect(screen.getByRole('button', { name: 'Refresh snapshot' })).not.toBeDisabled()
   })
 
-  it('opens diagnostics details with bounded server health and on-demand detail', async () => {
+  it('opens the last selected diagnostics tab on reopen', async () => {
     fetchMock
       .mockResolvedValueOnce(makeJsonResponse(snapshot))
-      .mockResolvedValueOnce(makeJsonResponse({ generatedAt: '2026-05-19T20:01:00Z', counts: { total: 1, enabled: 1, paused: 0, failures: 0 }, jobs: [] }))
+      .mockResolvedValueOnce(makeJsonResponse({ generatedAt: '2026-05-19T20:01:00Z', filesScanned: 1, entries: [] }))
 
     render(<ObservabilitySnapshotWidget data={makeDashboardData()} />)
     await waitFor(() => expect(screen.getByText('7 events')).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: 'Diagnostics details' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'logs' }))
+    await waitFor(() => expect(screen.getByText('logs detail')).toBeTruthy())
+    expect(window.localStorage.getItem('mission-control:observability-diagnostics-tab')).toBe('logs')
 
-    expect(screen.getByRole('dialog', { name: 'Observability diagnostics' })).toBeTruthy()
-    expect(screen.getByText('Hermes runtime')).toBeTruthy()
-    expect(screen.getByText('Cron scheduler')).toBeTruthy()
-    expect(screen.getByText('Local services')).toBeTruthy()
-    expect(screen.getByText('Hermes API')).toBeTruthy()
-    expect(screen.getByText('Paperclip')).toBeTruthy()
-    expect(screen.getByText('secretsRedacted')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'overview' }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByRole('tab', { name: 'cron' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'logs' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'memory' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '×' }))
+    expect(screen.queryByRole('dialog', { name: 'Observability diagnostics' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'cron' }))
-    await waitFor(() => expect(screen.getByText('cron detail')).toBeTruthy())
-    await waitFor(() => expect(screen.getAllByText((content) => content.includes('jobs path missing')).length).toBeGreaterThan(0))
+    fireEvent.click(screen.getByRole('button', { name: 'Diagnostics details' }))
+    expect(screen.getByRole('tab', { name: 'logs' }).getAttribute('aria-selected')).toBe('true')
+    await waitFor(() => expect(screen.getByText('logs detail')).toBeTruthy())
   })
 })

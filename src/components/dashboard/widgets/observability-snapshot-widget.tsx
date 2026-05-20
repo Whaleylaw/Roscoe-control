@@ -253,7 +253,7 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
     : null
 
 
-  const loadDetail = (kind: DetailKind) => {
+  const loadDetail = useCallback((kind: DetailKind) => {
     setDetail((prev) => prev?.kind === kind && prev.data
       ? null
       : { kind, loading: true, error: null, data: null })
@@ -270,7 +270,7 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
         error: err instanceof Error ? err.message : `Failed to load ${kind} detail`,
         data: null,
       }))
-  }
+  }, [])
 
   const signals = apiSignals || fallbackSignals
 
@@ -376,6 +376,30 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
 type SignalSummary = Array<{ label: string; value: string; detail: string; tone: Tone }>
 type DiagnosticsTab = 'overview' | DetailKind
 
+const DIAGNOSTICS_TAB_STORAGE_KEY = 'mission-control:observability-diagnostics-tab'
+
+function isDiagnosticsTab(value: string | null): value is DiagnosticsTab {
+  return value === 'overview' || value === 'cron' || value === 'logs' || value === 'memory'
+}
+
+function loadStoredDiagnosticsTab(): DiagnosticsTab {
+  if (typeof window === 'undefined') return 'overview'
+  try {
+    const stored = window.localStorage.getItem(DIAGNOSTICS_TAB_STORAGE_KEY)
+    return isDiagnosticsTab(stored) ? stored : 'overview'
+  } catch {
+    return 'overview'
+  }
+}
+
+function storeDiagnosticsTab(tab: DiagnosticsTab) {
+  try {
+    window.localStorage.setItem(DIAGNOSTICS_TAB_STORAGE_KEY, tab)
+  } catch {
+    // Non-critical: storage may be disabled in hardened browser contexts.
+  }
+}
+
 function DiagnosticsDetailsModal({
   snapshot,
   apiError,
@@ -401,7 +425,7 @@ function DiagnosticsDetailsModal({
   onCopySummary: () => void
   copyStatus: 'idle' | 'copied' | 'error'
 }) {
-  const [activeTab, setActiveTab] = useState<DiagnosticsTab>('overview')
+  const [activeTab, setActiveTab] = useState<DiagnosticsTab>(() => loadStoredDiagnosticsTab())
   const dialogRef = useFocusTrap(onClose)
   const services = Object.entries(snapshot?.services || {})
   const safeguards = Object.entries(snapshot?.safeguards || {}).filter(([, enabled]) => enabled)
@@ -410,10 +434,14 @@ function DiagnosticsDetailsModal({
 
   const selectTab = (tab: DiagnosticsTab) => {
     setActiveTab(tab)
-    if (tab !== 'overview' && (detail?.kind !== tab || (!detail.loading && !detail.data))) {
-      onLoadDetail(tab)
-    }
+    storeDiagnosticsTab(tab)
   }
+
+  useEffect(() => {
+    if (activeTab !== 'overview' && detail?.kind !== activeTab) {
+      onLoadDetail(activeTab)
+    }
+  }, [activeTab, detail?.kind, onLoadDetail])
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
@@ -535,7 +563,7 @@ function DiagnosticsDetailsModal({
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => onLoadDetail(activeTab)} className="h-7 px-2 text-2xs">Reload</Button>
-                  {detail && <Button variant="outline" size="sm" onClick={onClearDetail} className="h-7 px-2 text-2xs">Clear</Button>}
+                  {detail && <Button variant="outline" size="sm" onClick={() => { onClearDetail(); selectTab('overview') }} className="h-7 px-2 text-2xs">Clear</Button>}
                 </div>
               </div>
               {activeDetail?.loading && <div className="text-xs text-muted-foreground">Loading {activeTab}…</div>}
