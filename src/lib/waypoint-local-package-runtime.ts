@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3'
 import { runReferralPackageBuilder } from '@waypoint/folder-host'
 
 import { getWaypointProjectBinding } from './waypoint-project-binding'
+import { assessReferralChronologyRuntime } from './waypoint-referral-chronology'
 
 export type WaypointLocalPackageRunStatus = 'ok' | 'blocked' | 'skipped' | 'failed'
 
@@ -85,6 +86,30 @@ export async function runWaypointLocalPackageTask(
   const projectRoot = resolveTrustedProjectRoot(db, task, workflow)
   const recipeSlug = task.recipe_slug ?? stringValue(objectRecord(waypoint.recipe).slug) ?? ''
   if (!recipeSlug) throw new Error(`Task ${task.id} is missing a recipe_slug for local package execution`)
+
+  if (recipeSlug === 'firmvault-medical-chronology-update') {
+    const chronology = await assessReferralChronologyRuntime(db, {
+      taskId: task.id,
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      now,
+    })
+    if (chronology.status === 'blocked') {
+      return {
+        status: 'blocked',
+        taskId: task.id,
+        artifacts: [],
+        missingArtifacts: chronology.missingArtifacts,
+        summary: chronology.reason,
+      }
+    }
+    return {
+      status: 'ok',
+      taskId: task.id,
+      artifacts: chronology.artifacts,
+      summary: chronology.reason,
+    }
+  }
 
   try {
     const packageResult = await runReferralPackageBuilder({

@@ -48,20 +48,24 @@ describe('Waypoint local package runtime', () => {
       expect(result.missingArtifacts).toEqual([
         '03-medical/medical-chronology-output/reports/date-of-service-ledger.json',
         '03-medical/medical-chronology-output/reports/visit-content.json',
-        '03-medical/medical-chronology-output/reports/rendered-template-check.json',
       ])
 
       const updated = db.prepare(`SELECT status, metadata FROM tasks WHERE id = ?`).get(task.id) as { status: string; metadata: string }
       expect(updated.status).toBe('blocked')
       expect(JSON.parse(updated.metadata)).toMatchObject({
         waypoint: {
-          local_runtime: { status: 'blocked', adapter: 'waypoint-referral-package-builder' },
+          chronology_runtime: {
+            status: 'blocked',
+            stage: 'staged_data',
+            source_truth: 'staged_json',
+            html_source_truth: false,
+          },
           blocker: { status: 'blocked', missing_artifacts: result.missingArtifacts },
         },
       })
 
       const event = db.prepare(`SELECT event_type, payload_json FROM workflow_events WHERE task_id = ? ORDER BY id DESC LIMIT 1`).get(task.id) as { event_type: string; payload_json: string }
-      expect(event.event_type).toBe('waypoint.local_package.blocked')
+      expect(event.event_type).toBe('waypoint.chronology.blocked')
       expect(JSON.parse(event.payload_json)).toMatchObject({ missing_artifacts: result.missingArtifacts })
     } finally {
       db.close()

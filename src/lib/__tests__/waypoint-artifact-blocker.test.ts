@@ -17,6 +17,11 @@ const CHRONOLOGY_REQUIRED = [
   '03-medical/medical-chronology-output/reports/rendered-template-check.json',
 ] as const
 
+const CHRONOLOGY_INITIAL_STAGED_REQUIRED = [
+  '03-medical/medical-chronology-output/reports/date-of-service-ledger.json',
+  '03-medical/medical-chronology-output/reports/visit-content.json',
+] as const
+
 async function setupBlockedChronologyTask() {
   const db = new Database(':memory:')
   runMigrations(db)
@@ -45,7 +50,7 @@ describe('Waypoint artifact blocker/resume semantics', () => {
     try {
       const blockedTask = db.prepare(`SELECT status, metadata FROM tasks WHERE id = ?`).get(taskId) as { status: string; metadata: string }
       expect(blockedTask.status).toBe('blocked')
-      expect(JSON.parse(blockedTask.metadata).waypoint.blocker).toMatchObject({ status: 'blocked', missing_artifacts: [...CHRONOLOGY_REQUIRED] })
+      expect(JSON.parse(blockedTask.metadata).waypoint.blocker).toMatchObject({ status: 'blocked', missing_artifacts: [...CHRONOLOGY_INITIAL_STAGED_REQUIRED] })
 
       for (const artifact of CHRONOLOGY_REQUIRED) {
         await mkdir(join(projectRoot, artifact, '..'), { recursive: true })
