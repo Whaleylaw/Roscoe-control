@@ -480,7 +480,8 @@ function DiagnosticsDetailsModal({
                 onClick={() => selectTab(tab)}
                 className={`flex-1 rounded-md px-2 py-1.5 text-2xs font-medium capitalize transition-colors ${activeTab === tab ? 'bg-primary/20 text-primary border border-primary/30' : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground'}`}
               >
-                {tab}
+                <span>{tab}</span>
+                <TabStatus tab={tab} detail={detail} />
               </button>
             ))}
           </div>
@@ -576,6 +577,20 @@ function DiagnosticsDetailsModal({
       </div>
     </div>
   )
+}
+
+function TabStatus({ tab, detail }: { tab: DiagnosticsTab; detail: DetailState }) {
+  if (tab === 'overview' || detail?.kind !== tab) return null
+  const label = detail.loading ? 'loading' : detail.error ? 'error' : detail.data ? 'loaded' : 'idle'
+  const className = detail.loading
+    ? 'bg-blue-400/70'
+    : detail.error
+      ? 'bg-red-400/80'
+      : detail.data
+        ? 'bg-green-400/80'
+        : 'bg-muted-foreground/50'
+
+  return <span aria-hidden="true" title={`${tab} ${label}`} className={`ml-1 inline-block h-1.5 w-1.5 rounded-full align-middle ${className}`} />
 }
 
 function DetailPanel({ kind, data }: { kind: DetailKind; data: CronDetail | LogsDetail | MemoryDetail }) {
