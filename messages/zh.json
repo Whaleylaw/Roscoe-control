@@ -114,7 +114,8 @@
     "expandSidebar": "展开侧边栏",
     "more": "更多",
     "recipes": "Recipes",
-    "email": "Email"
+    "email": "Email",
+    "logout": "登出"
   },
   "settings": {
     "language": "语言",

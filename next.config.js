@@ -3,10 +3,20 @@ const withNextIntl = require('next-intl/plugin')('./src/i18n/request.ts')
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: __dirname,
   outputFileTracingExcludes: {
-    '/*': ['./.data/**/*'],
+    // `.git` must be excluded so the Next.js file tracer does not copy the
+    // entire repo .git directory into `.next/standalone/`. When it does,
+    // Git treats the standalone dir as its own working tree and the
+    // self-update endpoint's `git status --porcelain` (run from
+    // process.cwd() under `pnpm start:standalone`) reports every file the
+    // standalone build doesn't bundle (e.g. `src/lib/__tests__/`) as
+    // deleted — blocking the dirty-tree check and breaking self-update.
+    '/*': ['./.data/**/*', './.git/**/*'],
   },
-  turbopack: {},
+  turbopack: {
+    root: __dirname,
+  },
   // Transpile ESM-only packages so they resolve correctly in all environments
   transpilePackages: ['react-markdown', 'remark-gfm'],
   

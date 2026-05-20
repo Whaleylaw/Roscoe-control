@@ -111,15 +111,17 @@ export function useServerEvents() {
         case 'task.status_changed':
           if (event.data?.id || event.data?.task_id) {
             const taskId = event.data.id ?? event.data.task_id
-            updateTask(taskId, {
+            const updates = {
               status: event.data.status,
               updated_at: event.data.updated_at ?? event.data.at,
+              ...(event.data.error_message !== undefined ? { error_message: event.data.error_message } : {}),
               ...(event.data.container_id !== undefined ? { container_id: event.data.container_id } : {}),
               ...(event.data.runner_started_at !== undefined ? { runner_started_at: event.data.runner_started_at } : {}),
               ...(event.data.runner_attempts !== undefined ? { runner_attempts: event.data.runner_attempts } : {}),
               ...(event.data.worktree_path !== undefined ? { worktree_path: event.data.worktree_path } : {}),
               ...(event.data.runner_last_failure_reason !== undefined ? { runner_last_failure_reason: event.data.runner_last_failure_reason } : {}),
-            })
+            }
+            updateTask(taskId, updates)
           }
           break
         case 'task.deleted':

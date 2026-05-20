@@ -37,25 +37,29 @@ const taskMetadataSchema = z.object({
   code_location: z.string().min(1, 'code_location cannot be empty').max(500).optional(),
 }).catchall(z.unknown())
 
-export const createTaskSchema = z.object({
+// Field validators reused by createTaskSchema and updateTaskSchema.
+// Defaults intentionally live on createTaskSchema only — they MUST NOT apply
+// on update, otherwise a PUT that omits a field would silently overwrite the
+// stored value (e.g. PUT {title} would reset status to 'inbox' and tags to []).
+const taskFields = {
   title: z.string().min(1, 'Title is required').max(500),
-  description: z.string().max(5000).optional(),
-  status: z.enum(['backlog', 'inbox', 'assigned', 'awaiting_owner', 'in_progress', 'review', 'quality_review', 'done', 'failed']).default('inbox'),
-  priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
-  project_id: z.number().int().positive().optional(),
-  assigned_to: z.string().max(100).optional(),
-  created_by: z.string().max(100).optional(),
-  due_date: z.number().int().min(0).max(4102444800).optional(), // max ~2100-01-01
-  estimated_hours: z.number().min(0).max(10000).optional(),
-  actual_hours: z.number().min(0).max(10000).optional(),
-  outcome: z.enum(['success', 'failed', 'partial', 'abandoned']).optional(),
-  error_message: z.string().max(5000).optional(),
-  resolution: z.string().max(5000).optional(),
-  feedback_rating: z.number().int().min(1).max(5).optional(),
-  feedback_notes: z.string().max(5000).optional(),
-  retry_count: z.number().int().min(0).optional(),
-  completed_at: z.number().int().min(0).max(4102444800).optional(),
-  tags: z.array(z.string().min(1).max(100)).max(50).default([] as string[]),
+  description: z.string().max(5000),
+  status: z.enum(['backlog', 'inbox', 'assigned', 'awaiting_owner', 'in_progress', 'review', 'quality_review', 'done', 'failed']),
+  priority: z.enum(['critical', 'high', 'medium', 'low']),
+  project_id: z.number().int().positive(),
+  assigned_to: z.string().max(100),
+  created_by: z.string().max(100),
+  due_date: z.number().int().min(0).max(4102444800), // max ~2100-01-01
+  estimated_hours: z.number().min(0).max(10000),
+  actual_hours: z.number().min(0).max(10000),
+  outcome: z.enum(['success', 'failed', 'partial', 'abandoned']),
+  error_message: z.string().max(5000),
+  resolution: z.string().max(5000),
+  feedback_rating: z.number().int().min(1).max(5),
+  feedback_notes: z.string().max(5000),
+  retry_count: z.number().int().min(0),
+  completed_at: z.number().int().min(0).max(4102444800),
+  tags: z.array(z.string().min(1).max(100)).max(50),
   model_override: z
     .string()
     .min(1)
@@ -63,25 +67,49 @@ export const createTaskSchema = z.object({
     .refine(isKnownModel, {
       error: (issue) =>
         `model_override '${String(issue.input)}' is not in the model registry. Known models: ${MODEL_IDS.join(', ')}`,
-    })
-    .optional(),
+    }),
+  recipe_slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'recipe_slug must be kebab-case'),
+  workspace_source: WorkspaceSourceSchema,
+  read_only_mounts: readOnlyMountsArraySchema,
+  extra_skills: extraSkillsArraySchema,
+  metadata: taskMetadataSchema,
+}
+
+export const createTaskSchema = z.object({
+  title: taskFields.title,
+  description: taskFields.description.optional(),
+  status: taskFields.status.default('inbox'),
+  priority: taskFields.priority.default('medium'),
+  project_id: taskFields.project_id.optional(),
+  assigned_to: taskFields.assigned_to.optional(),
+  created_by: taskFields.created_by.optional(),
+  due_date: taskFields.due_date.optional(),
+  estimated_hours: taskFields.estimated_hours.optional(),
+  actual_hours: taskFields.actual_hours.optional(),
+  outcome: taskFields.outcome.optional(),
+  error_message: taskFields.error_message.optional(),
+  resolution: taskFields.resolution.optional(),
+  feedback_rating: taskFields.feedback_rating.optional(),
+  feedback_notes: taskFields.feedback_notes.optional(),
+  retry_count: taskFields.retry_count.optional(),
+  completed_at: taskFields.completed_at.optional(),
+  tags: taskFields.tags.default([] as string[]),
+  model_override: taskFields.model_override.optional(),
 
   // Phase 13 — Task Runtime Context (TCTX-01..04, TCTX-06). Field SHAPE
   // enforced here (Zod). Business RULES (recipe existence, workspace_source
   // gap, allowlist membership, caps) live in POST /api/tasks (Plan 13-02) and
   // PATCH /api/tasks/[id] (Plan 13-03) and surface via
   // buildAggregatedValidationResponse.
-  recipe_slug: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-z0-9][a-z0-9-]*$/, 'recipe_slug must be kebab-case')
-    .optional(),
-  workspace_source: WorkspaceSourceSchema.optional(),
-  read_only_mounts: readOnlyMountsArraySchema.optional(),
-  extra_skills: extraSkillsArraySchema.optional(),
-
-  metadata: taskMetadataSchema.default({} as Record<string, unknown>),
+  recipe_slug: taskFields.recipe_slug.optional(),
+  workspace_source: taskFields.workspace_source.optional(),
+  read_only_mounts: taskFields.read_only_mounts.optional(),
+  extra_skills: taskFields.extra_skills.optional(),
+  metadata: taskFields.metadata.default({} as Record<string, unknown>),
 })
 
 // Phase 20 Plan 20-02 (ROUTE-02, COMPAT-03) — legacy blocker contract envelope.
@@ -99,11 +127,32 @@ export const BLOCKER_KINDS = [
 ] as const
 export type BlockerKind = typeof BLOCKER_KINDS[number]
 
-export const updateTaskSchema = createTaskSchema.partial().extend({
-  status: z.enum(['backlog', 'inbox', 'assigned', 'awaiting_owner', 'in_progress', 'review', 'quality_review', 'done', 'failed']).optional(),
-  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
-  tags: z.array(z.string().min(1).max(100)).max(50).optional(),
-  metadata: taskMetadataSchema.optional(),
+// Every field optional, NO defaults — see comment above on `taskFields`.
+export const updateTaskSchema = z.object({
+  title: taskFields.title.optional(),
+  description: taskFields.description.optional(),
+  status: taskFields.status.optional(),
+  priority: taskFields.priority.optional(),
+  project_id: taskFields.project_id.optional(),
+  assigned_to: taskFields.assigned_to.optional(),
+  created_by: taskFields.created_by.optional(),
+  due_date: taskFields.due_date.optional(),
+  estimated_hours: taskFields.estimated_hours.optional(),
+  actual_hours: taskFields.actual_hours.optional(),
+  outcome: taskFields.outcome.optional(),
+  error_message: taskFields.error_message.optional(),
+  resolution: taskFields.resolution.optional(),
+  feedback_rating: taskFields.feedback_rating.optional(),
+  feedback_notes: taskFields.feedback_notes.optional(),
+  retry_count: taskFields.retry_count.optional(),
+  completed_at: taskFields.completed_at.optional(),
+  tags: taskFields.tags.optional(),
+  model_override: taskFields.model_override.optional(),
+  recipe_slug: taskFields.recipe_slug.optional(),
+  workspace_source: taskFields.workspace_source.optional(),
+  read_only_mounts: taskFields.read_only_mounts.optional(),
+  extra_skills: taskFields.extra_skills.optional(),
+  metadata: taskFields.metadata.optional(),
   blocker_reason: z.string().trim().min(1).max(2000).optional(),
   blocker_kind: z.enum(BLOCKER_KINDS).optional(),
   resume_hint: z.string().trim().min(1).max(500).optional(),

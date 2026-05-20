@@ -69,6 +69,8 @@ interface Task {
   due_date?: number
   estimated_hours?: number
   actual_hours?: number
+  error_message?: string
+  resolution?: string
   tags?: string[]
   metadata?: any
   aegisApproved?: boolean
@@ -84,9 +86,7 @@ interface Task {
   github_pr_state?: string
   review_pr?: { provider: string; pr_number: number; pr_url: string; state: string } | null
   comment_count?: number
-  error_message?: string
   outcome?: 'success' | 'failed' | 'partial' | 'abandoned'
-  resolution?: string
   dispatch_attempts?: number
   // Phase 09 GSD fields — extended in Wave 2a (migration 052 + store Task type)
   gsd_phase?: 'discuss' | 'plan' | 'execute' | 'verify' | 'done' | null
@@ -1664,6 +1664,7 @@ function TaskDetailModal({
     review: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
     quality_review: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
     done: 'bg-green-500/15 text-green-400 border-green-500/25',
+    failed: 'bg-red-500/15 text-red-400 border-red-500/25',
     awaiting_owner: 'bg-orange-500/15 text-orange-400 border-orange-500/25',
   }
 
@@ -1939,6 +1940,17 @@ function TaskDetailModal({
                   </>
                 )}
               </div>
+
+              {task.status === 'failed' && task.error_message && (
+                <div className="rounded-lg border border-red-500/25 bg-red-500/10 p-3">
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-red-400/80">
+                    Failure reason
+                  </div>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-red-100/90">
+                    {task.error_message}
+                  </div>
+                </div>
+              )}
 
               {/* Metadata grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">
@@ -2982,6 +2994,7 @@ function EditTaskModal({
                   <option value="review">{t('colReview')}</option>
                   <option value="quality_review">{t('colQualityReview')}</option>
                   <option value="done">{t('colDone')}</option>
+                  <option value="failed">{t('colFailed')}</option>
                 </select>
               </div>
 

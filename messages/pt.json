@@ -114,7 +114,8 @@
     "expandSidebar": "Expandir barra lateral",
     "more": "Mais",
     "recipes": "Recipes",
-    "email": "Email"
+    "email": "Email",
+    "logout": "Sair"
   },
   "settings": {
     "language": "Idioma",

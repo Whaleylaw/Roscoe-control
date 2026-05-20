@@ -114,7 +114,8 @@
     "expandSidebar": "Seitenleiste ausklappen",
     "more": "Mehr",
     "recipes": "Recipes",
-    "email": "Email"
+    "email": "Email",
+    "logout": "Abmelden"
   },
   "settings": {
     "language": "Sprache",

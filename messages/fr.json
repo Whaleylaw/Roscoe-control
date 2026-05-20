@@ -114,7 +114,8 @@
     "expandSidebar": "Développer la barre latérale",
     "more": "Plus",
     "recipes": "Recipes",
-    "email": "Email"
+    "email": "Email",
+    "logout": "Se déconnecter"
   },
   "settings": {
     "language": "Langue",

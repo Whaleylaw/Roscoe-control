@@ -114,7 +114,8 @@
     "expandSidebar": "Развернуть боковую панель",
     "more": "Ещё",
     "recipes": "Recipes",
-    "email": "Email"
+    "email": "Email",
+    "logout": "Выйти"
   },
   "settings": {
     "language": "Язык",
