@@ -26,9 +26,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@waypoint/core": [
-        "./packages/waypoint-core/src/index.ts"
       ]
     }
   },

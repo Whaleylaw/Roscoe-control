@@ -14,6 +14,12 @@ importers:
       '@scalar/api-reference-react':
         specifier: ^0.8.66
         version: 0.8.66(react@19.2.4)(tailwindcss@3.4.19(yaml@2.8.3))(typescript@5.9.3)
+      '@waypoint/core':
+        specifier: 0.1.1
+        version: 0.1.1
+      '@waypoint/folder-host':
+        specifier: 0.1.1
+        version: 0.1.1
       '@xterm/addon-fit':
         specifier: ^0.11.0
         version: 0.11.0
@@ -1971,6 +1977,12 @@ packages:
     resolution: {integrity: sha512-e89uuTLMh0U5cZ9iDpEI2senqPGfbPRTHM/0AaQkcxnpqjkZqDYP8rpfm7edOz8s+pOCOROEy1PIveSW8+fL5g==}
     peerDependencies:
       vue: ^3.5.0
+
+  '@waypoint/core@0.1.1':
+    resolution: {integrity: sha512-rHkpD7P+q4Us/4UmmI1nw95cDnebAU3PAlcpfjWk2CrZK4U1lgdvPymUk8AjIJvEvz+gIXJvJAHBauwEddWPQA==, tarball: http://localhost:3001/api/packages/aaron/npm/%40waypoint%2Fcore/-/0.1.1/core-0.1.1.tgz}
+
+  '@waypoint/folder-host@0.1.1':
+    resolution: {integrity: sha512-EqiXSHPsHnmgREyMaZMSRPZ8JTrIMA5vkrb670TyY2nWSrAUY1sANok+KE/KDU3771hM7D8KyyJhTVl/YXnQAA==, tarball: http://localhost:3001/api/packages/aaron/npm/%40waypoint%2Ffolder-host/-/0.1.1/folder-host-0.1.1.tgz}
 
   '@webgpu/types@0.1.69':
     resolution: {integrity: sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==}
@@ -7174,6 +7186,15 @@ snapshots:
   '@vueuse/shared@13.9.0(vue@3.5.29(typescript@5.9.3))':
     dependencies:
       vue: 3.5.29(typescript@5.9.3)
+
+  '@waypoint/core@0.1.1':
+    dependencies:
+      yaml: 2.8.3
+
+  '@waypoint/folder-host@0.1.1':
+    dependencies:
+      '@waypoint/core': 0.1.1
+      yaml: 2.8.3
 
   '@webgpu/types@0.1.69': {}
 
