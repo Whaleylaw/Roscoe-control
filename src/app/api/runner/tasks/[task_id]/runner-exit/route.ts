@@ -221,7 +221,26 @@ export async function POST(
         )
       }
 
-      // 2. Successful exits do NOT flip tasks.status here. The agent owns
+      // 2. If another runner endpoint already moved the task out of the
+      //    in-progress runtime state, do not clobber that handoff. This covers
+      //    blocked recipe checkpoints that move to review before docker wait
+      //    posts runner-exit.
+      if (task.status !== 'in_progress') {
+        if (!isSuccessfulExit && task.status === 'quality_review') {
+          db.prepare(
+            `UPDATE tasks
+               SET container_id = NULL,
+                   runner_started_at = NULL,
+                   runner_last_failure_reason = ?,
+                   updated_at = ?
+             WHERE id = ?
+               AND status = 'quality_review'`,
+          ).run(failureReason, nowUnix, taskId)
+        }
+        return
+      }
+
+      // 3. Successful exits do NOT flip tasks.status here. The agent owns
       //    the terminal flip via /submit (Plan 14-11). Exit early after
       //    persisting the attempt row.
       if (isSuccessfulExit) return
@@ -285,10 +304,12 @@ export async function POST(
   // a coherent story (the docker stop was triggered by the blocker, not by
   // the agent's own exit code).
   let exitReasonForBroadcast: string = reason
+  let freshStatus: string | null = null
   try {
     const fresh = db
       .prepare(`SELECT status FROM tasks WHERE id = ?`)
       .get(taskId) as { status: string } | undefined
+    freshStatus = fresh?.status ?? null
     if (fresh?.status === 'awaiting_owner') {
       exitReasonForBroadcast = 'blocked'
     }
@@ -302,7 +323,21 @@ export async function POST(
     )
   }
 
+  if (!isSuccessfulExit && freshStatus) {
+    eventBus.broadcast('task.status_changed', {
+      id: taskId,
+      task_id: taskId,
+      status: freshStatus,
+      previous_status: 'in_progress',
+      container_id: null,
+      runner_last_failure_reason: failureReason,
+      workspace_id: task.workspace_id,
+      at: nowUnix,
+    })
+  }
+
   eventBus.broadcast('task.container_exited', {
+    id: taskId,
     task_id: taskId,
     attempt,
     reason: exitReasonForBroadcast,

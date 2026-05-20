@@ -1,0 +1,82 @@
+schema_version: 1
+id: firmvault-client-check-in-cadence
+name: FirmVault Client Check-In Cadence
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as full_intake_complete, treatment_monitoring, manual, or recurring_timer.
+    default: full_intake_complete
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.full_intake_complete == true
+  - type: event
+    event: law_firm.client_check_in.manual
+  - type: manual
+
+nodes:
+  start_check_in_cadence:
+    type: recipe
+    name: Start Client Check-In Cadence
+    recipe: firmvault-client-check-in-start-cadence
+    depends_on:
+      conditions:
+        - law_firm.landmarks.full_intake_complete == true
+    completes:
+      - law_firm.landmarks.client_check_in_active
+    config:
+      task_goal: >-
+        Establish or verify the biweekly client check-in cadence in
+        client/check-ins.md and client/contactability.md. Record the preferred
+        contact method if already known, the last known contact date if present,
+        the next check-in due date, and an activity/workflow-log entry. Do not
+        send messages, texts, emails, or calls in this node.
+
+  prepare_check_in_handoff:
+    type: recipe
+    name: Prepare Client Check-In Handoff
+    recipe: firmvault-client-check-in-prepare-handoff
+    depends_on:
+      nodes:
+        - start_check_in_cadence
+    completes:
+      - law_firm.landmarks.client_check_in_prepared
+    config:
+      task_goal: >-
+        Prepare a human-facing check-in script or handoff based on intake,
+        contactability, current providers, treatment status, accident facts, and
+        outstanding items. Do not send the message or claim the client was
+        contacted. The output should be suitable for a human to call, text, or
+        email the client and then report the result back into the task.
+
+  human_client_contact:
+    type: review
+    name: Human Client Contact
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_check_in_handoff
+    completes:
+      - law_firm.landmarks.client_contact_attempted
+    config:
+      task_goal: Human completes or records the client contact attempt, then comments with the result so the workflow can document the response.
+
+  wait_for_next_check_in:
+    type: wait
+    name: Wait for Next Client Check-In
+    duration: 14d
+    depends_on:
+      nodes:
+        - human_client_contact
+    exit_when:
+      condition: law_firm.landmarks.demand_sent == true
+    config:
+      task_goal: Wait fourteen days for the next check-in cadence unless the demand has been sent and treatment-monitoring check-ins should stop.

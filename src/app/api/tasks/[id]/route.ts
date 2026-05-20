@@ -15,6 +15,8 @@ import { revokeTokensForTask } from '@/lib/runner-tokens';
 import { getIndexedRecipeBySlug } from '@/lib/recipe-indexer';
 import { getMountsCap, getExtraSkillsCap } from '@/lib/task-runtime-settings';
 import { isKnownModel, MODEL_IDS } from '@/lib/model-registry';
+import { bypassLawFirmCaseLandmark } from '@/lib/law-firm';
+import { advanceWorkflowAfterTaskApproval, satisfyWorkflowCondition } from '@/lib/workflow-engine';
 import {
   validateHostPathAgainstAllowlist,
   buildAggregatedValidationResponse,
@@ -55,6 +57,7 @@ function mapTaskRow(task: any): Task & {
   workspace_source: { project_id: number; base_ref: string } | null
   read_only_mounts: Array<{ host_path: string; container_path: string; label: string }>
   extra_skills: string[]
+  review_pr: { provider: string; pr_number: number; pr_url: string; state: string } | null
 } {
   return {
     ...task,
@@ -63,8 +66,22 @@ function mapTaskRow(task: any): Task & {
     workspace_source: task.workspace_source ? JSON.parse(task.workspace_source) : null,
     read_only_mounts: task.read_only_mounts ? JSON.parse(task.read_only_mounts) : [],
     extra_skills: task.extra_skills ? JSON.parse(task.extra_skills) : [],
+    review_pr: task.review_pr ? JSON.parse(task.review_pr) : null,
     ticket_ref: formatTicketRef(task.project_prefix, task.project_ticket_no),
   }
+}
+
+function reviewPrSelect(alias = 't'): string {
+  return `(SELECT json_object(
+    'provider', r.provider,
+    'pr_number', r.pr_number,
+    'pr_url', r.pr_url,
+    'state', r.state
+  )
+   FROM task_review_prs r
+   WHERE r.task_id = ${alias}.id AND r.workspace_id = ${alias}.workspace_id
+   ORDER BY r.created_at DESC, r.id DESC
+   LIMIT 1) as review_pr`
 }
 
 function hasAegisApproval(
@@ -79,6 +96,36 @@ function hasAegisApproval(
     LIMIT 1
   `).get(taskId, workspaceId) as { status?: string } | undefined
   return review?.status === 'approved'
+}
+
+function parseTaskMetadata(raw: unknown): Record<string, unknown> {
+  if (!raw) return {}
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
+  if (typeof raw !== 'string') return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function stringValue(value: unknown): string | null {
+  if (value == null) return null
+  const str = String(value).trim()
+  return str || null
+}
+
+function isHumanWorkflowReviewTask(task: Record<string, unknown>): boolean {
+  const metadata = parseTaskMetadata(task.metadata)
+  const workflow = objectRecord(metadata.workflow)
+  return workflow.node_type === 'review'
+    && !stringValue(workflow.recipe_slug)
+    && !stringValue(task.recipe_slug)
 }
 
 /**
@@ -102,7 +149,8 @@ export async function GET(
     }
     
     const stmt = db.prepare(`
-      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+        ${reviewPrSelect('t')}
       FROM tasks t
       LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
       WHERE t.id = ? AND t.workspace_id = ?
@@ -183,7 +231,7 @@ export async function PUT(
     
     // Get current task for comparison
     const currentTask = db
-      .prepare('SELECT * FROM tasks WHERE id = ? AND workspace_id = ?')
+      .prepare(`SELECT t.*, ${reviewPrSelect('t')} FROM tasks t WHERE t.id = ? AND t.workspace_id = ?`)
       .get(taskId, workspaceId) as Task;
     
     if (!currentTask) {
@@ -229,6 +277,115 @@ export async function PUT(
     }
 
     const previousDescriptionMentionRecipients = resolveMentionRecipients(currentTask.description || '', db, workspaceId).recipients;
+
+    if (rawBody.bypass_not_applicable === true) {
+      const metadataObject = parseTaskMetadata(currentTask.metadata)
+      const lawFirm = objectRecord(metadataObject.law_firm)
+      const caseSlug = stringValue(lawFirm.case_slug)
+      const landmark = stringValue(lawFirm.landmark)
+      if (!caseSlug || !landmark) {
+        return NextResponse.json(
+          { error: 'Bypass Not Applicable is only available for FirmVault workflow tasks with case and landmark metadata.' },
+          { status: 400 },
+        )
+      }
+
+      const actor = auth.user.display_name || auth.user.username || 'mission-control'
+      const bypassReason = stringValue(rawBody.bypass_reason)
+        || 'Marked not applicable in Mission Control.'
+      const bypassReasonSentence = bypassReason.replace(/[.!?]+$/, '')
+      const bypass = {
+        status: 'not_applicable',
+        reason: bypassReason,
+        task_id: taskId,
+        created_at: now,
+        created_by: actor,
+      }
+      const nextMetadata = {
+        ...metadataObject,
+        law_firm: {
+          ...lawFirm,
+          workflow_bypass: bypass,
+        },
+      }
+      const nextResolution = `Marked not applicable by ${actor}: ${bypassReasonSentence}. The FirmVault workflow item is complete, but no factual landmark such as an exhausted-benefits finding was asserted.`
+
+      await bypassLawFirmCaseLandmark(caseSlug, landmark, bypassReason, actor, taskId)
+      satisfyWorkflowCondition(db, {
+        subjectType: 'law_firm_case',
+        subjectId: caseSlug,
+        condition: `law_firm.landmarks.${landmark} == true`,
+        actor,
+        workspaceId,
+        payload: {
+          source: 'task_bypass_not_applicable',
+          landmark,
+          task_id: taskId,
+          reason: bypassReason,
+        },
+        status: 'inbox',
+      })
+
+      db.transaction(() => {
+        db.prepare(`
+          UPDATE tasks
+          SET status = 'done',
+              outcome = 'success',
+              resolution = ?,
+              metadata = ?,
+              error_message = NULL,
+              container_id = NULL,
+              completed_at = COALESCE(completed_at, ?),
+              updated_at = ?
+          WHERE id = ? AND workspace_id = ?
+        `).run(nextResolution, JSON.stringify(nextMetadata), now, now, taskId, workspaceId)
+
+        db.prepare(`
+          INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+          VALUES (?, 'system', ?, ?, ?)
+        `).run(taskId, `Bypass Not Applicable applied. ${nextResolution}`, now, workspaceId)
+
+        db.prepare(`
+          INSERT INTO quality_reviews (task_id, reviewer, status, notes, created_at, workspace_id)
+          VALUES (?, 'owner', 'approved', ?, ?, ?)
+        `).run(taskId, `Owner-approved not-applicable bypass: ${bypassReason}`, now, workspaceId)
+
+        revokeTokensForTask(db, taskId)
+      })()
+
+      db_helpers.logActivity(
+        'task_updated',
+        'task',
+        taskId,
+        auth.user.username,
+        `Task bypassed as not applicable: ${currentTask.status} → done`,
+        {
+          changes: ['bypass_not_applicable', `status: ${currentTask.status} → done`],
+          law_firm: { case_slug: caseSlug, landmark },
+        },
+        workspaceId,
+      )
+
+      const updatedTask = db.prepare(`
+        SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+          ${reviewPrSelect('t')}
+        FROM tasks t
+        LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
+        WHERE t.id = ? AND t.workspace_id = ?
+      `).get(taskId, workspaceId) as Task
+      const parsedTask = mapTaskRow(updatedTask)
+      syncTaskOutbound(updatedTask as any, workspaceId)
+      eventBus.broadcast('task.updated', parsedTask)
+
+      return NextResponse.json({
+        task: parsedTask,
+        bypass: {
+          case_slug: caseSlug,
+          landmark,
+          status: 'not_applicable',
+        },
+      })
+    }
 
     // ---------------------------------------------------------------------------
     // Phase 13 — runtime-context business rules (TCTX-01..06).
@@ -409,6 +566,7 @@ export async function PUT(
       updateParams.push(description);
     }
     if (normalizedStatus !== undefined) {
+      const isHumanReviewGate = isHumanWorkflowReviewTask(currentTask as unknown as Record<string, unknown>)
       // Phase 09 — GSD-15, D-30, D-31, D-32: gate enforcement on forward motion
       //   D-31: only 'in_progress' and 'done' are gated; backward/sideways motion
       //         (backlog, review, awaiting_owner, inbox, assigned, etc.) bypasses.
@@ -426,7 +584,12 @@ export async function PUT(
         }, { status: 403 })
       }
 
-      if (normalizedStatus === 'done' && !hasAegisApproval(db, taskId, workspaceId)) {
+      if (
+        normalizedStatus === 'done' &&
+        !currentRecipeSlug &&
+        !isHumanReviewGate &&
+        !hasAegisApproval(db, taskId, workspaceId)
+      ) {
         return NextResponse.json(
           { error: 'Aegis approval is required to move task to done.' },
           { status: 403 }
@@ -522,7 +685,7 @@ export async function PUT(
         // Re-SELECT the fresh row (not currentTask) so the response reflects
         // the committed envelope + status.
         const freshRow = db.prepare(
-          'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
+          `SELECT t.*, ${reviewPrSelect('t')} FROM tasks t WHERE t.id = ? AND t.workspace_id = ?`,
         ).get(taskId, workspaceId) as Task
         const freshTask = mapTaskRow(freshRow)
 
@@ -621,7 +784,7 @@ export async function PUT(
         }
 
         const freshRow = db.prepare(
-          'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
+          `SELECT t.*, ${reviewPrSelect('t')} FROM tasks t WHERE t.id = ? AND t.workspace_id = ?`,
         ).get(taskId, workspaceId) as Task
         const freshTask = mapTaskRow(freshRow)
 
@@ -724,6 +887,9 @@ export async function PUT(
     if (error_message !== undefined) {
       fieldsToUpdate.push('error_message = ?');
       updateParams.push(error_message);
+    } else if (normalizedStatus === 'quality_review' && currentTask.status !== 'quality_review') {
+      fieldsToUpdate.push('error_message = ?');
+      updateParams.push(null);
     }
     if (resolution !== undefined) {
       fieldsToUpdate.push('resolution = ?');
@@ -814,6 +980,20 @@ export async function PUT(
         revokeTokensForTask(db, taskId);
       }
     })();
+
+    const humanReviewWorkflowAdvancement = normalizedStatus === 'done'
+      && currentTask.status !== 'done'
+      && isHumanWorkflowReviewTask(currentTask as unknown as Record<string, unknown>)
+      ? advanceWorkflowAfterTaskApproval(db, {
+        taskId,
+        actor: auth.user.username,
+        payload: {
+          source: 'human_review',
+          reviewer: auth.user.username,
+        },
+        status: 'inbox',
+      })
+      : null
     
     // Track changes and log activities
     const changes: string[] = [];
@@ -911,7 +1091,8 @@ export async function PUT(
     
     // Fetch updated task
     const updatedTask = db.prepare(`
-      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+        ${reviewPrSelect('t')}
       FROM tasks t
       LEFT JOIN projects p ON p.id = t.project_id AND p.workspace_id = t.workspace_id
       WHERE t.id = ? AND t.workspace_id = ?
@@ -925,6 +1106,36 @@ export async function PUT(
 
     // Broadcast to SSE clients
     eventBus.broadcast('task.updated', parsedTask);
+
+    if (
+      currentTask.status !== 'assigned' &&
+      normalizedStatus === 'assigned' &&
+      (currentTask as unknown as { recipe_slug: string | null }).recipe_slug != null &&
+      (currentTask as unknown as { recipe_slug: string }).recipe_slug !== ''
+    ) {
+      eventBus.broadcast('task.runner_requested', {
+        task_id: taskId,
+        recipe_slug: (currentTask as unknown as { recipe_slug: string }).recipe_slug,
+        workspace_id: workspaceId,
+      })
+    }
+
+    if (
+      currentTask.status !== 'quality_review' &&
+      normalizedStatus === 'quality_review' &&
+      (currentTask as unknown as { recipe_slug: string | null }).recipe_slug != null &&
+      (currentTask as unknown as { recipe_slug: string }).recipe_slug !== ''
+    ) {
+      const recipe = getIndexedRecipeBySlug((currentTask as unknown as { recipe_slug: string }).recipe_slug)
+      if (recipe && recipe.error_message === null && recipe.review_md) {
+        eventBus.broadcast('task.runner_requested', {
+          task_id: taskId,
+          recipe_slug: (currentTask as unknown as { recipe_slug: string }).recipe_slug,
+          runner_mode: 'review',
+          workspace_id: workspaceId,
+        })
+      }
+    }
 
     // Plan 20-03 ROUTE-02 — recipe resume detection (Site 4).
     // Only the awaiting_owner → assigned flip on a recipe-tagged task emits
@@ -972,7 +1183,10 @@ export async function PUT(
       })
     }
 
-    return NextResponse.json({ task: parsedTask });
+    return NextResponse.json({
+      task: parsedTask,
+      ...(humanReviewWorkflowAdvancement ? { workflow_advancement: humanReviewWorkflowAdvancement } : {}),
+    });
   } catch (error) {
     logger.error({ err: error }, 'PUT /api/tasks/[id] error');
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });

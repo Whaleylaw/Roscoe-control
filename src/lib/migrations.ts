@@ -1771,6 +1771,356 @@ const migrations: Migration[] = [
       `)
       db.exec(`CREATE INDEX IF NOT EXISTS idx_task_runner_attempts_task ON task_runner_attempts(task_id, attempt DESC)`)
     }
+  },
+  {
+    id: '062_recipe_review_md',
+    up(db: Database.Database) {
+      const recipeCols = db.prepare(`PRAGMA table_info(recipes)`).all() as Array<{ name: string }>
+      const hasRecipeCol = (n: string) => recipeCols.some((c) => c.name === n)
+
+      if (!hasRecipeCol('review_md')) {
+        db.exec(`ALTER TABLE recipes ADD COLUMN review_md TEXT`)
+      }
+    }
+  },
+  {
+    id: '063_workflow_engine_v1',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workflow_definitions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL,
+          name TEXT NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          subject_type TEXT NOT NULL DEFAULT 'generic',
+          definition_yaml TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_by TEXT NOT NULL DEFAULT 'system',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE (workspace_id, slug, version)
+        );
+
+        CREATE TABLE IF NOT EXISTS workflow_instances (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          definition_id INTEGER NOT NULL,
+          workflow_key TEXT NOT NULL,
+          subject_type TEXT NOT NULL,
+          subject_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          started_by TEXT NOT NULL DEFAULT 'system',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          tenant_id INTEGER NOT NULL DEFAULT 1,
+          started_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          completed_at INTEGER,
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (definition_id) REFERENCES workflow_definitions(id) ON DELETE RESTRICT,
+          UNIQUE (workspace_id, workflow_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS workflow_node_instances (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workflow_instance_id INTEGER NOT NULL,
+          node_key TEXT NOT NULL,
+          node_type TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          recipe_slug TEXT,
+          task_id INTEGER,
+          review_task_id INTEGER,
+          due_at INTEGER,
+          review_round INTEGER NOT NULL DEFAULT 0,
+          depends_on_json TEXT NOT NULL DEFAULT '[]',
+          blocked_by_json TEXT NOT NULL DEFAULT '[]',
+          config_json TEXT NOT NULL DEFAULT '{}',
+          output_json TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          started_at INTEGER,
+          completed_at INTEGER,
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+          FOREIGN KEY (review_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+          UNIQUE (workflow_instance_id, node_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS workflow_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workflow_instance_id INTEGER NOT NULL,
+          node_instance_id INTEGER,
+          task_id INTEGER,
+          node_key TEXT,
+          event_type TEXT NOT NULL,
+          actor_type TEXT NOT NULL,
+          actor_id TEXT,
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+          FOREIGN KEY (node_instance_id) REFERENCES workflow_node_instances(id) ON DELETE SET NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_workflow_definitions_workspace_slug ON workflow_definitions(workspace_id, slug, version);
+        CREATE INDEX IF NOT EXISTS idx_workflow_instances_subject ON workflow_instances(workspace_id, subject_type, subject_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_instances_definition ON workflow_instances(definition_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_instances_workflow_status ON workflow_node_instances(workflow_instance_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_instances_task ON workflow_node_instances(task_id);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_instances_due ON workflow_node_instances(status, due_at);
+        CREATE INDEX IF NOT EXISTS idx_workflow_events_instance_created ON workflow_events(workflow_instance_id, created_at, id);
+        CREATE INDEX IF NOT EXISTS idx_workflow_events_task ON workflow_events(task_id, created_at);
+      `)
+    }
+  },
+  {
+    id: '064_workflow_dependency_index',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workflow_node_dependencies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          workflow_instance_id INTEGER NOT NULL,
+          node_instance_id INTEGER NOT NULL,
+          node_key TEXT NOT NULL,
+          dependency_type TEXT NOT NULL,
+          dependency_key TEXT NOT NULL,
+          dependency_semantics TEXT NOT NULL DEFAULT 'blocks',
+          dependency_group TEXT,
+          source_node_key TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          duration_seconds INTEGER,
+          reference_at INTEGER,
+          due_at INTEGER,
+          satisfied_at INTEGER,
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+          FOREIGN KEY (node_instance_id) REFERENCES workflow_node_instances(id) ON DELETE CASCADE,
+          UNIQUE (node_instance_id, dependency_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_key_status
+          ON workflow_node_dependencies(workspace_id, dependency_type, dependency_key, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_node_status
+          ON workflow_node_dependencies(node_instance_id, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_due
+          ON workflow_node_dependencies(workspace_id, dependency_type, status, due_at);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_source
+          ON workflow_node_dependencies(workflow_instance_id, source_node_key, dependency_type, status);
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_semantics
+          ON workflow_node_dependencies(node_instance_id, dependency_semantics, dependency_group, status);
+      `)
+    }
+  },
+  {
+    id: '065_workflow_dependency_semantics',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(workflow_node_dependencies)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('dependency_semantics')) {
+        db.exec(`ALTER TABLE workflow_node_dependencies ADD COLUMN dependency_semantics TEXT NOT NULL DEFAULT 'blocks'`)
+      }
+      if (!hasCol('dependency_group')) {
+        db.exec(`ALTER TABLE workflow_node_dependencies ADD COLUMN dependency_group TEXT`)
+      }
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_workflow_node_dependencies_semantics
+          ON workflow_node_dependencies(node_instance_id, dependency_semantics, dependency_group, status);
+      `)
+    }
+  },
+  {
+    id: '066_workflow_instance_vars',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(workflow_instances)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('vars_json')) {
+        db.exec(`ALTER TABLE workflow_instances ADD COLUMN vars_json TEXT NOT NULL DEFAULT '{}'`)
+      }
+    }
+  },
+  {
+    id: '067_task_review_prs',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_review_prs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_id INTEGER NOT NULL,
+          workspace_id INTEGER NOT NULL DEFAULT 1,
+          provider TEXT NOT NULL,
+          remote_name TEXT NOT NULL,
+          remote_url TEXT NOT NULL,
+          repo_owner TEXT NOT NULL,
+          repo_name TEXT NOT NULL,
+          base_ref TEXT NOT NULL,
+          head_ref TEXT NOT NULL,
+          branch_name TEXT NOT NULL,
+          pr_number INTEGER NOT NULL,
+          pr_url TEXT NOT NULL,
+          state TEXT NOT NULL DEFAULT 'open',
+          merge_commit_sha TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          last_checked_at INTEGER,
+          metadata_json TEXT NOT NULL DEFAULT '{}',
+          FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_task_review_prs_task
+          ON task_review_prs(task_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_task_review_prs_open
+          ON task_review_prs(workspace_id, provider, state, last_checked_at);
+        DROP INDEX IF EXISTS idx_task_review_prs_unique_provider_pr;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_review_prs_unique_provider_pr
+          ON task_review_prs(workspace_id, provider, remote_url, repo_owner, repo_name, pr_number);
+      `)
+    }
+  },
+  {
+    id: '068_email_triage',
+    up(db: Database.Database) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS email_triage_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          gmail_message_id TEXT NOT NULL UNIQUE,
+          gmail_thread_id TEXT,
+          sent_at INTEGER,
+          from_name TEXT,
+          from_email TEXT,
+          sender_domain TEXT,
+          to_json TEXT NOT NULL DEFAULT '[]',
+          cc_json TEXT NOT NULL DEFAULT '[]',
+          subject TEXT,
+          snippet TEXT,
+          body_hash TEXT,
+          labels_json TEXT NOT NULL DEFAULT '[]',
+          is_unread INTEGER NOT NULL DEFAULT 1,
+          has_attachments INTEGER NOT NULL DEFAULT 0,
+          bucket TEXT NOT NULL DEFAULT 'needs_review',
+          confidence REAL,
+          reason TEXT,
+          suggested_action TEXT NOT NULL DEFAULT 'none',
+          review_status TEXT NOT NULL DEFAULT 'pending',
+          action_taken TEXT,
+          case_slug TEXT,
+          firmvault_path TEXT,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_email_triage_bucket_status
+          ON email_triage_messages(bucket, review_status, sent_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_email_triage_sender
+          ON email_triage_messages(sender_domain, from_email);
+        CREATE INDEX IF NOT EXISTS idx_email_triage_thread
+          ON email_triage_messages(gmail_thread_id);
+        CREATE INDEX IF NOT EXISTS idx_email_triage_unread
+          ON email_triage_messages(is_unread, sent_at DESC);
+
+        CREATE TABLE IF NOT EXISTS email_triage_actions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          action TEXT NOT NULL,
+          actor TEXT NOT NULL DEFAULT 'mission-control',
+          message_count INTEGER NOT NULL DEFAULT 0,
+          detail_json TEXT NOT NULL DEFAULT '{}',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_email_triage_actions_created
+          ON email_triage_actions(created_at DESC);
+      `)
+    }
+  },
+  {
+    id: '069_email_triage_learning_and_body_preview',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(email_triage_messages)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('body_text')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN body_text TEXT`)
+      if (!hasCol('body_fetched_at')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN body_fetched_at INTEGER`)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS email_triage_rules (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          scope TEXT NOT NULL,
+          pattern TEXT NOT NULL,
+          bucket TEXT NOT NULL,
+          suggested_action TEXT NOT NULL DEFAULT 'none',
+          confidence REAL NOT NULL DEFAULT 0.99,
+          source TEXT NOT NULL DEFAULT 'manual_correction',
+          actor TEXT NOT NULL DEFAULT 'mission-control',
+          hit_count INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(scope, pattern)
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_triage_rules_lookup
+          ON email_triage_rules(scope, pattern, bucket);
+      `)
+    }
+  },
+  {
+    id: '070_email_triage_case_routing_contacts',
+    up(db: Database.Database) {
+      const cols = db.prepare(`PRAGMA table_info(email_triage_messages)`).all() as Array<{ name: string }>
+      const hasCol = (name: string) => cols.some((col) => col.name === name)
+      if (!hasCol('contact_name')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_name TEXT`)
+      if (!hasCol('contact_match_type')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_match_type TEXT`)
+      if (!hasCol('contact_match_value')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_match_value TEXT`)
+      if (!hasCol('contact_confidence')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN contact_confidence REAL`)
+      if (!hasCol('tags_json')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'`)
+      if (!hasCol('paralegal_review_status')) db.exec(`ALTER TABLE email_triage_messages ADD COLUMN paralegal_review_status TEXT`)
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS law_firm_contact_index (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          case_slug TEXT NOT NULL,
+          contact_name TEXT,
+          match_type TEXT NOT NULL,
+          match_value TEXT NOT NULL,
+          source_path TEXT NOT NULL,
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          UNIQUE(case_slug, match_type, match_value, source_path)
+        );
+        CREATE INDEX IF NOT EXISTS idx_law_firm_contact_index_lookup
+          ON law_firm_contact_index(match_type, match_value, case_slug);
+        CREATE INDEX IF NOT EXISTS idx_law_firm_contact_index_case
+          ON law_firm_contact_index(case_slug);
+
+        CREATE TABLE IF NOT EXISTS email_triage_case_reviews (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email_message_id INTEGER NOT NULL UNIQUE,
+          gmail_message_id TEXT NOT NULL,
+          gmail_thread_id TEXT,
+          case_slug TEXT,
+          contact_name TEXT,
+          match_type TEXT,
+          match_value TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          source TEXT NOT NULL DEFAULT 'email_reviewer',
+          firmvault_path TEXT,
+          attachments_json TEXT NOT NULL DEFAULT '[]',
+          error_message TEXT,
+          processed_at INTEGER,
+          detail_json TEXT NOT NULL DEFAULT '{}',
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          FOREIGN KEY (email_message_id) REFERENCES email_triage_messages(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_email_triage_case_reviews_status
+          ON email_triage_case_reviews(status, case_slug, created_at DESC);
+      `)
+
+      const reviewCols = db.prepare(`PRAGMA table_info(email_triage_case_reviews)`).all() as Array<{ name: string }>
+      const hasReviewCol = (name: string) => reviewCols.some((col) => col.name === name)
+      if (!hasReviewCol('firmvault_path')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN firmvault_path TEXT`)
+      if (!hasReviewCol('attachments_json')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN attachments_json TEXT NOT NULL DEFAULT '[]'`)
+      if (!hasReviewCol('error_message')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN error_message TEXT`)
+      if (!hasReviewCol('processed_at')) db.exec(`ALTER TABLE email_triage_case_reviews ADD COLUMN processed_at INTEGER`)
+    }
   }
 ]
 

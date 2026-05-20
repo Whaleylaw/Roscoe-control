@@ -686,6 +686,32 @@ describe('POST /api/runner/tasks/:task_id/runner-exit', () => {
     expect(types).not.toContain('task.runner_requested')
   })
 
+  it('does not clobber a recipe blocker handoff that already moved the task to review', async () => {
+    const taskId = seedTask({
+      status: 'review',
+      runner_attempts: 3,
+      runner_max_attempts: 3,
+      container_id: 'pending:1:3',
+    })
+    seedAttempt(taskId, 3)
+
+    asRunner()
+    const { req, params } = makePost(taskId, {
+      exit_code: 2,
+      reason: 'exit',
+      attempt: 3,
+    })
+    const res = await POST(req, { params })
+
+    expect(res.status).toBe(204)
+    expect(getTask(taskId).status).toBe('review')
+    expect(getTask(taskId).runner_last_failure_reason).toBeNull()
+
+    const types = broadcastMock.mock.calls.map((c) => c[0])
+    expect(types).toContain('task.container_exited')
+    expect(types).not.toContain('task.runner_requested')
+  })
+
   // --------------------------------------------------------------------------
   // 12. timeout reason → task.container_exited reason='timeout'.
   // --------------------------------------------------------------------------

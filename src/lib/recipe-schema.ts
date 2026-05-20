@@ -19,6 +19,7 @@
  *   - `model.primary`: MUST be in `model-registry` (MODEL-02)
  *   - `env`: Record<string, string>, default {}
  *   - `secrets`: string[] (ENV VAR names, not values), default []
+ *   - `tools`: string[] of recipe-agent tool names, default []
  *   - `tags`: string[], default []
  *   - `version`: positive integer, default 1
  *
@@ -53,6 +54,7 @@ export const recipeYamlSchema = z.object({
   max_attempts: z.number().int().min(1).max(10).optional(),
   env: z.record(z.string(), z.string()).default({}),
   secrets: z.array(z.string().min(1)).default([]),
+  tools: z.array(z.enum(['read_file', 'list_dir', 'grep_files', 'write_file', 'copy_case_template', 'run_shell'])).default([]),
   tags: z.array(z.string().min(1)).default([]),
   model: z.object({
     primary: z

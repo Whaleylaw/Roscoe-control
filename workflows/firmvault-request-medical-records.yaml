@@ -1,0 +1,271 @@
+schema_version: 1
+id: firmvault-request-medical-records
+name: FirmVault Request Medical Records and Bills
+version: 2
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  provider_slug:
+    description: FirmVault provider contact-stub slug for this provider-scoped records request workflow.
+    required: true
+    type: string
+  provider_name:
+    description: Provider display name, usually derived from the provider contact stub.
+    required: false
+    type: string
+  request_records:
+    description: Whether this workflow should request medical records.
+    default: true
+    type: boolean
+  request_bills:
+    description: Whether this workflow should request itemized bills.
+    default: true
+    type: boolean
+  litigation_certified_records:
+    description: Whether certified records language should be included because the case is in litigation.
+    default: false
+    type: boolean
+  send_method_preference:
+    description: Preferred outbound method for the human send gateway.
+    default: fax
+    enum: [fax, email, mail, manual]
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as provider_treatment_complete, demand_preparation, or manual.
+    default: manual
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.provider.treatment_complete == true
+  - type: condition
+    condition: law_firm.landmarks.treatment_complete == true
+  - type: event
+    event: law_firm.medical_records_request.manual
+  - type: event
+    event: law_firm.demand_preparation.records_needed
+
+nodes:
+  verify_medical_authorization:
+    type: recipe
+    name: Verify HIPAA Authorization
+    recipe: firmvault-medical-records-verify-authorization
+    description_file: recipes/firmvault-medical-records-verify-authorization/references/source-skill-medical-records-request.md
+    completes:
+      - law_firm.landmarks.medical_auth_verified
+    config:
+      task_goal: >-
+        Confirm a signed HIPAA or medical authorization exists by checking the
+        canonical authorization ledger and shadows: client/authorizations.md,
+        documents/shadows/client/hipaa-authorization-signed.md, and
+        documents/shadows/client/medical-authorization-signed.md. Do not broadly
+        search for the document unless the ledger says it exists but the
+        canonical shadow is missing; in that case repair the filing defect
+        first, then rely on the canonical path. If missing, route to review with
+        the precise missing authorization issue.
+      provider_scoped: true
+      stale_sources_rejected:
+        - deprecated per-case JSON files
+        - graph database state
+        - absolute-path scaffolding
+        - raw PHI storage
+
+  prepare_records_request:
+    type: recipe
+    name: Prepare Records and Bills Request
+    recipe: firmvault-request-records-bills-prepare-request
+    description_file: recipes/firmvault-request-records-bills-prepare-request/references/README.md
+    depends_on:
+      nodes:
+        - verify_medical_authorization
+    completes:
+      - law_firm.provider.records_request_packet_prepared
+    config:
+      task_goal: >-
+        Prepare the provider-specific request packet or request shadow using
+        vault data only, including provider details, treatment date range,
+        requested records, requested bills, and authorization attachment
+        checklist. The authorization attachment must come from the canonical
+        client authorization ledger and shadow paths, not a broad document
+        search.
+      certified_records_if_litigation: "{{litigation_certified_records}}"
+      provider_scoped: true
+
+  send_records_request:
+    type: recipe
+    name: Human Send Gateway for Medical Records and Bills Request
+    recipe: firmvault-request-records-bills-send-request
+    description_file: recipes/firmvault-request-records-bills-send-request/references/README.md
+    depends_on:
+      nodes:
+        - prepare_records_request
+    completes:
+      - law_firm.provider.records_request_sent
+    config:
+      task_goal: Confirm the request packet was sent by a human or prepare an exact human handoff. Record request method, confirmation if available, activity/ entry, and 15-day follow-up date. Do not claim all-provider landmarks from this provider-scoped node.
+      human_gateway: true
+      preferred_method: "{{send_method_preference}}"
+      aggregate_landmarks_require_separate_check:
+        - law_firm.landmarks.records_requested_all_providers
+        - law_firm.landmarks.bills_requested_all_providers
+
+  wait_15_days_for_records:
+    type: wait
+    name: Wait 15 Days for Records and Bills
+    duration: 15d
+    depends_on:
+      nodes:
+        - send_records_request
+    exit_when:
+      condition: law_firm.provider.records_and_bills_received == true
+    config:
+      task_goal: Wait 15 days after request send unless the provider's records and bills arrive first.
+
+  first_follow_up_records_request:
+    type: recipe
+    name: First Follow-Up on Medical Records and Bills
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
+    depends_on:
+      nodes:
+        - wait_15_days_for_records
+    completes:
+      - law_firm.provider.first_records_follow_up_complete
+    config:
+      task_goal: If records or bills have not arrived 15 days after the request, check for receipt first, then prepare or document first follow-up, provider status, fee issue, HIPAA issue, wrong contact issue, or expected production date.
+      provider_scoped: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  wait_15_more_days_for_second_follow_up:
+    type: wait
+    name: Wait Until 30-Day Second Follow-Up
+    duration: 15d
+    depends_on:
+      nodes:
+        - first_follow_up_records_request
+    exit_when:
+      condition: law_firm.provider.records_and_bills_received == true
+    config:
+      task_goal: Wait 15 more days after first follow-up unless the provider's records and bills arrive first.
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  second_follow_up_records_request:
+    type: recipe
+    name: Second Follow-Up on Medical Records and Bills
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
+    depends_on:
+      nodes:
+        - wait_15_more_days_for_second_follow_up
+    completes:
+      - law_firm.provider.second_records_follow_up_complete
+    config:
+      task_goal: If records or bills remain outstanding 30 days after the original request, check for receipt first, then prepare or document the second follow-up and capture the provider's response, fee issue, HIPAA issue, or expected production date.
+      provider_scoped: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  wait_15_more_days_for_third_follow_up:
+    type: wait
+    name: Wait Until 45-Day Third Follow-Up
+    duration: 15d
+    depends_on:
+      nodes:
+        - second_follow_up_records_request
+    exit_when:
+      condition: law_firm.provider.records_and_bills_received == true
+    config:
+      task_goal: Wait 15 more days after the second follow-up unless the provider's records and bills arrive first.
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  third_follow_up_records_request:
+    type: recipe
+    name: Third Follow-Up on Medical Records and Bills
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
+    depends_on:
+      nodes:
+        - wait_15_more_days_for_third_follow_up
+    completes:
+      - law_firm.provider.third_records_follow_up_complete
+    config:
+      task_goal: If records or bills remain outstanding 45 days after the original request, check for receipt first, then prepare or document the third follow-up and identify whether provider delay, fee, HIPAA, wrong contact, or production-date issues explain the delay.
+      provider_scoped: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  wait_15_more_days_for_escalation:
+    type: wait
+    name: Wait Until 60-Day Escalation
+    duration: 15d
+    depends_on:
+      nodes:
+        - third_follow_up_records_request
+    exit_when:
+      condition: law_firm.provider.records_and_bills_received == true
+    config:
+      task_goal: Wait 15 more days after the third follow-up unless the provider's records and bills arrive first.
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  escalate_records_request:
+    type: recipe
+    name: Escalate Delayed Medical Records and Bills
+    recipe: firmvault-request-records-bills-follow-up
+    description_file: recipes/firmvault-request-records-bills-follow-up/references/README.md
+    depends_on:
+      nodes:
+        - wait_15_more_days_for_escalation
+    completes:
+      - law_firm.provider.records_request_escalated
+    config:
+      task_goal: If records or bills are still missing 60 days after the original request, check for receipt first, then prepare attorney-review escalation to office manager, compliance/privacy officer, formal demand, subpoena strategy, or other legal intervention if litigation is active.
+      provider_scoped: true
+      attorney_review_if_legal_intervention_needed: true
+      skip_when_condition: law_firm.provider.records_and_bills_received == true
+
+  receive_and_process_records_bills:
+    type: recipe
+    name: Receive and Process Records and Bills
+    recipe: firmvault-medical-records-receive-and-process
+    description_file: recipes/firmvault-medical-records-receive-and-process/references/follow-up-process.md
+    depends_on:
+      conditions:
+        - law_firm.provider.records_or_bills_received == true
+    completes:
+      - law_firm.provider.records_and_bills_processed
+    config:
+      task_goal: Confirm received records or bills are present in the vault shadow, verify completeness enough for case use, update provider receipt fields, write activity/ entry, and trigger medical chronology work when appropriate.
+      provider_scoped: true
+      aggregate_landmarks_require_separate_check:
+        - law_firm.landmarks.all_records_received
+        - law_firm.landmarks.all_bills_received
+      downstream_workflow_trigger: firmvault-medical-chronology-update
+
+  update_medical_chronology:
+    type: recipe
+    name: Update Medical Chronology
+    recipe: firmvault-medical-chronology-update
+    description_file: recipes/firmvault-medical-chronology-update/references/README.md
+    depends_on:
+      nodes:
+        - receive_and_process_records_bills
+    completes:
+      - law_firm.provider.medical_chronology_updated
+    config:
+      task_goal: Create or update the provider medical chronology from received records shadows, documenting missing pages or unclear visits for review.
+      provider_scoped: true
+
+  confirm_provider_records_workflow_complete:
+    type: review
+    name: Confirm Provider Records Workflow Complete
+    depends_on:
+      nodes:
+        - update_medical_chronology
+    review:
+      mode: human
+      max_rounds: 1
+      fallback: human
+    completes:
+      - law_firm.provider.medical_records_request_workflow_complete

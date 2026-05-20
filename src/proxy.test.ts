@@ -49,6 +49,69 @@ describe('proxy host matching', () => {
     expect(response.status).not.toBe(403)
   })
 
+  it('allows host.docker.internal implicitly for local runner callbacks', async () => {
+    vi.resetModules()
+    vi.doMock('node:os', () => ({
+      default: { hostname: () => 'hetzner-jarv' },
+      hostname: () => 'hetzner-jarv',
+    }))
+
+    const { proxy } = await import('./proxy')
+    const request = {
+      headers: new Headers({
+        host: 'host.docker.internal:3000',
+        authorization: 'Bearer task-runner-token',
+      }),
+      nextUrl: {
+        host: 'host.docker.internal:3000',
+        hostname: 'host.docker.internal',
+        pathname: '/api/runner/tasks/123/submit',
+        clone: () => ({ pathname: '/api/runner/tasks/123/submit' }),
+      },
+      method: 'POST',
+      cookies: { get: () => undefined },
+    } as any
+
+    setNodeEnv('production')
+    process.env.MC_ALLOWED_HOSTS = 'localhost,127.0.0.1'
+    delete process.env.MC_ALLOW_ANY_HOST
+
+    const response = proxy(request)
+    expect(response.status).not.toBe(403)
+  })
+
+  it('passes runner daemon API requests with bearer auth to route-level validation', async () => {
+    vi.resetModules()
+    vi.doMock('node:os', () => ({
+      default: { hostname: () => 'hetzner-jarv' },
+      hostname: () => 'hetzner-jarv',
+    }))
+
+    const { proxy } = await import('./proxy')
+    const request = {
+      headers: new Headers({
+        host: 'localhost:3000',
+        authorization: 'Bearer runner-daemon-secret',
+      }),
+      nextUrl: {
+        host: 'localhost:3000',
+        hostname: 'localhost',
+        pathname: '/api/runner/config',
+        searchParams: new URLSearchParams(),
+        clone: () => ({ pathname: '/api/runner/config' }),
+      },
+      method: 'GET',
+      cookies: { get: () => undefined },
+    } as any
+
+    setNodeEnv('production')
+    process.env.MC_ALLOWED_HOSTS = 'localhost,127.0.0.1'
+    delete process.env.MC_ALLOW_ANY_HOST
+
+    const response = proxy(request)
+    expect(response.status).not.toBe(401)
+  })
+
   it('keeps blocking unrelated hosts in production', async () => {
     vi.resetModules()
     vi.doMock('node:os', () => ({

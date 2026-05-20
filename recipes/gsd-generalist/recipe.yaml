@@ -1,0 +1,24 @@
+slug: gsd-generalist
+name: GSD Generalist
+description: General-purpose fallback specialist for mixed tasks when no specific recipe class matches.
+when_to_use: Use when task class routes to gsd-generalist in gsd-orchestrator workflow.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 2400
+max_concurrent: 2
+max_attempts: 2
+secrets:
+  - OPENAI_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - gsd
+  - generalist
+model:
+  primary: openai/gpt-5.3-codex
+  provider: openai-codex
+  params:
+    temperature: 0.2

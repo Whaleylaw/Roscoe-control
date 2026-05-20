@@ -16,10 +16,12 @@ function makeRecipeFixture(parentDir: string): string {
   const recipeDir = path.join(parentDir, 'hello-world')
   fs.mkdirSync(path.join(recipeDir, 'tools'), { recursive: true })
   fs.mkdirSync(path.join(recipeDir, 'skills'), { recursive: true })
+  fs.mkdirSync(path.join(recipeDir, 'references'), { recursive: true })
   fs.writeFileSync(path.join(recipeDir, 'SOUL.md'), '# SOUL — say hello\n')
   fs.writeFileSync(path.join(recipeDir, 'README.md'), '# hello-world recipe\n')
   fs.writeFileSync(path.join(recipeDir, 'tools', 'a.txt'), 'tool-a contents\n')
   fs.writeFileSync(path.join(recipeDir, 'skills', 'b.txt'), 'skill-b contents\n')
+  fs.writeFileSync(path.join(recipeDir, 'references', 'c.txt'), 'reference-c contents\n')
   return recipeDir
 }
 
@@ -59,7 +61,7 @@ describe('runner recipe-stage copy + PREAMBLE.md write', () => {
     expect(rel.startsWith('..')).toBe(true)
   })
 
-  it('deep copy includes tools/, skills/, README.md, SOUL.md (no shallow copy; no dangling files)', async () => {
+  it('deep copy includes tools/, skills/, references/, README.md, SOUL.md (no shallow copy; no dangling files)', async () => {
     await stageRecipe({
       sourceDir: recipeDir,
       stageDir,
@@ -70,6 +72,9 @@ describe('runner recipe-stage copy + PREAMBLE.md write', () => {
     expect(fs.readFileSync(path.join(stageDir, 'tools', 'a.txt'), 'utf8')).toBe('tool-a contents\n')
     expect(fs.readFileSync(path.join(stageDir, 'skills', 'b.txt'), 'utf8')).toBe(
       'skill-b contents\n',
+    )
+    expect(fs.readFileSync(path.join(stageDir, 'references', 'c.txt'), 'utf8')).toBe(
+      'reference-c contents\n',
     )
   })
 

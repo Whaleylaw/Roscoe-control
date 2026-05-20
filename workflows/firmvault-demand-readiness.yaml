@@ -1,0 +1,71 @@
+schema_version: 1
+id: firmvault-demand-readiness
+name: FirmVault Demand Readiness
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as records_bills_complete, manual, or demand_preparation.
+    default: records_bills_complete
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.all_records_received == true
+  - type: condition
+    condition: law_firm.landmarks.all_bills_received == true
+  - type: event
+    event: law_firm.demand_readiness.manual
+
+nodes:
+  gather_demand_materials:
+    type: recipe
+    name: Gather Demand Materials
+    recipe: firmvault-demand-gather-materials
+    description_file: recipes/firmvault-demand-gather-materials/references/README.md
+    depends_on:
+      conditions:
+        - law_firm.landmarks.all_records_received == true
+        - law_firm.landmarks.all_bills_received == true
+        - law_firm.landmarks.medical_chronology_updated == true
+    completes:
+      - law_firm.landmarks.demand_materials_gathered
+      - law_firm.landmarks.damages_calculated
+    config:
+      task_goal: >-
+        Gather the demand-ready case materials from canonical FirmVault paths.
+        Read provider records/bills ledgers, medical bills shadows, medical
+        chronologies, lien clues, insurance ledgers, accident/liability ledgers,
+        and existing demand/readiness.md. Update demand/readiness.md with a
+        supported readiness summary, medical specials, missing items, lien/payor
+        issues, insurance claim posture, and whether the file is ready for the
+        Draft Demand workflow. Do not draft the demand letter.
+      canonical_paths:
+        - demand/readiness.md
+        - medical-providers/
+        - liens/
+        - insurance/
+        - accident/
+        - activity/
+        - workflow-log/
+
+  confirm_demand_readiness:
+    type: review
+    name: Confirm Demand Readiness
+    depends_on:
+      nodes:
+        - gather_demand_materials
+    completes:
+      - law_firm.landmarks.demand_readiness_reviewed
+    review:
+      mode: human
+    config:
+      task_goal: >-
+        Human review of the demand readiness summary. Confirm whether the case is
+        ready to move into demand drafting, whether more records/bills/lien work
+        is needed, or whether attorney direction is required before drafting.

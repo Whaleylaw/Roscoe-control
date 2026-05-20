@@ -1,6 +1,6 @@
 import { readdir, readFile, stat, writeFile } from 'fs/promises'
 import { createHash } from 'crypto'
-import { join } from 'path'
+import { basename, join } from 'path'
 import type { Database } from 'better-sqlite3'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 
@@ -36,6 +36,7 @@ export type LawFirmCaseDetail = {
   summary: LawFirmCaseSummary
   dashboard: {
     claims: Array<Record<string, string>>
+    medical_providers: LawFirmMedicalProvider[]
     recent_activity: Array<{ file: string; date: string | null; category: string | null; title: string; excerpt: string }>
   }
   state: {
@@ -44,6 +45,30 @@ export type LawFirmCaseDetail = {
     landmarks: LawFirmLandmark[]
   }
   files: Array<{ name: string; kind: 'markdown' | 'directory' | 'other' }>
+}
+
+export type LawFirmMedicalProvider = {
+  slug: string
+  name: string
+  role: string | null
+  treatment_status: string | null
+  records_requested: boolean | null
+  records_received: boolean | null
+  bills_requested: boolean | null
+  bills_received: boolean | null
+  records_requested_date: string | null
+  records_received_date: string | null
+  bills_requested_date: string | null
+  bills_received_date: string | null
+}
+
+type RoscoeMedicalRow = {
+  provider: string
+  status: string | null
+  bills_requested_date: string | null
+  bills_received_date: string | null
+  records_requested_date: string | null
+  records_received_date: string | null
 }
 
 export type LawFirmCaseProject = {
@@ -90,8 +115,9 @@ export async function readLawFirmCaseDetail(slug: string): Promise<LawFirmCaseDe
     readState(caseDir),
     readCaseFiles(caseDir),
   ])
-  const [claims, recentActivity] = await Promise.all([
+  const [claims, medicalProviders, recentActivity] = await Promise.all([
     readClaims(caseDir),
+    readMedicalProviders(caseDir),
     readRecentActivity(caseDir),
   ])
 
@@ -99,6 +125,7 @@ export async function readLawFirmCaseDetail(slug: string): Promise<LawFirmCaseDe
     summary,
     dashboard: {
       claims,
+      medical_providers: medicalProviders,
       recent_activity: recentActivity,
     },
     state: {
@@ -150,6 +177,92 @@ export async function updateLawFirmCaseState(
 
   await writeFile(statePath, stringifyYaml(state), 'utf8')
   return readLawFirmCaseDetail(slug)
+}
+
+export async function bypassLawFirmCaseLandmark(
+  slug: string,
+  landmarkKey: string,
+  reason: string,
+  actor: string,
+  taskId: number,
+): Promise<LawFirmCaseDetail> {
+  assertSafeCaseSlug(slug)
+  if (!/^[a-zA-Z0-9_:-]+$/.test(landmarkKey)) throw new Error('Invalid landmark key')
+
+  const caseDir = join(getLawFirmCasesRoot(), slug)
+  const now = new Date().toISOString()
+  const normalizedReason = reason.trim() || 'Marked not applicable in Mission Control.'
+  const evidence = `Bypassed as not applicable by ${actor}: ${normalizedReason}`
+
+  await Promise.all([
+    upsertStateLandmarkBypass(caseDir, landmarkKey, now, actor, evidence, taskId),
+    upsertCaseFrontmatterBypass(caseDir, slug, landmarkKey, now, actor, normalizedReason, taskId),
+  ])
+
+  return readLawFirmCaseDetail(slug)
+}
+
+async function upsertStateLandmarkBypass(
+  caseDir: string,
+  landmarkKey: string,
+  now: string,
+  actor: string,
+  evidence: string,
+  taskId: number,
+): Promise<void> {
+  const statePath = join(caseDir, 'state.yaml')
+  const raw = await readFile(statePath, 'utf8')
+  const parsed = parseYaml(raw)
+  const state = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+
+  const landmarks = objectRecord(state.landmarks)
+  const existing = objectRecord(landmarks[landmarkKey])
+  landmarks[landmarkKey] = {
+    ...existing,
+    satisfied: true,
+    satisfied_at: stringValue(existing.satisfied_at) || now,
+    satisfied_by: stringValue(existing.satisfied_by) || actor || 'mission-control',
+    evidence,
+    bypassed: true,
+    bypass_reason: evidence,
+    bypass_task_id: taskId,
+  }
+  state.landmarks = landmarks
+  await writeFile(statePath, stringifyYaml(state), 'utf8')
+}
+
+async function upsertCaseFrontmatterBypass(
+  caseDir: string,
+  slug: string,
+  landmarkKey: string,
+  now: string,
+  actor: string,
+  reason: string,
+  taskId: number,
+): Promise<void> {
+  const casePath = join(caseDir, `${slug}.md`)
+  const raw = await readFile(casePath, 'utf8')
+  const match = raw.match(/^---\n([\s\S]*?)\n---\n?/)
+  if (!match) throw new Error('Case file is missing YAML frontmatter')
+
+  const parsed = parseYaml(match[1])
+  const frontmatter = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+  const bypasses = objectRecord(frontmatter.workflow_bypasses)
+  bypasses[landmarkKey] = {
+    status: 'not_applicable',
+    reason,
+    task_id: taskId,
+    created_at: now,
+    created_by: actor || 'mission-control',
+  }
+  frontmatter.workflow_bypasses = bypasses
+
+  const next = `---\n${stringifyYaml(frontmatter)}---\n\n${raw.slice(match[0].length).replace(/^\n+/, '')}`
+  await writeFile(casePath, next, 'utf8')
 }
 
 export async function ensureLawFirmCaseProject(
@@ -298,6 +411,69 @@ async function readClaims(caseDir: string): Promise<Array<Record<string, string>
     ))
 }
 
+async function readMedicalProviders(caseDir: string): Promise<LawFirmMedicalProvider[]> {
+  const contactsDir = join(caseDir, 'contacts')
+  try {
+    const medicalRows = await readRoscoeMedicalRows(caseDir)
+    const entries = await readdir(contactsDir, { withFileTypes: true })
+    const providers = await Promise.all(entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md') && !entry.name.startsWith('.'))
+      .map(async (entry): Promise<LawFirmMedicalProvider | null> => {
+        const raw = await readFile(join(contactsDir, entry.name), 'utf8')
+        const frontmatter = parseMarkdownFrontmatter(raw)
+        const role = stringValue(frontmatter.role)
+        const tags = Array.isArray(frontmatter.tags) ? frontmatter.tags.map((tag) => String(tag)) : []
+        const isProvider = role === 'treating_provider' || tags.some((tag) => tag.includes('medical-provider'))
+        if (!isProvider) return null
+        const slug = entry.name.replace(/\.md$/, '')
+        const name = markdownTitle(raw) || titleFromSlug(slug)
+        const medicalRow = medicalRows.get(providerMatchKey(name)) ?? medicalRows.get(providerMatchKey(slug))
+        return {
+          slug,
+          name,
+          role,
+          treatment_status: medicalRow?.status ?? stringValue(frontmatter.treatment_status),
+          records_requested: medicalRow ? Boolean(medicalRow.records_requested_date) : booleanOrNull(frontmatter.records_requested),
+          records_received: medicalRow ? Boolean(medicalRow.records_received_date) : booleanOrNull(frontmatter.records_received),
+          bills_requested: medicalRow ? Boolean(medicalRow.bills_requested_date) : booleanOrNull(frontmatter.bills_requested),
+          bills_received: medicalRow ? Boolean(medicalRow.bills_received_date) : booleanOrNull(frontmatter.bills_received),
+          records_requested_date: medicalRow?.records_requested_date ?? stringValue(frontmatter.records_requested_date),
+          records_received_date: medicalRow?.records_received_date ?? stringValue(frontmatter.records_received_date),
+          bills_requested_date: medicalRow?.bills_requested_date ?? stringValue(frontmatter.bills_requested_date),
+          bills_received_date: medicalRow?.bills_received_date ?? stringValue(frontmatter.bills_received_date),
+        }
+      }))
+    return providers
+      .filter((provider): provider is LawFirmMedicalProvider => provider !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  } catch {
+    return []
+  }
+}
+
+async function readRoscoeMedicalRows(caseDir: string): Promise<Map<string, RoscoeMedicalRow>> {
+  const raw = await readOptionalFile(join(caseDir, `${basename(caseDir)}.md`))
+  const rows = new Map<string, RoscoeMedicalRow>()
+  if (!raw) return rows
+  const match = raw.match(/<!-- roscoe-medical-start -->([\s\S]*?)<!-- roscoe-medical-end -->/)
+  if (!match) return rows
+  const lines = match[1].split('\n').map((line) => line.trim()).filter((line) => line.startsWith('|'))
+  for (const line of lines) {
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim())
+    if (cells.length < 9 || cells[0] === 'Provider' || /^-+$/.test(cells[0])) continue
+    const row: RoscoeMedicalRow = {
+      provider: cells[0],
+      status: stringValue(cells[1]),
+      bills_requested_date: stringValue(cells[5]),
+      bills_received_date: stringValue(cells[6]),
+      records_requested_date: stringValue(cells[7]),
+      records_received_date: stringValue(cells[8]),
+    }
+    rows.set(providerMatchKey(row.provider), row)
+  }
+  return rows
+}
+
 async function readRecentActivity(caseDir: string): Promise<LawFirmCaseDetail['dashboard']['recent_activity']> {
   const activityDir = join(caseDir, 'Activity Log')
   try {
@@ -390,11 +566,38 @@ function assertSafeCaseSlug(slug: string) {
   }
 }
 
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
 function stringValue(value: unknown): string | null {
   if (value == null) return null
   if (value instanceof Date) return value.toISOString().slice(0, 10)
   const str = String(value).trim()
   return str || null
+}
+
+function booleanOrNull(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', 'yes', '1'].includes(normalized)) return true
+    if (['false', 'no', '0'].includes(normalized)) return false
+  }
+  return null
+}
+
+function markdownTitle(raw: string): string | null {
+  return raw.replace(/^---\n[\s\S]*?\n---\n?/, '').match(/^#\s+(.+)$/m)?.[1]?.trim() || null
+}
+
+function providerMatchKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 function normalizePhase(value: string | null): string | null {

@@ -1,0 +1,24 @@
+slug: gsd-paralegal-intake
+name: GSD Paralegal Intake
+description: Classifies legal intake tasks and prepares structured next-action packets.
+when_to_use: Use when task class routes to gsd-paralegal-intake in gsd-orchestrator workflow.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 2400
+max_concurrent: 2
+max_attempts: 2
+secrets:
+  - OPENAI_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - gsd
+  - legal
+model:
+  primary: openai/gpt-5.3-codex
+  provider: openai-codex
+  params:
+    temperature: 0.1

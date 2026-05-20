@@ -12,7 +12,7 @@ export function TaskFlowWidget({ data }: { data: DashboardData }) {
         <StatRow label="Inbox" value={inboxCount} />
         <StatRow label="Assigned" value={assignedCount} />
         <StatRow label="In Progress" value={runningTasks} />
-        <StatRow label="Review" value={reviewCount} />
+        <StatRow label="Human Review" value={reviewCount} />
         <StatRow label="Done" value={doneCount} />
         <StatRow label="Backlog" value={backlogCount} alert={backlogCount > 12} />
       </div>

@@ -1,0 +1,131 @@
+schema_version: 1
+id: firmvault-bi-claim-setup
+name: FirmVault BI Claim Setup
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as accident_report, intake, manual, or owner_supplied_carrier.
+    default: accident_report
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.accident_report_obtained == true
+  - type: condition
+    condition: law_firm.landmarks.at_fault_insurance_identified == true
+  - type: event
+    event: law_firm.insurance.bi.manual
+  - type: manual
+
+nodes:
+  identify_bi_carrier:
+    type: recipe
+    name: Identify BI Carrier
+    recipe: firmvault-insurance-bi-identify-carrier
+    depends_on:
+      conditions:
+        - law_firm.landmarks.accident_report_obtained == true
+    completes:
+      - law_firm.landmarks.at_fault_insurance_identified
+    config:
+      task_goal: >-
+        Read the canonical accident report, liability, intake, insurance, and
+        contact ledgers to identify the at-fault party and the supported BI
+        carrier. Create or normalize insurance/bi-<carrier-slug>.md and
+        case-local contact stubs only when supported by vault evidence. If the
+        BI carrier cannot be identified, route to human review with the exact
+        missing facts instead of broad searching or guessing.
+      canonical_paths:
+        - accident/police-report.md
+        - accident/accident.md
+        - accident/liability.md
+        - client/intake.md
+        - insurance/bi-<carrier-slug>.md
+        - contacts/<carrier-or-adjuster-slug>.md
+
+  prepare_bi_lor_handoff:
+    type: recipe
+    name: Prepare BI LOR Handoff
+    recipe: firmvault-insurance-bi-prepare-lor
+    depends_on:
+      nodes:
+        - identify_bi_carrier
+    completes:
+      - law_firm.landmarks.bi_lor_prepared
+    config:
+      task_goal: >-
+        Prepare a ready-to-send masked BI letter of representation at
+        documents/generated/insurance/bi-<carrier-slug>-lor.md using the
+        supported BI carrier ledger. The generated letter must include a
+        complete letter body, the carrier/recipient information currently known,
+        the client and incident facts, and clearly marked blanks or unknowns for
+        missing claim/adjuster/send details. Also prepare explicit human-send
+        instructions that point to the generated letter. Do not send mail, fax,
+        email, or portal messages. Do not claim a BI claim was opened or a LOR
+        was sent unless an existing sent shadow, activity entry, or owner
+        confirmation already supports it.
+      canonical_paths:
+        - insurance/bi-<carrier-slug>.md
+        - documents/generated/insurance/bi-<carrier-slug>-lor.md
+        - documents/sent/insurance/bi-<carrier-slug>-lor-sent.md
+        - activity/
+        - workflow-log/
+
+  human_send_bi_lor:
+    type: review
+    name: Human Send BI LOR
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_bi_lor_handoff
+    completes:
+      - law_firm.landmarks.bi_lor_sent
+    config:
+      task_goal: Review the generated BI letter of representation artifact now merged into the case branch at documents/generated/insurance/bi-<carrier-slug>-lor.md. The preceding Forgejo PR may be closed or show no diff after merge, so use the canonical generated artifact path on the case branch as the authoritative review surface. If the letter is acceptable, send it to the BI carrier by the available human channel such as email, mail, fax, portal, or phone-assisted claims submission. Then comment with send date, method, recipient, and any claim number or adjuster information received. If the letter cannot be sent because recipient or channel information is missing, comment with the exact missing information and leave the task in Human Review.
+
+  wait_for_bi_acknowledgment:
+    type: wait
+    name: Wait for BI Acknowledgment
+    duration: 5d
+    depends_on:
+      nodes:
+        - human_send_bi_lor
+    exit_when:
+      condition: law_firm.landmarks.bi_claim_acknowledged == true
+    config:
+      task_goal: Wait five days for BI carrier acknowledgment unless acknowledgment arrives earlier through document intake, owner confirmation, or a supported insurance ledger update.
+
+  process_bi_acknowledgment:
+    type: recipe
+    name: Process BI Acknowledgment or Follow Up
+    recipe: firmvault-insurance-bi-process-acknowledgment
+    depends_on:
+      nodes:
+        - wait_for_bi_acknowledgment
+    completes:
+      - law_firm.landmarks.bi_acknowledgment_checked
+    config:
+      task_goal: >-
+        Check the BI carrier ledger, sent LOR shadow, document shadows,
+        activity, workflow-log, and task comments for Progressive
+        acknowledgment. If acknowledgment arrived, normalize the BI ledger with
+        claim number, adjuster, contact details, acknowledgment date, and source
+        evidence without inventing missing fields. If no acknowledgment arrived
+        after the wait, prepare a human follow-up instruction or follow-up
+        letter draft and record the follow-up need without claiming external
+        contact. If mail was returned or defective, route to Human Review with
+        the exact correction needed.
+      canonical_paths:
+        - insurance/bi-<carrier-slug>.md
+        - documents/sent/insurance/bi-<carrier-slug>-lor-sent.md
+        - documents/shadows/insurance/
+        - documents/generated/insurance/
+        - activity/
+        - workflow-log/

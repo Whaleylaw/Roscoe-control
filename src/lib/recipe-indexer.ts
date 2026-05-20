@@ -22,7 +22,7 @@
  *   5. Parse + validate `recipe.yaml`
  *   6. On parse failure → write an error row + log + return `error`
  *   7. Verify the YAML's `slug` matches the directory name (else → error row)
- *   8. Read optional `SOUL.md`
+ *   8. Read optional `SOUL.md` and `REVIEW.md`
  *   9. UPSERT the full row (error_message set to NULL — this also handles the
  *      broken-to-valid recovery path so a fixed recipe becomes readable again)
  *
@@ -134,17 +134,23 @@ export async function indexRecipe(
     return { status: 'error', slug, error: reason }
   }
 
-  // Step 8: optional SOUL.md (null if missing).
+  // Step 8: optional SOUL.md and REVIEW.md (null if missing).
   let soulMd: string | null = null
   try {
     soulMd = await readFile(join(absDir, 'SOUL.md'), 'utf8')
   } catch {
     soulMd = null
   }
+  let reviewMd: string | null = null
+  try {
+    reviewMd = await readFile(join(absDir, 'REVIEW.md'), 'utf8')
+  } catch {
+    reviewMd = null
+  }
 
   // Step 9: UPSERT the full row. `ON CONFLICT ... DO UPDATE` fires the
   // `recipes_fts_au` trigger (migration 059) which re-syncs FTS5.
-  writeIndexedRow(db, parsed.value, dirSha, soulMd, workspaceId, tenantId)
+  writeIndexedRow(db, parsed.value, dirSha, soulMd, reviewMd, workspaceId, tenantId)
   return { status: 'indexed', slug, dirSha }
 }
 
@@ -211,6 +217,7 @@ export function getIndexedRecipeBySlug(
     version: row.version as number,
     dir_sha: row.dir_sha as string,
     soul_md: (row.soul_md as string) ?? null,
+    review_md: (row.review_md as string) ?? null,
     error_message: null,
     workspace_id: row.workspace_id as number,
     tenant_id: row.tenant_id as number,
@@ -227,6 +234,7 @@ function writeIndexedRow(
   y: RecipeYaml,
   dirSha: string,
   soulMd: string | null,
+  reviewMd: string | null,
   workspaceId: number,
   tenantId: number,
 ): void {
@@ -235,8 +243,8 @@ function writeIndexedRow(
     INSERT INTO recipes
       (slug, name, description, when_to_use, image, workspace_mode, timeout_seconds,
        max_concurrent, env_json, secrets_json, tags_json, model_json, version, dir_sha, soul_md,
-       error_message, workspace_id, tenant_id, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, unixepoch())
+       review_md, error_message, workspace_id, tenant_id, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, unixepoch())
     ON CONFLICT(slug) DO UPDATE SET
       name=excluded.name,
       description=excluded.description,
@@ -252,6 +260,7 @@ function writeIndexedRow(
       version=excluded.version,
       dir_sha=excluded.dir_sha,
       soul_md=excluded.soul_md,
+      review_md=excluded.review_md,
       error_message=NULL,
       workspace_id=excluded.workspace_id,
       tenant_id=excluded.tenant_id,
@@ -273,6 +282,7 @@ function writeIndexedRow(
     y.version,
     dirSha,
     soulMd,
+    reviewMd,
     workspaceId,
     tenantId,
   )

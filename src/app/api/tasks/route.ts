@@ -32,6 +32,7 @@ function mapTaskRow(task: any): Task & {
   workspace_source: { project_id: number; base_ref: string } | null
   read_only_mounts: Array<{ host_path: string; container_path: string; label: string }>
   extra_skills: string[]
+  review_pr: { provider: string; pr_number: number; pr_url: string; state: string } | null
 } {
   return {
     ...task,
@@ -42,6 +43,7 @@ function mapTaskRow(task: any): Task & {
     workspace_source: task.workspace_source ? JSON.parse(task.workspace_source) : null,
     read_only_mounts: task.read_only_mounts ? JSON.parse(task.read_only_mounts) : [],
     extra_skills: task.extra_skills ? JSON.parse(task.extra_skills) : [],
+    review_pr: task.review_pr ? JSON.parse(task.review_pr) : null,
     ticket_ref: formatTicketRef(task.project_prefix, task.project_ticket_no),
   }
 }
@@ -103,6 +105,16 @@ export async function GET(request: NextRequest) {
     // Build dynamic query
     let query = `
       SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+        (SELECT json_object(
+          'provider', r.provider,
+          'pr_number', r.pr_number,
+          'pr_url', r.pr_url,
+          'state', r.state
+        )
+         FROM task_review_prs r
+         WHERE r.task_id = t.id AND r.workspace_id = t.workspace_id
+         ORDER BY r.created_at DESC, r.id DESC
+         LIMIT 1) as review_pr,
         (SELECT COUNT(*) FROM comments c WHERE c.task_id = t.id AND c.workspace_id = t.workspace_id) as comment_count
       FROM tasks t
       LEFT JOIN projects p
@@ -437,7 +449,17 @@ export async function POST(request: NextRequest) {
     
     // Fetch the created task
     const createdTask = db.prepare(`
-      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix
+      SELECT t.*, p.name as project_name, p.ticket_prefix as project_prefix,
+        (SELECT json_object(
+          'provider', r.provider,
+          'pr_number', r.pr_number,
+          'pr_url', r.pr_url,
+          'state', r.state
+        )
+         FROM task_review_prs r
+         WHERE r.task_id = t.id AND r.workspace_id = t.workspace_id
+         ORDER BY r.created_at DESC, r.id DESC
+         LIMIT 1) as review_pr
       FROM tasks t
       LEFT JOIN projects p
         ON p.id = t.project_id AND p.workspace_id = t.workspace_id
@@ -535,7 +557,8 @@ export async function PUT(request: NextRequest) {
         const oldTask = db.prepare('SELECT * FROM tasks WHERE id = ? AND workspace_id = ?').get(task.id, workspaceId) as Task;
         if (!oldTask) continue;
 
-        if (task.status === 'done' && !hasAegisApproval(db, task.id, workspaceId)) {
+        const oldTaskRecipeSlug = (oldTask as unknown as { recipe_slug?: string | null }).recipe_slug
+        if (task.status === 'done' && !oldTaskRecipeSlug && !hasAegisApproval(db, task.id, workspaceId)) {
           throw new Error(`Aegis approval required for task ${task.id}`)
         }
 

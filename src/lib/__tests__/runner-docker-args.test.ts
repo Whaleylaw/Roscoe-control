@@ -30,9 +30,10 @@ function baseInput(overrides: Partial<DockerRunInput> = {}): DockerRunInput {
 }
 
 describe('runner docker-run argv composition', () => {
-  it("RUNNER-10: argv starts with ['run', '--rm', '-d']", () => {
+  it("RUNNER-10: argv starts with ['run', '-d'] and does not auto-remove before docker wait", () => {
     const argv = buildDockerRunArgs(baseInput())
-    expect(argv.slice(0, 3)).toEqual(['run', '--rm', '-d'])
+    expect(argv.slice(0, 2)).toEqual(['run', '-d'])
+    expect(argv).not.toContain('--rm')
   })
 
   it('CONTAINER-02: mount flags map worktree->/workspace:rw, recipe-stage->/recipe:ro, read_only_mount->/refs/<slug>:ro, extra_skill->/skills/<basename>:ro', () => {
@@ -52,6 +53,21 @@ describe('runner docker-run argv composition', () => {
     expect(argv).toContain('/docs/specs:/refs/specs-folder:ro')
     expect(argv).toContain('/home/user/skills/lint.md:/skills/lint.md:ro')
     expect(argv).toContain('/home/user/skills/qa.md:/skills/qa.md:ro')
+  })
+
+  it('CONTAINER-02: can mount a constrained workspace subpath as /workspace', () => {
+    const argv = buildDockerRunArgs(
+      baseInput({
+        worktreePath: '/Users/op/.data/runner/worktrees/task-42',
+        workspaceMountPath: '/Users/op/.data/runner/worktrees/task-42/cases/abby-sitgraves',
+      }),
+    )
+    expect(argv).toContain(
+      '/Users/op/.data/runner/worktrees/task-42/cases/abby-sitgraves:/workspace:rw',
+    )
+    expect(argv).not.toContain(
+      '/Users/op/.data/runner/worktrees/task-42:/workspace:rw',
+    )
   })
 
   it('RUNNER-10: labels include mc.task_id, mc.recipe_slug, mc.attempt, mc.runner_id, mc.runner_started_at', () => {
@@ -80,6 +96,13 @@ describe('runner docker-run argv composition', () => {
 
     const disabled = buildDockerRunArgs(baseInput({ networkHostGateway: false }))
     expect(disabled).not.toContain('host.docker.internal:host-gateway')
+  })
+
+  it('CONTAINER-03: can opt into an explicit Docker network mode', () => {
+    const argv = buildDockerRunArgs(baseInput({ networkMode: 'host' }))
+    const networkIdx = argv.indexOf('--network')
+    expect(networkIdx).toBeGreaterThanOrEqual(0)
+    expect(argv[networkIdx + 1]).toBe('host')
   })
 
   it('RUNNER-10: --memory uses resolved memory string; --cpus uses resolved cpus number stringified', () => {

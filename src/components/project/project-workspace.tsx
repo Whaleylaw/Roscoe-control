@@ -67,12 +67,12 @@ function WorkspaceContent() {
   }
 
   return (
-    <div className="flex flex-col min-h-full">
-      <div className="px-4 pt-4 pb-0 space-y-3">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-4 pt-4 pb-0 space-y-3">
         <ProjectBreadcrumb />
         <ProjectTabs />
       </div>
-      <div className="flex-1">
+      <div className="min-h-0 flex-1">
         <ProjectViewRouter />
       </div>
     </div>

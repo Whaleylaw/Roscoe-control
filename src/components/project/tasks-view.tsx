@@ -8,13 +8,15 @@ export function TasksView() {
   // project-workspace.tsx already gates on loading/not-found before this view.
   if (!project) return null
   return (
-    <TaskBoardPanel
-      scope={{
-        lockedProjectId: project.id,
-        hideProjectFilter: true,
-        hideProjectLabels: true,
-        defaultCreateProjectId: project.id,
-      }}
-    />
+    <div className="h-full min-h-0">
+      <TaskBoardPanel
+        scope={{
+          lockedProjectId: project.id,
+          hideProjectFilter: true,
+          hideProjectLabels: true,
+          defaultCreateProjectId: project.id,
+        }}
+      />
+    </div>
   )
 }

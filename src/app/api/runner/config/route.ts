@@ -19,6 +19,7 @@ import {
   getMaxMemoryPerContainer,
   getMaxCpuPerContainer,
   getFailedGcWindowDays,
+  getDockerNetworkMode,
 } from '@/lib/task-runtime-settings'
 import { logger } from '@/lib/logger'
 
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       max_cpu_per_container: getMaxCpuPerContainer(),
       failed_gc_window_days: getFailedGcWindowDays(),
       max_concurrent_containers: getMaxConcurrentContainers(),
+      docker_network_mode: getDockerNetworkMode(),
     })
   } catch (error) {
     logger.error({ err: error }, 'GET /api/runner/config error')

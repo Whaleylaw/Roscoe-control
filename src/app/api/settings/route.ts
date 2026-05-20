@@ -5,6 +5,10 @@ import { config } from '@/lib/config'
 import { mutationLimiter } from '@/lib/rate-limit'
 import { validateBody, updateSettingsSchema } from '@/lib/validation'
 
+const FORGEJO_TOKEN_KEY = 'runtime.forgejo_token'
+const FORGEJO_WEBHOOK_SECRET_KEY = 'runtime.forgejo_webhook_secret'
+const MASKED_SECRET_VALUE = '********'
+
 interface SettingRow {
   key: string
   value: string
@@ -97,6 +101,46 @@ const settingDefinitions: Record<string, { category: string; description: string
     description: 'Days to preserve worktree + logs for tasks that reached `failed` before the runner GC tick destroys them. `done` and `cancelled` are destroyed immediately.',
     default: '7',
   },
+  'runtime.review_pr_provider': {
+    category: 'runtime',
+    description: 'Review PR provider used when approved task work is published for merge gating. Supported value: forgejo.',
+    default: 'forgejo',
+  },
+  'runtime.review_pr_remote_name': {
+    category: 'runtime',
+    description: 'Git remote name used for review PR publication.',
+    default: 'forgejo',
+  },
+  'runtime.forgejo_base_url': {
+    category: 'runtime',
+    description: 'Base URL of the Forgejo/Gitea server used for review PR publication, e.g. http://localhost:3001.',
+    default: '',
+  },
+  [FORGEJO_TOKEN_KEY]: {
+    category: 'runtime',
+    description: 'Forgejo/Gitea API token used to create and inspect review pull requests.',
+    default: '',
+  },
+  [FORGEJO_WEBHOOK_SECRET_KEY]: {
+    category: 'runtime',
+    description: 'Shared secret used to verify Forgejo/Gitea pull-request webhooks.',
+    default: '',
+  },
+  'runtime.review_pr_auto_create': {
+    category: 'runtime',
+    description: 'Whether approving task work should automatically create a review PR. Set exactly false to disable.',
+    default: 'true',
+  },
+}
+
+function displaySettingValue(key: string, value: string | undefined, defaultValue: string): string {
+  if (key !== FORGEJO_TOKEN_KEY && key !== FORGEJO_WEBHOOK_SECRET_KEY) return value ?? defaultValue
+  return value ? MASKED_SECRET_VALUE : ''
+}
+
+function auditSettingValue(key: string, value: string | null | undefined): string | null {
+  if (key !== FORGEJO_TOKEN_KEY && key !== FORGEJO_WEBHOOK_SECRET_KEY) return value ?? null
+  return value ? MASKED_SECRET_VALUE : ''
 }
 
 /**
@@ -125,7 +169,7 @@ export async function GET(request: NextRequest) {
     const row = stored.get(key)
     settings.push({
       key,
-      value: row?.value ?? def.default,
+      value: displaySettingValue(key, row?.value, def.default),
       description: row?.description ?? def.description,
       category: row?.category ?? def.category,
       updated_by: row?.updated_by ?? null,
@@ -196,9 +240,16 @@ export async function PUT(request: NextRequest) {
 
       // Get old value for audit
       const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
-      changes[key] = { old: existing?.value ?? null, new: strValue }
+      const storedValue =
+        (key === FORGEJO_TOKEN_KEY || key === FORGEJO_WEBHOOK_SECRET_KEY) && strValue === MASKED_SECRET_VALUE
+          ? existing?.value ?? ''
+          : strValue
+      changes[key] = {
+        old: auditSettingValue(key, existing?.value),
+        new: auditSettingValue(key, storedValue) ?? '',
+      }
 
-      upsert.run(key, strValue, description, category, auth.user.username)
+      upsert.run(key, storedValue, description, category, auth.user.username)
       updated.push(key)
     }
   })
@@ -250,7 +301,7 @@ export async function DELETE(request: NextRequest) {
     action: 'settings_reset',
     actor: auth.user.username,
     actor_id: auth.user.id,
-    detail: { key, old_value: existing.value },
+    detail: { key, old_value: auditSettingValue(key, existing.value) },
     ip_address: ipAddress,
   })
 

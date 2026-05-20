@@ -1,0 +1,26 @@
+slug: firmvault-case-setup-create-shell
+name: FirmVault Case Setup - Create Shell
+description: Creates or verifies the native FirmVault case shell from accepted intake information.
+when_to_use: Use when a new personal-injury matter has enough intake information to open a FirmVault shadow case.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - copy_case_template
+  - write_file
+tags:
+  - law-firm
+  - firmvault
+  - onboarding
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

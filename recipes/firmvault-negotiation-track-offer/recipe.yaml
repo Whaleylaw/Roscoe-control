@@ -1,0 +1,25 @@
+slug: firmvault-negotiation-track-offer
+name: FirmVault Negotiation - Track Offer
+description: Documents an incoming demand response or settlement offer from canonical evidence or same-task human confirmation.
+when_to_use: Use after a demand has been sent and a carrier response or offer needs to be recorded before offer evaluation.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 3
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - law-firm
+  - firmvault
+  - negotiation
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

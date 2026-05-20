@@ -37,6 +37,7 @@ export interface DockerRunInput {
   runnerStartedAtIso: string
   containerName: string // e.g. 'mc-task-42-a3'
   worktreePath: string // host abs path — mounts /workspace:rw
+  workspaceMountPath?: string // optional host abs path mounted as /workspace:rw
   recipeStagePath: string // host abs path — mounts /recipe:ro
   readOnlyMounts: ReadOnlyMount[]
   extraSkills: string[] // host abs paths — mount basename under /skills/:ro
@@ -44,6 +45,7 @@ export interface DockerRunInput {
   memory: string // '2g'
   cpus: number // 1.0
   networkHostGateway?: boolean // defaults true
+  networkMode?: string | null
 }
 
 export interface StageRecipeInput {
@@ -77,8 +79,8 @@ export function slugify(label: string): string {
  * Build the docker run argv.
  *
  * Order matters:
- *   - 'run' --rm -d come first
- *   - --name next (so --rm flag parses cleanly in older docker builds)
+ *   - 'run' -d come first
+ *   - --name next
  *   - labels before resource caps so they appear in `docker ps --format`
  *   - mounts after env-file (env-file read before process start)
  *   - image LAST — everything after image would be treated as container argv
@@ -97,6 +99,7 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
     runnerStartedAtIso,
     containerName,
     worktreePath,
+    workspaceMountPath,
     recipeStagePath,
     readOnlyMounts,
     extraSkills,
@@ -104,11 +107,11 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
     memory,
     cpus,
     networkHostGateway,
+    networkMode,
   } = input
 
   const argv: string[] = [
     'run',
-    '--rm',
     '-d',
     '--name',
     containerName,
@@ -128,12 +131,16 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
     String(cpus),
   ]
 
+  if (networkMode && networkMode.trim()) {
+    argv.push('--network', networkMode.trim())
+  }
+
   if (networkHostGateway !== false) {
     argv.push('--add-host', 'host.docker.internal:host-gateway')
   }
 
   argv.push('--env-file', envFilePath)
-  argv.push('-v', `${worktreePath}:/workspace:rw`)
+  argv.push('-v', `${workspaceMountPath ?? worktreePath}:/workspace:rw`)
   argv.push('-v', `${recipeStagePath}:/recipe:ro`)
 
   for (const mount of readOnlyMounts) {
@@ -158,7 +165,7 @@ export function buildDockerRunArgs(input: DockerRunInput): string[] {
  * re-index the staged copy — tested at the callsite, not here.
  *
  * fs.promises.cp (Node 20+; stable in 22+) handles recursive directory copy
- * including nested tools/ and skills/. We write PREAMBLE.md AFTER cp so even
+ * including nested tools/, skills/, and references/. We write PREAMBLE.md AFTER cp so even
  * if a recipe author ships their own PREAMBLE.md the runner's version
  * overwrites it (the agent reads /recipe/PREAMBLE.md — the runner owns it).
  */

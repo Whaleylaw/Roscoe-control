@@ -1,0 +1,26 @@
+slug: firmvault-insurance-bi-process-acknowledgment
+name: FirmVault Insurance BI - Process Acknowledgment
+description: Processes a BI carrier acknowledgment or prepares a human follow-up when no acknowledgment arrived after the wait.
+when_to_use: Use after the BI LOR wait expires or when BI claim acknowledgment arrives early.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - law-firm
+  - firmvault
+  - insurance
+  - bi
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

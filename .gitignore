@@ -48,4 +48,5 @@ playwright-report/
 
 # Local runtime / reference artifacts — not product code
 .claude/
+.hermes/
 get-shit-done-main/

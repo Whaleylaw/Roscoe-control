@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger'
  *
  * Query shape:
  *   - container_id IS NOT NULL (there IS a container attribution on the task)
- *   - status IN ('assigned', 'in_progress') — terminal tasks (done/failed/cancelled)
+ *   - status IN ('assigned', 'in_progress', 'quality_review') — terminal tasks (done/failed/cancelled)
  *     are handled by /api/runner/terminal-tasks for GC, not reconciled here.
  *
  * Response: { tasks: [...] } — stable id-ascending order.
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         `SELECT id, recipe_slug, container_id, status, runner_started_at, runner_attempts
          FROM tasks
          WHERE container_id IS NOT NULL
-           AND status IN ('assigned', 'in_progress')
+           AND status IN ('assigned', 'in_progress', 'quality_review')
          ORDER BY id ASC`,
       )
       .all() as PendingContainerRow[]

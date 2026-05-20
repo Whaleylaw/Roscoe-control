@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
+import { EmailReviewerPanel } from '@/components/panels/email-reviewer-panel'
 
 type LawFirmCase = {
   slug: string
@@ -28,6 +29,7 @@ export function LawFirmPanel() {
   const [cases, setCases] = useState<LawFirmCase[]>([])
   const [root, setRoot] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [activeView, setActiveView] = useState<'cases' | 'email'>('cases')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -78,11 +80,35 @@ export function LawFirmPanel() {
           <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
           {root && <p className="mt-1 text-xs font-mono text-muted-foreground/70 truncate">{root}</p>}
         </div>
-        <Button variant="secondary" onClick={fetchCases} disabled={loading}>
-          {loading ? t('refreshing') : t('refresh')}
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="inline-flex rounded-md border border-border bg-card p-1 text-sm">
+            <button
+              type="button"
+              onClick={() => setActiveView('cases')}
+              className={`rounded px-3 py-1.5 ${activeView === 'cases' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Cases
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('email')}
+              className={`rounded px-3 py-1.5 ${activeView === 'email' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Email
+            </button>
+          </div>
+          <Button variant="secondary" onClick={fetchCases} disabled={loading || activeView !== 'cases'}>
+            {loading ? t('refreshing') : t('refresh')}
+          </Button>
+        </div>
       </header>
 
+      {activeView === 'email' ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <EmailReviewerPanel />
+        </div>
+      ) : (
+        <>
       <section className="grid gap-3 border-b border-border p-4 md:grid-cols-3">
         <Metric label={t('metrics.cases')} value={String(cases.length)} />
         <Metric label={t('metrics.phases')} value={String(activePhaseCount)} />
@@ -161,6 +187,8 @@ export function LawFirmPanel() {
           </ul>
         )}
       </div>
+        </>
+      )}
     </div>
   )
 }

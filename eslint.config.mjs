@@ -18,6 +18,17 @@ const config = [
       'react-hooks/immutability': 'off',
     },
   },
+  {
+    files: ['packages/waypoint-core/src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['next/*', '@/lib/*', '@/app/*', '@/components/*'],
+        },
+      ],
+    },
+  },
 ]
 
 export default config

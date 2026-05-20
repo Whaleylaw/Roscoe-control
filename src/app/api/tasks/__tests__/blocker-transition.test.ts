@@ -77,6 +77,11 @@ vi.mock('@/lib/config', () => ({
 }))
 
 import { PUT } from '@/app/api/tasks/[id]/route'
+import {
+  createWorkflowDefinition,
+  materializeReadyWorkflowNodes,
+  startWorkflowInstance,
+} from '@/lib/workflow-engine'
 
 // --- Fixture helpers --------------------------------------------------------
 
@@ -153,6 +158,101 @@ afterEach(() => {
 // --- Tests ------------------------------------------------------------------
 
 describe('PUT /api/tasks/:id legacy blocker contract (ROUTE-02, COMPAT-03)', () => {
+  it('approves a human workflow review task from review to done and completes the workflow node without Aegis', async () => {
+    const project = testDb.prepare(`
+      SELECT id FROM projects
+      WHERE workspace_id = 1 AND slug = 'general'
+      LIMIT 1
+    `).get() as { id: number }
+    const definitionId = createWorkflowDefinition(testDb, `
+schema_version: 1
+id: route-human-review-approval
+name: Route Human Review Approval
+subject_type: law_firm_case
+nodes:
+  owner_review:
+    type: review
+    review:
+      mode: human
+`, 'tester', 1, 1)
+    const instance = startWorkflowInstance(testDb, {
+      definitionId,
+      subjectType: 'law_firm_case',
+      subjectId: 'test-case',
+      actor: 'tester',
+      workspaceId: 1,
+      tenantId: 1,
+      now: 1000,
+    })
+    const materialized = materializeReadyWorkflowNodes(testDb, {
+      workflowInstanceId: instance.instance_id,
+      projectId: project.id,
+      workspaceId: 1,
+      actor: 'tester',
+      now: 1001,
+    })
+    const taskId = materialized.created[0].task_id
+
+    const res = await PUT(
+      makeRequest(taskId, { status: 'done' }),
+      { params: Promise.resolve({ id: String(taskId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    expect(readTask(taskId)?.status).toBe('done')
+    expect(testDb.prepare(`
+      SELECT status FROM workflow_node_instances
+      WHERE workflow_instance_id = ? AND node_key = 'owner_review'
+    `).get(instance.instance_id)).toMatchObject({ status: 'complete' })
+    expect(testDb.prepare(`
+      SELECT status FROM workflow_instances WHERE id = ?
+    `).get(instance.instance_id)).toMatchObject({ status: 'complete' })
+  })
+
+  it('allows a human workflow review task to move from review to quality_review', async () => {
+    const project = testDb.prepare(`
+      SELECT id FROM projects
+      WHERE workspace_id = 1 AND slug = 'general'
+      LIMIT 1
+    `).get() as { id: number }
+    const definitionId = createWorkflowDefinition(testDb, `
+schema_version: 1
+id: route-human-review-no-quality
+name: Route Human Review No Quality
+subject_type: law_firm_case
+nodes:
+  owner_review:
+    type: review
+    review:
+      mode: human
+`, 'tester', 1, 1)
+    const instance = startWorkflowInstance(testDb, {
+      definitionId,
+      subjectType: 'law_firm_case',
+      subjectId: 'test-case',
+      actor: 'tester',
+      workspaceId: 1,
+      tenantId: 1,
+      now: 1000,
+    })
+    const materialized = materializeReadyWorkflowNodes(testDb, {
+      workflowInstanceId: instance.instance_id,
+      projectId: project.id,
+      workspaceId: 1,
+      actor: 'tester',
+      now: 1001,
+    })
+    const taskId = materialized.created[0].task_id
+
+    const res = await PUT(
+      makeRequest(taskId, { status: 'quality_review' }),
+      { params: Promise.resolve({ id: String(taskId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    expect(readTask(taskId)?.status).toBe('quality_review')
+  })
+
   it('pauses a legacy in_progress task with full envelope', async () => {
     insertLegacyTask({
       id: 100,
@@ -558,7 +658,7 @@ describe('PUT /api/tasks/:id legacy blocker contract (ROUTE-02, COMPAT-03)', () 
         // the real 'failed' status and match 0 rows.
         if (
           !currentTaskSelectFaked &&
-          /^\s*SELECT\s+\*\s+FROM\s+tasks\s+WHERE\s+id\s*=\s*\?\s+AND\s+workspace_id\s*=\s*\?\s*$/i.test(sql)
+          /^\s*SELECT\s+t\.\*,[\s\S]+FROM\s+tasks\s+t\s+WHERE\s+t\.id\s*=\s*\?\s+AND\s+t\.workspace_id\s*=\s*\?\s*$/i.test(sql)
         ) {
           currentTaskSelectFaked = true
           const originalGet = stmt.get.bind(stmt)

@@ -24,6 +24,7 @@ type CaseDetail = {
   }
   dashboard: {
     claims: Array<Record<string, string>>
+    medical_providers: MedicalProvider[]
     recent_activity: Array<{ file: string; date: string | null; category: string | null; title: string; excerpt: string }>
   }
   state: {
@@ -33,6 +34,102 @@ type CaseDetail = {
   }
   files: Array<{ name: string; kind: 'markdown' | 'directory' | 'other' }>
 }
+
+type MedicalProvider = {
+  slug: string
+  name: string
+  role: string | null
+  treatment_status: string | null
+  records_requested: boolean | null
+  records_received: boolean | null
+  bills_requested: boolean | null
+  bills_received: boolean | null
+  records_requested_date: string | null
+  records_received_date: string | null
+  bills_requested_date: string | null
+  bills_received_date: string | null
+}
+
+type WorkflowPreview = {
+  workflow_instances: Array<{
+    workflow_instance_id: number
+    workflow_key: string
+    definition_slug: string
+    definition_name: string
+    definition_version: number
+    vars?: Record<string, string | number | boolean | null>
+    status: 'active' | 'blocked' | 'complete' | 'cancelled' | 'failed'
+    started_by: string
+    started_at: number
+    completed_at: number | null
+    updated_at: number
+    total_nodes: number
+    ready_nodes: number
+    running_nodes: number
+    waiting_nodes: number
+    blocked_nodes: number
+    complete_nodes: number
+    failed_nodes: number
+    task_count: number
+    nodes: Array<{
+      id: number
+      node_key: string
+      node_type: 'recipe' | 'review' | 'wait' | 'code' | 'gateway' | 'gate'
+      status: 'pending' | 'ready' | 'running' | 'waiting' | 'blocked' | 'complete' | 'failed' | 'skipped' | 'cancelled'
+      recipe_slug: string | null
+      task_id: number | null
+      due_at: number | null
+      completed_at: number | null
+      blocked_by: string[]
+    }>
+  }>
+  medical_providers: MedicalProvider[]
+  ready_items: Array<{
+    workflow_key: string
+    phase_name: string
+    landmark_name: string
+    priority: string
+    status: string
+    blocked_by: string[]
+  }>
+  workflows: Array<{
+    workflow_id: string
+    name: string
+    goal: string
+    phase_id: string
+    source: string | null
+    enabled: boolean
+    status: 'active' | 'complete' | 'not_started' | 'blocked'
+    completed_steps: number
+    total_steps: number
+    active_steps: number
+    blocked_by: string[]
+    steps: Array<{
+      id: string
+      type: 'recipe' | 'wait' | 'human_review' | 'code'
+      landmark_id: string
+      recipe_slug: string | null
+      status: 'ready' | 'complete' | 'blocked' | 'waiting' | 'skipped'
+      depends_on: string[]
+      blocked_by: string[]
+      wait_days: number | null
+      skip_when: string[]
+    }>
+  }>
+}
+
+const STARTABLE_CASE_WORKFLOWS = [
+  {
+    definitionSlug: 'firmvault-demand-readiness',
+    name: 'Demand Readiness',
+    description: 'Gather demand materials after records, bills, and chronology are ready.',
+  },
+  {
+    definitionSlug: 'firmvault-draft-demand',
+    name: 'Draft Demand',
+    description: 'Check internal final-lien process status, then draft the demand package for attorney review.',
+  },
+]
 
 const VIEWS = ['dashboard', 'tasks', 'workflow', 'activity', 'files'] as const
 
@@ -53,6 +150,11 @@ export function LawFirmCaseWorkspace() {
   const [phaseDraft, setPhaseDraft] = useState('')
   const [landmarkDraft, setLandmarkDraft] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
+  const [workflowPreview, setWorkflowPreview] = useState<WorkflowPreview | null>(null)
+  const [workflowLoading, setWorkflowLoading] = useState(false)
+  const [workflowMaterializing, setWorkflowMaterializing] = useState(false)
+  const [workflowOverriding, setWorkflowOverriding] = useState<string | null>(null)
+  const [workflowInstanceUpdating, setWorkflowInstanceUpdating] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<string | null>(null)
 
   const loadDetail = useCallback(async () => {
@@ -76,6 +178,30 @@ export function LawFirmCaseWorkspace() {
   useEffect(() => {
     if (slug) void loadDetail()
   }, [loadDetail, slug])
+
+  const loadWorkflowPreview = useCallback(async () => {
+    if (!slug) return
+    setWorkflowLoading(true)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, { cache: 'no-store' })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : [],
+        medical_providers: Array.isArray(body.medical_providers) ? body.medical_providers : [],
+        ready_items: Array.isArray(body.ready_items) ? body.ready_items : [],
+        workflows: Array.isArray(body.workflows) ? body.workflows : [],
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowLoading(false)
+    }
+  }, [slug, t])
+
+  useEffect(() => {
+    if (slug && view === 'workflow') void loadWorkflowPreview()
+  }, [loadWorkflowPreview, slug, view])
 
   const navigate = (nextView: string) => {
     const href = nextView === 'dashboard'
@@ -112,6 +238,183 @@ export function LawFirmCaseWorkspace() {
     }
   }, [detail, landmarkDraft, phaseDraft, saving, slug, t])
 
+  const materializeWorkflow = useCallback(async () => {
+    if (workflowMaterializing) return
+    setWorkflowMaterializing(true)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowMaterializeError'))
+      setFeedback(t('workflowMaterializeSuccess', {
+        created: Array.isArray(body.created) ? body.created.length : 0,
+        skipped: Array.isArray(body.skipped) ? body.skipped.length : 0,
+      }))
+      await loadWorkflowPreview()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowMaterializeError'))
+    } finally {
+      setWorkflowMaterializing(false)
+    }
+  }, [loadWorkflowPreview, slug, t, workflowMaterializing])
+
+  const updateWorkflowOverride = useCallback(async (workflowId: string, action: 'activate' | 'close') => {
+    if (workflowOverriding) return
+    setWorkflowOverriding(`${workflowId}:${action}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: workflowId, action }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: prev?.workflow_instances ?? [],
+        medical_providers: prev?.medical_providers ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: Array.isArray(body.workflows) ? body.workflows : prev?.workflows ?? [],
+      }))
+      setFeedback(action === 'activate' ? 'Workflow activated' : 'Workflow closed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowOverriding(null)
+    }
+  }, [slug, t, workflowOverriding])
+
+  const cancelWorkflowInstance = useCallback(async (workflowInstanceId: number) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(`cancel:${workflowInstanceId}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel_instance',
+          workflow_instance_id: workflowInstanceId,
+          reason: 'Cancelled from the case Workflow tab.',
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        medical_providers: prev?.medical_providers ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      setFeedback('Workflow instance cancelled')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
+  const bypassWorkflowNode = useCallback(async (workflowInstanceId: number, nodeKey: string) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(`bypass:${workflowInstanceId}:${nodeKey}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'bypass_node',
+          workflow_instance_id: workflowInstanceId,
+          node_key: nodeKey,
+          reason: 'Marked not applicable from the case Workflow tab.',
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        medical_providers: prev?.medical_providers ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      setFeedback('Workflow node marked not applicable')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
+  const startProviderMedicalRecordsWorkflow = useCallback(async (providerSlug: string) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(`start-medical-records:${providerSlug}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start_provider_medical_records',
+          provider_slug: providerSlug,
+          request_records: true,
+          request_bills: true,
+          status: 'inbox',
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        medical_providers: Array.isArray(body.medical_providers) ? body.medical_providers : prev?.medical_providers ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      const started = Array.isArray(body.result?.started) ? body.result.started.length : 0
+      const skipped = Array.isArray(body.result?.skipped) ? body.result.skipped.length : 0
+      setFeedback(started > 0 ? 'Medical records workflow started' : `Medical records workflow not started (${skipped} skipped)`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
+  const startCaseWorkflow = useCallback(async (definitionSlug: string) => {
+    if (workflowInstanceUpdating !== null) return
+    setWorkflowInstanceUpdating(`start-workflow:${definitionSlug}`)
+    setFeedback(null)
+    try {
+      const res = await fetch(`/api/law-firm/cases/${encodeURIComponent(slug)}/workflow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start_case_workflow',
+          definition_slug: definitionSlug,
+          status: 'inbox',
+          vars: { source_trigger: 'manual' },
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : t('workflowPreviewError'))
+      setWorkflowPreview((prev) => ({
+        workflow_instances: Array.isArray(body.workflow_instances) ? body.workflow_instances : prev?.workflow_instances ?? [],
+        medical_providers: Array.isArray(body.medical_providers) ? body.medical_providers : prev?.medical_providers ?? [],
+        ready_items: prev?.ready_items ?? [],
+        workflows: prev?.workflows ?? [],
+      }))
+      const created = Array.isArray(body.materialized?.created) ? body.materialized.created.length : 0
+      setFeedback(created > 0 ? 'Workflow started' : 'Workflow started; no task materialized yet')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('workflowPreviewError'))
+    } finally {
+      setWorkflowInstanceUpdating(null)
+    }
+  }, [slug, t, workflowInstanceUpdating])
+
   if (loading && !detail) {
     return <div className="p-6 text-sm text-muted-foreground">{t('detailLoading')}</div>
   }
@@ -128,8 +431,8 @@ export function LawFirmCaseWorkspace() {
   if (!detail) return null
 
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="space-y-3 border-b border-border px-4 pt-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 space-y-3 border-b border-border px-4 pt-4">
         <button
           type="button"
           className="text-sm text-muted-foreground hover:text-foreground"
@@ -167,16 +470,24 @@ export function LawFirmCaseWorkspace() {
       )}
 
       {view === 'dashboard' && <CaseDashboard detail={detail} />}
-      {view === 'tasks' && <CaseTasksView slug={slug} />}
+      {view === 'tasks' && (
+        <div className="min-h-0 flex-1">
+          <CaseTasksView slug={slug} />
+        </div>
+      )}
       {view === 'workflow' && (
         <WorkflowView
-          detail={detail}
-          phaseDraft={phaseDraft}
-          landmarkDraft={landmarkDraft}
-          saving={saving}
-          onPhaseChange={setPhaseDraft}
-          onLandmarkChange={(key, value) => setLandmarkDraft((prev) => ({ ...prev, [key]: value }))}
-          onSave={saveWorkflow}
+          workflowPreview={workflowPreview}
+          workflowLoading={workflowLoading}
+          workflowMaterializing={workflowMaterializing}
+          workflowOverriding={workflowOverriding}
+          workflowInstanceUpdating={workflowInstanceUpdating}
+          onMaterialize={materializeWorkflow}
+          onWorkflowOverride={updateWorkflowOverride}
+          onCancelWorkflowInstance={cancelWorkflowInstance}
+          onBypassWorkflowNode={bypassWorkflowNode}
+          onStartProviderMedicalRecords={startProviderMedicalRecordsWorkflow}
+          onStartCaseWorkflow={startCaseWorkflow}
         />
       )}
       {view === 'activity' && <ActivityView detail={detail} />}
@@ -223,15 +534,17 @@ function CaseTasksView({ slug }: { slug: string }) {
   }
 
   return (
-    <TaskBoardPanel
-      scope={{
-        lockedProjectId: project.id,
-        hideProjectFilter: true,
-        hideProjectLabels: true,
-        includeHiddenProjects: true,
-        defaultCreateProjectId: project.id,
-      }}
-    />
+    <div className="h-full min-h-0">
+      <TaskBoardPanel
+        scope={{
+          lockedProjectId: project.id,
+          hideProjectFilter: true,
+          hideProjectLabels: true,
+          includeHiddenProjects: true,
+          defaultCreateProjectId: project.id,
+        }}
+      />
+    </div>
   )
 }
 
@@ -278,54 +591,357 @@ function CaseDashboard({ detail }: { detail: CaseDetail }) {
 }
 
 function WorkflowView({
-  detail,
-  phaseDraft,
-  landmarkDraft,
-  saving,
-  onPhaseChange,
-  onLandmarkChange,
-  onSave,
+  workflowPreview,
+  workflowLoading,
+  workflowMaterializing,
+  workflowOverriding,
+  workflowInstanceUpdating,
+  onMaterialize,
+  onWorkflowOverride,
+  onCancelWorkflowInstance,
+  onBypassWorkflowNode,
+  onStartProviderMedicalRecords,
+  onStartCaseWorkflow,
 }: {
-  detail: CaseDetail
-  phaseDraft: string
-  landmarkDraft: Record<string, boolean>
-  saving: boolean
-  onPhaseChange: (value: string) => void
-  onLandmarkChange: (key: string, value: boolean) => void
-  onSave: () => void
+  workflowPreview: WorkflowPreview | null
+  workflowLoading: boolean
+  workflowMaterializing: boolean
+  workflowOverriding: string | null
+  workflowInstanceUpdating: string | null
+  onMaterialize: () => void
+  onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
+  onCancelWorkflowInstance: (workflowInstanceId: number) => void
+  onBypassWorkflowNode: (workflowInstanceId: number, nodeKey: string) => void
+  onStartProviderMedicalRecords: (providerSlug: string) => void
+  onStartCaseWorkflow: (definitionSlug: string) => void
 }) {
   const t = useTranslations('lawFirm')
+  const workflowInstances = workflowPreview?.workflow_instances ?? []
+  const medicalProviders = workflowPreview?.medical_providers ?? []
+  const readyItems = workflowPreview?.ready_items ?? []
+  const workflows = workflowPreview?.workflows ?? []
+  const grouped = {
+    active: workflows.filter((workflow) => workflow.status === 'active' || workflow.status === 'blocked'),
+    not_started: workflows.filter((workflow) => workflow.status === 'not_started'),
+    complete: workflows.filter((workflow) => workflow.status === 'complete'),
+  }
   return (
     <div className="p-6 space-y-4">
-      <label className="block max-w-md space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">{t('currentPhase')}</span>
-        <select
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-          value={phaseDraft}
-          onChange={(event) => onPhaseChange(event.target.value)}
-        >
-          {detail.state.phases.map((phase) => (
-            <option key={phase.key} value={phase.key}>{phase.label}</option>
-          ))}
-        </select>
-      </label>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-        {detail.state.landmarks.map((landmark) => (
-          <label key={landmark.key} className="flex items-start gap-2 rounded border bg-card p-3 text-sm">
-            <input
-              className="mt-1"
-              type="checkbox"
-              checked={Boolean(landmarkDraft[landmark.key])}
-              onChange={(event) => onLandmarkChange(landmark.key, event.target.checked)}
-            />
-            <span>
-              <span className="block text-foreground">{landmark.label}</span>
-              {landmark.satisfied_at && <span className="text-xs text-muted-foreground">{t('satisfiedAt')}: {landmark.satisfied_at}</span>}
-            </span>
-          </label>
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-foreground">Case Workflows</h2>
+          <p className="text-sm text-muted-foreground">
+            Start case-scoped workflow instances from registered Mission Control workflow definitions.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {STARTABLE_CASE_WORKFLOWS.map((workflow) => {
+            const existing = workflowInstances.find((instance) => instance.definition_slug === workflow.definitionSlug && ['active', 'blocked'].includes(instance.status))
+            const startingKey = `start-workflow:${workflow.definitionSlug}`
+            return (
+              <div key={workflow.definitionSlug} className="rounded border bg-background p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-foreground">{workflow.name}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{workflow.description}</div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onStartCaseWorkflow(workflow.definitionSlug)}
+                    disabled={workflowInstanceUpdating !== null || Boolean(existing)}
+                  >
+                    {workflowInstanceUpdating === startingKey ? 'Starting' : existing ? 'Active' : 'Start'}
+                  </Button>
+                </div>
+                <div className="mt-2 font-mono text-[11px] text-muted-foreground">{workflow.definitionSlug}</div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold text-foreground">Provider Workflows</h2>
+          <p className="text-sm text-muted-foreground">
+            Start the provider-scoped medical records workflow for a specific treating provider.
+          </p>
+        </div>
+        {medicalProviders.length === 0 ? (
+          <p className="mt-4 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            No treating providers were found in this case&apos;s contacts.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {medicalProviders.map((provider) => {
+              const existing = workflowInstances.find((workflow) => workflow.definition_slug === 'firmvault-request-medical-records' && workflow.vars?.provider_slug === provider.slug && ['active', 'blocked'].includes(workflow.status))
+              const startingKey = `start-medical-records:${provider.slug}`
+              return (
+                <div key={provider.slug} className="rounded border bg-background p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-foreground">{provider.name}</div>
+                      <div className="mt-1 font-mono text-[11px] text-muted-foreground">{provider.slug}</div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onStartProviderMedicalRecords(provider.slug)}
+                      disabled={workflowInstanceUpdating !== null || Boolean(existing)}
+                    >
+                      {workflowInstanceUpdating === startingKey ? 'Starting' : existing ? 'Active' : 'Start Records'}
+                    </Button>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                    <span>Treatment: {provider.treatment_status || 'unknown'}</span>
+                    <span>Records requested: {formatNullableBoolean(provider.records_requested)}</span>
+                    <span>Records received: {formatNullableBoolean(provider.records_received)}</span>
+                    <span>Bills received: {formatNullableBoolean(provider.bills_received)}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Workflow Activity</h2>
+            <p className="text-sm text-muted-foreground">
+              Actual workflow instances running for this case. Agent work appears on the existing Tasks board.
+            </p>
+          </div>
+          <span className="rounded border px-2 py-1 text-xs text-muted-foreground">{workflowInstances.length} instances</span>
+        </div>
+        {workflowInstances.length === 0 ? (
+          <p className="mt-4 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            No workflow instances have started for this case yet.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {workflowInstances.map((workflow) => (
+              <article key={workflow.workflow_instance_id} className="rounded-md border bg-background p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-foreground">{workflow.definition_name}</h3>
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">{workflow.definition_slug} v{workflow.definition_version}</p>
+                    {workflow.vars?.provider_slug ? (
+                      <p className="mt-1 text-xs text-muted-foreground">Provider: {String(workflow.vars.provider_name || workflow.vars.provider_slug)}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className={`rounded px-2 py-0.5 text-xs ${workflowInstanceTone(workflow.status)}`}>
+                      {formatLabel(workflow.status)}
+                    </span>
+                    {workflow.status === 'active' || workflow.status === 'blocked' ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onCancelWorkflowInstance(workflow.workflow_instance_id)}
+                        disabled={workflowInstanceUpdating !== null}
+                      >
+                        {workflowInstanceUpdating === `cancel:${workflow.workflow_instance_id}` ? 'Cancelling' : 'Cancel'}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-5 gap-2 text-center text-xs">
+                  <WorkflowMetric label="Ready" value={workflow.ready_nodes} />
+                  <WorkflowMetric label="Running" value={workflow.running_nodes} />
+                  <WorkflowMetric label="Waiting" value={workflow.waiting_nodes} />
+                  <WorkflowMetric label="Blocked" value={workflow.blocked_nodes} />
+                  <WorkflowMetric label="Done" value={`${workflow.complete_nodes}/${workflow.total_nodes}`} />
+                </div>
+                <div className="mt-3 space-y-1.5">
+                  {workflow.nodes.map((node) => (
+                    <div key={node.id} className="rounded border px-2 py-1 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-foreground">
+                          {formatLabel(node.node_key)}
+                          {node.task_id ? <span className="ml-1 text-muted-foreground">#{node.task_id}</span> : null}
+                          {node.due_at ? <span className="ml-1 text-purple-500">due {formatUnixTime(node.due_at)}</span> : null}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {canBypassWorkflowNode(node.status) ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onBypassWorkflowNode(workflow.workflow_instance_id, node.node_key)}
+                              disabled={workflowInstanceUpdating !== null}
+                            >
+                              {workflowInstanceUpdating === `bypass:${workflow.workflow_instance_id}:${node.node_key}` ? 'Bypassing' : 'Not Applicable'}
+                            </Button>
+                          ) : null}
+                          <span className={`rounded px-1.5 py-0.5 ${workflowNodeTone(node.status)}`}>{formatLabel(node.status)}</span>
+                        </div>
+                      </div>
+                      {node.blocked_by.length > 0 && (
+                        <div className="mt-1 text-amber-500">Blocked by: {node.blocked_by.join(', ')}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border bg-card p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{t('workflowTasksTitle')}</h2>
+            <p className="text-sm text-muted-foreground">
+              {workflowLoading ? t('workflowPreviewLoading') : t('workflowTasksSummary', { count: readyItems.length })}
+            </p>
+          </div>
+          <Button onClick={onMaterialize} disabled={workflowMaterializing || workflowLoading}>
+            {workflowMaterializing ? t('workflowMaterializing') : t('materializeWorkflow')}
+          </Button>
+        </div>
+        {readyItems.length > 0 && (
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {readyItems.slice(0, 6).map((item) => (
+              <div key={item.workflow_key} className="rounded border bg-background p-3 text-sm">
+                <div className="font-medium text-foreground">{item.landmark_name}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{item.phase_name} · {item.priority} · {item.status}</div>
+                {item.blocked_by.length > 0 && (
+                  <div className="mt-1 text-xs text-amber-500">{t('blockedBy')}: {item.blocked_by.join(', ')}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <WorkflowColumn title="Active" workflows={grouped.active} empty="No active workflows" workflowOverriding={workflowOverriding} onWorkflowOverride={onWorkflowOverride} />
+        <WorkflowColumn title="Not Started" workflows={grouped.not_started} empty="No hidden workflows are ready yet" workflowOverriding={workflowOverriding} onWorkflowOverride={onWorkflowOverride} />
+        <WorkflowColumn title="Complete" workflows={grouped.complete} empty="No completed workflows" workflowOverriding={workflowOverriding} onWorkflowOverride={onWorkflowOverride} />
+      </div>
+    </div>
+  )
+}
+
+function WorkflowColumn({
+  title,
+  workflows,
+  empty,
+  workflowOverriding,
+  onWorkflowOverride,
+}: {
+  title: string
+  workflows: NonNullable<WorkflowPreview['workflows']>
+  empty: string
+  workflowOverriding: string | null
+  onWorkflowOverride: (workflowId: string, action: 'activate' | 'close') => void
+}) {
+  return (
+    <section className="min-w-0">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <span className="rounded border px-2 py-0.5 text-xs text-muted-foreground">{workflows.length}</span>
+      </div>
+      <div className="space-y-3">
+        {workflows.length === 0 ? (
+          <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">{empty}</p>
+        ) : workflows.map((workflow) => (
+          <article key={workflow.workflow_id} className="rounded-md border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h4 className="text-sm font-semibold text-foreground">{workflow.name}</h4>
+                <p className="mt-1 text-xs text-muted-foreground">{workflow.goal}</p>
+              </div>
+              <span className="shrink-0 rounded border px-2 py-0.5 text-[11px] text-muted-foreground">
+                {workflow.completed_steps}/{workflow.total_steps}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {workflow.steps.map((step) => (
+                <div key={step.id} className="rounded border bg-background p-2 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-medium text-foreground">{formatLabel(step.id)}</span>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 ${workflowStepTone(step.status)}`}>{formatLabel(step.status)}</span>
+                  </div>
+                  <div className="mt-1 text-muted-foreground">
+                    {step.type}{step.recipe_slug ? ` · ${step.recipe_slug}` : ''}{step.wait_days ? ` · wait ${step.wait_days} days` : ''}
+                  </div>
+                  {step.blocked_by.length > 0 && (
+                    <div className="mt-1 text-amber-500">Blocked by: {step.blocked_by.join(', ')}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {!workflow.enabled && (
+              <div className="mt-3 rounded border border-dashed px-2 py-1 text-xs text-muted-foreground">
+                Cataloged from FirmVault SOPs; not enabled for task materialization yet.
+              </div>
+            )}
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onWorkflowOverride(workflow.workflow_id, 'activate')}
+                disabled={workflow.status === 'active' || workflowOverriding !== null}
+              >
+                Activate
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onWorkflowOverride(workflow.workflow_id, 'close')}
+                disabled={workflow.status === 'complete' || workflowOverriding !== null}
+              >
+                Close
+              </Button>
+            </div>
+          </article>
         ))}
       </div>
-      <Button onClick={onSave} disabled={saving}>{saving ? t('saving') : t('saveWorkflow')}</Button>
+    </section>
+  )
+}
+
+function workflowStepTone(status: WorkflowPreview['workflows'][number]['steps'][number]['status']): string {
+  if (status === 'complete' || status === 'skipped') return 'bg-green-500/10 text-green-500'
+  if (status === 'ready') return 'bg-blue-500/10 text-blue-500'
+  if (status === 'waiting') return 'bg-purple-500/10 text-purple-500'
+  return 'bg-amber-500/10 text-amber-500'
+}
+
+function workflowInstanceTone(status: WorkflowPreview['workflow_instances'][number]['status']): string {
+  if (status === 'complete') return 'bg-green-500/10 text-green-500'
+  if (status === 'failed' || status === 'cancelled') return 'bg-red-500/10 text-red-500'
+  if (status === 'blocked') return 'bg-amber-500/10 text-amber-500'
+  return 'bg-blue-500/10 text-blue-500'
+}
+
+function workflowNodeTone(status: WorkflowPreview['workflow_instances'][number]['nodes'][number]['status']): string {
+  if (status === 'complete' || status === 'skipped') return 'bg-green-500/10 text-green-500'
+  if (status === 'ready') return 'bg-blue-500/10 text-blue-500'
+  if (status === 'running') return 'bg-yellow-500/10 text-yellow-500'
+  if (status === 'waiting') return 'bg-purple-500/10 text-purple-500'
+  if (status === 'failed' || status === 'cancelled') return 'bg-red-500/10 text-red-500'
+  return 'bg-amber-500/10 text-amber-500'
+}
+
+function canBypassWorkflowNode(status: WorkflowPreview['workflow_instances'][number]['nodes'][number]['status']): boolean {
+  return ['pending', 'ready', 'waiting', 'blocked'].includes(status)
+}
+
+function formatNullableBoolean(value: boolean | null): string {
+  if (value === true) return 'yes'
+  if (value === false) return 'no'
+  return 'unknown'
+}
+
+function WorkflowMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded border bg-card/50 px-2 py-1">
+      <div className="font-semibold text-foreground">{value}</div>
+      <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>
   )
 }
@@ -380,4 +996,17 @@ function Metric({ label, value }: { label: string; value: string }) {
 function formatLabel(value: string | null): string {
   if (!value) return ''
   return value.replace(/_/g, ' ')
+}
+
+function formatUnixTime(value: number): string {
+  try {
+    return new Date(value * 1000).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return String(value)
+  }
 }

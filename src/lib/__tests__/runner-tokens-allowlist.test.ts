@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { RUNNER_TOKEN_ALLOWLIST } from '@/lib/runner-tokens'
 
 /**
- * Phase 15 (15-01 / CP-01): coverage for the 7th RUNNER_TOKEN_ALLOWLIST entry.
+ * Phase 15 (15-01 / CP-01): coverage for runner-token allowlist additions.
  *
  * The Phase 15 checkpoint endpoint lives at the literal roadmap path
  * `/api/tasks/:id/checkpoints` (NOT under `/api/runner/*`). Honors the
@@ -16,21 +16,22 @@ import { RUNNER_TOKEN_ALLOWLIST } from '@/lib/runner-tokens'
  * the allowlist-shape contract.
  */
 
-const CHECKPOINTS_TASK_ENTRY_INDEX = 6 // appended AFTER the original six /api/runner/* entries
+const CHECKPOINTS_TASK_ENTRY_INDEX = 7 // appended AFTER the runner-scoped entries
 
 describe('RUNNER_TOKEN_ALLOWLIST — Phase 15 CP-01 additions', () => {
-  it('has exactly 7 entries (was 6 before Phase 15)', () => {
-    expect(RUNNER_TOKEN_ALLOWLIST.length).toBe(7)
+  it('has exactly 8 entries', () => {
+    expect(RUNNER_TOKEN_ALLOWLIST.length).toBe(8)
   })
 
-  it('preserves the original six /api/runner/tasks/:id/* entries at positions 0-5', () => {
-    const sources = RUNNER_TOKEN_ALLOWLIST.slice(0, 6).map((e) => ({
+  it('preserves the runner-scoped /api/runner/tasks/:id/* entries at positions 0-6', () => {
+    const sources = RUNNER_TOKEN_ALLOWLIST.slice(0, 7).map((e) => ({
       method: e.method,
       source: e.pathPattern.source,
     }))
     expect(sources).toEqual([
       { method: 'POST', source: /^\/api\/runner\/tasks\/(\d+)\/checkpoints\/?$/.source },
       { method: 'POST', source: /^\/api\/runner\/tasks\/(\d+)\/submit\/?$/.source },
+      { method: 'POST', source: /^\/api\/runner\/tasks\/(\d+)\/review\/?$/.source },
       { method: 'POST', source: /^\/api\/runner\/tasks\/(\d+)\/fail\/?$/.source },
       { method: 'GET',  source: /^\/api\/runner\/tasks\/(\d+)\/status\/?$/.source },
       { method: 'GET',  source: /^\/api\/runner\/tasks\/(\d+)\/?$/.source },
@@ -38,7 +39,7 @@ describe('RUNNER_TOKEN_ALLOWLIST — Phase 15 CP-01 additions', () => {
     ])
   })
 
-  it('7th entry is POST /api/tasks/:id/checkpoints with digit-only id', () => {
+  it('last entry is POST /api/tasks/:id/checkpoints with digit-only id', () => {
     const entry = RUNNER_TOKEN_ALLOWLIST[CHECKPOINTS_TASK_ENTRY_INDEX]
     expect(entry.method).toBe('POST')
     expect(entry.pathPattern.source).toBe(/^\/api\/tasks\/(\d+)\/checkpoints\/?$/.source)
@@ -95,9 +96,10 @@ describe('RUNNER_TOKEN_ALLOWLIST — Phase 15 CP-01 additions', () => {
       expect(matches('DELETE', '/api/tasks/1/checkpoints')).toBe(false)
     })
 
-    it('still accepts the original six /api/runner/* pairings', () => {
+    it('still accepts the runner-scoped /api/runner/* pairings', () => {
       expect(matches('POST', '/api/runner/tasks/1/checkpoints')).toBe(true)
       expect(matches('POST', '/api/runner/tasks/1/submit')).toBe(true)
+      expect(matches('POST', '/api/runner/tasks/1/review')).toBe(true)
       expect(matches('POST', '/api/runner/tasks/1/fail')).toBe(true)
       expect(matches('GET',  '/api/runner/tasks/1/status')).toBe(true)
       expect(matches('GET',  '/api/runner/tasks/1')).toBe(true)

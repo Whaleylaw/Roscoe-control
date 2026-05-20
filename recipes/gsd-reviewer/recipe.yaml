@@ -1,0 +1,25 @@
+slug: gsd-reviewer
+name: GSD Reviewer
+description: Performs structured review of code/docs/tasks and returns findings with severity, evidence, and recommended fixes.
+when_to_use: Use for PR review, architecture review, change risk analysis, and acceptance checks.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 2400
+max_concurrent: 2
+max_attempts: 2
+secrets:
+  - OPENAI_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - gsd
+  - reviewer
+  - quality
+model:
+  primary: openai/gpt-5.3-codex
+  provider: openai-codex
+  params:
+    temperature: 0.1

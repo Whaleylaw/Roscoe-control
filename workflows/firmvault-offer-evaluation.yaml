@@ -1,0 +1,109 @@
+schema_version: 1
+id: firmvault-offer-evaluation
+name: FirmVault Offer Evaluation
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as offer_documented, manual, or counter_offer_received.
+    default: offer_documented
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.offer_documented == true
+  - type: event
+    event: law_firm.negotiation.offer_documented
+  - type: manual
+
+nodes:
+  prepare_offer_evaluation:
+    type: recipe
+    name: Prepare Offer Evaluation
+    recipe: firmvault-negotiation-offer-evaluation
+    depends_on:
+      conditions:
+        - law_firm.landmarks.offer_documented == true
+    completes:
+      - law_firm.landmarks.offer_evaluated
+      - law_firm.landmarks.net_to_client_prepared
+    config:
+      attorney_pr_gate: true
+      merge_requires_attorney_review: true
+      task_goal: >-
+        Prepare an attorney-facing offer evaluation package from the documented
+        offer, demand package, medical specials, liens/final-lien readiness,
+        fee agreement, case costs, and insurance ledgers. Calculate net-to-client
+        scenarios only from supported canonical facts; if fee percentage, costs,
+        liens, policy limits, demand amount, or response deadline are unknown,
+        mark them as unknown and surface the exact missing fact. Compare the
+        offer to the demand and case factors, but do not make a final legal
+        recommendation, do not contact the client or carrier, do not accept,
+        reject, counter, declare impasse, or mark settlement reached. The
+        Forgejo review PR for this task is the attorney review surface; attorney
+        merge of that PR approves the evaluation for client discussion.
+      canonical_paths:
+        - negotiation/offers.md
+        - negotiation/offer-evaluation.md
+        - demand/readiness.md
+        - demand/demand-package.md
+        - demand/damages-summary.md
+        - insurance/
+        - liens/
+        - settlement/
+        - medical-providers/
+        - activity/
+        - workflow-log/
+
+  client_offer_decision:
+    type: review
+    name: Client Offer Decision
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_offer_evaluation
+    completes:
+      - law_firm.landmarks.client_advised_of_offer
+    config:
+      task_goal: >-
+        After the attorney approves the offer evaluation PR, communicate the
+        attorney-approved offer analysis to the client through the appropriate
+        human channel. Record the client communication result in this task
+        thread: date, method, who participated, whether the client needs more
+        time or information, and any authority to accept, reject, or counter.
+        Do not mark settlement reached from this review unless a later workflow
+        records a supported acceptance and settlement-processing trigger.
+
+  document_client_decision:
+    type: recipe
+    name: Document Client Decision
+    recipe: firmvault-negotiation-document-client-decision
+    depends_on:
+      nodes:
+        - client_offer_decision
+    completes:
+      - law_firm.landmarks.offer_decision_documented
+    config:
+      task_goal: >-
+        Read the same-task Mission Control comments from the client decision
+        review and write the client communication result to canonical FirmVault
+        files. Update negotiation/offers.md and negotiation/offer-evaluation.md
+        with the supported client decision status. Append activity and workflow-log
+        entries. If the client authorized a counter, record the counter authority
+        without sending it; the Negotiate Claim workflow should prepare/send any
+        counter. If the client accepted, record acceptance authority without
+        starting settlement processing unless a later settlement workflow is
+        triggered. If the human review lacks a clear decision, return to Human
+        Review with the exact missing facts.
+      canonical_paths:
+        - negotiation/offers.md
+        - negotiation/offer-evaluation.md
+        - insurance/
+        - activity/
+        - workflow-log/

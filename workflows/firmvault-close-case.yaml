@@ -1,0 +1,110 @@
+schema_version: 1
+id: firmvault-close-case
+name: FirmVault Close Case
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as final_distribution_complete, verdict_complete, declined, or manual.
+    default: final_distribution_complete
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.final_distribution_complete == true
+  - type: event
+    event: law_firm.case.ready_to_close
+  - type: manual
+
+nodes:
+  verify_closure_readiness:
+    type: recipe
+    name: Verify Closure Readiness
+    recipe: firmvault-close-case-verify-readiness
+    depends_on:
+      conditions:
+        - law_firm.landmarks.final_distribution_complete == true
+    completes:
+      - law_firm.landmarks.all_obligations_verified
+    config:
+      task_goal: >-
+        Verify the case is ready for successful closure. Confirm final
+        distribution complete, trust account zeroed, settlement/release/funds
+        documented, liens resolved or not applicable, and no unresolved workflow
+        blockers in canonical activity/workflow logs. If any obligation remains
+        open, submit Human Review with the exact blocker. If ready, write a
+        closure readiness checklist under closing/ and append activity/workflow
+        log entries. Do not archive the file or mark the case closed.
+
+  prepare_closing_letter:
+    type: recipe
+    name: Prepare Closing Letter
+    recipe: firmvault-close-case-prepare-letter
+    depends_on:
+      nodes:
+        - verify_closure_readiness
+    completes:
+      - law_firm.landmarks.final_letter_prepared
+    config:
+      task_goal: >-
+        Prepare a client closing-letter draft using the verified closure facts.
+        Write the draft under documents/generated/client/ and a send handoff
+        under closing/. The letter should thank the client, confirm the case is
+        closed after final distribution, explain retention in general terms, and
+        avoid unsupported promises. Do not send the letter, request a review, or
+        archive the file.
+
+  human_send_closing_letter:
+    type: review
+    name: Human Send Closing Letter
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - prepare_closing_letter
+    completes:
+      - law_firm.landmarks.final_letter_sent
+    config:
+      task_goal: >-
+        Send the closing letter by the available human channel. For this test
+        ladder, comment with synthetic send facts: send date, method, recipient,
+        and whether a review request was included or intentionally omitted.
+
+  human_archive_file:
+    type: review
+    name: Human Archive File
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - human_send_closing_letter
+    completes:
+      - law_firm.landmarks.case_archived
+    config:
+      task_goal: >-
+        Confirm the file archive step. For this test ladder, comment with
+        synthetic archive facts: archive date, archive location/reference,
+        retention period, and whether physical/digital archive actions are
+        complete or simulated.
+
+  document_case_closed:
+    type: recipe
+    name: Document Case Closed
+    recipe: firmvault-close-case-document-closure
+    depends_on:
+      nodes:
+        - human_archive_file
+    completes:
+      - law_firm.landmarks.case_closed
+    config:
+      task_goal: >-
+        Document final case closure from same-task human/test comments and
+        canonical closure readiness files. Update the case root, Dashboard, and
+        closing ledger to closed status with closure date, final letter sent
+        status, archive reference, retention date, and closure reason. Append
+        activity/workflow-log entries. Do not invent archive or send facts.

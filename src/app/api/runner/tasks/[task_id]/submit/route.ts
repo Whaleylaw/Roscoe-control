@@ -31,6 +31,7 @@ import { logger } from '@/lib/logger'
 const Body = z.object({
   status: z.literal('done'),
   resolution: z.string().max(10_000).optional(),
+  comment: z.string().max(10_000).optional(),
 })
 
 // Re-submits after the review-flip (and already-terminal states) return 409
@@ -84,8 +85,8 @@ export async function POST(
   try {
     const db = getDatabase()
     const task = db
-      .prepare('SELECT id, status FROM tasks WHERE id = ?')
-      .get(taskId) as { id: number; status: string } | undefined
+      .prepare('SELECT id, title, status, workspace_id FROM tasks WHERE id = ?')
+      .get(taskId) as { id: number; title: string; status: string; workspace_id: number } | undefined
 
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
@@ -96,6 +97,8 @@ export async function POST(
     }
 
     const nowUnix = Math.floor(Date.now() / 1000)
+    const reviewComment = (body.comment ?? body.resolution ?? '').trim()
+    let changed = 0
 
     // Atomic: flip status to review + clear container_id + revoke live
     // runner-tokens. Guarded on status NOT IN ('review','done','failed',
@@ -110,13 +113,14 @@ export async function POST(
     // (src/lib/task-dispatch.ts:414) is the canonical terminal transition and
     // owns the completed_at timestamp if/when a dedicated column is added.
     db.transaction(() => {
-      db.prepare(`
+      const update = db.prepare(`
         UPDATE tasks
         SET status = 'review',
             container_id = NULL,
             updated_at = ?
         WHERE id = ? AND status NOT IN ('review','done','failed','cancelled')
       `).run(nowUnix, taskId)
+      changed = update.changes
 
       // Resolution is advisory in Phase 14: write to task_runner_attempts
       // best-effort for the most-recent attempt that has no resolution yet.
@@ -143,21 +147,26 @@ export async function POST(
         }
       }
 
+      if (changed > 0 && reviewComment.length > 0) {
+        db.prepare(`
+          INSERT INTO comments (task_id, author, content, created_at, workspace_id)
+          VALUES (?, 'recipe-runner', ?, ?, ?)
+        `).run(taskId, reviewComment, nowUnix, task.workspace_id)
+      }
+
       revokeTokensForTask(db, taskId, nowUnix)
     })()
 
     // Broadcast AFTER the transaction commits so SSE subscribers never see a
-    // transition that later got rolled back. Phase 17 D-01: previous_status is
-    // always 'in_progress' because the WHERE clause on the UPDATE rejects any
-    // row not in that state (the 409 ALREADY_SETTLED guard above also enforces
-    // this). workspace_id is emitted as null — the submit route does not carry
-    // it in the cached task SELECT; downstream consumers (UI, runner) derive
-    // scope from task_id.
+    // transition that later got rolled back. The runner normally submits from
+    // in_progress; using the actual observed pre-transaction status keeps the
+    // event honest if a valid runner-token races with another non-terminal
+    // transition.
     eventBus.broadcast('task.status_changed', {
       task_id: taskId,
       status: 'review',
-      previous_status: 'in_progress',
-      workspace_id: null,
+      previous_status: task.status,
+      workspace_id: task.workspace_id,
       at: nowUnix,
     })
 

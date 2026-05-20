@@ -176,6 +176,18 @@ describe('startRecipeWatcher debounce', () => {
     expect(after.timeout_seconds).toBe(600)
   })
 
+  it('reacts to reference material changes because references contribute to dir_sha', async () => {
+    mkdirSync(join(recipesRoot, 'delta', 'references'))
+    await startRecipeWatcher({ recipesRoot })
+    const before = testDb.prepare(`SELECT dir_sha FROM recipes WHERE slug='delta'`).get() as { dir_sha: string }
+
+    writeFileSync(join(recipesRoot, 'delta', 'references', 'source-skill.md'), 'reference guidance')
+    await new Promise((r) => setTimeout(r, 1200))
+
+    const after = testDb.prepare(`SELECT dir_sha FROM recipes WHERE slug='delta'`).get() as { dir_sha: string }
+    expect(after.dir_sha).not.toBe(before.dir_sha)
+  })
+
   it('ignores temp/swap files (.swp, ~, .tmp, .DS_Store) — no extra reindex', async () => {
     await startRecipeWatcher({ recipesRoot })
     const before = testDb.prepare(`SELECT updated_at FROM recipes WHERE slug='delta'`).get() as { updated_at: number }

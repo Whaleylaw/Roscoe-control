@@ -92,6 +92,32 @@ function seedTask(t: SeedTask): number {
   return Number(lastInsertRowid)
 }
 
+function seedRecipeWithReview(slug: string): void {
+  testDb
+    .prepare(
+      `INSERT INTO recipes (
+         slug, name, image, workspace_mode, timeout_seconds, max_concurrent,
+         env_json, secrets_json, tags_json, model_json, version, dir_sha,
+         soul_md, review_md, workspace_id, tenant_id
+       ) VALUES (?, ?, 'mc-recipe-agent:latest', 'worktree', 300, 1,
+         '{}', '[]', '[]', '{"primary":"openai/gpt-5.4-mini"}', 1, ?,
+         'soul', 'review', 1, 1)`,
+    )
+    .run(slug, slug, `sha-${slug}`)
+}
+
+function seedOpenReviewPr(taskId: number): void {
+  testDb
+    .prepare(
+      `INSERT INTO task_review_prs (
+         task_id, workspace_id, provider, remote_name, remote_url, repo_owner,
+         repo_name, base_ref, head_ref, branch_name, pr_number, pr_url, state
+       ) VALUES (?, 1, 'forgejo', 'forgejo', 'ssh://git@localhost:2222/aaron/FirmVault.git',
+         'aaron', 'FirmVault', 'main', 'mc/task-open', 'mc/task-open', ?, ?, 'open')`,
+    )
+    .run(taskId, 1000 + taskId, `http://localhost:3001/aaron/FirmVault/pulls/${1000 + taskId}`)
+}
+
 beforeEach(() => {
   testDb = new Database(':memory:')
   testDb.pragma('foreign_keys = ON')
@@ -181,6 +207,56 @@ describe('GET /api/runner/ready-tasks', () => {
     expect(t.runner_max_attempts).toBe(5)
     // runner_attempts defaults to 0 per migration 056's NOT NULL DEFAULT 0.
     expect(t.runner_attempts).toBe(0)
+  })
+
+  it('excludes quality_review recipe tasks that already have an open review PR gate', async () => {
+    asRunner()
+    seedRecipeWithReview('reviewable')
+    const waitingOnPrId = seedTask({
+      title: 'waiting-on-pr',
+      status: 'quality_review',
+      recipe_slug: 'reviewable',
+    })
+    seedOpenReviewPr(waitingOnPrId)
+    const stillNeedsReviewId = seedTask({
+      title: 'needs-review',
+      status: 'quality_review',
+      recipe_slug: 'reviewable',
+    })
+
+    const res = await GET(makeGet())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expect(body.tasks.map((t: { id: number }) => t.id)).toEqual([stillNeedsReviewId])
+  })
+
+  it('excludes quality_review recipe tasks blocked by a recipe-specific reviewer', async () => {
+    asRunner()
+    seedRecipeWithReview('reviewable')
+    seedTask({
+      title: 'blocked-review',
+      status: 'quality_review',
+      recipe_slug: 'reviewable',
+      // Simulates legacy rows left in quality_review before blocked verdicts
+      // were routed back to Human Review.
+    })
+    testDb.prepare(`
+      UPDATE tasks
+      SET error_message = 'Recipe review blocked: Need reporting agency.'
+      WHERE title = 'blocked-review'
+    `).run()
+    const stillNeedsReviewId = seedTask({
+      title: 'needs-review',
+      status: 'quality_review',
+      recipe_slug: 'reviewable',
+    })
+
+    const res = await GET(makeGet())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+
+    expect(body.tasks.map((t: { id: number }) => t.id)).toEqual([stillNeedsReviewId])
   })
 
   it('RUNNER-04: rejects non-runner-secret bearer with 403 (id-guard)', async () => {

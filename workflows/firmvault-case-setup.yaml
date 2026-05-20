@@ -1,0 +1,49 @@
+schema_version: 1
+id: firmvault-case-setup
+name: FirmVault Case Setup
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug to create or verify.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as intake_upload or manual.
+    default: intake_upload
+    type: string
+
+triggers:
+  - type: manual
+  - type: event
+    event: law_firm.new_intake_uploaded
+
+nodes:
+  create_case_workspace:
+    type: recipe
+    name: Create FirmVault Case Workspace
+    recipe: firmvault-case-setup-create-shell
+    completes:
+      - law_firm.landmarks.case_setup_complete
+      - law_firm.landmarks.client_info_received
+    config:
+      task_goal: >-
+        Create or verify the deterministic FirmVault case scaffold from the
+        accepted intake upload. The output must include the root case file,
+        Dashboard.md, case-local AGENTS.md, starter ledgers, document folders,
+        activity index, workflow-log index, normalized intake shadow when
+        available, and audit entries. Do not invent unsupported facts.
+
+  human_case_setup_review:
+    type: review
+    name: Human Review of Case Setup
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - create_case_workspace
+    completes:
+      - law_firm.landmarks.case_setup_reviewed
+    config:
+      task_goal: Confirm the new case scaffold is correct before downstream case workflows rely on it.

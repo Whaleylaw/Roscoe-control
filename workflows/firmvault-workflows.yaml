@@ -1,0 +1,765 @@
+schema_version: 1
+
+# Mission Control executable translation of the original FirmVault workflow SOPs:
+# /Users/aaronwhaley/.hermes/agents/paralegal/workspace/skills.tools.workflows/workflows
+#
+# Node types:
+# - recipe: materializes a Mission Control task backed by a recipe runner.
+# - wait: blocks downstream nodes until runtime state says the wait expired, unless skip_when is satisfied.
+# - human_review: materializes a human checkpoint task.
+# - code: reserved for deterministic tools/functions that feed later nodes.
+#
+# Most workflows start disabled until their landmarks and recipes are mapped.
+# Disabled workflows remain cataloged but are not currently materialized.
+
+workflows:
+  case_setup:
+    enabled: false
+    source: phase_0_onboarding/workflows/case_setup/workflow.md
+    phase_id: phase_0_onboarding
+    name: Case Setup
+    goal: Create the case workspace and initialize baseline case state.
+    trigger:
+      active_when: new_case_intake_started
+    steps:
+      - id: recognize_new_case
+        type: human_review
+        landmark_id: case_setup_requested
+      - id: gather_required_inputs
+        type: recipe
+        recipe_slug: firmvault-document-collection-review-intake
+        landmark_id: client_info_received
+        depends_on: [recognize_new_case]
+      - id: create_case_workspace
+        type: recipe
+        recipe_slug: firmvault-case-setup-create-shell
+        landmark_id: case_workspace_created
+        depends_on: [gather_required_inputs]
+      - id: confirm_case_setup
+        type: human_review
+        landmark_id: case_setup_confirmed
+        depends_on: [create_case_workspace]
+
+  document_collection:
+    enabled: false
+    source: phase_0_onboarding/workflows/document_collection/workflow.md
+    phase_id: phase_0_onboarding
+    name: Initial Document Collection
+    goal: Collect intake documents, fee agreement, HIPAA, and related onboarding paperwork.
+    trigger:
+      active_when: case_setup_complete
+    steps:
+      - id: load_document_checklist
+        type: recipe
+        recipe_slug: firmvault-document-collection-review-intake
+        landmark_id: onboarding_document_checklist_loaded
+        depends_on:
+          conditions:
+            - law_firm.landmarks.case_setup_complete == true
+      - id: request_missing_documents
+        type: recipe
+        recipe_slug: firmvault-document-collection-request-missing-documents
+        landmark_id: onboarding_documents_requested
+        depends_on: [load_document_checklist]
+      - id: send_signature_packets
+        type: recipe
+        recipe_slug: firmvault-document-collection-send-signature-packets
+        landmark_id: onboarding_signature_packets_sent
+        depends_on: [request_missing_documents]
+      - id: wait_for_signed_documents
+        type: wait
+        wait: { days: 7 }
+        depends_on: [send_signature_packets]
+        skip_when: [contract_signed, medical_auth_signed]
+      - id: confirm_onboarding_documents
+        type: human_review
+        landmark_id: full_intake_complete
+        depends_on: [contract_signed, medical_auth_signed, client_info_received]
+
+  accident_report:
+    enabled: false
+    source: phase_1_file_setup/workflows/accident_report/workflow.md
+    phase_id: phase_1_file_setup
+    name: Accident Report
+    goal: Identify, request, receive, and analyze the crash report.
+    trigger:
+      active_when: full_intake_complete
+    steps:
+      - id: identify_reporting_agency
+        type: recipe
+        recipe_slug: firmvault-accident-report-analyze
+        landmark_id: accident_reporting_agency_identified
+      - id: get_report_number
+        type: recipe
+        recipe_slug: firmvault-accident-report-analyze
+        landmark_id: accident_report_number_identified
+        depends_on: [identify_reporting_agency]
+      - id: request_accident_report
+        type: recipe
+        recipe_slug: firmvault-accident-report-analyze
+        landmark_id: accident_report_requested
+        depends_on: [get_report_number]
+      - id: wait_for_accident_report
+        type: wait
+        wait: { days: 14 }
+        depends_on: [request_accident_report]
+        skip_when: [accident_report_obtained]
+      - id: analyze_accident_report
+        type: recipe
+        recipe_slug: firmvault-accident-report-analyze
+        landmark_id: accident_report_obtained
+        depends_on: [accident_report_obtained]
+
+  insurance_bi_claim:
+    enabled: false
+    source: phase_1_file_setup/workflows/insurance_bi_claim/workflow.md
+    phase_id: phase_1_file_setup
+    name: BI Claim Setup
+    goal: Identify at-fault insurance, send LOR, and open the bodily injury claim.
+    trigger:
+      active_when: accident_report_obtained
+    steps:
+      - id: identify_at_fault_insurance
+        type: recipe
+        recipe_slug: firmvault-insurance-bi-send-lor
+        landmark_id: at_fault_insurance_identified
+      - id: send_bi_lor
+        type: recipe
+        recipe_slug: firmvault-insurance-bi-send-lor
+        landmark_id: bi_lor_sent
+        depends_on: [identify_at_fault_insurance]
+      - id: open_bi_claim
+        type: recipe
+        recipe_slug: firmvault-insurance-bi-send-lor
+        landmark_id: insurance_claims_setup
+        depends_on: [send_bi_lor]
+
+  insurance_pip_claim:
+    enabled: true
+    executable_definition: firmvault-pip-claim-setup
+    source: phase_1_file_setup/workflows/insurance_pip_claim/workflow.md
+    phase_id: pip_track
+    name: PIP Claim Setup
+    goal: Identify PIP carrier, file KACP application, confirm approval, and track PIP status.
+    trigger:
+      active_when: pip_track_active
+    steps:
+      - id: run_pip_waterfall
+        type: recipe
+        recipe_slug: firmvault-insurance-pip-open-claim
+        landmark_id: pip_carrier_identified
+      - id: file_pip_application
+        type: recipe
+        recipe_slug: firmvault-pip-file-application
+        landmark_id: pip_application_filed
+        depends_on: [run_pip_waterfall]
+      - id: confirm_pip_approval
+        type: recipe
+        recipe_slug: firmvault-pip-confirm-approval
+        landmark_id: pip_approved
+        depends_on: [file_pip_application]
+      - id: wait_before_pip_status_followup
+        type: wait
+        wait: { days: 30 }
+        depends_on: [confirm_pip_approval]
+        skip_when: [pip_benefits_exhausted]
+      - id: track_pip_exhaustion
+        type: recipe
+        recipe_slug: firmvault-pip-track-exhaustion
+        landmark_id: pip_benefits_exhausted
+        depends_on: [wait_before_pip_status_followup]
+
+  medical_provider_setup:
+    enabled: true
+    executable_definition: firmvault-medical-provider-setup
+    source: phase_1_file_setup/workflows/medical_provider_setup/workflow.md
+    phase_id: phase_1_file_setup
+    name: Medical Provider Setup
+    goal: Collect provider information, treatment dates, injuries, and initialize provider tracking.
+    trigger:
+      active_when: full_intake_complete
+    steps:
+      - id: create_provider_ledgers
+        type: recipe
+        recipe_slug: firmvault-medical-provider-setup-case
+        landmark_id:
+          - providers_setup
+          - provider_treatment_dates_recorded
+          - injury_summary_recorded
+        depends_on:
+          conditions:
+            - law_firm.landmarks.full_intake_complete == true
+      - id: confirm_medical_provider_setup
+        type: human_review
+        landmark_id: medical_provider_setup_reviewed
+        depends_on: [create_provider_ledgers]
+
+  client_check_in:
+    enabled: true
+    executable_definition: firmvault-client-check-in-cadence
+    source: phase_2_treatment/workflows/client_check_in/workflow.md
+    phase_id: client_contact
+    name: Client Check-In
+    goal: Contact client, document treatment updates, and trigger provider updates/referrals.
+    trigger:
+      active_when: case_active
+    steps:
+      - id: start_check_in_cadence
+        type: recipe
+        recipe_slug: firmvault-client-check-in-start-cadence
+        landmark_id: client_check_in_active
+        depends_on:
+          conditions:
+            - law_firm.landmarks.full_intake_complete == true
+      - id: prepare_check_in_handoff
+        type: recipe
+        recipe_slug: firmvault-client-check-in-prepare-handoff
+        landmark_id: client_check_in_prepared
+        depends_on: [start_check_in_cadence]
+      - id: human_client_contact
+        type: human_review
+        landmark_id: client_contact_attempted
+        depends_on: [prepare_check_in_handoff]
+      - id: trigger_new_provider_workflow
+        type: recipe
+        recipe_slug: firmvault-medical-provider-setup-case
+        landmark_id: provider_referral_needed
+        depends_on: [human_client_contact]
+      - id: wait_for_next_checkin
+        type: wait
+        wait: { days: 14 }
+        depends_on: [human_client_contact]
+        skip_when: [demand_sent]
+
+  lien_identification:
+    enabled: false
+    source: phase_2_treatment/workflows/lien_identification/workflow.md
+    phase_id: lien_track
+    name: Early Lien Identification
+    goal: Categorize coverage and identify Medicare, Medicaid, health insurance, and provider liens.
+    trigger:
+      active_when: providers_setup
+    steps:
+      - id: categorize_health_coverage
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: health_coverage_categorized
+      - id: identify_medicare_interest
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medicare_interest_identified
+        depends_on: [categorize_health_coverage]
+      - id: identify_medicaid_interest
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medicaid_interest_identified
+        depends_on: [categorize_health_coverage]
+      - id: identify_health_insurance_liens
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: health_insurance_liens_identified
+        depends_on: [categorize_health_coverage]
+      - id: identify_provider_liens
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: provider_liens_identified
+        depends_on: [providers_setup]
+      - id: create_lien_inventory
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: liens_identified
+        depends_on:
+          - identify_medicare_interest
+          - identify_medicaid_interest
+          - identify_health_insurance_liens
+          - identify_provider_liens
+      - id: send_lien_notices
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: liens_opened
+        depends_on: [create_lien_inventory]
+
+  medical_chronology:
+    enabled: false
+    source: phase_2_treatment/workflows/medical_chronology/workflow.md
+    phase_id: phase_2_treatment
+    name: Medical Chronology
+    goal: Convert new records, extract facts, identify red flags, and update the medical chronology.
+    trigger:
+      active_when: medical_records_received
+    steps:
+      - id: identify_new_records
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medical_records_new_batch_identified
+      - id: convert_pdfs_to_markdown
+        type: code
+        function: read_pdf
+        landmark_id: medical_records_converted
+        depends_on: [identify_new_records]
+      - id: extract_key_information
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medical_information_extracted
+        depends_on: [convert_pdfs_to_markdown]
+      - id: research_medical_terms
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medical_terms_reviewed
+        depends_on: [extract_key_information]
+      - id: identify_red_flags
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medical_red_flags_reviewed
+        depends_on: [extract_key_information]
+      - id: update_chronology
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: medical_chronology_updated
+        depends_on:
+          - research_medical_terms
+          - identify_red_flags
+
+  medical_provider_status:
+    enabled: false
+    source: phase_2_treatment/workflows/medical_provider_status/workflow.md
+    phase_id: phase_2_treatment
+    name: Medical Provider Status
+    goal: Review provider list, update treatment status, and flag follow-ups.
+    trigger:
+      active_when: providers_setup
+    steps:
+      - id: review_provider_list
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: provider_list_reviewed
+      - id: update_provider_status
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: provider_status_updated
+        depends_on: [review_provider_list]
+      - id: identify_treatment_completion
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: treatment_complete
+        depends_on: [update_provider_status]
+      - id: flag_provider_followups
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: provider_followups_flagged
+        depends_on: [update_provider_status]
+
+  referral_new_provider:
+    enabled: false
+    source: phase_2_treatment/workflows/referral_new_provider/workflow.md
+    phase_id: phase_2_treatment
+    name: Referral to New Provider
+    goal: Identify referral need, select provider, coordinate appointment, and add provider to the case.
+    trigger:
+      active_when: provider_referral_needed
+    steps:
+      - id: identify_referral_need
+        type: human_review
+        landmark_id: provider_referral_needed
+      - id: select_provider
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: referred_provider_selected
+        depends_on: [identify_referral_need]
+      - id: coordinate_appointment
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: referred_provider_appointment_scheduled
+        depends_on: [select_provider]
+      - id: add_provider_to_case
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: providers_setup
+        depends_on: [coordinate_appointment]
+
+  request_records_bills:
+    enabled: true
+    source: phase_2_treatment/workflows/request_records_bills/workflow.md
+    phase_id: phase_2_treatment
+    name: Medical Records and Bills Request
+    goal: After treatment is complete, verify authorization, request records and bills, wait for production, follow up, then confirm receipt.
+    trigger:
+      active_when: treatment_complete
+    steps:
+      - id: verify_medical_authorization
+        type: recipe
+        recipe_slug: firmvault-medical-records-verify-authorization
+        landmark_id: medical_auth_signed
+        description: Deterministically verify the canonical authorization ledger and shadows; broad document search is only a repair fallback when canonical filing is broken.
+        depends_on:
+          conditions:
+            - law_firm.landmarks.providers_setup == true
+            - law_firm.landmarks.treatment_complete == true
+      - id: prepare_records_request
+        type: recipe
+        recipe_slug: firmvault-medical-records-prepare-request
+        landmark_id: records_request_packet_prepared
+        depends_on:
+          nodes:
+            - verify_medical_authorization
+          conditions:
+            - law_firm.landmarks.medical_auth_signed == true
+      - id: send_initial_request
+        type: recipe
+        recipe_slug: firmvault-medical-records-send-request
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - prepare_records_request
+      - id: wait_for_first_followup
+        type: wait
+        wait: { days: 14 }
+        duration: 14d
+        depends_on:
+          nodes:
+            - send_initial_request
+        skip_when:
+          - all_records_received
+          - all_bills_received
+      - id: first_follow_up_request
+        type: recipe
+        recipe_slug: firmvault-medical-records-first-follow-up
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - wait_for_first_followup
+      - id: wait_for_second_followup
+        type: wait
+        wait: { days: 7 }
+        duration: 7d
+        depends_on:
+          nodes:
+            - first_follow_up_request
+        skip_when:
+          - all_records_received
+          - all_bills_received
+      - id: second_follow_up_request
+        type: recipe
+        recipe_slug: firmvault-medical-records-second-follow-up
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - wait_for_second_followup
+      - id: wait_for_escalation
+        type: wait
+        wait: { days: 9 }
+        duration: 9d
+        depends_on:
+          nodes:
+            - second_follow_up_request
+        skip_when:
+          - all_records_received
+          - all_bills_received
+      - id: escalate_delayed_records
+        type: recipe
+        recipe_slug: firmvault-medical-records-escalate-delay
+        landmark_id: records_requested_all_providers
+        depends_on:
+          nodes:
+            - wait_for_escalation
+      - id: human_review_records
+        type: human_review
+        landmark_id: all_records_received
+        depends_on:
+          conditions:
+            - law_firm.landmarks.all_records_received == true
+            - law_firm.landmarks.all_bills_received == true
+
+  gather_demand_materials:
+    enabled: false
+    source: phase_3_demand/workflows/gather_demand_materials/workflow.md
+    phase_id: phase_3_demand
+    name: Gather Demand Materials
+    goal: Confirm records, bills, chronology, liens, and damages needed for demand drafting.
+    trigger:
+      active_when: treatment_complete
+    steps:
+      - id: verify_records_received
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: all_records_received
+      - id: verify_bills_received
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: all_bills_received
+      - id: calculate_damages
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: damages_calculated
+        depends_on:
+          - verify_records_received
+          - verify_bills_received
+
+  draft_demand:
+    enabled: false
+    source: phase_3_demand/workflows/draft_demand/workflow.md
+    phase_id: phase_3_demand
+    name: Draft Demand
+    goal: Draft the demand package after demand materials are complete.
+    trigger:
+      active_when: damages_calculated
+    steps:
+      - id: prepare_demand_draft
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: demand_drafted
+        depends_on:
+          - all_records_received
+          - all_bills_received
+          - damages_calculated
+      - id: attorney_review_demand
+        type: human_review
+        landmark_id: attorney_reviewed_demand
+        depends_on: [prepare_demand_draft]
+
+  send_demand:
+    enabled: false
+    source: phase_3_demand/workflows/send_demand/workflow.md
+    phase_id: phase_3_demand
+    name: Send Demand
+    goal: Send demand to proper recipients and start response tracking.
+    trigger:
+      active_when: attorney_reviewed_demand
+    steps:
+      - id: identify_demand_recipients
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: demand_recipients_identified
+      - id: send_demand_package
+        type: human_review
+        landmark_id: demand_sent
+        depends_on:
+          - identify_demand_recipients
+          - attorney_reviewed_demand
+      - id: wait_for_response
+        type: wait
+        wait: { days: 30 }
+        depends_on: [send_demand_package]
+        skip_when: [initial_offer_received]
+
+  track_offers:
+    enabled: false
+    source: phase_4_negotiation/workflows/track_offers/workflow.md
+    phase_id: phase_4_negotiation
+    name: Track Offers
+    goal: Log offers, deadlines, conditions, and negotiation history.
+    trigger:
+      active_when: demand_sent
+    steps:
+      - id: wait_for_offer
+        type: wait
+        wait: { days: 30 }
+        skip_when: [initial_offer_received]
+      - id: log_incoming_offer
+        type: recipe
+        recipe_slug: firmvault-workflow-task
+        landmark_id: initial_offer_received
+        depends_on: [initial_offer_received]
+
+  offer_evaluation:
+    enabled: true
+    executable_definition: firmvault-offer-evaluation
+    source: phase_4_negotiation/workflows/offer_evaluation/workflow.md
+    phase_id: phase_4_negotiation
+    name: Offer Evaluation
+    goal: Prepare attorney-facing offer evaluation, net-to-client analysis, and client decision documentation.
+    trigger:
+      active_when: offer_documented
+    steps:
+      - id: prepare_offer_evaluation
+        type: recipe
+        recipe_slug: firmvault-negotiation-offer-evaluation
+        landmark_id:
+          - offer_evaluated
+          - net_to_client_prepared
+        depends_on:
+          conditions:
+            - law_firm.landmarks.offer_documented == true
+      - id: client_offer_decision
+        type: human_review
+        landmark_id: client_advised_of_offer
+        depends_on: [prepare_offer_evaluation]
+      - id: document_client_decision
+        type: recipe
+        recipe_slug: firmvault-negotiation-document-client-decision
+        landmark_id: offer_decision_documented
+        depends_on: [client_offer_decision]
+
+  negotiate_claim:
+    enabled: true
+    executable_definition: firmvault-negotiate-claim
+    source: phase_4_negotiation/workflows/negotiate_claim/workflow.md
+    phase_id: phase_4_negotiation
+    name: Negotiate Claim
+    goal: Prepare and document the formal negotiation response after attorney/client decision.
+    trigger:
+      active_when: offer_decision_documented
+    steps:
+      - id: prepare_negotiation_response
+        type: recipe
+        recipe_slug: firmvault-negotiation-prepare-response
+        landmark_id: negotiation_response_prepared
+        depends_on:
+          conditions:
+            - law_firm.landmarks.offer_decision_documented == true
+      - id: human_send_negotiation_response
+        type: human_review
+        landmark_id: negotiation_response_human_sent
+        depends_on: [prepare_negotiation_response]
+      - id: document_negotiation_result
+        type: recipe
+        recipe_slug: firmvault-negotiation-document-response
+        landmark_id:
+          - negotiation_result_documented
+          - settlement_reached
+        depends_on: [human_send_negotiation_response]
+
+  settlement_processing:
+    enabled: true
+    executable_definition: firmvault-settlement-processing
+    source: phase_5_settlement/workflows/settlement_processing/workflow.md
+    phase_id: phase_5_settlement
+    name: Settlement Processing
+    goal: Prepare settlement statement, authorization, release execution, and funds tracking.
+    trigger:
+      active_when: settlement_reached
+    steps:
+      - id: prepare_settlement_statement
+        type: recipe
+        recipe_slug: firmvault-settlement-prepare-statement
+        landmark_id: settlement_statement_prepared
+      - id: prepare_authorization_to_settle
+        type: recipe
+        recipe_slug: firmvault-settlement-prepare-authorization
+        landmark_id: authorization_to_settle_prepared
+        depends_on: [prepare_settlement_statement]
+      - id: get_client_signature
+        type: human_review
+        landmark_id: client_authorized
+        depends_on: [prepare_authorization_to_settle]
+      - id: execute_release
+        type: human_review
+        landmark_id: release_executed
+        depends_on: [client_authorized]
+      - id: wait_for_funds
+        type: wait
+        wait: { days: 14 }
+        depends_on: [execute_release]
+        skip_when: [funds_received]
+      - id: receive_settlement_funds
+        type: recipe
+        recipe_slug: firmvault-settlement-document-funds
+        landmark_id: funds_received
+        depends_on: [wait_for_funds]
+
+  settlement_lien_negotiation:
+    enabled: true
+    executable_definition: firmvault-settlement-lien-negotiation
+    source: phase_5_settlement/workflows/lien_negotiation/workflow.md
+    phase_id: phase_5_settlement
+    name: Settlement Lien Negotiation
+    goal: Negotiate liens during settlement before distribution.
+    trigger:
+      active_when: settlement_reached
+    steps:
+      - id: prioritize_liens
+        type: recipe
+        recipe_slug: firmvault-settlement-lien-audit
+        landmark_id: liens_prioritized
+      - id: calculate_available_funds
+        type: recipe
+        recipe_slug: firmvault-settlement-lien-audit
+        landmark_id: lien_available_funds_calculated
+        depends_on: [prioritize_liens]
+      - id: negotiate_settlement_liens
+        type: recipe
+        recipe_slug: firmvault-settlement-lien-document-result
+        landmark_id: liens_negotiated
+        depends_on: [calculate_available_funds]
+
+  lien_resolution:
+    enabled: true
+    executable_definition: firmvault-lien-resolution
+    source: phase_6_lien/workflows/get_final_lien/workflow.md
+    phase_id: lien_track
+    name: Lien Identification and Resolution
+    goal: Identify, open, negotiate, and pay all liens before final distribution.
+    trigger:
+      active_when: phase_or_track_active
+    steps:
+      - id: identify_liens
+        type: recipe
+        landmark_id: liens_identified
+        recipe_slug: firmvault-lien-resolution-review-inventory
+
+      - id: open_liens
+        type: recipe
+        landmark_id: liens_opened
+        recipe_slug: firmvault-lien-resolution-review-inventory
+        depends_on: [identify_liens]
+
+      - id: request_final_amounts
+        type: recipe
+        landmark_id: final_amounts_requested
+        recipe_slug: firmvault-lien-resolution-prepare-final-request
+        depends_on:
+          - open_liens
+          - treatment_complete
+
+      - id: wait_for_final_amounts
+        type: wait
+        wait: { days: 30 }
+        depends_on: [request_final_amounts]
+        skip_when: [final_amounts_received]
+
+      - id: receive_final_amounts
+        type: recipe
+        landmark_id: final_amounts_received
+        recipe_slug: firmvault-lien-resolution-document-final-amount
+        depends_on: [wait_for_final_amounts]
+
+      - id: negotiate_liens
+        type: recipe
+        landmark_id: liens_negotiated
+        recipe_slug: firmvault-lien-resolution-document-payment
+        depends_on: [receive_final_amounts]
+
+      - id: pay_liens
+        type: recipe
+        landmark_id: liens_paid
+        recipe_slug: firmvault-lien-resolution-document-payment
+        depends_on: [negotiate_liens]
+
+  final_distribution:
+    enabled: true
+    executable_definition: firmvault-final-distribution
+    source: phase_6_lien/workflows/final_distribution/workflow.md
+    phase_id: lien_track
+    name: Final Distribution
+    goal: Prepare supplemental statement and distribute remaining funds after liens resolve.
+    trigger:
+      active_when: liens_negotiated
+    steps:
+      - id: prepare_supplemental_statement
+        type: recipe
+        recipe_slug: firmvault-final-distribution-prepare-statement
+        landmark_id: final_distribution_statement_prepared
+        depends_on: [funds_received, liens_negotiated]
+      - id: issue_additional_distribution
+        type: human_review
+        landmark_id: client_distribution_issued
+        depends_on: [prepare_supplemental_statement]
+      - id: confirm_receipt
+        type: human_review
+        landmark_id: client_distributed
+        depends_on: [issue_additional_distribution]
+      - id: zero_trust_account
+        type: recipe
+        recipe_slug: firmvault-final-distribution-zero-trust
+        landmark_id: trust_account_zeroed
+        depends_on: [confirm_receipt]

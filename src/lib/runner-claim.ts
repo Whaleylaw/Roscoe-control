@@ -386,6 +386,11 @@ export function resolveRecipeMaxAttempts(
 
 export interface DispatchTaskPayload {
   id: number
+  title?: string | null
+  description?: string | null
+  tags?: unknown
+  metadata?: unknown
+  comments?: TaskCommentPayload[]
   recipe_slug: string
   workspace_source: unknown
   read_only_mounts: unknown
@@ -403,8 +408,20 @@ export interface DispatchTaskPayload {
   resume_marker: ResumeMarker | null
 }
 
+export interface TaskCommentPayload {
+  id: number
+  author: string
+  content: string
+  created_at: string
+}
+
 export interface BuildDispatchPayloadParams {
   taskId: number
+  title?: string | null
+  description?: string | null
+  tags?: unknown
+  metadata?: unknown
+  comments?: TaskCommentPayload[]
   recipeSlug: string
   workspaceSource: unknown
   readOnlyMounts: unknown
@@ -435,6 +452,11 @@ export function buildDispatchPayload(
 ): DispatchTaskPayload {
   return {
     id: params.taskId,
+    title: params.title ?? null,
+    description: params.description ?? null,
+    tags: params.tags ?? null,
+    metadata: params.metadata ?? null,
+    comments: params.comments ?? [],
     recipe_slug: params.recipeSlug,
     workspace_source: params.workspaceSource,
     read_only_mounts: params.readOnlyMounts,

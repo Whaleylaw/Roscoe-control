@@ -1,0 +1,70 @@
+schema_version: 1
+id: firmvault-track-offers
+name: FirmVault Track Offers
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as demand_sent, manual, or demand_response_received.
+    default: demand_sent
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.demand_sent == true
+  - type: event
+    event: law_firm.negotiation.offer_received
+  - type: manual
+
+nodes:
+  wait_for_offer_response:
+    type: wait
+    name: Wait for Offer or Demand Response
+    duration: 30d
+    depends_on:
+      conditions:
+        - law_firm.landmarks.demand_sent == true
+    exit_when:
+      condition: law_firm.landmarks.initial_offer_received == true
+    config:
+      task_goal: >-
+        Wait 30 days after the demand is sent unless an initial offer is
+        documented earlier through passive document intake, owner confirmation,
+        or a supported negotiation ledger update.
+
+  log_incoming_offer:
+    type: recipe
+    name: Log Incoming Offer
+    recipe: firmvault-negotiation-track-offer
+    depends_on:
+      nodes:
+        - wait_for_offer_response
+    completes:
+      - law_firm.landmarks.initial_offer_received
+      - law_firm.landmarks.offer_documented
+    config:
+      task_goal: >-
+        Determine whether a real offer or substantive demand response has been
+        received. First inspect canonical FirmVault negotiation and insurance
+        paths for an existing offer with date, amount, source, and claim/carrier.
+        Then inspect same-task Mission Control comments for human/operator offer
+        details. If no offer details are present, move to Human Review with a
+        precise request for offer date, amount, carrier/adjuster, claim number,
+        conditions, deadline, and whether the response is an offer, denial, or
+        information request. If an offer is supported, update negotiation/offers.md,
+        the applicable insurance ledger, activity, and workflow-log. Do not
+        evaluate the offer, recommend acceptance/counter, contact the client, or
+        respond to the carrier.
+      canonical_paths:
+        - negotiation/offers.md
+        - insurance/
+        - demand/demand-package.md
+        - documents/received/insurance/
+        - documents/shadows/insurance/
+        - activity/
+        - workflow-log/

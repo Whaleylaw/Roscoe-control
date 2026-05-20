@@ -100,6 +100,10 @@ export const BLOCKER_KINDS = [
 export type BlockerKind = typeof BLOCKER_KINDS[number]
 
 export const updateTaskSchema = createTaskSchema.partial().extend({
+  status: z.enum(['backlog', 'inbox', 'assigned', 'awaiting_owner', 'in_progress', 'review', 'quality_review', 'done', 'failed']).optional(),
+  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  tags: z.array(z.string().min(1).max(100)).max(50).optional(),
+  metadata: taskMetadataSchema.optional(),
   blocker_reason: z.string().trim().min(1).max(2000).optional(),
   blocker_kind: z.enum(BLOCKER_KINDS).optional(),
   resume_hint: z.string().trim().min(1).max(500).optional(),

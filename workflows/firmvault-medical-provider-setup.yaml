@@ -1,0 +1,73 @@
+schema_version: 1
+id: firmvault-medical-provider-setup
+name: FirmVault Medical Provider Setup
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as intake, accident_report, client_check_in, referral, or manual.
+    default: full_intake_complete
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.full_intake_complete == true
+  - type: event
+    event: law_firm.medical_provider.manual
+  - type: event
+    event: law_firm.client_check_in.provider_mentioned
+  - type: event
+    event: law_firm.referral.provider_selected
+  - type: manual
+
+nodes:
+  create_provider_ledgers:
+    type: recipe
+    name: Create Medical Provider Ledgers
+    recipe: firmvault-medical-provider-setup-case
+    depends_on:
+      conditions:
+        - law_firm.landmarks.full_intake_complete == true
+    completes:
+      - law_firm.landmarks.providers_setup
+      - law_firm.landmarks.provider_treatment_dates_recorded
+      - law_firm.landmarks.injury_summary_recorded
+    config:
+      task_goal: >-
+        Review canonical intake, accident, client-update, referral, and report
+        evidence for known medical providers. Create or normalize canonical
+        provider folders and ledgers under medical-providers/<provider-slug>/,
+        plus case-local contact stubs when supported. Capture provider type,
+        contact/records contact details, treatment start/end/status, injuries
+        treated, source evidence, and uncertainty. Do not request records or
+        bills in this workflow; completed-treatment providers should instead
+        satisfy the provider/treatment facts needed by the separate Request
+        Medical Records and Bills workflow.
+      canonical_paths:
+        - client/intake.md
+        - client/check-ins.md
+        - accident/accident.md
+        - accident/police-report.md
+        - documents/shadows/accident/
+        - medical-providers/<provider-slug>/provider.md
+        - medical-providers/<provider-slug>/records-bills.md
+        - medical-providers/<provider-slug>/chronology.md
+        - contacts/<provider-slug>.md
+
+  confirm_medical_provider_setup:
+    type: review
+    name: Confirm Medical Provider Setup
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - create_provider_ledgers
+    completes:
+      - law_firm.landmarks.medical_provider_setup_reviewed
+    config:
+      task_goal: Confirm known providers, treatment dates/statuses, and injury summaries are captured well enough for treatment monitoring and later records/bills workflows.

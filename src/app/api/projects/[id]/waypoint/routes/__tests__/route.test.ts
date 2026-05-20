@@ -1,0 +1,510 @@
+import { mkdtemp } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+
+import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { NextRequest, NextResponse } from 'next/server'
+import { runMigrations } from '@/lib/migrations'
+import { createWorkflowDefinition } from '@/lib/workflow-engine'
+import { bindWaypointProjectMetadata } from '@/lib/waypoint-project-binding'
+
+let db: Database.Database
+let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
+let authFailure: { error: string; status: number } | null = null
+const mutationLimiterMock = vi.fn<() => NextResponse | null>(() => null)
+
+vi.mock('@/lib/db', () => ({ getDatabase: () => db }))
+
+vi.mock('@/lib/auth', () => ({
+  requireRole: vi.fn((_req: unknown, required: 'viewer' | 'operator' | 'admin') => {
+    if (authFailure) {
+      return authFailure
+    }
+    const order = { viewer: 0, operator: 1, admin: 2 }
+    if (order[authRole] < order[required]) return { error: 'Forbidden', status: 403 }
+    return { user: { id: 1, username: 'operator', role: authRole, workspace_id: 1, tenant_id: 1 } }
+  }),
+}))
+
+vi.mock('@/lib/workspaces', () => ({
+  ensureTenantWorkspaceAccess: vi.fn(),
+  ForbiddenError: class ForbiddenError extends Error {
+    status = 403
+  },
+}))
+
+vi.mock('@/lib/rate-limit', () => ({
+  mutationLimiter: mutationLimiterMock,
+}))
+
+vi.mock('@/lib/logger', () => ({ logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} } }))
+
+function req(path: string, body: Record<string, unknown>) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+function getReq(path: string) {
+  return new NextRequest(`http://localhost${path}`, { method: 'GET' })
+}
+
+function malformedJsonReq(path: string) {
+  return new NextRequest(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{"subject":"plan",',
+  })
+}
+
+function seedProject(input: { gsdEnabled: number }): number {
+  const result = db.prepare(
+    `INSERT INTO projects (
+       workspace_id, name, slug, description, ticket_prefix, status,
+       gsd_enabled, gsd_track, gsd_phase, gsd_gate_mode, gsd_project_id, gsd_updated_at,
+       created_at, updated_at
+     ) VALUES (
+       1, 'Alpha', 'alpha', NULL, 'ALP', 'active',
+       ?, 'product', 'plan', 'manual_approval', 'umbrella-1', unixepoch(),
+       unixepoch(), unixepoch()
+     )`,
+  ).run(input.gsdEnabled)
+  return Number(result.lastInsertRowid)
+}
+
+async function bindReferralPackageProject(projectId: number) {
+  const caseRoot = await mkdtemp(join(tmpdir(), 'mc-waypoint-api-case-'))
+  const sourceRoot = await mkdtemp(join(tmpdir(), 'mc-waypoint-api-source-'))
+  const metadata = bindWaypointProjectMetadata(null, {
+    trustedRoots: { fixture: { caseRoot, sourceRoot } },
+    caseRootKey: 'fixture',
+    caseRoot,
+    sourceRoot,
+    questSlug: 'referral-package',
+    packagePin: { packageSource: 'forgejo', coreVersion: '0.1.2', folderHostVersion: '0.1.2' },
+  })
+  db.prepare(`UPDATE projects SET metadata = ? WHERE id = ? AND workspace_id = 1`).run(metadata, projectId)
+  return { caseRoot, sourceRoot }
+}
+
+function seedWaypointPlan(projectId: number): number {
+  const ws = db.prepare(
+    `INSERT INTO gsd_workstreams (project_id, key, name, status, created_at, updated_at)
+     VALUES (?, 'core', 'WS-1', 'active', unixepoch(), unixepoch())`,
+  ).run(projectId)
+  const workstreamId = Number(ws.lastInsertRowid)
+
+  const ms = db.prepare(
+    `INSERT INTO gsd_milestones (project_id, workstream_id, version_label, title, status, created_at, updated_at)
+     VALUES (?, ?, 'v1', 'MS-1', 'active', unixepoch(), unixepoch())`,
+  ).run(projectId, workstreamId)
+  const milestoneId = Number(ms.lastInsertRowid)
+
+  const ph = db.prepare(
+    `INSERT INTO gsd_phases (milestone_id, phase_key, phase_slug, lifecycle_phase, ordering_numeric, status, depends_on_phase_ids, created_at, updated_at)
+     VALUES (?, '10', 'execute-phase', 'execute', 10, 'active', '[]', unixepoch(), unixepoch())`,
+  ).run(milestoneId)
+  const phaseId = Number(ph.lastInsertRowid)
+
+  const pl = db.prepare(
+    `INSERT INTO gsd_plans (phase_id, plan_ref, title, wave, status, depends_on_plan_ids, created_at, updated_at)
+     VALUES (?, 'P-1', 'Plan-1', 1, 'todo', '[]', unixepoch(), unixepoch())`,
+  ).run(phaseId)
+
+  return Number(pl.lastInsertRowid)
+}
+
+async function loadRoute() {
+  return import('@/app/api/projects/[id]/waypoint/routes/route')
+}
+
+beforeEach(() => {
+  vi.resetModules()
+  authRole = 'operator'
+  authFailure = null
+  mutationLimiterMock.mockReset()
+  mutationLimiterMock.mockReturnValue(null)
+  db = new Database(':memory:')
+  runMigrations(db)
+})
+
+afterEach(() => {
+  db.close()
+  vi.clearAllMocks()
+})
+
+describe('POST /api/projects/:id/waypoint/routes', () => {
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/1/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
+  it('returns consistent auth error envelope when unauthorized', async () => {
+    authFailure = { error: 'Forbidden', status: 403 }
+
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/1/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Forbidden',
+    })
+  })
+
+  it('rejects viewer role', async () => {
+    authRole = 'viewer'
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/routes`, { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 409 when waypoint lifecycle is not enabled', async () => {
+    const projectId = seedProject({ gsdEnabled: 0 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/routes`, { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error' })
+  })
+
+  it('returns consistent error envelope for invalid project id', async () => {
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/not-a-number/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project ID',
+    })
+  })
+
+  it('returns consistent error envelope when project is missing', async () => {
+    const { POST } = await loadRoute()
+    const res = await POST(req('/api/projects/999999/waypoint/routes', { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Project not found',
+    })
+  })
+
+  it('returns consistent error envelope for malformed JSON body', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { POST } = await loadRoute()
+    const res = await POST(malformedJsonReq(`/api/projects/${projectId}/waypoint/routes`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid JSON body',
+    })
+  })
+
+  it('normalizes rate-limit responses into waypoint error envelope', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    mutationLimiterMock.mockReturnValueOnce(NextResponse.json({ error: 'rate limited' }, { status: 429 }))
+
+    const { POST } = await loadRoute()
+    const res = await POST(req(`/api/projects/${projectId}/waypoint/routes`, { subject: 'plan', plan_id: 1 }), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(429)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Too many requests. Please try again later.',
+    })
+  })
+
+  it('starts a package-backed referral-package Quest route from the project binding', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    await bindReferralPackageProject(projectId)
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/routes`, {
+        subject: 'quest',
+        quest_slug: 'referral-package',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: true,
+      action: 'start_route',
+      subject: 'quest',
+      quest_slug: 'referral-package',
+      package_pin: {
+        package_source: 'forgejo',
+        core_version: '0.1.2',
+        folder_host_version: '0.1.2',
+      },
+      first_blockers: expect.arrayContaining([
+        expect.objectContaining({
+          task_id: expect.any(Number),
+          recipe_slug: 'firmvault-medical-chronology-update',
+          missing_artifacts: expect.arrayContaining([
+            '03-medical/medical-chronology-output/reports/date-of-service-ledger.json',
+            '03-medical/medical-chronology-output/reports/visit-content.json',
+          ]),
+        }),
+      ]),
+      next_actions: expect.arrayContaining([expect.stringContaining('date-of-service-ledger.json')]),
+    })
+    expect(body.workflow_instance_id).toBeTypeOf('number')
+    expect(body.task_summary.total).toBeGreaterThanOrEqual(1)
+  })
+
+  it('starts a typed plan route', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  workstream_id:
+    required: false
+    type: number
+  milestone_id:
+    required: true
+    type: number
+  phase_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+nodes:
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/routes`, {
+        subject: 'plan',
+        plan_id: planId,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: true,
+      action: 'start_route',
+      subject: 'plan',
+      plan_id: planId,
+      definition_slug: 'waypoint-plan-execution',
+      definition_version: 1,
+    })
+    expect(body.reused).toBeTypeOf('boolean')
+    expect(body.workflow_instance_id).toBeTypeOf('number')
+  })
+})
+
+describe('GET /api/projects/:id/waypoint/routes', () => {
+  it('returns consistent forbidden envelope when workspace access is denied', async () => {
+    const { ensureTenantWorkspaceAccess, ForbiddenError } = await import('@/lib/workspaces')
+    vi.mocked(ensureTenantWorkspaceAccess).mockImplementationOnce(() => {
+      throw new ForbiddenError('Workspace access denied')
+    })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/1/waypoint/routes'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Workspace access denied',
+    })
+  })
+
+  it('returns consistent auth error envelope when unauthorized', async () => {
+    authFailure = { error: 'Forbidden', status: 403 }
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/1/waypoint/routes'), {
+      params: Promise.resolve({ id: '1' }),
+    })
+
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Forbidden',
+    })
+  })
+
+  it('returns consistent error envelope for invalid project id', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/not-a-number/waypoint/routes'), {
+      params: Promise.resolve({ id: 'not-a-number' }),
+    })
+
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Invalid project ID',
+    })
+  })
+
+  it('returns consistent error envelope when project is missing', async () => {
+    const { GET } = await loadRoute()
+    const res = await GET(getReq('/api/projects/999999/waypoint/routes'), {
+      params: Promise.resolve({ id: '999999' }),
+    })
+
+    expect(res.status).toBe(404)
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      action: 'error',
+      error: 'Project not found',
+    })
+  })
+
+  it('returns consistent error envelope for invalid query params', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+
+    const { GET } = await loadRoute()
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes?limit=999`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body).toMatchObject({ ok: false, action: 'error', error: 'Invalid query params' })
+    expect(body.details?.[0]).toMatchObject({
+      code: expect.any(String),
+      path: 'limit',
+      message: expect.any(String),
+    })
+  })
+
+  it('lists routes with status filter and pagination', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    const planId = seedWaypointPlan(projectId)
+
+    createWorkflowDefinition(
+      db,
+      `
+schema_version: 1
+id: waypoint-plan-execution
+name: Waypoint Plan Execution
+version: 1
+subject_type: waypoint_plan
+vars:
+  project_id:
+    required: true
+    type: number
+  workstream_id:
+    required: false
+    type: number
+  milestone_id:
+    required: true
+    type: number
+  phase_id:
+    required: true
+    type: number
+  plan_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+nodes:
+  implement_plan:
+    type: recipe
+    recipe: gsd-coder
+`,
+      'tester',
+      1,
+      1,
+    )
+
+    const { POST, GET } = await loadRoute()
+    await POST(
+      req(`/api/projects/${projectId}/waypoint/routes`, {
+        subject: 'plan',
+        plan_id: planId,
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    const res = await GET(getReq(`/api/projects/${projectId}/waypoint/routes?status=active&limit=10&offset=0`), {
+      params: Promise.resolve({ id: String(projectId) }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(body.action).toBe('list_routes')
+    expect(body.filters).toMatchObject({ status: 'active' })
+    expect(body.pagination).toMatchObject({ limit: 10, offset: 0 })
+    expect(body.count).toBeGreaterThanOrEqual(1)
+  })
+})

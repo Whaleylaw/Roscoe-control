@@ -25,7 +25,7 @@
  * entire logs directory stays portable if it is moved.
  */
 
-import { closeSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export interface LogPaths {
@@ -108,7 +108,11 @@ export function ensureAttemptDir(paths: LogPaths, meta: AttemptMetaInit): void {
  * symlink) is not a special case.
  */
 export function updateLatestSymlink(paths: LogPaths, attempt: number): void {
-  rmSync(paths.latestSymlink, { force: true })
+  try {
+    unlinkSync(paths.latestSymlink)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+  }
   symlinkSync(`attempt-${attempt}`, paths.latestSymlink, 'dir')
 }
 

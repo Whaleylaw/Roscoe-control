@@ -66,6 +66,7 @@ interface MockTask {
   created_by: string
   created_at: number
   updated_at: number
+  review_pr?: { provider: string; pr_number: number; pr_url: string; state: string } | null
 }
 
 interface MockProject {
@@ -520,6 +521,83 @@ describe('TaskBoardPanel', () => {
           expect(lastTaskPutMethod).toBe('PUT')
         })
       }
+    })
+  })
+
+  describe('review PR links', () => {
+    it('renders safe review PR links on task cards', async () => {
+      mockStoreState = buildStoreState({
+        tasks: [
+          {
+            ...defaultTasks[0],
+            review_pr: {
+              provider: 'forgejo',
+              pr_number: 12,
+              pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/12',
+              state: 'open',
+            },
+          },
+        ],
+      })
+
+      await renderBoard()
+
+      const links = await screen.findAllByText('Review PR #12')
+      expect(links.length).toBeGreaterThan(0)
+      expect(links[0].closest('a')).toHaveAttribute('href', 'http://localhost:3001/aaron/FirmVault/pulls/12')
+    })
+
+    it('does not render unsafe review PR URLs', async () => {
+      mockStoreState = buildStoreState({
+        tasks: [
+          {
+            ...defaultTasks[0],
+            review_pr: {
+              provider: 'forgejo',
+              pr_number: 13,
+              pr_url: 'javascript:alert(1)',
+              state: 'open',
+            },
+          },
+        ],
+      })
+
+      await renderBoard()
+
+      expect(screen.queryByText('Review PR #13')).toBeNull()
+    })
+
+    it('merges returned review PR into an open modal after quality review submit', async () => {
+      mockSearchParams = new URLSearchParams('taskId=101')
+      global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : (input as Request).url ?? String(input)
+        const method = (init?.method || 'GET').toUpperCase()
+        if (url === '/api/quality-review' && method === 'POST') {
+          return new Response(JSON.stringify({
+            success: true,
+            review_pr: {
+              provider: 'forgejo',
+              pr_number: 14,
+              pr_url: 'http://localhost:3001/aaron/FirmVault/pulls/14',
+              state: 'open',
+            },
+            workflow_advancement: null,
+          }), { status: 200 })
+        }
+        return makeFetchMock()(input, init)
+      }) as unknown as typeof fetch
+
+      await renderBoard()
+      await waitFor(() => {
+        expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+      })
+      fireEvent.click(screen.getByRole('tab', { name: 'tabQualityReview' }))
+      fireEvent.change(screen.getByPlaceholderText('reviewNotesPlaceholder'), { target: { value: 'Approved.' } })
+      fireEvent.click(screen.getByText('submit'))
+
+      const links = await screen.findAllByText('Review PR #14')
+      expect(links.length).toBeGreaterThan(0)
+      expect(mockStoreState.selectedTask?.review_pr?.pr_number).toBe(14)
     })
   })
 })

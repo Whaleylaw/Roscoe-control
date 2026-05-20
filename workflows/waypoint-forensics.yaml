@@ -1,0 +1,36 @@
+schema_version: 1
+id: waypoint-forensics
+name: Waypoint Forensics
+version: 1
+subject_type: waypoint_project
+
+vars:
+  project_id:
+    required: true
+    type: number
+  workspace_id:
+    required: true
+    type: number
+
+triggers:
+  - type: manual
+
+nodes:
+  reconstruct_timeline:
+    type: recipe
+    recipe: gsd-researcher
+    description: Build a timeline of route transitions, task execution, and gating events.
+
+  analyze_contributing_factors:
+    type: recipe
+    recipe: gsd-reviewer
+    depends_on:
+      nodes:
+        - reconstruct_timeline
+
+  publish_forensics_report:
+    type: recipe
+    recipe: gsd-doc-drafter
+    depends_on:
+      nodes:
+        - analyze_contributing_factors

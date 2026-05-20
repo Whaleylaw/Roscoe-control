@@ -1,0 +1,104 @@
+schema_version: 1
+id: firmvault-accident-report
+name: FirmVault Accident Report
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as full_intake_complete, accident_report_uploaded, or manual.
+    default: full_intake_complete
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.full_intake_complete == true
+  - type: event
+    event: law_firm.accident_report.manual
+  - type: manual
+
+nodes:
+  identify_report_status:
+    type: recipe
+    name: Identify Accident Report Status
+    recipe: firmvault-accident-report-analyze
+    depends_on:
+      conditions:
+        - law_firm.landmarks.full_intake_complete == true
+    completes:
+      - law_firm.landmarks.accident_report_status_checked
+    config:
+      task_goal: >-
+        Check canonical accident-report locations first. Determine whether an
+        accident or police report shadow is already present, whether the
+        reporting agency and report number are known, and whether the report is
+        not applicable. If a report exists outside the canonical shadow path,
+        normalize it before treating it as found.
+
+  request_accident_report:
+    type: recipe
+    name: Request Accident Report
+    recipe: firmvault-accident-report-analyze
+    depends_on:
+      nodes:
+        - identify_report_status
+    completes:
+      - law_firm.landmarks.accident_report_requested
+    config:
+      task_goal: >-
+        If the accident report is not already present, prepare the exact human
+        handoff for requesting it from the reporting agency. If canonical case
+        evidence shows no police report is applicable, document the
+        not-applicable resolution instead of requesting one. Record agency,
+        known report number, request method, fee issue, and next expected follow
+        up when a request is applicable. Do not claim the report was requested
+        unless supported by evidence or owner confirmation. If agency/request
+        facts are missing and no not-applicable evidence exists, ask for those
+        facts through a blocked checkpoint and do not complete this node.
+
+  wait_for_accident_report:
+    type: wait
+    name: Wait for Accident Report
+    duration: 14d
+    depends_on:
+      nodes:
+        - request_accident_report
+    exit_when:
+      condition: law_firm.landmarks.accident_report_received == true
+    config:
+      task_goal: Wait fourteen days for the accident report unless the canonical report shadow arrives first.
+
+  analyze_accident_report:
+    type: recipe
+    name: Analyze Accident Report
+    recipe: firmvault-accident-report-analyze
+    depends_on:
+      nodes:
+        - wait_for_accident_report
+      conditions:
+        - law_firm.landmarks.accident_report_received == true
+    completes:
+      - law_firm.landmarks.accident_report_obtained
+    config:
+      task_goal: >-
+        Analyze the canonical accident report shadow and update supported
+        accident, liability, contact, and insurance ledgers. Extract only
+        traceable facts from the masked report shadow and surface uncertainty
+        for human review.
+
+  confirm_accident_report:
+    type: review
+    name: Confirm Accident Report Workflow
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - analyze_accident_report
+    completes:
+      - law_firm.landmarks.accident_report_reviewed
+    config:
+      task_goal: Confirm accident report facts are sufficiently captured before BI, PIP, UM/UIM, Med Pay, or workers' compensation workflows rely on them.

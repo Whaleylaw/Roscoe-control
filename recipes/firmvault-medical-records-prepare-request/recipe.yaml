@@ -1,0 +1,26 @@
+slug: firmvault-medical-records-prepare-request
+name: FirmVault Medical Records Prepare Request
+description: Prepares provider-specific records and bills request work product from FirmVault masked case data.
+when_to_use: Use after authorization is verified and before a medical records request is sent or handed to a human for sending.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - law-firm
+  - firmvault
+  - medical-records
+  - request
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2

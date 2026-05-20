@@ -58,6 +58,7 @@ function getImplicitAllowedHosts(): string[] {
     'localhost',
     '127.0.0.1',
     '::1',
+    'host.docker.internal',
     normalizeHostname(os.hostname()),
   ].filter(Boolean)
 
@@ -185,9 +186,9 @@ export function proxy(request: NextRequest) {
     }
   }
 
-  // Allow login, setup, auth API, docs, and container health probe without session
+  // Allow login, setup, auth API, docs, signed Forgejo webhooks, and container health probe without session
   const isPublicHealthProbe = pathname === '/api/status' && request.nextUrl.searchParams.get('action') === 'health'
-  if (pathname === '/login' || pathname === '/setup' || pathname.startsWith('/api/auth/') || pathname === '/api/setup' || pathname === '/api/docs' || pathname === '/docs' || isPublicHealthProbe) {
+  if (pathname === '/login' || pathname === '/setup' || pathname.startsWith('/api/auth/') || pathname === '/api/setup' || pathname === '/api/docs' || pathname === '/docs' || pathname === '/api/webhooks/forgejo' || isPublicHealthProbe) {
     const { response, nonce } = nextResponseWithNonce(request)
     return addSecurityHeaders(response, request, nonce)
   }
@@ -204,8 +205,12 @@ export function proxy(request: NextRequest) {
     // Agent-scoped keys are validated in route auth (DB-backed) and should be
     // allowed to pass through proxy auth gate.
     const looksLikeAgentApiKey = /^mca_[a-f0-9]{48}$/i.test(apiKey)
+    const isRunnerTokenScopedPath =
+      /^\/api\/runner\/tasks\/\d+\/(?:checkpoints|submit|review|fail|status|comments)?\/?$/.test(pathname)
+      || /^\/api\/tasks\/\d+\/checkpoints\/?$/.test(pathname)
+    const isRunnerDaemonPath = pathname.startsWith('/api/runner/')
 
-    if (sessionToken || hasValidApiKey || looksLikeAgentApiKey) {
+    if (sessionToken || hasValidApiKey || looksLikeAgentApiKey || (apiKey && (isRunnerTokenScopedPath || isRunnerDaemonPath))) {
       const { response, nonce } = nextResponseWithNonce(request)
       return addSecurityHeaders(response, request, nonce)
     }

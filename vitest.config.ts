@@ -12,7 +12,12 @@ export default defineConfig(async () => {
       environment: 'jsdom',
       globals: true,
       setupFiles: ['src/test/setup.ts'],
-      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+      include: [
+        'src/**/*.test.ts',
+        'src/**/*.test.tsx',
+        'packages/waypoint-core/src/**/*.test.ts',
+        'examples/waypoint-host-minimal/src/**/*.test.ts',
+      ],
       coverage: {
         provider: 'v8' as const,
         include: ['src/lib/**/*.ts'],

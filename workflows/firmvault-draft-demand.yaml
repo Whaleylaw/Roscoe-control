@@ -1,0 +1,84 @@
+schema_version: 1
+id: firmvault-draft-demand
+name: FirmVault Draft Demand
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as demand_readiness_reviewed, manual, or attorney_request.
+    default: demand_readiness_reviewed
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.demand_readiness_reviewed == true
+  - type: event
+    event: law_firm.demand_drafting.manual
+  - type: manual
+
+nodes:
+  check_final_lien_process:
+    type: recipe
+    name: Check Final Lien Process
+    recipe: firmvault-demand-check-final-lien-process
+    completes:
+      - law_firm.landmarks.demand_lien_process_checked
+    config:
+      task_goal: >-
+        Check liens/ and demand/readiness.md before drafting demand. This is an
+        internal readiness check only: do not put lien holder, lien amount,
+        payor, or lien uncertainty details into the demand letter. If an
+        evidence-backed lien exists and the final-lien amount process has not
+        started, create the canonical internal handoff/audit entry needed to
+        start the final-lien workflow so final lien work can run in parallel
+        with demand/negotiation instead of waiting until settlement.
+      canonical_paths:
+        - demand/readiness.md
+        - liens/
+        - activity/
+        - workflow-log/
+
+  draft_demand_letter:
+    type: recipe
+    name: Draft Demand Letter
+    recipe: firmvault-demand-draft-letter
+    depends_on:
+      nodes:
+        - check_final_lien_process
+    completes:
+      - law_firm.landmarks.demand_drafted
+      - law_firm.landmarks.attorney_reviewed_demand
+    config:
+      attorney_pr_gate: true
+      merge_requires_attorney_review: true
+      task_goal: >-
+        Draft the demand package from canonical FirmVault paths. Use
+        demand/readiness.md, accident/liability facts, BI claim ledgers,
+        provider chronologies, and bills/damages summaries. The demand letter
+        may include liability, injuries, treatment chronology, medical specials,
+        supported demand amount, response deadline, and exhibit list. Do not
+        include or mention lien information in the demand letter or demand
+        package content, including notes saying lien information was excluded.
+        If a required demand recipient, claim number, demand amount, or
+        attorney direction is missing, surface the exact blocker for review
+        instead of inventing it. After recipe-specific quality review, the
+        Forgejo review PR for this task must remain open for attorney review.
+        The attorney's merge of that open PR is the attorney approval gate; do
+        not create a separate post-merge attorney-review task and do not merge
+        the demand draft before attorney approval.
+      canonical_paths:
+        - demand/readiness.md
+        - demand/demand-letter.md
+        - demand/damages-summary.md
+        - demand/demand-package.md
+        - accident/
+        - insurance/
+        - medical-providers/
+        - documents/shadows/accident/
+        - activity/
+        - workflow-log/

@@ -114,7 +114,8 @@
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "more": "More",
-    "recipes": "Recipes"
+    "recipes": "Recipes",
+    "email": "Email"
   },
   "settings": {
     "language": "Language",
@@ -766,7 +767,7 @@
     "colAssigned": "Assigned",
     "colAwaitingOwner": "Awaiting Owner",
     "colInProgress": "In Progress",
-    "colReview": "Review",
+    "colReview": "Human Review",
     "colQualityReview": "Quality Review",
     "colFailed": "Failed",
     "retryTask": "Retry Task",
@@ -2297,6 +2298,15 @@
     "saving": "Saving...",
     "saveSuccess": "Case workflow updated",
     "saveError": "Failed to save case workflow",
+    "workflowTasksTitle": "FirmVault v2 tasks",
+    "workflowPreviewLoading": "Reading PHASE_DAG.yaml and case frontmatter...",
+    "workflowTasksSummary": "{count, plural, =0 {No v2 workflow tasks are ready} one {# v2 workflow task is ready} other {# v2 workflow tasks are ready}}",
+    "workflowPreviewError": "Failed to preview FirmVault workflow tasks",
+    "materializeWorkflow": "Create Mission Control tasks",
+    "workflowMaterializing": "Creating tasks...",
+    "workflowMaterializeSuccess": "Created {created} workflow tasks; skipped {skipped} existing tasks.",
+    "workflowMaterializeError": "Failed to create FirmVault workflow tasks",
+    "blockedBy": "Blocked by",
     "backToCases": "Back to cases",
     "caseViews": "Case views",
     "caseNav": {

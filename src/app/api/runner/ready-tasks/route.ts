@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger'
  * Auth: runner-secret principal only (user.id === -1000). 403 otherwise.
  *
  * Query shape — tasks that are:
- *   - status = 'assigned' (the scheduler-assigned-to-runner lane)
+ *   - status = 'assigned' or recipe-backed quality_review with REVIEW.md
  *   - recipe_slug IS NOT NULL (recipe-mode execution — non-recipe tasks
  *     are agent-or-human work and do NOT go to the runner)
  *   - container_id IS NULL (not yet claimed by any runner)
@@ -32,6 +32,7 @@ type ReadyTaskRow = {
   extra_skills: string | null
   runner_max_attempts: number | null
   runner_attempts: number
+  runner_mode: 'work' | 'review'
 }
 
 type ReadyTaskResponse = {
@@ -43,6 +44,7 @@ type ReadyTaskResponse = {
   extra_skills: unknown[]
   runner_max_attempts: number | null
   runner_attempts: number
+  runner_mode: 'work' | 'review'
 }
 
 function mapRow(row: ReadyTaskRow): ReadyTaskResponse {
@@ -57,6 +59,7 @@ function mapRow(row: ReadyTaskRow): ReadyTaskResponse {
     extra_skills: row.extra_skills ? JSON.parse(row.extra_skills) : [],
     runner_max_attempts: row.runner_max_attempts,
     runner_attempts: row.runner_attempts,
+    runner_mode: row.runner_mode,
   }
 }
 
@@ -77,7 +80,8 @@ export async function GET(request: NextRequest) {
     const rows = db
       .prepare(
         `SELECT id, recipe_slug, model_override, workspace_source, read_only_mounts,
-                extra_skills, runner_max_attempts, runner_attempts
+                extra_skills, runner_max_attempts, runner_attempts,
+                'work' AS runner_mode
          FROM tasks
          WHERE status = 'assigned'
            AND recipe_slug IS NOT NULL
@@ -86,6 +90,36 @@ export async function GET(request: NextRequest) {
          LIMIT 50`,
       )
       .all() as ReadyTaskRow[]
+
+    const hasRecipesTable = (
+      db.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'recipes'`).get() as { n: number }
+    ).n > 0
+    if (hasRecipesTable && rows.length < 50) {
+      const reviewRows = db.prepare(`
+        SELECT t.id, t.recipe_slug, t.model_override, t.workspace_source, t.read_only_mounts,
+               t.extra_skills, t.runner_max_attempts, t.runner_attempts,
+               'review' AS runner_mode
+        FROM tasks t
+        JOIN recipes r ON r.slug = t.recipe_slug AND r.workspace_id = t.workspace_id AND r.error_message IS NULL
+        WHERE t.status = 'quality_review'
+          AND t.recipe_slug IS NOT NULL
+          AND t.container_id IS NULL
+          AND r.review_md IS NOT NULL
+          AND r.review_md <> ''
+          AND (t.error_message IS NULL OR t.error_message NOT LIKE 'Aegis review error:%')
+          AND (t.error_message IS NULL OR t.error_message NOT LIKE 'Recipe review blocked:%')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM task_review_prs pr
+            WHERE pr.task_id = t.id
+              AND pr.workspace_id = t.workspace_id
+              AND pr.state = 'open'
+          )
+        ORDER BY t.id ASC
+        LIMIT ?
+      `).all(50 - rows.length) as ReadyTaskRow[]
+      rows.push(...reviewRows)
+    }
 
     return NextResponse.json({ tasks: rows.map(mapRow) })
   } catch (err) {

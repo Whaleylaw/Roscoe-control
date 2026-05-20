@@ -1,0 +1,92 @@
+schema_version: 1
+id: firmvault-medical-provider-status
+name: FirmVault Medical Provider Status
+version: 1
+subject_type: law_firm_case
+
+vars:
+  case_slug:
+    description: FirmVault case slug the workflow is running against.
+    required: true
+    type: string
+  source_trigger:
+    description: Human-readable trigger source such as client_check_in, provider_update, treatment_review, or manual.
+    default: providers_setup
+    type: string
+
+triggers:
+  - type: condition
+    condition: law_firm.landmarks.providers_setup == true
+  - type: event
+    event: law_firm.client_check_in.treatment_update
+  - type: event
+    event: law_firm.medical_provider.status_review_due
+  - type: manual
+
+nodes:
+  review_provider_statuses:
+    type: recipe
+    name: Review Medical Provider Statuses
+    recipe: firmvault-medical-provider-review-status
+    depends_on:
+      conditions:
+        - law_firm.landmarks.providers_setup == true
+    completes:
+      - law_firm.landmarks.provider_list_reviewed
+      - law_firm.landmarks.provider_status_updated
+      - law_firm.landmarks.provider_followups_flagged
+    config:
+      task_goal: >-
+        Review each canonical provider folder under medical-providers/. For
+        each provider, read provider.md, treatment.md if present,
+        records-bills.md, chronology.md, client/check-ins.md, and relevant
+        activity/workflow-log entries. Normalize provider treatment status
+        using only supported evidence: active, discharged, referred_out,
+        on_hold, pending_first_visit, or unknown. Add or update
+        medical-providers/<provider-slug>/treatment.md when missing or stale,
+        preserve unknown facts as unknown, and append activity/workflow-log
+        entries. Flag providers needing client/provider follow-up. If every
+        provider is clearly discharged or otherwise complete, record that the
+        case may be treatment complete and identify the evidence; otherwise do
+        not mark treatment complete. Do not request records or bills, do not
+        create records-request letters, and do not claim records/bills were
+        requested.
+      canonical_paths:
+        - client/check-ins.md
+        - medical-providers/<provider-slug>/provider.md
+        - medical-providers/<provider-slug>/treatment.md
+        - medical-providers/<provider-slug>/records-bills.md
+        - medical-providers/<provider-slug>/chronology.md
+        - activity/
+        - workflow-log/
+
+  human_treatment_status_review:
+    type: review
+    name: Human Treatment Status Review
+    review:
+      mode: human
+    depends_on:
+      nodes:
+        - review_provider_statuses
+    completes:
+      - law_firm.landmarks.treatment_status_reviewed
+    config:
+      task_goal: >-
+        Review the provider-status summary and answer any narrow treatment
+        questions. Confirm whether the client is still treating, whether any
+        provider is missing, whether the client has been discharged or reached
+        MMI, and whether a referral or client follow-up is needed. If treatment
+        is complete, comment with the supporting facts so the case can satisfy
+        treatment_complete through the provider ledgers or a follow-up recipe.
+
+  wait_for_treatment_status_refresh:
+    type: wait
+    name: Wait for Next Treatment Status Refresh
+    duration: 30d
+    depends_on:
+      nodes:
+        - human_treatment_status_review
+    exit_when:
+      condition: law_firm.landmarks.treatment_complete == true
+    config:
+      task_goal: Wait thirty days for the next provider-status refresh unless treatment_complete is satisfied earlier.

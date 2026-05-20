@@ -30,7 +30,7 @@ describe('computeDirSha', () => {
     expect(before).not.toBe(after)
   })
 
-  it('includes nested files under tools/ and skills/', async () => {
+  it('includes nested files under tools/, skills/, and references/', async () => {
     writeFileSync(join(dir, 'recipe.yaml'), 'slug: a\n')
     const sha0 = await computeDirSha(dir)
 
@@ -43,9 +43,14 @@ describe('computeDirSha', () => {
     writeFileSync(join(dir, 'skills', 'searching.md'), 'how to search')
     const sha2 = await computeDirSha(dir)
     expect(sha1).not.toBe(sha2)
+
+    mkdirSync(join(dir, 'references'))
+    writeFileSync(join(dir, 'references', 'source-skill.md'), 'legacy skill guidance')
+    const sha3 = await computeDirSha(dir)
+    expect(sha2).not.toBe(sha3)
   })
 
-  it('ignores files outside recipe.yaml/SOUL.md/README.md/tools/skills (editor temp files do not affect sha)', async () => {
+  it('ignores files outside recipe.yaml/SOUL.md/README.md/tools/skills/references (editor temp files do not affect sha)', async () => {
     writeFileSync(join(dir, 'recipe.yaml'), 'slug: a\n')
     const before = await computeDirSha(dir)
 

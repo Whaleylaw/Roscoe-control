@@ -17,6 +17,7 @@ import {
   DEFAULT_MAX_MEMORY_PER_CONTAINER,
   DEFAULT_MAX_CPU_PER_CONTAINER,
   DEFAULT_FAILED_GC_WINDOW_DAYS,
+  DEFAULT_DOCKER_NETWORK_MODE,
 } from '@/lib/task-runtime-settings'
 
 let testDb: Database.Database
@@ -90,6 +91,7 @@ describe('GET /api/runner/config', () => {
     expect(body.max_cpu_per_container).toBe(DEFAULT_MAX_CPU_PER_CONTAINER)
     expect(body.failed_gc_window_days).toBe(DEFAULT_FAILED_GC_WINDOW_DAYS)
     expect(body.max_concurrent_containers).toBe(DEFAULT_MAX_CONCURRENT_CONTAINERS)
+    expect(body.docker_network_mode).toBe(DEFAULT_DOCKER_NETWORK_MODE)
   })
 
   it('reflects stored setting values after admin writes', async () => {
@@ -107,6 +109,7 @@ describe('GET /api/runner/config', () => {
     upsert.run('runtime.max_memory_per_container', '16g')
     upsert.run('runtime.max_cpu_per_container', '6.5')
     upsert.run('runtime.failed_gc_window_days', '30')
+    upsert.run('runtime.docker_network_mode', 'host')
 
     const res = await GET(configReq(KNOWN_RUNNER_SECRET))
     expect(res.status).toBe(200)
@@ -119,6 +122,7 @@ describe('GET /api/runner/config', () => {
     expect(body.max_memory_per_container).toBe('16g')
     expect(body.max_cpu_per_container).toBe(6.5)
     expect(body.failed_gc_window_days).toBe(30)
+    expect(body.docker_network_mode).toBe('host')
   })
 
   it('rejects non-runner-secret bearer with 403', async () => {
@@ -136,6 +140,7 @@ describe('GET /api/runner/config', () => {
 
     // Exact key set — no extras, no missing.
     expect(Object.keys(body).sort()).toEqual([
+      'docker_network_mode',
       'failed_gc_window_days',
       'max_concurrent_containers',
       'max_cpu_per_container',
@@ -150,5 +155,6 @@ describe('GET /api/runner/config', () => {
     expect(typeof body.max_cpu_per_container).toBe('number')
     expect(typeof body.failed_gc_window_days).toBe('number')
     expect(typeof body.max_concurrent_containers).toBe('number')
+    expect(typeof body.docker_network_mode).toBe('string')
   })
 })

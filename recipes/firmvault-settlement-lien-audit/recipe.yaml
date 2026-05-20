@@ -1,0 +1,26 @@
+slug: firmvault-settlement-lien-audit
+name: FirmVault Settlement Lien - Audit
+description: Audits settlement-stage liens and prepares a no-lien clearance or lien negotiation strategy.
+when_to_use: Use after settlement is reached and before final distribution to determine whether settlement lien negotiation is needed.
+image: mc-recipe-agent:latest
+workspace_mode: worktree
+timeout_seconds: 3600
+max_concurrent: 1
+max_attempts: 2
+secrets:
+  - OPENROUTER_API_KEY
+tools:
+  - read_file
+  - list_dir
+  - grep_files
+  - write_file
+tags:
+  - law-firm
+  - firmvault
+  - settlement
+  - liens
+model:
+  primary: openai/gpt-5.4-mini
+  provider: openrouter
+  params:
+    temperature: 0.2
