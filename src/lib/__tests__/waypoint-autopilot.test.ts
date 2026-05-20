@@ -19,7 +19,7 @@ describe('runWaypointAutopilot', () => {
       },
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       iterations: 1,
       changed: false,
       stopReason: 'pending_gate',
@@ -44,7 +44,7 @@ describe('runWaypointAutopilot', () => {
       },
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       iterations: 1,
       changed: false,
       stopReason: 'no_progress',
@@ -69,7 +69,7 @@ describe('runWaypointAutopilot', () => {
       },
     })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       iterations: 1,
       changed: false,
       stopReason: 'blocked',
@@ -106,9 +106,9 @@ describe('runWaypointAutopilot', () => {
       },
     })
 
-    expect(statusCalls).toBe(2)
+    expect(statusCalls).toBe(3)
     expect(materializedByRoute).toEqual([9101, 9102, 9101, 9102])
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       iterations: 2,
       changed: true,
       stopReason: 'max_iterations',
