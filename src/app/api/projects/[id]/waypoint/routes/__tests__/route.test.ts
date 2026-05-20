@@ -1,8 +1,13 @@
+import { mkdtemp } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+
 import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 import { runMigrations } from '@/lib/migrations'
 import { createWorkflowDefinition } from '@/lib/workflow-engine'
+import { bindWaypointProjectMetadata } from '@/lib/waypoint-project-binding'
 
 let db: Database.Database
 let authRole: 'admin' | 'operator' | 'viewer' = 'operator'
@@ -68,6 +73,21 @@ function seedProject(input: { gsdEnabled: number }): number {
      )`,
   ).run(input.gsdEnabled)
   return Number(result.lastInsertRowid)
+}
+
+async function bindReferralPackageProject(projectId: number) {
+  const caseRoot = await mkdtemp(join(tmpdir(), 'mc-waypoint-api-case-'))
+  const sourceRoot = await mkdtemp(join(tmpdir(), 'mc-waypoint-api-source-'))
+  const metadata = bindWaypointProjectMetadata(null, {
+    trustedRoots: { fixture: { caseRoot, sourceRoot } },
+    caseRootKey: 'fixture',
+    caseRoot,
+    sourceRoot,
+    questSlug: 'referral-package',
+    packagePin: { packageSource: 'forgejo', coreVersion: '0.1.2', folderHostVersion: '0.1.2' },
+  })
+  db.prepare(`UPDATE projects SET metadata = ? WHERE id = ? AND workspace_id = 1`).run(metadata, projectId)
+  return { caseRoot, sourceRoot }
 }
 
 function seedWaypointPlan(projectId: number): number {
@@ -236,6 +256,47 @@ describe('POST /api/projects/:id/waypoint/routes', () => {
       action: 'error',
       error: 'Too many requests. Please try again later.',
     })
+  })
+
+  it('starts a package-backed referral-package Quest route from the project binding', async () => {
+    const projectId = seedProject({ gsdEnabled: 1 })
+    await bindReferralPackageProject(projectId)
+
+    const { POST } = await loadRoute()
+    const res = await POST(
+      req(`/api/projects/${projectId}/waypoint/routes`, {
+        subject: 'quest',
+        quest_slug: 'referral-package',
+      }),
+      { params: Promise.resolve({ id: String(projectId) }) },
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      ok: true,
+      action: 'start_route',
+      subject: 'quest',
+      quest_slug: 'referral-package',
+      package_pin: {
+        package_source: 'forgejo',
+        core_version: '0.1.2',
+        folder_host_version: '0.1.2',
+      },
+      first_blockers: expect.arrayContaining([
+        expect.objectContaining({
+          task_id: expect.any(Number),
+          recipe_slug: 'firmvault-medical-chronology-update',
+          missing_artifacts: expect.arrayContaining([
+            '03-medical/medical-chronology-output/reports/date-of-service-ledger.json',
+            '03-medical/medical-chronology-output/reports/visit-content.json',
+          ]),
+        }),
+      ]),
+      next_actions: expect.arrayContaining([expect.stringContaining('date-of-service-ledger.json')]),
+    })
+    expect(body.workflow_instance_id).toBeTypeOf('number')
+    expect(body.task_summary.total).toBeGreaterThanOrEqual(1)
   })
 
   it('starts a typed plan route', async () => {

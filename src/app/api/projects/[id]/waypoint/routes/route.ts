@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import type Database from 'better-sqlite3'
 import { z } from 'zod'
 import { getDatabase } from '@/lib/db'
 import { requireRole } from '@/lib/auth'
@@ -9,13 +10,23 @@ import { getScopedProject, parseStrictId } from '@/lib/gsd-hierarchy'
 import { listWaypointRoutes, resolveWaypointPlanRouteScope } from '@/lib/waypoint-command'
 import { startOrReuseWaypointRoute, WAYPOINT_SUBJECT_TYPES } from '@/lib/waypoint'
 import { normalizeWaypointRateLimitError, normalizeWaypointValidationDetails } from '@/lib/waypoint-api'
+import { startReferralPackageQuestRoute } from '@/lib/waypoint-quest-runtime'
+import { getWaypointProjectBinding } from '@/lib/waypoint-project-binding'
+import { checkWaypointTaskArtifacts } from '@/lib/waypoint-artifacts'
 
-const Body = z.object({
+const PlanBody = z.object({
   subject: z.literal('plan'),
   plan_id: z.number().int().positive(),
   definition_slug: z.string().min(1).default('waypoint-plan-execution'),
   definition_version: z.number().int().positive().default(1),
 })
+
+const QuestBody = z.object({
+  subject: z.literal('quest'),
+  quest_slug: z.literal('referral-package'),
+})
+
+const Body = z.discriminatedUnion('subject', [PlanBody, QuestBody])
 
 const Query = z.object({
   status: z.enum(['active', 'blocked', 'complete', 'cancelled', 'failed']).optional(),
@@ -33,6 +44,71 @@ function routesError(status: number, error: string, details?: unknown) {
     },
     { status },
   )
+}
+
+interface RouteTaskSummary {
+  readonly total: number
+  readonly by_status: Record<string, number>
+}
+
+interface FirstArtifactBlocker {
+  readonly task_id: number
+  readonly recipe_slug: string | null
+  readonly missing_artifacts: readonly string[]
+}
+
+function summarizeRouteTasks(db: Database.Database, workflowInstanceId: number, workspaceId: number): RouteTaskSummary {
+  const rows = db.prepare(`
+    SELECT status, COUNT(*) AS count
+    FROM tasks
+    WHERE workspace_id = ?
+      AND json_extract(metadata, '$.workflow.workflow_instance_id') = ?
+    GROUP BY status
+  `).all(workspaceId, workflowInstanceId) as Array<{ status: string; count: number }>
+
+  const byStatus: Record<string, number> = {}
+  let total = 0
+  for (const row of rows) {
+    byStatus[row.status] = row.count
+    total += row.count
+  }
+  return { total, by_status: byStatus }
+}
+
+async function collectFirstArtifactBlockers(
+  db: Database.Database,
+  taskIds: readonly number[],
+  workspaceId: number,
+): Promise<FirstArtifactBlocker[]> {
+  const blockers: FirstArtifactBlocker[] = []
+  for (const taskId of taskIds) {
+    const row = db.prepare(`SELECT id, recipe_slug, metadata FROM tasks WHERE id = ? AND workspace_id = ? LIMIT 1`)
+      .get(taskId, workspaceId) as { id: number; recipe_slug: string | null; metadata: string | null } | undefined
+    if (!row) continue
+    const waypoint = objectRecord(parseJsonObject(row.metadata).waypoint)
+    const requiredArtifacts = Array.isArray(waypoint.required_artifacts) ? waypoint.required_artifacts : []
+    if (requiredArtifacts.length === 0) continue
+    const check = await checkWaypointTaskArtifacts(db, { taskId: row.id, workspaceId })
+    if (check.missingArtifacts.length > 0) {
+      blockers.push({ task_id: row.id, recipe_slug: row.recipe_slug, missing_artifacts: check.missingArtifacts })
+    }
+  }
+  return blockers
+}
+
+function nextActionsForBlockers(blockers: readonly FirstArtifactBlocker[]): string[] {
+  if (blockers.length === 0) return ['Route started; continue with the next materialized task.']
+  return blockers.flatMap((blocker) => blocker.missing_artifacts.map((artifact) => `Produce or attach required artifact ${artifact} for task ${blocker.task_id}.`))
+}
+
+function parseJsonObject(raw: string | null): Record<string, unknown> {
+  if (!raw) return {}
+  const parsed: unknown = JSON.parse(raw)
+  return objectRecord(parsed)
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
 export async function GET(
@@ -185,13 +261,53 @@ export async function POST(
       return routesError(400, 'Invalid request body', normalizeWaypointValidationDetails(parsed.error.issues))
     }
 
+    const actor = auth.user.display_name || auth.user.username || 'operator'
+
+    if (parsed.data.subject === 'quest') {
+      const projectWithMetadata = db.prepare(`SELECT id, workspace_id, metadata FROM projects WHERE id = ? AND workspace_id = ? LIMIT 1`)
+        .get(projectId, workspaceId) as { id: number; workspace_id: number; metadata: string | null } | undefined
+      if (!projectWithMetadata) return routesError(404, 'Project not found')
+      const binding = getWaypointProjectBinding(projectWithMetadata)
+      if (!binding) return routesError(409, 'Project does not have a Waypoint package binding')
+      if (binding.questSlug !== parsed.data.quest_slug) {
+        return routesError(409, `Project is bound to ${binding.questSlug}, not ${parsed.data.quest_slug}`)
+      }
+
+      const route = await startReferralPackageQuestRoute(db, {
+        projectId,
+        workspaceId,
+        tenantId,
+        actor,
+      })
+      const taskSummary = summarizeRouteTasks(db, route.workflowInstanceId, workspaceId)
+      const firstBlockers = await collectFirstArtifactBlockers(db, route.materializedTaskIds, workspaceId)
+
+      return NextResponse.json({
+        ok: true,
+        action: 'start_route',
+        subject: 'quest',
+        quest_slug: parsed.data.quest_slug,
+        workflow_instance_id: route.workflowInstanceId,
+        reused: route.reused,
+        task_summary: taskSummary,
+        materialized_task_ids: route.materializedTaskIds,
+        package_pin: {
+          package_source: binding.packageSource,
+          package_pin: binding.packagePin,
+          core_version: binding.coreVersion,
+          folder_host_version: binding.folderHostVersion,
+        },
+        first_blockers: firstBlockers,
+        next_actions: nextActionsForBlockers(firstBlockers),
+      })
+    }
+
     const scope = resolveWaypointPlanRouteScope(db, {
       workspaceId,
       projectId,
       planId: parsed.data.plan_id,
     })
 
-    const actor = auth.user.display_name || auth.user.username || 'operator'
     const route = startOrReuseWaypointRoute(db, {
       workspaceId,
       tenantId,
