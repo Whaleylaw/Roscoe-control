@@ -20,6 +20,7 @@ import { GateBadge } from '@/components/panels/task-card/gate-badge'
 import { RecipeBadge } from '@/components/panels/task-card/recipe-badge'
 import { RunnerStatusBanner } from './runner-status-banner'
 import { ProgressTab } from './task-detail/progress-tab'
+import { WaypointReviewTab } from './task-detail/waypoint-review-tab'
 import { RecipeCombobox } from './task-form/recipe-combobox'
 import { AdvancedSection } from './task-form/advanced-section'
 
@@ -45,6 +46,14 @@ function safeReviewPrUrl(raw?: string | null): string | null {
   } catch {
     return null
   }
+}
+
+function waypointReviewRouteId(task: { metadata?: any }): number | null {
+  const waypoint = task.metadata?.waypoint
+  const workflow = task.metadata?.workflow
+  const raw = waypoint?.route_id ?? workflow?.workflow_instance_id
+  const numeric = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : null
 }
 
 interface Task {
@@ -1404,8 +1413,9 @@ function TaskDetailModal({
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewError, setReviewError] = useState<string | null>(null)
   const mentionTargets = useMentionTargets()
-  const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'quality' | 'session' | 'progress'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'quality' | 'session' | 'progress' | 'waypoint'>('details')
   const progressT = useTranslations('taskBoard.progressTab')
+  const waypointRouteId = waypointReviewRouteId(task)
   const [reviewer, setReviewer] = useState('aegis')
   const lastTaskIdRef = useRef(task.id)
 
@@ -1854,6 +1864,23 @@ function TaskDetailModal({
                 )}
               </button>
             )}
+            {waypointRouteId && task.project_id && (
+              <button
+                key="waypoint"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'waypoint'}
+                aria-controls="tabpanel-waypoint"
+                onClick={() => setActiveTab('waypoint')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'waypoint'
+                    ? 'bg-secondary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                }`}
+              >
+                Waypoint
+              </button>
+            )}
             {task.recipe_slug && (
               <button
                 key="progress"
@@ -2192,6 +2219,12 @@ function TaskDetailModal({
           {activeTab === 'progress' && task.recipe_slug && (
             <div id="tabpanel-progress" className="mt-4">
               <ProgressTab taskId={task.id} />
+            </div>
+          )}
+
+          {activeTab === 'waypoint' && task.project_id && waypointRouteId && (
+            <div id="tabpanel-waypoint" className="mt-4">
+              <WaypointReviewTab projectId={task.project_id} routeId={waypointRouteId} />
             </div>
           )}
         </div>
