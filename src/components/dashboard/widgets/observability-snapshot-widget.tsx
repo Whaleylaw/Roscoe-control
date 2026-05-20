@@ -344,17 +344,6 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
         >
           Diagnostics details
         </Button>
-        {(['cron', 'logs', 'memory'] as DetailKind[]).map((kind) => (
-          <Button
-            key={kind}
-            variant="outline"
-            size="sm"
-            onClick={() => loadDetail(kind)}
-            className="h-7 rounded-md px-2 text-2xs capitalize"
-          >
-            {detail?.kind === kind && detail.loading ? `Loading ${kind}…` : detail?.kind === kind && detail.data ? `Hide ${kind}` : `Inspect ${kind}`}
-          </Button>
-        ))}
         <Button
           variant="outline"
           size="sm"
@@ -364,21 +353,6 @@ export function ObservabilitySnapshotWidget({ data }: { data: DashboardData }) {
           {copyStatus === 'copied' ? 'Copied summary' : copyStatus === 'error' ? 'Copy failed' : 'Copy diagnostic summary'}
         </Button>
       </div>
-
-      {detail && (
-        <div className="mx-4 mb-4 rounded-lg border border-border/70 bg-secondary/20 p-3">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div>
-              <div className="text-xs font-semibold capitalize">{detail.kind} detail</div>
-              <div className="text-2xs text-muted-foreground">Loaded on demand; bounded and redacted server-side.</div>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setDetail(null)} className="h-7 px-2 text-2xs">Close</Button>
-          </div>
-          {detail.loading && <div className="text-xs text-muted-foreground">Loading…</div>}
-          {detail.error && <div className="text-xs text-red-300">{detail.error}</div>}
-          {!detail.loading && !detail.error && detail.data && <DetailPanel kind={detail.kind} data={detail.data} />}
-        </div>
-      )}
 
       {diagnosticsOpen && (
         <DiagnosticsDetailsModal

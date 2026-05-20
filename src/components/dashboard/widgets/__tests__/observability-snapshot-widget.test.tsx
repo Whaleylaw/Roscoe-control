@@ -43,7 +43,7 @@ afterEach(() => {
 })
 
 describe('ObservabilitySnapshotWidget refresh control', () => {
-  it('refreshes the server snapshot on demand without clearing loaded detail', async () => {
+  it('refreshes the server snapshot on demand without clearing drawer detail', async () => {
     fetchMock
       .mockResolvedValueOnce(makeJsonResponse(snapshot))
       .mockResolvedValueOnce(makeJsonResponse({ generatedAt: '2026-05-19T20:01:00Z', counts: { total: 1, enabled: 1, paused: 0, failures: 0 }, jobs: [] }))
@@ -55,13 +55,15 @@ describe('ObservabilitySnapshotWidget refresh control', () => {
     render(<ObservabilitySnapshotWidget data={makeDashboardData()} />)
 
     await waitFor(() => expect(screen.getByText('7 events')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Diagnostics details' }))
     fireEvent.click(screen.getByRole('button', { name: 'Inspect cron' }))
-    await waitFor(() => expect(screen.getByText('cron detail')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Observability diagnostics' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Loaded detail')).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh snapshot' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Refresh snapshot' })[1])
 
-    await waitFor(() => expect(screen.getByText('8 events')).toBeTruthy())
-    expect(screen.getByText('cron detail')).toBeTruthy()
+    await waitFor(() => expect(screen.getAllByText('8 events').length).toBeGreaterThan(0))
+    expect(screen.getByText('Loaded detail')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith('/api/observability?scope=snapshot')
   })
 
@@ -135,7 +137,7 @@ describe('ObservabilitySnapshotWidget refresh control', () => {
     expect(screen.getByText('Paperclip')).toBeTruthy()
     expect(screen.getByText('secretsRedacted')).toBeTruthy()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Inspect cron' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect cron' }))
     await waitFor(() => expect(screen.getAllByText('Loaded detail').length).toBeGreaterThan(0))
     await waitFor(() => expect(screen.getAllByText((content) => content.includes('jobs path missing')).length).toBeGreaterThan(0))
   })
