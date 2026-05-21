@@ -40,13 +40,23 @@ const SERVICE_ACCOUNTS = new Set([
   'ntp', 'chrony', 'systemd-network', 'systemd-resolve',
 ])
 
+const TOOL_STATE_DIRS: Record<string, string> = {
+  claude: '.claude',
+  codex: '.codex',
+  openclaw: '.openclaw',
+}
+
 /** Check if a CLI tool (claude, codex) is accessible for a given user home dir */
 function checkToolExists(homeDir: string, tool: string): boolean {
-  // Check common install locations relative to user home
+  // Check common install locations relative to user home. Keep dot-config
+  // directory names in a static map: dynamic patterns like `.${tool}` make
+  // Next's file tracer scan every dot directory in the project, including
+  // large repo-local runtime state such as `.data/`.
+  const toolStateDir = TOOL_STATE_DIRS[tool]
   const candidates = [
     path.join(homeDir, '.local', 'bin', tool),
     path.join(homeDir, '.npm-global', 'bin', tool),
-    path.join(homeDir, `.${tool}`),             // e.g. ~/.claude, ~/.openclaw config dir = installed
+    ...(toolStateDir ? [path.join(homeDir, toolStateDir)] : []),
   ]
   for (const p of candidates) {
     try { if (fs.existsSync(p)) return true } catch {}

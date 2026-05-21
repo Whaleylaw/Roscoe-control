@@ -5,14 +5,21 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: __dirname,
   outputFileTracingExcludes: {
-    // `.git` must be excluded so the Next.js file tracer does not copy the
-    // entire repo .git directory into `.next/standalone/`. When it does,
-    // Git treats the standalone dir as its own working tree and the
-    // self-update endpoint's `git status --porcelain` (run from
-    // process.cwd() under `pnpm start:standalone`) reports every file the
-    // standalone build doesn't bundle (e.g. `src/lib/__tests__/`) as
-    // deleted — blocking the dirty-tree check and breaking self-update.
-    '/*': ['./.data/**/*', './.git/**/*'],
+    // Exclude local runtime and diagnostic state from standalone tracing.
+    // `.git` must be excluded so the self-update endpoint does not see the
+    // standalone dir as a dirty working tree. `.data` and agent diagnostic
+    // dirs can be very large in long-lived dev checkouts and must never be
+    // bundled into `.next/standalone/` or scanned as runtime dependencies.
+    '/*': [
+      './.data/**/*',
+      './.git/**/*',
+      './.hermes/**/*',
+      './.claude/**/*',
+      './.playwright-mcp/**/*',
+      './playwright-report/**/*',
+      './test-results/**/*',
+      './Heap.*.heapsnapshot',
+    ],
   },
   turbopack: {
     root: __dirname,

@@ -148,9 +148,17 @@ git ls-remote forgejo refs/heads/main refs/heads/feat/waypoint-runtime-slice
 git ls-remote fork refs/heads/main refs/heads/feat/waypoint-runtime-slice
 ```
 
+## Investigation result
+
+The root cause was repo-local runtime state, not the Waypoint integration code. The primary checkout contained an 8.2G `.data/` tree with 1,327,427 files, including 6.2G under `.data/runner`. With that directory present, `pnpm build` repeatedly timed out during `Creating an optimized production build ...`. When `.data/` was temporarily hidden, the same checkout built successfully.
+
+A secondary build-tracing issue was also found in `src/app/api/super/os-users/route.ts`: `path.join(homeDir, `.${tool}`)` made Next/Turbopack warn that the dynamic dot-directory pattern matched 13,220 files in the project. That pattern is now static via `TOOL_STATE_DIRS`.
+
+The durable fix is to keep long-lived runtime state outside the source checkout by default at `$HOME/.mission-control/data`, provide a relocation script for legacy `.data/`, and expand standalone tracing excludes for local runtime/diagnostic directories.
+
 ## Definition of done
 
-- Primary checkout `pnpm build` passes with the existing repo-local `.data` present.
+- Primary checkout `pnpm build` passes after relocating legacy repo-local `.data` to `$HOME/.mission-control/data`.
 - Clean worktree `pnpm build` still passes.
 - Runtime data placement is documented as explicit operational policy.
 - Forgejo remains the source of truth.

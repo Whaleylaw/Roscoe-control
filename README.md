@@ -311,7 +311,9 @@ mission-control/
 │   │   ├── security-events.ts # Security event logger + trust scoring
 │   │   └── adapters/          # Framework adapters
 │   └── store/index.ts         # Zustand state management
-└── .data/                     # Runtime data (SQLite DB, token logs)
+└── scripts/                   # CLI/runtime helper scripts
+
+Runtime data defaults outside the checkout at `$HOME/.mission-control/data` so builds do not scan local state. Legacy `.data/` is still supported when `MISSION_CONTROL_DATA_DIR=.data` is explicitly set.
 ```
 
 ## Tech Stack
@@ -377,7 +379,7 @@ See [`.env.example`](.env.example) for the complete list. Key variables:
 | `OPENCLAW_CONFIG_PATH` | No* | Absolute path to `openclaw.json` |
 | `OPENCLAW_STATE_DIR` | No* | Exact path to the OpenClaw state directory (default: `~/.openclaw`). Preferred over `OPENCLAW_HOME` — avoids double-nesting |
 | `OPENCLAW_HOME` | No* | Legacy alias — treated as *parent* home dir (`.openclaw` is appended). Use `OPENCLAW_STATE_DIR` when it already points to the state dir |
-| `MISSION_CONTROL_DATA_DIR` | No | Directory for all MC data files (DB, tokens, etc.). Use an absolute path with the standalone server to survive rebuilds. |
+| `MISSION_CONTROL_DATA_DIR` | No | Directory for all MC data files (DB, tokens, etc.). Defaults to `$HOME/.mission-control/data`; use an absolute path with the standalone server to survive rebuilds. |
 | `MC_CLAUDE_HOME` | No | Path to `~/.claude` directory |
 | `MC_ALLOWED_HOSTS` | No | Host allowlist for production |
 | `NEXT_PUBLIC_GATEWAY_OPTIONAL` | No | Run without gateway connection |

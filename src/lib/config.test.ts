@@ -54,6 +54,20 @@ describe('config data paths', () => {
     vi.resetModules()
   })
 
+  it('defaults runtime data outside the source checkout', async () => {
+    const config = await loadConfigWithEnv({
+      MISSION_CONTROL_DATA_DIR: undefined,
+      MISSION_CONTROL_DB_PATH: undefined,
+      MISSION_CONTROL_TOKENS_PATH: undefined,
+      NEXT_PHASE: undefined,
+    })
+
+    const expectedDataDir = path.join(os.homedir(), '.mission-control', 'data')
+    expect(config.dataDir).toBe(expectedDataDir)
+    expect(config.dbPath).toBe(path.join(expectedDataDir, 'mission-control.db'))
+    expect(config.tokensPath).toBe(path.join(expectedDataDir, 'mission-control-tokens.json'))
+  })
+
   it('derives db and token paths from MISSION_CONTROL_DATA_DIR', async () => {
     const config = await loadConfigWithEnv({
       MISSION_CONTROL_DATA_DIR: '/tmp/mission-control-data',

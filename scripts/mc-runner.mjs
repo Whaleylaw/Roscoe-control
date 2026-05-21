@@ -45,7 +45,7 @@ import { spawn, spawnSync } from 'node:child_process'
 // Config resolution
 // ======================================================
 
-const DATA_DIR = process.env.MISSION_CONTROL_DATA_DIR || path.join(process.cwd(), '.data')
+const DATA_DIR = process.env.MISSION_CONTROL_DATA_DIR || path.join(os.homedir(), '.mission-control', 'data')
 const MC_URL = (process.env.MC_URL || 'http://127.0.0.1:3000').replace(/\/$/, '')
 const RUNNER_ID = process.env.RUNNER_ID || `runner-${os.hostname()}-${process.pid}`
 const HEARTBEAT_INTERVAL_MS = 10_000

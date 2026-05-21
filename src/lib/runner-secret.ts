@@ -17,7 +17,7 @@ import { logger } from './logger'
 // Documentation-only constant — callers should not hardcode the path.
 // The real location is resolved at runtime via `getRunnerSecretPath()` which
 // honors `config.dataDir` (so tests and alternate data dirs work correctly).
-export const RUNNER_SECRET_FILENAME = '.data/runner.secret'
+export const RUNNER_SECRET_FILENAME = 'runner.secret'
 
 function getRunnerSecretPath(): string {
   return path.join(config.dataDir, 'runner.secret')
@@ -105,7 +105,7 @@ export function ensureRunnerSecret(): string {
 
   fs.writeFileSync(secretPath, secret, { mode: 0o600 })
 
-  logger.info('Auto-generated runner secret (persisted to .data/runner.secret — mode 0600)')
+  logger.info({ path: secretPath }, 'Auto-generated runner secret (mode 0600)')
 
   return secret
 }

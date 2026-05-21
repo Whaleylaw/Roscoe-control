@@ -52,7 +52,7 @@ pnpm test:all         # lint + typecheck + test + build + e2e
 src/app/          Next.js pages + API routes (App Router)
 src/components/   UI panels and shared components
 src/lib/          Core logic, database, utilities
-.data/            SQLite database + runtime state (gitignored)
+$HOME/.mission-control/data/  Default SQLite database + runtime state (`.data/` remains supported only when explicitly configured)
 scripts/          Install, deploy, diagnostics scripts
 docs/             Documentation and guides
 ```
@@ -61,7 +61,7 @@ Path alias: `@/*` maps to `./src/*`
 
 ## Data Directory
 
-Set `MISSION_CONTROL_DATA_DIR` env var to change the data location (defaults to `.data/`).
+Set `MISSION_CONTROL_DATA_DIR` env var to change the data location (defaults to `$HOME/.mission-control/data`). Use `pnpm runtime:relocate-data` to move a legacy repo-local `.data/` directory out of the source checkout.
 Database path: defaults to `<MISSION_CONTROL_DATA_DIR>/mission-control.db`.
 
 ## Conventions
@@ -166,9 +166,9 @@ A full-takeover project workspace for Mission Control that elevates projects fro
 - `@scalar/api-reference-react` 0.8.x - OpenAPI interactive docs at `/docs`
 ## Configuration
 - All configuration via environment variables; see `.env.example` for full reference
-- On first run, `AUTH_SECRET` and `API_KEY` auto-generate and persist to `.data/.auto-generated`
+- On first run, `AUTH_SECRET` and `API_KEY` auto-generate and persist to `<data-dir>/.auto-generated`
 - Setup flow available at `http://localhost:3000/setup` (creates admin account)
-- Data directory: `MISSION_CONTROL_DATA_DIR` (defaults to `.data/`)
+- Data directory: `MISSION_CONTROL_DATA_DIR` (defaults to `$HOME/.mission-control/data`)
 - Database path: `MISSION_CONTROL_DB_PATH` (defaults to `<data-dir>/mission-control.db`)
 - `AUTH_USER` / `AUTH_PASS` / `AUTH_PASS_B64` - Seed admin account headlessly
 - `AUTH_SECRET` - Session signing key (auto-generated)
