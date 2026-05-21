@@ -156,6 +156,13 @@ A secondary build-tracing issue was also found in `src/app/api/super/os-users/ro
 
 The durable fix is to keep long-lived runtime state outside the source checkout by default at `$HOME/.mission-control/data`, provide a relocation script for legacy `.data/`, and expand standalone tracing excludes for local runtime/diagnostic directories.
 
+Browser-control testing found and fixed two additional production-only issues:
+
+- The Forgejo-published `@waypoint/folder-host` catalog loader uses an `import.meta.resolve` fallback when it cannot find the package catalog from its own runtime location. Next/Turbopack production bundling exposed that as `x.resolve is not a function` during live route start. Mission Control now passes an explicit local `@waypoint/core` catalog root and traces the catalog YAML into standalone output.
+- The LaunchAgent-backed standalone server needs `.next/static` and `public` copied into `.next/standalone`; otherwise the live browser sees unhydrated login HTML. The build script now runs `scripts/copy-standalone-assets.mjs` after `next build`.
+
+Live browser smoke at `http://127.0.0.1:3000` passed with project `65`, route `73`, materialized tasks `2414`–`2421`, and the Waypoint review tab showing `PACKAGE RUNTIME` plus `ROUTE NODES`. Evidence screenshots are under `dogfood-output/waypoint-browser-smoke-1779331466692/screenshots/`.
+
 ## Definition of done
 
 - Primary checkout `pnpm build` passes after relocating legacy repo-local `.data` to `$HOME/.mission-control/data`.

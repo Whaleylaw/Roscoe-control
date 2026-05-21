@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 import {
   loadBundledWaypointCatalog,
   type BundledWaypointCatalog,
@@ -32,8 +35,21 @@ export interface MissionControlWaypointCatalog {
   readonly referralPackage: MissionControlReferralPackageCatalog
 }
 
+function findLocalWaypointCoreCatalogRoot(): string | undefined {
+  const candidates = [
+    process.env.MISSION_CONTROL_WAYPOINT_CATALOG_ROOT,
+    join(process.cwd(), 'node_modules', '@waypoint', 'core'),
+    join(process.cwd(), '.next', 'standalone', 'node_modules', '@waypoint', 'core'),
+  ].filter((candidate): candidate is string => Boolean(candidate))
+
+  return candidates.find((candidate) => (
+    existsSync(join(candidate, 'quests')) && existsSync(join(candidate, 'recipes'))
+  ))
+}
+
 export async function loadMissionControlWaypointCatalog(): Promise<MissionControlWaypointCatalog> {
-  const bundled = await loadBundledWaypointCatalog()
+  const root = findLocalWaypointCoreCatalogRoot()
+  const bundled = await loadBundledWaypointCatalog(root ? { root } : {})
   const resolved = bundled.resolveQuestRecipes(REFERRAL_PACKAGE_QUEST_SLUG)
 
   if (!resolved.ok) {

@@ -342,6 +342,7 @@ export async function POST(
       return routesError(error.status, error.message)
     }
     if (error instanceof Error) {
+      logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/routes error')
       return routesError(400, error.message)
     }
     logger.error({ err: error }, 'POST /api/projects/[id]/waypoint/routes error')

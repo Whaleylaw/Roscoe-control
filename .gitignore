@@ -35,6 +35,7 @@ aegis/
 # Playwright
 test-results/
 playwright-report/
+dogfood-output/
 .tmp/
 .playwright-mcp/
 

@@ -4,6 +4,15 @@ const withNextIntl = require('next-intl/plugin')('./src/i18n/request.ts')
 const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: __dirname,
+  outputFileTracingIncludes: {
+    // The Waypoint catalog YAML is runtime data shipped inside @waypoint/core.
+    // The API passes an explicit root to avoid import.meta.resolve in the
+    // package loader, and standalone builds must copy these files with it.
+    '/*': [
+      './node_modules/@waypoint/core/quests/**/*',
+      './node_modules/@waypoint/core/recipes/**/*',
+    ],
+  },
   outputFileTracingExcludes: {
     // Exclude local runtime and diagnostic state from standalone tracing.
     // `.git` must be excluded so the self-update endpoint does not see the
